@@ -1,0 +1,37 @@
+{
+  "builders":
+  [
+    {
+      "type": "qemu",
+      "iso_url": "http://releases.ubuntu.com/18.04/ubuntu-18.04.4-live-server-amd64.iso",
+      "iso_checksum": "5c43d0b0ade0b554c2d51c85e5f0095b",
+      "iso_checksum_type": "md5",
+      "output_directory": "output_ubuntu_lts_test",
+      "shutdown_command": "echo 'packer' | sudo -S shutdown -P now",
+      "display": "none",
+      "disk_size": "5G",
+      "format": "qcow2",
+      "http_directory": "path/to/httpdir",
+      "accelerator": "none",
+      "vm_name": "vm_001",
+      "ssh_username": "ubuntu",
+      "ssh_password": "ubuntu",
+      "net_device": "virtio-net",
+      "disk_interface": "virtio",
+      "boot_wait": "300s",
+      "headless": "false",
+      "boot_command": [
+        "<esc><wait>",
+        "<esc><wait>",
+        "<enter><wait>",
+        "/install/vmlinuz<wait>",
+        " initrd=/install/initrd.gz",
+        " auto-install/enable=true",
+        " debconf/priority=critical",
+        " preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg<wait>",
+        " -- <wait>",
+        "<enter><wait>"
+      ]
+    }
+  ]
+}
