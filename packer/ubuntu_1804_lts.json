@@ -11,27 +11,32 @@
       "display": "none",
       "disk_size": "5G",
       "format": "qcow2",
-      "http_directory": "path/to/httpdir",
+      "http_directory": "/Users/terracskiens/Projects/git/homelab/packer/http/",
       "accelerator": "none",
       "vm_name": "vm_001",
       "ssh_username": "ubuntu",
       "ssh_password": "ubuntu",
       "net_device": "virtio-net",
       "disk_interface": "virtio",
-      "boot_wait": "300s",
+      "boot_wait": "240s",
       "headless": "false",
+      "floppy_files": [
+        "http/preseed.cfg"
+      ],
       "boot_command": [
         "<esc><wait>",
         "<esc><wait>",
         "<enter><wait>",
-        "/install/vmlinuz<wait>",
+        "/install/vmlinuz noapic",
         " initrd=/install/initrd.gz",
-        " auto-install/enable=true",
-        " debconf/priority=critical",
-        " preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg<wait>",
-        " -- <wait>",
-        "<enter><wait>"
-      ]
+        " file=/floppy/preseed.cfg",
+        " debian-installer=en_US auto locale=en_US kbd-chooser/method=us ",
+        " grub-installer/bootdev=/dev/vda<wait> ",
+        " fb=false debconf/frontend=noninteractive ",
+        " keyboard-configuration/modelcode=SKIP keyboard-configuration/layout=USA ",
+        " keyboard-configuration/variant=USA console-setup/ask_detect=false ",
+        " -- <enter>"
+       ]
     }
   ]
 }
