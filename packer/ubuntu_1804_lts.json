@@ -14,13 +14,13 @@
       ],
       "boot_command": [
         "<tab><leftCtrlOn>u<leftCtrlOff>",
-        "linux vga=788 initrd=initrd.gz ",
-        "auto-install/enable=true ",
-        "file=/floppy/preseed.cfg ",
-        "debian-installer/locale=en_US netcfg/choose_interface=auto ",
-        "initrd=/install/initrd.gz priority=critical ",
-        "quiet splash noprompt noshell auto=true ",
-        " -- <enter>"
+        "linux initrd=initrd.gz ",
+        "file=/floppy/preseed.cfg priority=critical ",
+        "oem-config/enable=true auto=true priority=critical ",
+        "debian-installer/locale=en_US keyboard-configuration/layoutcode=us ",
+        "ubiquity/reboot=true languagechooser/language-name=English ",
+        "countrychooser/shortlist=US localechooser/supported-locales=en_US.UTF-8 ",
+        "automatic-ubiquity  quiet splash noprompt noshell --- <enter>"
        ],
       "output_directory": "output_ubuntu_lts_test",
       "shutdown_command": "echo 'packer' | sudo -S shutdown -P now",
