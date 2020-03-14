@@ -3,34 +3,33 @@
   [
     {
       "type": "qemu",
-      "iso_url": "http://releases.ubuntu.com/18.04/ubuntu-18.04.4-live-server-amd64.iso",
-      "iso_checksum": "5c43d0b0ade0b554c2d51c85e5f0095b",
+      "iso_url": "http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/mini.iso",
+      "iso_checksum": "b0f1b9ea6f5ca113b851e7022199e05b",
+      "http_directory": "http/",
       "iso_checksum_type": "md5",
+      "boot_wait": "10s",
+      "boot_command": [
+        "<tab><leftCtrlOn>u<leftCtrlOff>",
+        "linux vga=788 initrd=initrd.gz ",
+        "auto-install/enable=true ",
+        "preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg ",
+        "preseed/url/checksum=36427dd9aeb1100f6766f6a95c8aa029 ",
+        "debian-installer/locale=en_US netcfg/choose_interface=auto ",
+        "initrd=/install/initrd.gz priority=critical ",
+        " -- <enter>"
+       ],
       "output_directory": "output_ubuntu_lts_test",
       "shutdown_command": "echo 'packer' | sudo -S shutdown -P now",
       "display": "none",
       "disk_size": "5G",
       "format": "qcow2",
-      "http_directory": "/Users/terracskiens/Projects/git/homelab/packer/http/",
       "accelerator": "none",
       "vm_name": "vm_001",
-      "ssh_username": "ubuntu",
-      "ssh_password": "ubuntu",
+      "ssh_username": "root",
+      "ssh_password": "p4ssW0rd",
       "net_device": "virtio-net",
       "disk_interface": "virtio",
-      "boot_wait": "240s",
-      "headless": "false",
-      "boot_command": [
-        "<esc><wait>",
-        "<esc><wait>",
-        "<enter><wait>",
-        " /install/vmlinuz noapic",
-        " initrd=/install/initrd.gz",
-        " auto-install/enable=true",
-        " debconf/priority=critical",
-        " preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg",
-        " -- <enter>"
-       ]
+      "headless": "false"
     }
   ]
 }
