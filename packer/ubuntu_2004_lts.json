@@ -3,8 +3,8 @@
   [
     {
       "type": "qemu",
-      "iso_url": "http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/installer-amd64/current/images/netboot/mini.iso",
-      "iso_checksum": "b0f1b9ea6f5ca113b851e7022199e05b",
+      "iso_url": "http://archive.ubuntu.com/ubuntu/dists/focal/main/installer-amd64/current/legacy-images/netboot/mini.iso",
+      "iso_checksum": "e5bf713621b43207dead707396da29f6",
       "http_directory": "http/",
       "iso_checksum_type": "md5",
       "boot_wait": "10s",
