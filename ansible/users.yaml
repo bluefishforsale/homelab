@@ -1,0 +1,35 @@
+---
+
+- name: all the user stuff
+  hosts: all
+  tasks:
+  - name: check for terrac
+    ansible.builtin.shell: id terrac
+    register: terrac_exists
+
+  - name: Add required base users
+    when: terrac_exists.rc != 0
+    user:
+      name: terrac
+      comment: Terrac Skiens
+      shell: /bin/zsh
+      uid: 11010
+      groups: sudo,docker
+      append: yes
+      generate_ssh_key: yes
+      ssh_key_bits: 2048
+      ssh_key_file: .ssh/id_rsa
+
+  - name: add existing terrac to groups
+    when: terrac_exists.rc == 0
+    become: yes
+    command: usermod -a -G "{{ item }}" terrac
+    with_items:
+      - docker
+      - sudo
+
+  - name: Authorized Keys for terrac
+    authorized_key:
+      user: terrac
+      state: present
+      key: https://github.com/bluefishforsale.keys
