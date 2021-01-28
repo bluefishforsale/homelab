@@ -1,17 +1,21 @@
 ---
+- name: check vars
+  ansible.builtin.shell: test -n "{{ user }}"
+  register: user_var_set
 
 - name: all the user stuff
   hosts: all
+  when: user_var_set.rc == 0
   tasks:
-  - name: check for terrac
-    ansible.builtin.shell: id terrac
-    register: terrac_exists
+  - name: check for "{{ user }}"
+    ansible.builtin.shell: id "{{ user }}"
+    register: "{{ user }}"_exists
 
   - name: Add required base users
-    when: terrac_exists.rc != 0
+    when: "{{ user }}"_exists.rc != 0
     user:
-      name: terrac
-      comment: Terrac Skiens
+      name: "{{ user }}"
+      comment: "{{ user }}"
       shell: /bin/zsh
       uid: 11010
       groups: sudo,docker
@@ -20,16 +24,16 @@
       ssh_key_bits: 2048
       ssh_key_file: .ssh/id_rsa
 
-  - name: add existing terrac to groups
-    when: terrac_exists.rc == 0
+  - name: add existing "{{ user }}" to groups
+    when: "{{ user }}"_exists.rc == 0
     become: yes
-    command: usermod -a -G "{{ item }}" terrac
+    command: usermod -a -G "{{ item }}" "{{ user }}"
     with_items:
       - docker
       - sudo
 
-  - name: Authorized Keys for terrac
+  - name: Authorized Keys for "{{ user }}"
     authorized_key:
-      user: terrac
+      user: "{{ user }}"
       state: present
       key: https://github.com/bluefishforsale.keys
