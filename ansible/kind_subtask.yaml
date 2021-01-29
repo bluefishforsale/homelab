@@ -1,0 +1,27 @@
+---
+- name: kind installed and in $PATH
+  shell: which kind
+  register: kind_installed
+
+- name: KIND clusters
+  when: kind_installed.rc == 0
+  block:
+  - name: copy KIND config template
+    copy:
+      src: files/kind_cluster_template.yaml
+      dest: kind_cluster_template.yaml
+
+  - name: KIND clusters create and stop
+    block:
+      - name: has the KIND cluster been created yet
+        shell: kind get clusters
+        register: kind_clusters
+      - name: create KIND {{ item }}
+        when:  item not in kind_clusters.stdout
+        command: kind create cluster --name "{{ item }}" --config kind_cluster_template.yaml
+      - name: is the docker container running?
+        shell: docker ps -q --no-trunc -fname='^{{ item }}'-control-plane$
+        register: docker_containers
+      - name: stop the KIND {{ item }}
+        when:  docker_containers.stdout | length > 0
+        command: docker stop "{{ docker_containers.stdout }}"
