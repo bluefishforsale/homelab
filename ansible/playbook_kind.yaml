@@ -1,11 +1,11 @@
 - name: KIND clusters
   hosts: all
   vars:
-    kind_types:
+    kind_clusters:
     - consul
     - istio
     - linkerd
   tasks:
     - name: Make KIND for each type of software
-      include_tasks: kind_subtask.yaml
-      loop: "{{ kind_types }}"
+      include_tasks: subtask_kind.yaml
+      loop: "{{ kind_clusters }}"

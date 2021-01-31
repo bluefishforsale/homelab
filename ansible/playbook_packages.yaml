@@ -3,7 +3,7 @@
   hosts: all
   tasks:
   - name: Seconds since last apt-get update
-    ansible.builtin.shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
+    shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
     register: apt_get_update_secs
 
   - name: base packages
@@ -67,6 +67,14 @@
           state: touch
           mode: 0755
 
+      - name: Download K9s
+        get_url:
+          url: https://github.com/derailed/k9s/releases/download/v0.24.2/k9s_Linux_x86_64.tar.gz
+          dest: /tmp/k9s.tgz
+
+      - name: k9s untar
+        command: tar -xf /tmp/k9s.tgz -C /usr/local/bin/ --mode=0755
+
   - name: enable and start all services
     become: yes
     systemd:
@@ -77,51 +85,3 @@
       enabled: yes
       state: started
       name: ssh
-
-  - name: login user specific
-    block:
-      - name: check oh_my_zsh installed
-        ansible.builtin.shell: test -d ~/.oh-my-zsh
-        register: oh_my_zsh_installed
-
-      - name: check p10k installed
-        ansible.builtin.shell: grep -q powerlevel10k ~/.zshrc
-        register: p10k_installed
-
-      - name: check ultimate vim installed
-        ansible.builtin.shell: test -d ~/.vim_runtime
-        register: ultimate_vim_installed
-
-      - name: oh my zsh
-        when: oh_my_zsh_installed.rc == 1
-        command: "{{ item }}"
-        with_items:
-        - curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o install.sh
-        - chmod +x ./install.sh
-        - ./install.sh
-        - rm ./install.sh
-
-      - name: powerlevel10k
-        when: p10k_installed.rc == 1
-        command: "{{ item }}"
-        with_items:
-        - git clone --depth=1 https://gitee.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
-
-      - name: Replace before the expression till the begin of the file (requires Ansible >= 2.4)
-        when: p10k_installed.rc == 1
-        ansible.builtin.replace:
-          path: ~/.zshrc
-          regexp: '^ZSH_THEME=.*$'
-          replace: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-
-      - name: p10k config
-        copy:
-          src: files/.p10k.zsh
-          dest: ~/.p10k.zsh
-
-      - name: ultimate vim
-        when: ultimate_vim_installed.rc != 0
-        command: "{{ item }}"
-        with_items:
-          - git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
-          - sh ~/.vim_runtime/install_awesome_vimrc.sh

@@ -1,0 +1,9 @@
+---
+- name: Loop over all users and call user_template playbook
+  hosts: all
+  vars_files:
+    - vars_users.yaml
+  tasks:
+    - name: iterate over the users list do identical setup for each
+      include_tasks: subtask_user.yaml
+      loop: "{{ user }}"

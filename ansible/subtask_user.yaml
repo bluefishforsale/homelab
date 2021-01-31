@@ -1,0 +1,80 @@
+---
+- name: check for user
+  shell: id "{{ item.name }}"
+  register: user_exists
+
+- name: Add required base users
+  when: user_exists.rc != 0
+  user:
+    name: "{{ item.name }}"
+    comment: "{{ item.First item.Last}}"
+    shell: /bin/zsh
+    group: "{{ item.name }}"
+    groups: "{{ item.groups }}"
+    append: yes
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+
+- name: Add github keys to "{{ item.name }}"
+  when:
+  authorized_key:
+    user: "{{ item.name }}"
+    state: present
+    key: "https://github.com/{{ item.github }}.keys"
+
+- name: check oh_my_zsh installed
+  ansible.builtin.shell: test -d ~/.oh-my-zsh
+  register: oh_my_zsh_installed
+
+- name: check p10k installed
+  ansible.builtin.shell: grep -q powerlevel10k ~/.zshrc
+  register: p10k_installed
+
+- name: check ultimate vim installed
+  ansible.builtin.shell: test -d ~/.vim_runtime
+  register: ultimate_vim_installed
+
+- name: oh my zsh
+  when: oh_my_zsh_installed.rc == 1
+  command: "{{ item.name }}"
+  with_items:
+  - curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o install.sh
+  - chmod +x ./install.sh
+  - ./install.sh
+  - rm ./install.sh
+
+- name: powerlevel10k
+  when: p10k_installed.rc == 1
+  command: "{{ item.name }}"
+  with_items:
+  - git clone --depth=1 https://gitee.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+
+- name: Replace before the expression till the begin of the file (requires Ansible >= 2.4)
+  when: p10k_installed.rc == 1
+  ansible.builtin.replace:
+    path: ~/.zshrc
+    regexp: '^ZSH_THEME=.*$'
+    replace: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+
+- name: p10k config
+  copy:
+    src: files/p10k.zsh
+    dest: ~/.p10k.zsh
+
+- name: ultimate vim
+  when: ultimate_vim_installed.rc != 0
+  command: "{{ item.name }}"
+  with_items:
+    - git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
+    - sh ~/.vim_runtime/install_awesome_vimrc.sh
+
+- name: tmux conf
+  copy:
+    src: files/tmux.conf
+    dest: ~/.tmux.conf
+
+- name: Glances conf
+  copy:
+    src: files/glances.conf
+    dest: ~/.config/glances/glances.conf
