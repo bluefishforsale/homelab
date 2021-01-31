@@ -16,7 +16,7 @@
     - name: Install a suite of common tools
       apt:
         pkg:
-          [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux ]
+          [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux, glances ]
 
     - name: Virtualization software
       apt:
@@ -31,7 +31,7 @@
         apt:
           state: present
           pkg:
-            [ apt-transport-https, ca-certificates, curl, gnupg-agent, software-properties-common ]
+            [ apt-transport-https, ca-certificates, curl, gnupg2, gnupg-agent, software-properties-common ]
 
       - name: add the docker apt-key
         apt_key:
@@ -75,13 +75,36 @@
       - name: k9s untar
         command: tar -xf /tmp/k9s.tgz -C /usr/local/bin/ --mode=0755
 
+      - name: add the kubectl apt-key
+        apt_key:
+          url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+
+      - name: adding the kubectl repo
+        apt_repository:
+          repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+          state: present
+
+      - name: apt-get update
+        apt: update_cache=yes
+
+      - name: docker packages
+        apt:
+          state: present
+          pkg: kubectl
+
+      - name: install Kubectx
+        command: "{{ item }}"
+        become: yes
+        with_items:
+          - curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
+          - chmod +x /usr/local/bin/kubectx
+
   - name: enable and start all services
     become: yes
     systemd:
       enabled: yes
       state: started
-      name: docker
-    systemd:
-      enabled: yes
-      state: started
-      name: ssh
+      name: "{{ item }}"
+    with_items:
+      - docker
+      - ssh
