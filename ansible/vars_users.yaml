@@ -4,8 +4,3 @@ user:
     Last: Skiens
     groups: [sudo, docker]
     github: bluefishforsale
-  - name: carret
-    First: Carret
-    Last: Sneiks
-    groups: [sudo, docker]
-    github: bluefishforsale

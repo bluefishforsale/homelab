@@ -1,4 +1,7 @@
-192.168.1.101
-192.168.1.102
-192.168.1.103
-virtual.local
+[virtualbox]
+virtual.local  ansible_connection=ssh        ansible_user=terrac
+
+[upsquared]
+192.168.1.101 ansible_connection=ssh  ansible_user=ubuntu
+192.168.1.102 ansible_connection=ssh  ansible_user=ubuntu
+192.168.1.103 ansible_connection=ssh  ansible_user=ubuntu

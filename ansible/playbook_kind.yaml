@@ -1,4 +1,4 @@
-- name: KIND clusters
+- name: KIND
   hosts: all
   vars:
     kind_clusters:
@@ -6,6 +6,15 @@
     - istio
     - linkerd
   tasks:
-    - name: Make KIND for each type of software
-      include_tasks: subtask_kind.yaml
-      loop: "{{ kind_clusters }}"
+    - name: install KIND
+      get_url:
+        url: https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64
+        dest: /usr/local/bin/kind
+
+    - name: KIND exec perms
+      file:
+        path: /usr/local/bin/kind
+        state: touch
+        mode: 0755    - name: Make KIND for each type of software
+    include_tasks: subtask_kind.yaml
+    loop: "{{ kind_clusters }}"

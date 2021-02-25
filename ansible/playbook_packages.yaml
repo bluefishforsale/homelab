@@ -16,95 +16,64 @@
     - name: Install a suite of common tools
       apt:
         pkg:
-          [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux, glances ]
+          [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip]
 
     - name: Virtualization software
       apt:
         state: present
         pkg:
-          [ qemu ]
+          [ virtualbox, libvirt-bin, ]
 
-  - name: docker.io
+  - name: Download K9s
+    get_url:
+      url: https://github.com/derailed/k9s/releases/download/v0.24.2/k9s_Linux_x86_64.tar.gz
+      force: yes
+      dest: /tmp/k9s.tgz
+
+  - name: k9s untar
     become: yes
-    block:
-      - name: packages needed to get started
-        apt:
-          state: present
-          pkg:
-            [ apt-transport-https, ca-certificates, curl, gnupg2, gnupg-agent, software-properties-common ]
+    become_user: root
+    command: tar -xf /tmp/k9s.tgz -C /usr/local/bin/ --mode=0755
 
-      - name: add the docker apt-key
-        apt_key:
-          url: https://download.docker.com/linux/ubuntu/gpg
-
-      - name: adding the repo
-        apt_repository:
-          repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
-          state: present
-
-      - name: apt-get update
-        apt: update_cache=yes
-
-      - name: docker packages
-        apt:
-          state: present
-          pkg:
-            [ docker-ce, docker-ce-cli, containerd.io ]
-
-      - name: test docker run
-        command: "{{ item }}"
-        with_items:
-        - docker run --rm hello-world
-
-      - name: install KIND
-        get_url:
-          url: https://kind.sigs.k8s.io/dl/v0.9.0/kind-linux-amd64
-          dest: /usr/local/bin/kind
-
-      - name: KIND exec perms
-        file:
-          path: /usr/local/bin/kind
-          state: touch
-          mode: 0755
-
-      - name: Download K9s
-        get_url:
-          url: https://github.com/derailed/k9s/releases/download/v0.24.2/k9s_Linux_x86_64.tar.gz
-          dest: /tmp/k9s.tgz
-
-      - name: k9s untar
-        command: tar -xf /tmp/k9s.tgz -C /usr/local/bin/ --mode=0755
-
-      - name: add the kubectl apt-key
-        apt_key:
-          url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-
-      - name: adding the kubectl repo
-        apt_repository:
-          repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
-          state: present
-
-      - name: apt-get update
-        apt: update_cache=yes
-
-      - name: docker packages
-        apt:
-          state: present
-          pkg: kubectl
-
-      - name: install Kubectx
-        command: "{{ item }}"
-        become: yes
-        with_items:
-          - curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
-          - chmod +x /usr/local/bin/kubectx
-
-  - name: enable and start all services
+  - name: add the kubectl apt-key
     become: yes
+    become_user: root
+    apt_key:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+
+  - name: adding the kubectl repo
+    become: yes
+    become_user: root
+    apt_repository:
+      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+
+  - name: apt-get update
+    become: yes
+    become_user: root
+    apt: update_cache=yes
+
+  - name: install kubectl
+    become: yes
+    become_user: root
+    apt:
+      state: present
+      pkg: kubectl
+
+  - name: install Kubectx
+    command: "{{ item }}"
+    become: yes
+    become_user: root
+    with_items:
+      - curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
+      - chmod +x /usr/local/bin/kubectx
+
+  - name: Enable and Start all services
+    become: yes
+    become_user: root
     systemd:
       enabled: yes
       state: started
       name: "{{ item }}"
     with_items:
-      - docker
       - ssh
