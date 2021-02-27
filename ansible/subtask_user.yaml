@@ -7,6 +7,7 @@
       user: '{{ item }}'
 
   - name: check for user
+    changed_when: false
     shell: id "{{ user.name }}"
     register: user_exists
 
@@ -29,76 +30,85 @@
       state: present
       key: "https://github.com/{{ user.github }}.keys"
 
-  - name: Passwordless Sudo for the Sudo Group (is this safe to re-run?)
-    lineinfile:
-      path: /etc/sudoers
-      state: present
-      regexp: '^%sudo'
-      line: '%sudo ALL=(ALL) NOPASSWD: ALL'
-      validate: 'visudo -cf %s'
-
 - name: Installed as the user
   become: yes
   become_user: "{{ user.name }}"
+  ignore_errors: yes
   block:
+
   - name: check oh_my_zsh installed
-    ansible.builtin.shell: test -d ~{{ user.name }}/.oh-my-zsh
+    changed_when: false
+    stat:
+      path: ~{{ user.name }}/.oh-my-zsh
     register: oh_my_zsh_installed
 
+  - name: print vars
+    ansible.builtin.debug:
+      msg: "{{ oh_my_zsh_installed }}"
+
+  - name: install oh my zsh
+    changed_when: false
+    when: oh_my_zsh_installed.stat.isdir == 'false'
+    command: "{{ local_item }}"
+    with_items:
+    - curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh
+    loop_control:
+      loop_var: local_item
+
   - name: check p10k installed
-    ansible.builtin.shell: grep -q powerlevel10k ~{{ user }}/.zshrc
+    changed_when: false
+    shell: grep powerlevel10k ~{{ user.name }}/.zshrc | echo
     register: p10k_installed
 
-  - name: check ultimate vim installed
-    ansible.builtin.shell: test -d ~{{ user.name }}/vim_runtime
-    register: ultimate_vim_installed
+  - name: install powerlevel10k
+    when: not p10k_installed.stdout
+    git:  repo=https://gitee.com/romkatv/powerlevel10k.git
+          dest=~{{ user.name }}/.oh-my-zsh/custom/themes/powerlevel10k
+          accept_hostkey=yes
+          force=yes
+          depth=1
 
-  - name: oh my zsh
-    when: oh_my_zsh_installed.rc == 1
-    become: yes
-    become_user: "{{ user.name }}"
-    command: "{{ item.name }}"
-    with_items:
-    - curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o install.sh
-    - chmod +x ./install.sh
-    - ./install.sh
-    - rm ./install.sh
-
-  - name: powerlevel10k
-    when: p10k_installed.rc == 1
-    command: "{{ item.name }}"
-    with_items:
-    - git clone --depth=1 https://gitee.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
-
-  - name: Replace before the expression till the begin of the file (requires Ansible >= 2.4)
-    when: p10k_installed.rc == 1
+  - name: Set p10k THEME in .zshrc
+    when: not p10k_installed.stdout
     lineinfile:
-      path: "{{ user.name }}/.zshrc"
+      path: ~{{ user.name }}/.zshrc
       state: present
       backrefs: yes
       regexp: '^ZSH_THEME=.*$'
       line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
       line: \g<1>:{{ }}
-      validate: "source {{ user.name }}/.zshrc"
+      validate: source ~{{ user.name }}/.zshrc
 
-  - name: p10k config
+  - name: p10k config and state
+    when: not p10k_installed.stdout
     copy:
       src: files/p10k.zsh
-      dest: ~/.p10k.zsh
+      dest: ~{{ user.name }}/.p10k.zsh
+
+  - name: check ultimate vim installed
+    changed_when: false
+    stat:
+     path: ~{{ user.name }}/.vim_runtime
+    register: ultimate_vim_installed
 
   - name: ultimate vim
-    when: ultimate_vim_installed.rc != 0
-    command: "{{ item.name }}"
+    when: not ultimate_vim_installed.stat.isdir is defined
+    command: "{{ local_item }}"
     with_items:
-      - git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
-      - sh ~/.vim_runtime/install_awesome_vimrc.sh
+      - git clone --depth=1 https://github.com/amix/vimrc.git ~{{ user.name }}/.vim_runtime
+      - sh ~{{ user.name }}/.vim_runtime/install_awesome_vimrc.sh
+    loop_control:
+      loop_var: local_item
 
   - name: tmux conf
     copy:
       src: files/tmux.conf
-      dest: ~/.tmux.conf
+      dest: ~{{ user.name }}/.tmux.conf
+
+  - name: Ensures ~{{ user.name }}/.config/glances/ path exists
+    file: path=~{{ user.name }}/.config/glances/ state=directory
 
   - name: Glances conf
     copy:
       src: files/glances.conf
-      dest: ~/.config/glances/glances.conf
+      dest: ~{{ user.name }}/.config/glances/glances.conf
