@@ -10,70 +10,10 @@
     become: yes
     block:
     - name: apt-get update
-      when: apt_get_update_secs.stdout|int > 1800
+      # when: apt_get_update_secs.stdout|int > 1800
       apt: update_cache=yes
 
     - name: Install a suite of common tools
       apt:
         pkg:
           [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip]
-
-    - name: Virtualization software
-      apt:
-        state: present
-        pkg:
-          [ virtualbox, libvirt-bin, ]
-
-  - name: Download K9s
-    get_url:
-      url: https://github.com/derailed/k9s/releases/download/v0.24.2/k9s_Linux_x86_64.tar.gz
-      force: yes
-      dest: /tmp/k9s.tgz
-
-  - name: k9s untar
-    become: yes
-    become_user: root
-    command: tar -xf /tmp/k9s.tgz -C /usr/local/bin/ --mode=0755
-
-  - name: add the kubectl apt-key
-    become: yes
-    become_user: root
-    apt_key:
-      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-
-  - name: adding the kubectl repo
-    become: yes
-    become_user: root
-    apt_repository:
-      repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
-      state: present
-
-  - name: apt-get update
-    become: yes
-    become_user: root
-    apt: update_cache=yes
-
-  - name: install kubectl
-    become: yes
-    become_user: root
-    apt:
-      state: present
-      pkg: kubectl
-
-  - name: install Kubectx
-    command: "{{ item }}"
-    become: yes
-    become_user: root
-    with_items:
-      - curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
-      - chmod +x /usr/local/bin/kubectx
-
-  - name: Enable and Start all services
-    become: yes
-    become_user: root
-    systemd:
-      enabled: yes
-      state: started
-      name: "{{ item }}"
-    with_items:
-      - ssh

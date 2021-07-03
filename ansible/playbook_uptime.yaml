@@ -1,0 +1,7 @@
+- name: Hello World
+  hosts: all
+  tasks:
+    - name: hostname
+      command: hostname
+    - name: uptime
+      command: uptime

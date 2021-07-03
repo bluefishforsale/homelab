@@ -30,10 +30,17 @@
         backrefs: yes
         regexp: ^(PATH=.*)
         line: \g<1>:{{ containerd_path }}
-        validate: "source /etc/environment"
+        validate: "stat %s"
 
     - name: generate vanilla containerd config
-      shell: containerd config default > /etc/containerd/config.toml
+      shell: containerd config default
+      register: containerd_config
+
+    - name: generate vanilla containerd config
+      when: containerd_config.stdout | length > 0
+      copy:
+        content: "{{ containerd_config.stdout }}"
+        dest: /etc/containerd/config.toml
 
     - name: discover Containerd unit file
       shell: systemctl daemon-reload
@@ -43,3 +50,27 @@
         enabled: yes
         state: started
         name: containerd
+
+    - name: Install a suite of common tools
+      apt:
+        pkg:
+          - kubelet
+          - kubeadm
+          - kubectl
+
+    - name: swapp-off fstab
+      shell: sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+    - name: swapp-off command
+      shell: swapoff -a
+
+    - name: overlay br_netfilter
+      shell: modprobe overlay br_netfilter
+
+    - name: kube-sysctls
+      copy:
+        src: files/sysctl.d_kubernetes.conf
+        dest: /etc/sysctl.d/kubernetes.conf
+
+    - name: sysctl reload
+      shell: sysctl --system

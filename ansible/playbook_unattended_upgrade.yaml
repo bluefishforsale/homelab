@@ -1,0 +1,7 @@
+- name: unattended upgrade
+  hosts: all
+  tasks:
+    - name: unattended upgrade
+      become: yes
+      become_user: root
+      command: unattended-upgrade
