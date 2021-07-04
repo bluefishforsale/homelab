@@ -1,13 +1,10 @@
 [virtualbox]
 virtual.local  ansible_connection=ssh        ansible_user=terrac
 
-[upsquared-ip]
-192.168.1.100 ansible_connection=ssh  ansible_user=ubuntu
-192.168.1.101 ansible_connection=ssh  ansible_user=ubuntu
-192.168.1.102 ansible_connection=ssh  ansible_user=ubuntu
-192.168.1.103 ansible_connection=ssh  ansible_user=ubuntu
+[pi]
+192.168.1.2 ansible_connection=ssh  ansible_user=ubuntu
 
-[upsquared-dns]
+[up2]
 node000.local ansible_connection=ssh  ansible_user=ubuntu
 node001.local ansible_connection=ssh  ansible_user=ubuntu
 node002.local ansible_connection=ssh  ansible_user=ubuntu

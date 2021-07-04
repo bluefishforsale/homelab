@@ -1,0 +1,52 @@
+acl localnet {
+  //localhost
+  127.0.0.1;
+
+  //local IPv4 LAN
+  192.168.1.0/24;
+ };
+
+ options {
+  directory "/var/cache/bind";
+
+  // If your ISP provided one or more IP addresses for stable
+  // nameservers, you probably want to use them as forwarders.
+  // Uncomment the following block, and insert the addresses replacing
+  // the all-0's placeholder.
+
+  forwarders {
+    50.0.1.1;
+    8.8.8.8;
+    50.0.2.2;
+    1.1.1.1;
+  };
+
+  allow-query {
+    any;
+    localnet;
+  };
+
+  allow-query-cache {
+    localnet;
+  };
+
+  recursion yes;
+
+  allow-recursion {
+    localnet;
+  };
+
+  allow-transfer {
+    localnet;
+  };
+
+  //========================================================================
+  // If BIND logs error messages about the root key being expired,
+  // you will need to update your keys. See https://www.isc.org/bind-keys
+  //========================================================================
+  dnssec-enable no;
+  // dnssec-validation auto;
+
+  auth-nxdomain no;  # conform to RFC1035
+  listen-on-v6 { any; };
+ };

@@ -1,0 +1,15 @@
+$ORIGIN  1.168.192.in-addr.arpa.
+$TTL 86400 ; 1 day
+
+@ IN SOA dns01.local. dnsadmin.local. (
+      2021010103  ; serial
+      3600        ; refresh (1 hours)
+      3600        ; retry (1 hour)
+      3600        ; expire (1 hour)
+      3600        ; minimum (1 hour)
+)
+
+@       IN        NS          dns01.local.
+1       IN        PTR         gw.local.
+2       IN        PTR         dns01.local.
+3       IN        PTR         dns02.local.

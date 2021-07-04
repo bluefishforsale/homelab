@@ -57,13 +57,13 @@
       shell: containerd config default
       register: containerd_config
 
-    # - name: mkdir /etc/containerd
-    #   file:
-    #     path: /etc/containerd
-    #     state: directory
-    #     owner: root
-    #     group: root
-    #     mode: 1755
+    - name: mkdir /etc/containerd
+      file:
+        path: /etc/containerd
+        state: directory
+        owner: root
+        group: root
+        mode: 1755
 
     - name: generate vanilla containerd config
       when: containerd_config.stdout | length > 0

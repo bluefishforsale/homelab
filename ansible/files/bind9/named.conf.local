@@ -1,0 +1,13 @@
+include "/etc/bind/rndc.key";
+
+zone "local" {
+  type master;
+  file "/var/lib/bind/local.zone";
+  allow-update { key rndc-key; };
+};
+
+zone "1.168.192.in-addr.arpa" {
+  type master;
+  file "/var/lib/bind/db.rev.1.168.192.in-addr.arpa";
+  allow-update { key rndc-key; };
+};
