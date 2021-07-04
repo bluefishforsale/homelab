@@ -1,6 +1,9 @@
 ---
 - name: root and system level
   hosts: all
+  vars:
+    new_paths: '/usr/local/go/bin'
+
   tasks:
   - name: Seconds since last apt-get update
     shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
@@ -16,4 +19,23 @@
     - name: Install a suite of common tools
       apt:
         pkg:
-          [ zsh, wget, curl, htop, nmap, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip]
+          [ golang, gcc, zsh, wget, curl, htop, nmap, make, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip]
+
+    # - name: golang-src
+    #   unarchive:
+    #     remote_src: yes
+    #     src: https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
+    #     dest:  /usr/local
+
+
+    - name: old_paths
+      shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
+      register: old_paths
+
+    - name: add go to the environment PATH
+      lineinfile:
+        path: /etc/environment
+        state: present
+        backrefs: yes
+        regexp: '^PATH=.*'
+        line: 'PATH={{ old_paths.stdout }}:{{ new_paths }}'

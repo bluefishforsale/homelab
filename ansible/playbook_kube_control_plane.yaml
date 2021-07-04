@@ -1,63 +1,18 @@
 - name: Kubernetes And all related tools
+  become: yes
   hosts: all
+  vars:
+    containerd_install: '/usr/local/src/'
   tasks:
-  - name: Seconds since last apt-get update
-    shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
-    register: apt_get_update_secs
 
-  - name: Kubernetes.io
-    become: yes
+  - name: System
     block:
-    - name: Download containerd
-      get_url:
-        url: https://github.com/containerd/containerd/archive/v1.4.3.zip
-        dest: /tmp/containerd.zip
 
-    - name: containerd unzip
-      command:  unzip -o /tmp/containerd.zip -d /usr/local
+    - name: Seconds since last apt-get update
+      shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
+      register: apt_get_update_secs
 
-    - name: copy systemd unit file to proper place
-      shell: cp /usr/local/containerd*/containerd.service /etc/systemd/system
-
-    - name: latest version of containerd path
-      shell: find /usr/local/ -maxdepth 1 -type d -name "containerd*" | sort | tail -n1
-      register: containerd_path
-
-    - name: add containerd location to path
-      lineinfile:
-        path: /etc/environment
-        state: present
-        backrefs: yes
-        regexp: ^(PATH=.*)
-        line: \g<1>:{{ containerd_path }}
-        validate: "stat %s"
-
-    - name: generate vanilla containerd config
-      shell: containerd config default
-      register: containerd_config
-
-    - name: generate vanilla containerd config
-      when: containerd_config.stdout | length > 0
-      copy:
-        content: "{{ containerd_config.stdout }}"
-        dest: /etc/containerd/config.toml
-
-    - name: discover Containerd unit file
-      shell: systemctl daemon-reload
-
-    - name: Enable and Start Containerd
-      systemd:
-        enabled: yes
-        state: started
-        name: containerd
-
-    - name: Install a suite of common tools
-      apt:
-        pkg:
-          - kubelet
-          - kubeadm
-          - kubectl
-
+    # host level switches and all that
     - name: swapp-off fstab
       shell: sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 
@@ -67,10 +22,79 @@
     - name: overlay br_netfilter
       shell: modprobe overlay br_netfilter
 
+
+  - name: ContainerD
+    block:
+
+    - name: apt packages needed for containerd
+      apt:
+        pkg:
+          [ golang, gcc, containerd ]
+
+    # - name: containerd-untar
+    #   unarchive:
+    #     remote_src: yes
+    #     src: https://github.com/containerd/containerd/archive/v1.5.2.zip
+    #     dest: "{{containerd_install}}"
+
+    # - name: latest containerd path
+    #   shell: find "{{containerd_install}}" -maxdepth 1 -type d -name "containerd*" | sort | tail -n1
+    #   register: containerd_path
+
+    # - name: make
+    #   shell:
+    #     chdir: "{{containerd_path.stdout}}"
+    #     cmd: make && make install
+
+    # - name: link systemd service to proper place
+    #   shell: ln -sf "{{ containerd_path.stdout }}/containerd.service" /etc/systemd/system
+
+    # - name: old_paths
+    #   shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
+    #   register: old_paths
+
+    - name: generate vanilla containerd config
+      shell: containerd config default
+      register: containerd_config
+
+    # - name: mkdir /etc/containerd
+    #   file:
+    #     path: /etc/containerd
+    #     state: directory
+    #     owner: root
+    #     group: root
+    #     mode: 1755
+
+    - name: generate vanilla containerd config
+      when: containerd_config.stdout | length > 0
+      copy:
+        content: "{{ containerd_config.stdout }}"
+        dest: /etc/containerd/config.toml
+
+    - name: daemon-reload
+      shell: systemctl daemon-reload
+
+    - name: Enable and Start Containerd
+      systemd:
+        enabled: yes
+        state: started
+        name: containerd
+
+    - name: Kubernetes.io tooling
+      apt:
+        pkg:
+          [ kubelet, kubeadm, kubectl ]
+
+  - name: Kubernetes
+    block:
+
     - name: kube-sysctls
       copy:
-        src: files/sysctl.d_kubernetes.conf
+        src: sysctl.d_kubernetes.conf
         dest: /etc/sysctl.d/kubernetes.conf
+
+    - name: daemon-reload
+      shell: systemctl daemon-reload
 
     - name: sysctl reload
       shell: sysctl --system
