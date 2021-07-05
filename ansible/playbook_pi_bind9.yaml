@@ -15,14 +15,14 @@
     - name: bind and tools
       apt:
         pkg:
-          [ isc-dhcp-server, bind9, bind9utils, dnsutils]
+          [ bind9, bind9utils, dnsutils]
 
     - name: rndc-key-check
       shell: cat /etc/bind/rndc.key
       register: rndc_keyfile
 
     - name: rndc-key-write
-      when: rndc_keyfile.stdout | length > 0
+      when: rndc_keyfile.stdout | length <= 0
       shell: rndc-confgen -a -b 512
 
     - name: configs
@@ -57,7 +57,6 @@
 
     - name: Config Check
       shell: named-checkconf
-
 
   - name: restart bind9
     shell: systemctl restart bind9
