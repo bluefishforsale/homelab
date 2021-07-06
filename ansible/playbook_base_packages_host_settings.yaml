@@ -19,14 +19,7 @@
     - name: Install a suite of common tools
       apt:
         pkg:
-          [ golang, gcc, zsh, wget, curl, htop, nmap, make, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip]
-
-    # - name: golang-src
-    #   unarchive:
-    #     remote_src: yes
-    #     src: https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
-    #     dest:  /usr/local
-
+          [ golang, gcc, zsh, wget, curl, htop, nmap, make, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip, ntpdate]
 
     - name: old_paths
       shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
@@ -39,3 +32,19 @@
         backrefs: yes
         regexp: '^PATH=.*'
         line: 'PATH={{ old_paths.stdout }}:{{ new_paths }}'
+
+  - name: Set the Host TZ and hwclock to UTC
+    community.general.timezone:
+      hwclock: UTC
+      name: UTC
+
+  - name: copy ntpdate cron
+    copy:
+      src: files/crons/ntpdate.cron
+      dest: /etc/cron.d/cron.ntpdate
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: set time and date from NTP upstream
+    shell: /usr/sbin/ntpdate time.nist.gov 

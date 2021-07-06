@@ -4,3 +4,8 @@ user:
     Last: Skiens
     groups: [sudo, docker]
     github: bluefishforsale
+  - name: ubuntu
+    First: ubuntu
+    Last: ubuntu
+    groups: [sudo, docker]
+    github: bluefishforsale

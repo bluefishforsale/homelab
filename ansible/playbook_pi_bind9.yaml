@@ -1,5 +1,5 @@
 ---
-- name: root and system level
+- name: Childs Play™ (the movie)
   hosts: all
   vars:
     dummy: Null
@@ -17,13 +17,14 @@
         pkg:
           [ bind9, bind9utils, dnsutils]
 
-    - name: rndc-key-check
-      shell: cat /etc/bind/rndc.key
-      register: rndc_keyfile
+    # - name: rndc-key-check
+    #   shell: cat /etc/bind/rndc.key
+    #   register: rndc_keyfile
 
     - name: rndc-key-write
-      when: rndc_keyfile.stdout | length <= 0
-      shell: rndc-confgen -a -b 512
+      shell:
+        creates: /etc/bind/rndc.key
+        cmd: rndc-confgen -a -b 512
 
     - name: configs
       copy:
@@ -52,11 +53,17 @@
         group: bind
         mode: 0644
       with_items:
-        - local.zone
+        - home.zone
         - db.rev.1.168.192.in-addr.arpa
 
     - name: Config Check
       shell: named-checkconf
 
-  - name: restart bind9
-    shell: systemctl restart bind9
+    - name: Check home zone
+      shell: named-checkzone  home /var/lib/bind/home.zone
+
+    - name: Check reverse mapping zone
+      shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
+
+    - name: restart bind9
+      shell: systemctl restart bind9

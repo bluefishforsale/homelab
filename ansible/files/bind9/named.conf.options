@@ -27,16 +27,19 @@ acl localnet {
   };
 
   allow-query-cache {
+    any;
     localnet;
   };
 
   recursion yes;
 
   allow-recursion {
+    any;
     localnet;
   };
 
   allow-transfer {
+    any;
     localnet;
   };
 

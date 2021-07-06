@@ -31,28 +31,6 @@
         pkg:
           [ golang, gcc, containerd ]
 
-    # - name: containerd-untar
-    #   unarchive:
-    #     remote_src: yes
-    #     src: https://github.com/containerd/containerd/archive/v1.5.2.zip
-    #     dest: "{{containerd_install}}"
-
-    # - name: latest containerd path
-    #   shell: find "{{containerd_install}}" -maxdepth 1 -type d -name "containerd*" | sort | tail -n1
-    #   register: containerd_path
-
-    # - name: make
-    #   shell:
-    #     chdir: "{{containerd_path.stdout}}"
-    #     cmd: make && make install
-
-    # - name: link systemd service to proper place
-    #   shell: ln -sf "{{ containerd_path.stdout }}/containerd.service" /etc/systemd/system
-
-    # - name: old_paths
-    #   shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
-    #   register: old_paths
-
     - name: generate vanilla containerd config
       shell: containerd config default
       register: containerd_config
@@ -63,7 +41,7 @@
         state: directory
         owner: root
         group: root
-        mode: 1755
+        mode: 0755
 
     - name: generate vanilla containerd config
       when: containerd_config.stdout | length > 0
@@ -79,6 +57,9 @@
         enabled: yes
         state: started
         name: containerd
+
+  - name: Kubelet and Kubeadm
+    block:
 
     - name: Kubernetes.io tooling
       apt:

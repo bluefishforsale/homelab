@@ -50,18 +50,19 @@
         mode: 0644
       with_items:
         - /etc/dhcp/dhcpd.conf
+        - /etc/dhcp/kube-nodes.conf
         - /etc/default/isc-dhcp-server
 
-  - name: Enable and Start service
-    become: yes
-    become_user: root
-    systemd:
-      enabled: yes
-      state: started
-      name: "{{ item }}"
-    with_items:
-      - isc-dhcp-server
+    - name: Enable and Start service
+      become: yes
+      become_user: root
+      systemd:
+        enabled: yes
+        state: started
+        name: "{{ item }}"
+      with_items:
+        - isc-dhcp-server
 
-# kick the service, maybe this is NOT the first run?
-  - name: restart service
-    shell: systemctl restart isc-dhcp-server
+  # kick the service, maybe this is NOT the first run?
+    - name: restart service
+      shell: systemctl restart isc-dhcp-server
