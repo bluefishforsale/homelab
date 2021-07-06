@@ -1,0 +1,50 @@
+$ORIGIN home.
+$TTL 86400 ; 1 day
+
+@ IN SOA dns01.home. dnsadmin.home. (
+      2021070506    ; serial
+      3600          ; refresh (1 hours)
+      3600          ; retry (1 hour)
+      3600          ; expire (1 hour)
+      3600          ; minimum (1 hour)
+)
+
+@                 IN          NS    dns01.home.
+
+gw                IN          A     192.168.1.1
+dns01             IN          A     192.168.1.2
+dns02             IN          A     192.168.1.3
+
+node000		IN		A	192.168.1.100
+node001		IN		A	192.168.1.101
+node002		IN		A	192.168.1.102
+node003		IN		A	192.168.1.103
+node004		IN		A	192.168.1.104
+node005		IN		A	192.168.1.105
+node006		IN		A	192.168.1.106
+node007		IN		A	192.168.1.107
+node008		IN		A	192.168.1.108
+node009		IN		A	192.168.1.109
+node010		IN		A	192.168.1.110
+node011		IN		A	192.168.1.111
+node012		IN		A	192.168.1.112
+node013		IN		A	192.168.1.113
+node014		IN		A	192.168.1.114
+node015		IN		A	192.168.1.115
+node016		IN		A	192.168.1.116
+node017		IN		A	192.168.1.117
+node018		IN		A	192.168.1.118
+node019		IN		A	192.168.1.119
+node020		IN		A	192.168.1.120
+node021		IN		A	192.168.1.121
+node022		IN		A	192.168.1.122
+node023		IN		A	192.168.1.123
+node024		IN		A	192.168.1.124
+node025		IN		A	192.168.1.125
+node026		IN		A	192.168.1.126
+node027		IN		A	192.168.1.127
+node028		IN		A	192.168.1.128
+node029		IN		A	192.168.1.129
+node030		IN		A	192.168.1.130
+node031		IN		A	192.168.1.131
+node032		IN		A	192.168.1.132
