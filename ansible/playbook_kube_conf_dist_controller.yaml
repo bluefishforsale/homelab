@@ -1,5 +1,5 @@
-- name: Push-it Worker Ediition
-  hosts: k8s_worker
+- name: Push-it Controller Ediition
+  hosts: k8s_controller
   vars:
     k8s_dir: /var/lib/kubernetes
   tasks:
@@ -15,7 +15,7 @@
         group: root
         state: directory
 
-    - name: Copy proxy and instance kubeconfig
+    - name: Copy admin controller and scheduler configs
       copy:
         dest: "{{ k8s_dir }}/{{ item }}"
         src: "files/kubeconf/{{item}}"
@@ -23,5 +23,6 @@
         group: root
         owner: root
       with_items:
-        - "{{inventory_hostname}}.kubeconfig"
-        - "kube-proxy.kubeconfig"
+        - admin.kubeconfig
+        - kube-controller-manager.kubeconfig
+        - kube-scheduler.kubeconfig
