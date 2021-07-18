@@ -1,8 +1,0 @@
-- name: KIND clusters
-  hosts: all
-  vars:
-  tasks:
-  - name: copy over all the kubernetes yamls
-    copy:
-      src: files/kube_yamls
-      dest: ~/
