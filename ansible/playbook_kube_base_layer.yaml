@@ -1,6 +1,6 @@
 - name: Kubernetes And all related tools
   become: yes
-  hosts: all
+  hosts: k8s
   vars:
     containerd_install: '/usr/local/src/'
   tasks:
@@ -58,13 +58,13 @@
         state: started
         name: containerd
 
-  - name: Kubelet and Kubeadm
+  - name: Kubelet and Kubectl
     block:
 
     - name: Kubernetes.io tooling
       apt:
         pkg:
-          [ kubelet, kubeadm, kubectl ]
+          [ kubelet, kubectl ]
 
   - name: Kubernetes
     block:
