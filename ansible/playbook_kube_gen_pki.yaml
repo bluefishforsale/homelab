@@ -1,0 +1,69 @@
+- name: Gleaming the Kube™
+  hosts: local
+  vars:
+    cfssl: "files/cfssl"
+    cluster_name: k8s
+    kubernetes_public_address: 192.168.1.101
+
+  tasks:
+  - name: Generate Kubernetes Control Plane CA TLS Certs
+    block:
+
+    - name: install cfssl
+      delegate_to: localhost
+      community.general.homebrew:
+        name: cfssl
+        state: present
+
+    - name: Certificate Authority
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+        chdir: "{{ cfssl }}"
+        creates:
+          - ca-key.pem
+          - ca.pem
+          - ca.csr
+
+    - name: The Admin Client Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
+        chdir: "{{ cfssl }}"
+
+    - name: Controller Manager Client Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
+        chdir: "{{ cfssl }}"
+
+    - name: Kube Proxy Client Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
+        chdir: "{{ cfssl }}"
+
+    - name: Scheduler Client Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-schedulerkube-proxy
+        chdir: "{{ cfssl }}"
+
+    - name: API Server Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,172.18.0.1,{{kube_api_server.k8s_lb_nodeip}},{{kube_api_server.k8s_lb_nodename}},{{kube_api_server.k8s_lb_ip}},{{kube_api_server.k8s_lb_name}},kubernetes.internal -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
+        chdir: "{{ cfssl }}"
+
+    - name: Service Account Key Pair
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
+        chdir: "{{ cfssl }}"
+
+    # Node Client Certs
+    - name: Client Certs
+      delegate_to: localhost
+      include: subtask_kube_node_certs.yaml file={{item}}
+      with_inventory_hostnames:
+      - k8s

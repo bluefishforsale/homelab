@@ -1,0 +1,28 @@
+- name: Push-it Worker Ediition
+  hosts: k8s_worker
+  vars:
+    k8s_dir: /var/lib/kubernetes
+  tasks:
+  - name: Distribute the Certs made in previous steps
+    become: yes
+    block:
+
+    - name: Make The Kube Certs Dir (workers)
+      file:
+        path: "{{ k8s_dir }}"
+        mode: 0755
+        owner: root
+        group: root
+        state: directory
+
+    - name: Copy PEM and Keys (workers)
+      copy:
+        dest: "{{ k8s_dir }}/{{ item }}"
+        src: "files/cfssl/{{item}}"
+        mode: 0644
+        group: root
+        owner: root
+      with_items:
+        - ca.pem
+        - "{{inventory_hostname}}-key.pem"
+        - "{{inventory_hostname}}.pem"

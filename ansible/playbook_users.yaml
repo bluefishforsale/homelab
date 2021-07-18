@@ -3,10 +3,18 @@
   hosts: all
   vars_files:
     - vars_users.yaml
+  vars:
+    github: bluefishforsale
   tasks:
     - name: Global oh-my-zsh shell, theme, and vimrc
       become: yes
       block:
+
+      - name: Add github keys to Root
+        authorized_key:
+          user: root
+          state: present
+          key: "https://github.com/{{github}}.keys"
 
       - name: Sudo group gets passwordless sudo access
         lineinfile:
@@ -14,33 +22,26 @@
           state: present
           regexp: '^%sudo'
           line: '%sudo ALL=(ALL) NOPASSWD: ALL'
-          validate: 'visudo -cf %s'
-
-      - name: check oh_my_zsh installed
-        changed_when: false
-        stat:
-          path: /usr/share/oh-my-zsh
-        register: oh_my_zsh_installed
 
       - name: install oh my zsh as root
         shell:
-          cmd: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-          creates: /usr/share/oh-my-zsh
+          cmd: curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -
+          creates: /root/.oh-my-zsh
 
       - name: move oh-my-zsh to /usr/share
         shell:
-          creates: /usr/share/oh-my-zsh
           cmd: mv /root/.oh-my-zsh /usr/share/oh-my-zsh
+          creates: /root/.oh-my-zsh
 
       - name: copy zshrc template
         shell:
-          creates: /usr/share/oh-my-zsh/zshrc
           cmd: cp /usr/share/oh-my-zsh/templates/zshrc.zsh-template /usr/share/oh-my-zsh/zshrc
+          creates: /root/.oh-my-zsh
 
       - name: /etc/skel zshrc symlink
         shell:
-          creates:  /etc/skel/.zshrc
           cmd: ln /usr/share/oh-my-zsh/zshrc /etc/skel/.zshrc
+          creates:  /etc/skel/.zshrc
 
       - name: install powerlevel10k
         git:
@@ -63,21 +64,16 @@
           src: files/p10k.zsh
           dest: /etc/skel/.p10k.zsh
 
-      - name: check ultimate vim installed
-        changed_when: false
-        stat:
-          path: /etc/skel/.vim_runtime
-        register: ultimate_vim_installed
-
       - name: ultimate vim
-        when: not ultimate_vim_installed.stat.isdir is defined
-        command: "{{ local_item }}"
+        shell:
+          cmd: "{{ local_item }}"
+          creates: /etc/skel/.vim_runtime
         with_items:
           - git clone --depth=1 https://github.com/amix/vimrc.git /etc/skel/.vim_runtime
           - mkdir -p /usr/share/vim_runtime
           - cmod -R 1755 /usr/share/vim_runtime
           - sh /tmp/.vim_runtime/install_awesome_vimrc.shsh /etc/skel/.vim_runtime/install_awesome_vimrc.sh
-          - cp /root/.vimrc /etc/skel
+          - cp -rp /root/.vimrc /etc/skel
         loop_control:
           loop_var: local_item
 

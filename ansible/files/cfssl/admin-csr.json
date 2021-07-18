@@ -1,0 +1,16 @@
+{
+    "CN": "admin",
+    "key": {
+      "algo": "rsa",
+      "size": 2048
+    },
+    "names": [
+      {
+        "C": "US",
+        "L": "BearEay",
+        "O": "system:masters",
+        "OU": "KxTHW Bare Metal",
+        "ST": "California"
+      }
+    ]
+  }

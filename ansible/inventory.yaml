@@ -1,11 +1,21 @@
-[virtualbox]
-virtual.local  ansible_connection=ssh        ansible_user=terrac
+[local]
+127.0.0.1 ansible_connection=local
 
 [pi]
 192.168.1.2 ansible_connection=ssh  ansible_user=ubuntu
 
-[up2]
-node000.local ansible_connection=ssh  ansible_user=ubuntu
-node001.local ansible_connection=ssh  ansible_user=ubuntu
-node002.local ansible_connection=ssh  ansible_user=ubuntu
-node003.local ansible_connection=ssh  ansible_user=ubuntu
+[dns]
+192.168.1.2 ansible_connection=ssh  ansible_user=ubuntu
+
+[k8s]
+node[000:003].home ansible_connection=ssh  ansible_user=ubuntu
+
+[k8s_worker]
+node000.home ansible_connection=ssh  ansible_user=ubuntu
+node003.home ansible_connection=ssh  ansible_user=ubuntu
+
+[k8s_controller]
+node[001:002].home ansible_connection=ssh  ansible_user=ubuntu
+
+[etcd]
+node[001:002].home ansible_connection=ssh  ansible_user=ubuntu

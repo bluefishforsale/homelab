@@ -2,7 +2,7 @@ $ORIGIN  1.168.192.in-addr.arpa.
 $TTL 86400 ; 1 day
 
 @ IN SOA dns01.home. dnsadmin.home. (
-      2021070506  ; serial
+      2021071700  ; serial
       3600        ; refresh (1 hours)
       3600        ; retry (1 hour)
       3600        ; expire (1 hour)
@@ -13,36 +13,43 @@ $TTL 86400 ; 1 day
 1           IN          PTR         gw.home.
 2           IN          PTR         dns01.home.
 3           IN          PTR         dns02.home.
+
+99          IN          PTR         k8s-lb.home.
+
 100		IN		PTR		node000.home.
 101		IN		PTR		node001.home.
 102		IN		PTR		node002.home.
 103		IN		PTR		node003.home.
-104		IN		PTR		node004.home.
-105		IN		PTR		node005.home.
-106		IN		PTR		node006.home.
-107		IN		PTR		node007.home.
-108		IN		PTR		node008.home.
-109		IN		PTR		node009.home.
-110		IN		PTR		node010.home.
-111		IN		PTR		node011.home.
-112		IN		PTR		node012.home.
-113		IN		PTR		node013.home.
-114		IN		PTR		node014.home.
-115		IN		PTR		node015.home.
-116		IN		PTR		node016.home.
-117		IN		PTR		node017.home.
-118		IN		PTR		node018.home.
-119		IN		PTR		node019.home.
-120		IN		PTR		node020.home.
-121		IN		PTR		node021.home.
-122		IN		PTR		node022.home.
-123		IN		PTR		node023.home.
-124		IN		PTR		node024.home.
-125		IN		PTR		node025.home.
-126		IN		PTR		node026.home.
-127		IN		PTR		node027.home.
-128		IN		PTR		node028.home.
-129		IN		PTR		node029.home.
-130		IN		PTR		node030.home.
-131		IN		PTR		node031.home.
-132		IN		PTR		node032.home.
+; 104		IN		PTR		node004.home.
+; 105		IN		PTR		node005.home.
+; 106		IN		PTR		node006.home.
+; 107		IN		PTR		node007.home.
+; 108		IN		PTR		node008.home.
+; 109		IN		PTR		node009.home.
+; 110		IN		PTR		node010.home.
+; 111		IN		PTR		node011.home.
+; 112		IN		PTR		node012.home.
+; 113		IN		PTR		node013.home.
+; 114		IN		PTR		node014.home.
+; 115		IN		PTR		node015.home.
+; 116		IN		PTR		node016.home.
+; 117		IN		PTR		node017.home.
+; 118		IN		PTR		node018.home.
+; 119		IN		PTR		node019.home.
+; 120		IN		PTR		node020.home.
+; 121		IN		PTR		node021.home.
+; 122		IN		PTR		node022.home.
+; 123		IN		PTR		node023.home.
+; 124		IN		PTR		node024.home.
+; 125		IN		PTR		node025.home.
+; 126		IN		PTR		node026.home.
+; 127		IN		PTR		node027.home.
+; 128		IN		PTR		node028.home.
+; 129		IN		PTR		node029.home.
+; 130		IN		PTR		node030.home.
+; 131		IN		PTR		node031.home.
+; 132		IN		PTR		node032.home.
+
+143		IN		PTR		ocean.home.
+144		IN		PTR		ocean-eth0.home.
+
