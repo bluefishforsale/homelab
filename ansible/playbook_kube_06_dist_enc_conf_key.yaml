@@ -1,0 +1,18 @@
+- name: Gleaming the Kube™
+  hosts: k8s_controller
+  become: yes
+  vars:
+    files: "./files/kube_encryption_conf"
+    kube_dir: "/var/lib/kubernetes"
+
+  tasks:
+
+    - name: Copy Key To Controllers
+      copy:
+        dest: "{{ kube_dir }}/{{ item }}"
+        content: '{{ lookup("template", "{{files}}/encryption-config.yaml.j2") }}'
+        mode: 0644
+        group: root
+        owner: root
+      with_items:
+        - encryption-config.yaml

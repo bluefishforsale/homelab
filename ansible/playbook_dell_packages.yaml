@@ -1,0 +1,52 @@
+---
+- name: root and system level
+  hosts: all
+  vars:
+    foo: bar
+
+  tasks:
+  - name: Tools and Utilities
+    become: yes
+    block:
+
+    - name: mkdir /tmp/perc_cli
+      file:
+        path: "/tmp/perc_cli"
+        mode: 0777
+        owner: root
+        group: root
+        state: directory
+
+    - name: PercCLI Download and unpack directly from HTTP source
+      unarchive:
+        src: https://dl.dell.com/FOLDER04470715M/1/perccli_7.1-007.0127_linux.tar.gz
+        dest: "/tmp/perc_cli"
+        copy: no
+
+    - name: Enable universe repository
+      apt_repository:
+        repo: "{{ item }}"
+      loop:
+        - "deb http://archive.ubuntu.com/ubuntu/ bionic universe"
+        - "deb http://archive.ubuntu.com/ubuntu/ bionic-updates universe"
+        - "deb http://security.ubuntu.com/ubuntu/ bionic-security universe"
+
+    - name: Update repositories cache
+      apt:
+        name: alien
+        update_cache: yes
+
+    - name: Convert RPM to deb
+      shell:
+        chdir: /tmp/perc_cli/Linux
+        cmd: alien perccli-007.0127.0000.0000-1.noarch.rpm
+
+    - name: Install Perc CLI
+      apt:
+        deb: /tmp/perc_cli/Linux/perccli_007.0127.0000.0000-2_all.deb
+
+    - name: Symlink perccli to /usr/local/bin
+      file:
+        src: /opt/MegaRAID/perccli/perccli64
+        dest: /usr/local/bin/perccli64
+        state: link

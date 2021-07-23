@@ -23,5 +23,5 @@
         group: root
         owner: root
       with_items:
-        - "{{inventory_hostname}}.kubeconfig"
         - "kube-proxy.kubeconfig"
+        - "{{inventory_hostname}}.kubeconfig"

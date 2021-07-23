@@ -9,6 +9,14 @@
     shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
     register: apt_get_update_secs
 
+  - name: Stop snapd
+    systemd:
+      state: "{{ item }}"
+      name: snapd
+    with_items:
+      - stopped
+      - disabled
+
   - name: base packages
     become: yes
     block:
@@ -19,7 +27,11 @@
     - name: Install a suite of common tools
       apt:
         pkg:
-          [ golang, gcc, zsh, wget, curl, htop, nmap, make, netcat, strace, fping, bmon, iptraf-ng, tmux, glances, unzip, ntpdate]
+          [
+            golang, gcc, zsh, wget, curl, htop, iostat, iotop
+            nmap, make, netcat, strace, fping, bmon,
+            iptraf-ng, tmux, glances, unzip, ntpdate
+          ]
 
     - name: old_paths
       shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'

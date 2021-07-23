@@ -56,13 +56,3 @@
     with_items:
       - curl https://raw.githubusercontent.com/ahmetb/kubectx/master/kubectx -o /usr/local/bin/kubectx
       - chmod +x /usr/local/bin/kubectx
-
-  - name: Enable and Start all services
-    become: yes
-    become_user: root
-    systemd:
-      enabled: yes
-      state: started
-      name: "{{ item }}"
-    with_items:
-      - ssh

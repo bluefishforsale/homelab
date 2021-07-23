@@ -1,0 +1,8 @@
+- name: test flight
+  hosts: local
+  tasks:
+    - name: fancy vars printout
+      debug:
+        # msg: "{{ groups['k8s_controller'] | map('extract', ['ansible_default_ipv4']) | join(',') }}"
+        msg: "{{ groups['k8s_controller'] | map('extract', ['ansible_connection']) | join(',') }}"
+        # msg: "{{ groups['k8s_controller']  }}"
