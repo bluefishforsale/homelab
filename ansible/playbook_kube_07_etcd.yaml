@@ -1,5 +1,5 @@
 - name: Download, install, and configure etcd
-  hosts: k8s_controller
+  hosts: etcd
   become: yes
   vars:
     instpath: "/opt/etcd"
@@ -8,8 +8,12 @@
     filename: etcd-v3.5.0-linux-amd64.tar.gz
     version: latest
     project_url: https://api.github.com/repos/{{ org }}/{{ repo }}/releases
-  tasks:
+    # config vars holders
+    all_hosts_but_this: []
+    HOST_IP: {}
+    PEERS_MAP: ""
 
+  tasks:
     - name: check {{ repo }} version
       uri:
         url: "{{ project_url }}/{{ version }}"
@@ -21,7 +25,7 @@
         path: "{{ instpath }}/{{ repo }}-{{ latest_version.json.tag_name }}"
       register: newestbinary
 
-    - name: download and link to version {{ version }}
+    - name: Download and link to version {{ version }}
       block:
         - name: "check if {{ instpath }} exists"
           file:
@@ -69,15 +73,38 @@
           when: tempfolder_1.path is defined
           ignore_errors: true
 
-      - name: systemd Unit file
-        copy:
-          dest: "/etc/systemd/system/etcd.service"
-          content: '{{ lookup("template", "ansible/files/etcd/etcd.service.j2") }}'
-          mode: 0644
-          group: root
-          owner: root
-        vars:
-          etcd_name:
-          internal_ip:
-          etcd_name:
-          controllers: "{{ ''.join(k8s_controllers) }}"
+    - name: Make the EtcD systemd File
+      block:
+        # Make variables for the etcD configfile
+        - name: Set variable all_hosts_but_this
+          set_fact:
+            all_hosts_but_this: "{{ groups['etcd'] | difference([inventory_hostname]) }}"
+
+        - name: Get IP for a subset of hosts, store in HOST_IP
+          set_fact:
+            HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+          loop: "{{all_hosts_but_this}}"
+
+        - name: Flatten dict to formatted string, store PEERS_MAP
+          set_fact:
+            PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0)|ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
+          loop: "{{  HOST_IP | dict2items }}"
+          loop_control:
+            index_var: index
+
+        - name: Get IP for all hosts, store in HOST_IP
+          set_fact:
+            HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+          loop: "{{ groups['etcd'] }}"
+
+        - name: Test Flight
+          debug: var=HOST_IP
+
+        # Create the config file from template
+        - name: systemd Unit file
+          copy:
+            dest: "/etc/systemd/system/etcd.service"
+            content: '{{ lookup("template", "files/etcd/etcd.service.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
