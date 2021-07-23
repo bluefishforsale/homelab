@@ -4,8 +4,8 @@ Documentation=https://github.com/coreos
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/etcd \
-  --name etcd-cluster-0 \
+ExecStart=/usr/local/etcd/etcd \
+  --name "{{inventory_hostname}}" \
   --cert-file=/etc/etcd/kubernetes.pem \
   --key-file=/etc/etcd/kubernetes-key.pem \
   --peer-cert-file=/etc/etcd/kubernetes.pem \

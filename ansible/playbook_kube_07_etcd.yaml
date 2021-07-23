@@ -2,7 +2,9 @@
   hosts: etcd
   become: yes
   vars:
-    instpath: "/opt/etcd"
+    confpath: "/etc/etcd"
+    instpath: "/usr/local/etcd"
+    datapath: "/var/lib/etcd"
     org: etcd-io
     repo: etcd
     filename: etcd-v3.5.0-linux-amd64.tar.gz
@@ -14,6 +16,23 @@
     PEERS_MAP: ""
 
   tasks:
+    - name: CA and certs
+      block:
+      - name: MKdir
+        file:
+          path: "{{confpath}}"
+          state: directory
+          mode: 0700
+      - name: Copy certs
+        copy:
+          src: "files/cfssl/{{item}}"
+          dest: "{{confpath}}/{{item}}"
+          mode: 0700
+        with_items:
+          - ca.pem
+          - kubernetes-key.pem
+          - kubernetes.pem
+
     - name: check {{ repo }} version
       uri:
         url: "{{ project_url }}/{{ version }}"
@@ -27,11 +46,17 @@
 
     - name: Download and link to version {{ version }}
       block:
+        - name: "check if {{ datapath }} exists"
+          file:
+            path: "{{ datapath }}"
+            state: directory
+            mode: 0700
+
         - name: "check if {{ instpath }} exists"
           file:
             path: "{{ instpath }}"
             state: directory
-            mode: '0755'
+            mode: 0700
 
         - name: create tempdir
           tempfile:
@@ -83,7 +108,8 @@
         - name: Get IP for a subset of hosts, store in HOST_IP
           set_fact:
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-          loop: "{{all_hosts_but_this}}"
+          loop: "{{ groups['etcd'] }}"
+          # loop: "{{all_hosts_but_this}}"
 
         - name: Flatten dict to formatted string, store PEERS_MAP
           set_fact:
@@ -97,8 +123,8 @@
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
           loop: "{{ groups['etcd'] }}"
 
-        - name: Test Flight
-          debug: var=HOST_IP
+        # - name: Test Flight
+        #   debug: var=HOST_IP
 
         # Create the config file from template
         - name: systemd Unit file
@@ -108,3 +134,10 @@
             mode: 0644
             group: root
             owner: root
+
+        - name: enable and restart etcd
+          systemd:
+            name: etcd
+            state: restarted
+            enabled: true
+            daemon_reload: true

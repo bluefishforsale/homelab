@@ -3,10 +3,11 @@
   vars:
     cfssl: "files/cfssl"
     cluster_name: k8s
-    # TODO: this is hard-wired to a single node until we provision something inside kubernertes like metalLB.
-    # must regen certs and re dist after that
-    kube_api_server_ip: 192.168.1.101
-    kube_api_server: node001.home
+    # config vars holders
+    all_hosts_but_this: []
+    HOST_IP: {}
+    PEERS_MAP: ""
+
 
   tasks:
   - name: Generate Kubernetes Control Plane CA TLS Certs
@@ -52,10 +53,22 @@
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
         chdir: "{{ cfssl }}"
 
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['etcd'] }}"
+
+    - name: Flatten dict to formatted string, store PEERS_MAP
+      set_fact:
+        PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0)|ternary(',','') }}{{ item.key }},{{ item.value }}"
+      loop: "{{  HOST_IP | dict2items }}"
+      loop_control:
+        index_var: index
+
     - name: API Server Certificate
       delegate_to: localhost
       shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,172.18.0.1,{{kube_api_server_ip}},{{kube_api_server}},kubernetes.internal -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,172.18.0.1,{{PEERS_MAP}},kubernetes.internal -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
         chdir: "{{ cfssl }}"
 
     - name: Service Account Key Pair
