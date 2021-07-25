@@ -14,7 +14,6 @@ node[000:004].home ansible_connection=ssh  ansible_user=ubuntu
 node000.home ansible_connection=ssh  ansible_user=ubuntu
 node004.home ansible_connection=ssh  ansible_user=ubuntu
 
-
 [k8s_controller]
 node[001:003].home ansible_connection=ssh  ansible_user=ubuntu
 

@@ -1,0 +1,60 @@
+- name: Kube 07 Haproxy keepalived
+  hosts: k8s_controller
+  become: yes
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    # Make variables for the Kubernetes configfile
+    - name: Get IP for a subset of hosts, store in PEERS_IP
+      shell:
+        cmd: ip route | awk '(/default/){print $5}'
+      register: iface
+
+    - name: Get IP for all hosts, store in HOST_IP
+      set_fact:
+        APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s_controller'] }}"
+
+    - name: haproxy + keepalive
+      block:
+        - name: directory
+          file:
+            path: "/etc/{{item}}"
+            state: directory
+            mode: 0755
+          with_items:
+            - haproxy
+            - keepalived
+
+        - name: install
+          apt:
+            name: [ haproxy, keepalived ]
+            state: present
+            update_cache: yes
+
+        - name: write configs haproxy
+          copy:
+            dest: "/etc/haproxy/haproxy.cfg"
+            content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
+            mode: 0644
+
+        - name: write configs keepalived
+          copy:
+            dest: "/etc/keepalived/keepalived.conf"
+            content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
+            mode: 0644
+
+        - name: enable and restart
+          systemd:
+            name: "{{item}}"
+            state: restarted
+            enabled: yes
+            daemon_reload: yes
+          with_items:
+            - haproxy
+            - keepalived

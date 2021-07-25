@@ -1,4 +1,4 @@
-- name: Push-it Controller Ediition
+- name: Kube 05.1 Dist Kubeconfigs Controllers
   hosts: k8s_controller
   vars:
     k8s_dir: /var/lib/kubernetes

@@ -1,6 +1,8 @@
-- name: Download, install, and configure kubernetes Control plane
+- name: Kube 08 Kubernetes apiserver, controller-manager, scheduler
   hosts: k8s_controller
   become: yes
+  vars_files:
+    - vars_kube.yaml
   vars:
     confpath: "/etc/kubernetes/config"
     instpath: "/usr/local/bin"
@@ -14,13 +16,6 @@
       - kubectl
     version: v1.21.3
     project_url: "https://storage.googleapis.com/kubernetes-release/release/{{version}}/bin/linux/amd64"
-    # Kube networking
-    SERVICE_CLUSTER_CIDR: "172.20.0.0/24"
-    CLUSTER_CIDR: "172.18.0.0/16"
-    # config vars holders
-    all_hosts_but_this: []
-    HOST_IP: {}
-    PEERS_MAP: ""
 
   tasks:
     - name: Nginx
@@ -90,12 +85,21 @@
         - name: Get IP for all hosts, store in HOST_IP
           set_fact:
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+          loop: "{{ groups['k8s_controller'] }}"
+
+        - name: Get IP for single APISERVER
+          set_fact:
+            APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+        - name: Get IP for all host list
+          set_fact:
+            PEERS_IP: "{{ PEERS_IP | combine({ item: lookup('community.general.dig', item) }) }}"
           loop: "{{ groups['etcd'] }}"
 
-        - name: Flatten dict to formatted string, store ETCD_SERVER_URLS
+        - name: Flatten dict to formatted string
           set_fact:
-            ETCD_SERVER_URLS: "{{ PEERS_MAP }}{{ (index > 0)|ternary(',','') }}https://{{ item.value }}:2379"
-          loop: "{{  HOST_IP | dict2items }}"
+            ETCD_SERVER_URLS : "{{ ETCD_SERVER_URLS }}{{ (index > 0)|ternary(',','') }}https://{{item.value}}:2379"
+          loop: "{{  PEERS_IP | dict2items }}"
           loop_control:
             index_var: index
 
@@ -127,5 +131,6 @@
             enabled: true
             daemon_reload: true
           with_items:
+            - kube-scheduler
             - kube-apiserver
             - kube-controller-manager

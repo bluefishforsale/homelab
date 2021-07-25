@@ -41,7 +41,7 @@
       # - name: /etc/skel zshrc symlink
       #   shell:
       #     cmd: ln /usr/share/oh-my-zsh/zshrc /etc/skel/.zshrc
-      #     creates:  /etc/skel/.zshrc
+      #     creates: /etc/skel/.zshrc
 
       - name: install powerlevel10k
         git:
@@ -83,7 +83,9 @@
           dest: ~/.tmux.conf
 
       - name: Ensures /etc/skel/.config/glances path exists
-        file: path=/etc/skel/.config/glances state=directory
+        file:
+          path: /etc/skel/.config/glances
+        state: directory
 
       - name: Glances conf
         copy:

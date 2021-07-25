@@ -1,6 +1,8 @@
-- name: Download, install, and configure etcd
+- name: Kube 07 etcd
   hosts: etcd
   become: yes
+  vars_files:
+    - vars_kube.yaml
   vars:
     confpath: "/etc/etcd"
     instpath: "/usr/local/etcd"
@@ -10,10 +12,6 @@
     filename: etcd-v3.5.0-linux-amd64.tar.gz
     version: latest
     project_url: https://api.github.com/repos/{{ org }}/{{ repo }}/releases
-    # config vars holders
-    all_hosts_but_this: []
-    HOST_IP: {}
-    PEERS_MAP: ""
 
   tasks:
     - name: CA and certs
@@ -100,16 +98,15 @@
 
     - name: Make the EtcD systemd File
       block:
-        # Make variables for the etcD configfile
-        - name: Set variable all_hosts_but_this
-          set_fact:
-            all_hosts_but_this: "{{ groups['etcd'] | difference([inventory_hostname]) }}"
+        # # Make variables for the etcD configfile
+        # - name: Set variable all_hosts_but_this
+        #   set_fact:
+        #     all_hosts_but_this: "{{ groups['etcd'] | difference([inventory_hostname]) }}"
 
         - name: Get IP for a subset of hosts, store in HOST_IP
           set_fact:
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
           loop: "{{ groups['etcd'] }}"
-          # loop: "{{all_hosts_but_this}}"
 
         - name: Flatten dict to formatted string, store PEERS_MAP
           set_fact:
@@ -118,13 +115,10 @@
           loop_control:
             index_var: index
 
-        - name: Get IP for all hosts, store in HOST_IP
-          set_fact:
-            HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-          loop: "{{ groups['etcd'] }}"
-
-        # - name: Test Flight
-        #   debug: var=HOST_IP
+        # - name: Get IP for all hosts, store in HOST_IP
+        #   set_fact:
+        #     HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+        #   loop: "{{ groups['etcd'] }}"
 
         # Create the config file from template
         - name: systemd Unit file

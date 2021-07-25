@@ -1,4 +1,4 @@
-- name: Gleaming the Kube™
+- name: Kube 06 Dist Encryption Config
   hosts: k8s_controller
   become: yes
   vars:

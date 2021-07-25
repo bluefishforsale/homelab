@@ -1,13 +1,7 @@
-- name: Gleaming the Kube™
+- name: Kube 04.1 Gen PKI
   hosts: local
-  vars:
-    cfssl: "files/cfssl"
-    cluster_name: k8s
-    # config vars holders
-    all_hosts_but_this: []
-    HOST_IP: {}
-    PEERS_MAP: ""
-
+  vars_files:
+    - vars_kube.yaml
 
   tasks:
   - name: Generate Kubernetes Control Plane CA TLS Certs
@@ -53,10 +47,11 @@
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
         chdir: "{{ cfssl }}"
 
-    - name: Get IP for a subset of hosts, store in HOST_IP
+    #### Bulding variables
+    - name: Hostname expansion into dict of name:ip
       set_fact:
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-      loop: "{{ groups['etcd'] }}"
+      loop: "{{ groups['k8s_controller'] + [APISERVER]}}"
 
     - name: Flatten dict to formatted string, store PEERS_MAP
       set_fact:
@@ -68,7 +63,7 @@
     - name: API Server Certificate
       delegate_to: localhost
       shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,172.18.0.1,{{PEERS_MAP}},kubernetes.internal -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,172.18.0.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}} -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
         chdir: "{{ cfssl }}"
 
     - name: Service Account Key Pair

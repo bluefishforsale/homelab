@@ -1,4 +1,4 @@
-- name: Push-it Worker Ediition
+- name: Kube 05.1 Dist Kubeconfigs Workers
   hosts: k8s_worker
   vars:
     k8s_dir: /var/lib/kubernetes

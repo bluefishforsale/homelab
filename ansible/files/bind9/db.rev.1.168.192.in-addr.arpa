@@ -2,7 +2,7 @@ $ORIGIN  1.168.192.in-addr.arpa.
 $TTL 86400 ; 1 day
 
 @ IN SOA dns01.home. dnsadmin.home. (
-      2021071700  ; serial
+      2021072400  ; serial
       3600        ; refresh (1 hours)
       3600        ; retry (1 hour)
       3600        ; expire (1 hour)
@@ -14,13 +14,14 @@ $TTL 86400 ; 1 day
 2           IN          PTR         dns01.home.
 3           IN          PTR         dns02.home.
 
-99          IN          PTR         k8s-lb.home.
+99          IN          PTR         apiserver.home.
 
 100		IN		PTR		node000.home.
 101		IN		PTR		node001.home.
 102		IN		PTR		node002.home.
 103		IN		PTR		node003.home.
-; 104		IN		PTR		node004.home.
+104		IN		PTR		node004.home.
+
 ; 105		IN		PTR		node005.home.
 ; 106		IN		PTR		node006.home.
 ; 107		IN		PTR		node007.home.
