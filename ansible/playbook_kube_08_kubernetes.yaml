@@ -24,25 +24,25 @@
         - name: "check if /etc/nginx/sites-available exists"
           file:
             path: "/etc/nginx/sites-available"
-            state: directory
+            state: absent
             mode: 0755
 
         - name: apt nginx install
           apt:
             name: nginx
-            state: present
+            state: absent
             update_cache: yes
 
-        - name: nginx config
-          copy:
-            dest: "/etc/nginx/sites-available/kubernetes.default.svc.cluster.local"
-            src: "files/nginx/kubernetes.default.svc.cluster.local"
-            mode: 0644
+        # - name: nginx config
+        #   copy:
+        #     dest: "/etc/nginx/sites-available/kubernetes.default.svc.cluster.local"
+        #     src: "files/nginx/kubernetes.default.svc.cluster.local"
+        #     mode: 0644
 
         - name: enable and restart nginx
           systemd:
             name: "{{item}}"
-            state: restarted
+            state: stopped
             enabled: true
             daemon_reload: true
           with_items:

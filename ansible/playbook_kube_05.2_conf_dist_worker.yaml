@@ -2,6 +2,8 @@
   hosts: k8s_worker
   vars:
     k8s_dir: /var/lib/kubernetes
+  vars_files:
+    - vars_kube.yaml
   tasks:
   - name: Distribute the files made in previous steps
     become: yes

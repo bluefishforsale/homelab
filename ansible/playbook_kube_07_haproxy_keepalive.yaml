@@ -22,14 +22,27 @@
 
     - name: haproxy + keepalive
       block:
-        - name: directory
+        - name: config
           file:
             path: "/etc/{{item}}"
             state: directory
             mode: 0755
+            owner: haproxy
+            group: haproxy
           with_items:
             - haproxy
             - keepalived
+
+        # - name: logs
+        #   file:
+        #     path: "/var/log/{{item}}"
+        #     state: absent
+        #     mode: 0755
+        #     owner: haproxy
+        #     group: haproxy
+        #   with_items:
+        #     - haproxy
+        #     - keepalived
 
         - name: install
           apt:
@@ -42,12 +55,16 @@
             dest: "/etc/haproxy/haproxy.cfg"
             content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
             mode: 0644
+            owner: haproxy
+            group: haproxy
 
         - name: write configs keepalived
           copy:
             dest: "/etc/keepalived/keepalived.conf"
             content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
             mode: 0644
+            owner: haproxy
+            group: haproxy
 
         - name: enable and restart
           systemd:

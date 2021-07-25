@@ -4,7 +4,8 @@
   vars:
     files: "./files/kube_encryption_conf"
     kube_dir: "/var/lib/kubernetes"
-
+  vars_files:
+    - vars_kube.yaml
   tasks:
 
     - name: Copy Key To Controllers

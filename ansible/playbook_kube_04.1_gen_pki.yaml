@@ -18,10 +18,7 @@
       shell:
         cmd: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
         chdir: "{{ cfssl }}"
-        creates:
-          - ca-key.pem
-          - ca.pem
-          - ca.csr
+
 
     - name: The Admin Client Certificate
       delegate_to: localhost
