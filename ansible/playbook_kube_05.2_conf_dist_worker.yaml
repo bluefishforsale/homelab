@@ -1,4 +1,4 @@
-- name: Kube 05.1 Dist Kubeconfigs Workers
+- name: Kube 05.2 Dist Kubeconfigs Workers
   hosts: k8s_worker
   vars:
     k8s_dir: /var/lib/kubernetes
