@@ -1,0 +1,2 @@
+alias log="sudo journalctl --no-pager -u $1"
+alias sys="sudo systemctl $*"

@@ -1,25 +1,23 @@
 - name: Experimental x-12
   hosts: etcd
   vars:
-    host_ip: {}
-    PEERS_MAP: ""
+    dirs:
+      cni:
+        conf: /etc/cni/net.d
+        bin: /opt/cni/bin
+      kubernetes:
+        conf: /etc/kubernetes/config
+        static: /etc/kubernetes/manifests
+        data: /var/lib/kubernetes
+        lock: /var/run/kubernetes
+      system:
+        bin: /usr/local/bin
+      kube-proxy:
+        data: /var/lib/kube-proxy
+
   tasks:
-    # Make variables for the etcD configfile
-    - name: set a fact
-      set_fact:
-        all_hosts_but_this: "{{ groups['k8s_controller'] | difference([inventory_hostname]) }}"
+    - name: print debug
+      debug:
+        msg: "{{ item.value }}"
+      with_dict: "{{dirs.values()}}"
 
-    - name: Get IP for a list of hosts, store in variable
-      set_fact:
-        host_ip: "{{ host_ip | combine({ item: lookup('community.general.dig', item) }) }}"
-      loop: "{{all_hosts_but_this}}"
-
-    - name: Flatten dict to formatted string, store in variable
-      set_fact:
-        PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0)|ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
-      loop: "{{  host_ip | dict2items }}"
-      loop_control:
-        index_var: index
-
-    - name: Test Flight
-      debug: var=PEERS_MAP

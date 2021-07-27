@@ -5,18 +5,18 @@
 192.168.1.2 ansible_connection=ssh  ansible_user=ubuntu
 
 [dns]
-dns01.home ansible_connection=ssh  ansible_user=ubuntu
+dns01 ansible_connection=ssh  ansible_user=ubuntu
 # dns02 ansible_connection=ssh  ansible_user=ubuntu
 
 [k8s]
-node[000:004].home ansible_connection=ssh  ansible_user=ubuntu
+node[000:004] ansible_connection=ssh  ansible_user=ubuntu
 
 [k8s_worker]
-node000.home ansible_connection=ssh  ansible_user=ubuntu
-node004.home ansible_connection=ssh  ansible_user=ubuntu
+node000 ansible_connection=ssh  ansible_user=ubuntu
+node004 ansible_connection=ssh  ansible_user=ubuntu
 
 [k8s_controller]
-node[001:003].home ansible_connection=ssh  ansible_user=ubuntu
+node[001:003] ansible_connection=ssh  ansible_user=ubuntu
 
 [etcd]
-node[001:003].home ansible_connection=ssh  ansible_user=ubuntu
+node[001:003] ansible_connection=ssh  ansible_user=ubuntu

@@ -6,14 +6,16 @@ authentication:
   webhook:
     enabled: true
   x509:
-    clientCAFile: "/var/lib/kubernetes/ca.pem"
+    clientCAFile: "{{pki_dir}}/ca.pem"
 authorization:
   mode: Webhook
 clusterDomain: "cluster.local"
 clusterDNS:
-  - "{{groups['dns']}}"
-podCIDR: "${POD_CIDR}"
+{% for item in groups['dns'] %}
+    - {{ lookup('community.general.dig', item) }}
+{% endfor %}
+podCIDR: "{{POD_CIDR}}"
 resolvConf: "/run/systemd/resolve/resolv.conf"
 runtimeRequestTimeout: "15m"
-tlsCertFile: "{{pki_dir}}//{{inventory_hostname}}.pem"
-tlsPrivateKeyFile: "{{pki_dir}}//{{inventory_hostname}}-key.pem"
+tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"
+tlsPrivateKeyFile: "{{pki_dir}}/{{inventory_hostname}}-key.pem"
