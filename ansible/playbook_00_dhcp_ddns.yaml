@@ -1,6 +1,5 @@
----
-- name: Press Play... (Moby)
-  hosts: all
+- name: DCHP server
+  hosts: dns
   vars:
     dummy: Null
 
@@ -58,11 +57,6 @@
       become_user: root
       systemd:
         enabled: yes
-        state: started
-        name: "{{ item }}"
-      with_items:
-        - isc-dhcp-server
-
-  # kick the service, maybe this is NOT the first run?
-    - name: restart service
-      shell: systemctl restart isc-dhcp-server
+        state: restarted
+        name: isc-dhcp-server
+        daemon_reload: true

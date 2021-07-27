@@ -1,4 +1,4 @@
-- name: Kube 05.1 Dist Kubeconfigs Controllers
+- name: Kube 05.2 Dist Kubeconfigs Controllers
   hosts: k8s_controller
   vars:
     k8s_dir: /var/lib/kubernetes

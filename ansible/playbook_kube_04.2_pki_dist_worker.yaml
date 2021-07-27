@@ -1,7 +1,7 @@
 - name: Kube 04.2 Dist PKI Workers
   hosts: k8s_worker
-  vars:
-    k8s_dir: /var/lib/kubernetes
+  vars_files:
+    - vars_kube.yaml
   tasks:
   - name: Distribute the Certs made in previous steps
     become: yes
@@ -9,7 +9,7 @@
 
     - name: Make The Kube Certs Dir (workers)
       file:
-        path: "{{ k8s_dir }}"
+        path: "{{ pki_dir }}"
         mode: 0755
         owner: root
         group: root
@@ -17,7 +17,7 @@
 
     - name: Copy PEM and Keys (workers)
       copy:
-        dest: "{{ k8s_dir }}/{{ item }}"
+        dest: "{{ pki_dir }}/{{ item }}"
         src: "files/cfssl/{{item}}"
         mode: 0644
         group: root

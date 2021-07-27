@@ -18,36 +18,6 @@
     project_url: "https://storage.googleapis.com/kubernetes-release/release/{{version}}/bin/linux/amd64"
 
   tasks:
-    # - name: Nginx
-    #   block:
-    #     # Make variables for the Kubernetes configfile
-    #     - name: "check if /etc/nginx/sites-available exists"
-    #       file:
-    #         path: "/etc/nginx/sites-available"
-    #         state: absent
-    #         mode: 0755
-
-    #     - name: apt nginx install
-    #       apt:
-    #         name: nginx
-    #         state: absent
-    #         update_cache: yes
-
-    #     # - name: nginx config
-    #     #   copy:
-    #     #     dest: "/etc/nginx/sites-available/kubernetes.default.svc.cluster.local"
-    #     #     src: "files/nginx/kubernetes.default.svc.cluster.local"
-    #     #     mode: 0644
-
-    #     - name: enable and restart nginx
-    #       systemd:
-    #         name: "{{item}}"
-    #         state: stopped
-    #         enabled: true
-    #         daemon_reload: true
-    #       with_items:
-    #         - nginx
-
     - name: Kubernetes
       block:
         - name: "check if {{ datapath }} exists"

@@ -59,7 +59,7 @@
         - name: create tempdir
           tempfile:
             state: directory
-            suffix: dwnld
+            suffix: _dwnld
           register: tempfolder_1
 
         - name: "installing {{ repo }} {{ latest_version.json.tag_name }}"
@@ -132,6 +132,6 @@
         - name: enable and restart etcd
           systemd:
             name: etcd
-            state: restarted
+            state: started
             enabled: true
             daemon_reload: true

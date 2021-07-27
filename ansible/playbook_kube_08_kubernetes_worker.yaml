@@ -1,0 +1,294 @@
+- name: Kube 08 Containerd, Kubelet, CNI
+  hosts: k8s_worker
+  become: yes
+  vars_files:
+    - vars_kube.yaml
+  vars:
+    dirs:
+      cni:
+        conf: /etc/cni/net.d
+        bin: /opt/cni/bin
+      kubernetes:
+        conf: /etc/kubernetes/config
+        static: /etc/kubernetes/manifests
+        data: /var/lib/kubernetes
+        lock: /var/run/kubernetes
+      system:
+        bin: /usr/local/bin
+      kube-proxy:
+        data: /var/lib/kube-proxy
+    org: kubernetes
+    repo: kubernetes
+    binaries:
+      - kube-proxy
+      - kubelet
+      - kubectl
+    version: v1.21.3
+    project_url: "https://storage.googleapis.com/kubernetes-release/release/{{version}}/bin/linux/amd64"
+
+  tasks:
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s_worker'] }}"
+
+    ######### Dirs for all the things at once
+    - name: "Mkdir all"
+      file:
+        path: "{{item.value}}"
+        state: directory
+        mode: 0755
+      with_dict: "{{dirs.values()}}"
+
+
+############ CRI binaries
+    - name: CRI binaries
+      block:
+        - name: create tempdir
+          tempfile:
+            state: directory
+            suffix: .download
+          register: tempfolder_1
+
+        - name: Installing crictl
+          unarchive:
+            remote_src: yes
+            src: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.14.0/crictl-v1.14.0-linux-amd64.tar.gz
+            dest: "{{ tempfolder_1.path }}"
+            keep_newer: yes
+
+        - name: command because no mv available
+          command: mv "{{tempfolder_1.path}}/crictl" "{{dirs['system']['bin']}}/crictl"
+
+        - name: Cleanup
+          file:
+            path: "{{tempfolder_1.path}}"
+            state: absent
+
+############ runc
+        - name: Installing runc
+          get_url:
+            url: https://github.com/opencontainers/runc/releases/download/v1.0.0-rc93/runc.amd64
+            dest: "{{dirs['system']['bin']}}/runc"
+            mode: 0755
+
+############ CNI-PLUGINS
+        - name: Installing CNI-PLUGINS
+          unarchive:
+            remote_src: yes
+            src: https://github.com/containernetworking/plugins/releases/download/v0.7.5/cni-plugins-amd64-v0.7.5.tgz
+            dest: "{{dirs['cni']['bin']}}"
+            keep_newer: yes
+
+        - name: CNI Bridge config
+          copy:
+            dest: "/etc/cni/net.d/{{item}}"
+            content: '{{ lookup("template", "files/cni/{{item}}.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
+          with_items:
+            - 10-bridge.conf
+            - 99-loopback.conf
+
+################# Sysctl, modules, swap
+    - name: Sysctl, modules, swap
+      block:
+      - name: swapp-off fstab
+        shell: sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+      - name: swapp-off command
+        shell: swapoff -a
+
+      - name: Container Modules
+        copy:
+          dest: "/etc/modules-load.d/containerd.conf"
+          content: |
+            overlay
+            br_netfilter
+
+      - name: Live Modprobe
+        shell:
+          cmd: modprobe "{{item}}"
+        with_items: [overlay, br_netfilter]
+
+      - name: Write Sysctl Startup Params
+        copy:
+          dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
+          content: |
+            net.bridge.bridge-nf-call-iptables  = 1
+            net.ipv4.ip_forward                 = 1
+            net.bridge.bridge-nf-call-ip6tables = 1
+
+      - name: sysctl reload
+        shell: sysctl --system
+
+################# Containerd
+    - name: "Containerd"
+      block:
+
+        - name: mkdir /etc/containerd
+          file:
+            path: /etc/containerd
+            state: directory
+            mode: 0755
+
+       ############### Binary
+        - name: create tempdir
+          tempfile:
+            state: directory
+            suffix: .download
+          register: tempfolder_1
+
+        - name: Installing containerd
+          unarchive:
+            remote_src: yes
+            src: https://github.com/containerd/containerd/releases/download/v1.4.4/containerd-1.4.4-linux-amd64.tar.gz
+            dest: "{{ tempfolder_1.path }}"
+            keep_newer: yes
+
+        - name: get the filenames
+          command: ls -1 {{tempfolder_1.path}}/bin/
+          register: files
+
+        - name: mv files to bin
+          command: mv {{tempfolder_1.path}}/bin/{{item}} {{dirs['system']['bin']}}/{{item}}
+          with_items: ["{{files.stdout.split()}}"]
+
+        - name: Cleanup
+          file:
+            path: "{{tempfolder_1.path}}"
+            state: absent
+
+       ############### Config
+        - name: Generate vanilla containerd config
+          shell: containerd config default
+          register: containerd_config
+
+        - name: Write config.toml
+          copy:
+            dest: "/etc/containerd/config.toml"
+            content: |
+              [plugins]
+                [plugins.cri.containerd]
+                  snapshotter = "overlayfs"
+                  [plugins.cri.containerd.default_runtime]
+                    runtime_type = "io.containerd.runtime.v1.linux"
+                    runtime_engine = "/usr/local/bin/runc"
+                    runtime_root = ""
+
+        # - name: Write Containerd config
+        #   when: containerd_config.stdout | length > 0
+        #   copy:
+        #     content: "{{ containerd_config.stdout }}"
+        #     dest: /etc/containerd/config.toml
+
+        # - name: change the system cgroup driver from false -> true
+        #   replace:
+        #     path: /etc/containerd/config.toml
+        #     regexp: '^(\s+SystemdCgroup\s+\=\s+)false$'
+        #     replace: '\1true'
+
+        - name: Write systemd Startup
+          copy:
+            dest: "/etc/systemd/system/containerd.service"
+            content: |
+              [Unit]
+              Description=containerd container runtime
+              Documentation=https://containerd.io
+              After=network.target
+
+              [Service]
+              ExecStartPre=/sbin/modprobe overlay
+              ExecStart=/usr/local/bin/containerd
+              Restart=always
+              RestartSec=5
+              Delegate=yes
+              KillMode=process
+              OOMScoreAdjust=-999
+              LimitNOFILE=1048576
+              LimitNPROC=infinity
+              LimitCORE=infinity
+
+              [Install]
+              WantedBy=multi-user.target
+
+        - name: enable and restart service
+          systemd:
+            name: containerd
+            state: started
+            enabled: true
+            daemon_reload: true
+
+#################### Kubelet
+    - name: Kubelet and Kube-proxy
+      block:
+
+        - name: Worker Apt Packages
+          apt:
+            pkg: [ socat, conntrack, ipset ]
+
+        - name: "installing {{repo}} {{version}}"
+          get_url:
+            url: "{{project_url}}/{{ item }}"
+            dest: "{{dirs['system']['bin']}}/{{ item }}"
+            mode: 0755
+          with_items: "{{binaries}}"
+  
+        - name: Kube*-configs
+          copy:
+            dest: "{{item.value}}/{{item.key}}-config.yaml"
+            content: '{{ lookup("template", "files/kubelet/{{item.key}}-config.yaml.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
+          with_dict: { 
+            kubelet: /var/lib/kubernetes/, 
+            kube-proxy: /var/lib/kube-proxy/
+            }
+
+        - name: systemd service
+          copy:
+            dest: "/etc/systemd/system/{{item}}.service"
+            content: '{{ lookup("template", "files/kubelet/{{item}}.service.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
+          with_items:
+            - kubelet
+            - kube-proxy
+
+        - name: systemd enable and restart kubelet and proxy
+          systemd:
+            name: "{{item}}"
+            state: restarted
+            enabled: true
+            daemon_reload: true
+          with_items:
+            - kubelet
+            - kube-proxy
+
+    # - name: Kube SystemD templates
+    #   block:
+        # Make variables for the Kubernetes configfile
+        # - name: Get IP for all hosts, store in HOST_IP
+        #   set_fact:
+        #     HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+        #   loop: "{{ groups['k8s_controller'] }}"
+
+        # - name: Get IP for single APISERVER
+        #   set_fact:
+        #     APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+        # - name: Get IP for all host list
+        #   set_fact:
+        #     PEERS_IP: "{{ PEERS_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+        #   loop: "{{ groups['etcd'] }}"
+
+        # - name: Flatten dict to formatted string
+        #   set_fact:
+        #     ETCD_SERVER_URLS : "{{ ETCD_SERVER_URLS }}{{ (index > 0)|ternary(',','') }}https://{{item.value}}:2379"
+        #   loop: "{{  PEERS_IP | dict2items }}"
+        #   loop_control:
+        #     index_var: index
+

@@ -1,8 +1,6 @@
 ---
-- name: Childs Play™ (the movie)
+- name: Bind9
   hosts: dns
-  vars:
-    dummy: Null
 
   tasks:
   - name: bind and other packages
@@ -65,7 +63,10 @@
     #   shell:
     #     cmd: find /\{etc,var,usr\} -name \"\*\.jnl\" \-delete
 
-    - name: restart bind9
+
+    - name: Enable and Start service
       systemd:
-        name: bind9
+        enabled: yes
         state: restarted
+        name: bind9
+        daemon_reload: true
