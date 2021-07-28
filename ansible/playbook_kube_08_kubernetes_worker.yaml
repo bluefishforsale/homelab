@@ -80,7 +80,7 @@
             dest: "{{dirs['cni']['bin']}}"
             keep_newer: yes
 
-        - name: CNI Bridge config
+        - name: CNI Config Files
           copy:
             dest: "/etc/cni/net.d/{{item}}"
             content: '{{ lookup("template", "files/cni/{{item}}.j2") }}'
@@ -161,33 +161,41 @@
             state: absent
 
        ############### Config
+
+
+        # - name: Write config.toml
+        #   copy:
+        #     dest: "/etc/containerd/config.toml"
+        #     content: |
+        #       [plugins]
+        #         [plugins.cri.containerd]
+        #           snapshotter = "overlayfs"
+        #           [plugins.cri.containerd.default_runtime]
+        #             runtime_type = "io.containerd.runtime.v1.linux"
+        #             runtime_engine = "/usr/local/bin/runc"
+        #             runtime_root = ""
+
         - name: Generate vanilla containerd config
           shell: containerd config default
           register: containerd_config
 
-        - name: Write config.toml
+        - name: Write Containerd config
+          when: containerd_config.stdout | length > 0
           copy:
-            dest: "/etc/containerd/config.toml"
-            content: |
-              [plugins]
-                [plugins.cri.containerd]
-                  snapshotter = "overlayfs"
-                  [plugins.cri.containerd.default_runtime]
-                    runtime_type = "io.containerd.runtime.v1.linux"
-                    runtime_engine = "/usr/local/bin/runc"
-                    runtime_root = ""
-
-        # - name: Write Containerd config
-        #   when: containerd_config.stdout | length > 0
-        #   copy:
-        #     content: "{{ containerd_config.stdout }}"
-        #     dest: /etc/containerd/config.toml
+            content: "{{ containerd_config.stdout }}"
+            dest: /etc/containerd/config.toml
 
         # - name: change the system cgroup driver from false -> true
         #   replace:
         #     path: /etc/containerd/config.toml
-        #     regexp: '^(\s+SystemdCgroup\s+\=\s+)false$'
+        #     regexp: '^(\s+systemd_cgroup\s+\=\s+)false$'
         #     replace: '\1true'
+
+        # - name: change the system cgroup driver from false -> true
+        #   replace:
+        #     path: /etc/containerd/config.toml
+        #     regexp: '^(\s+runtime_engine\s+\=\s+).*$'
+        #     replace: '\1"/usr/local/bin/runc"'
 
         - name: Write systemd Startup
           copy:
@@ -216,7 +224,7 @@
         - name: enable and restart service
           systemd:
             name: containerd
-            state: started
+            state: restarted
             enabled: true
             daemon_reload: true
 
@@ -267,28 +275,3 @@
           with_items:
             - kubelet
             - kube-proxy
-
-    # - name: Kube SystemD templates
-    #   block:
-        # Make variables for the Kubernetes configfile
-        # - name: Get IP for all hosts, store in HOST_IP
-        #   set_fact:
-        #     HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-        #   loop: "{{ groups['k8s_controller'] }}"
-
-        # - name: Get IP for single APISERVER
-        #   set_fact:
-        #     APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
-
-        # - name: Get IP for all host list
-        #   set_fact:
-        #     PEERS_IP: "{{ PEERS_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-        #   loop: "{{ groups['etcd'] }}"
-
-        # - name: Flatten dict to formatted string
-        #   set_fact:
-        #     ETCD_SERVER_URLS : "{{ ETCD_SERVER_URLS }}{{ (index > 0)|ternary(',','') }}https://{{item.value}}:2379"
-        #   loop: "{{  PEERS_IP | dict2items }}"
-        #   loop_control:
-        #     index_var: index
-

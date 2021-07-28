@@ -12,8 +12,7 @@ dns01 ansible_connection=ssh  ansible_user=ubuntu
 node[000:004] ansible_connection=ssh  ansible_user=ubuntu
 
 [k8s_worker]
-node000 ansible_connection=ssh  ansible_user=ubuntu
-node004 ansible_connection=ssh  ansible_user=ubuntu
+node00[0:4] ansible_connection=ssh  ansible_user=ubuntu
 
 [k8s_controller]
 node[001:003] ansible_connection=ssh  ansible_user=ubuntu
