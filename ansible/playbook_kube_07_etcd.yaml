@@ -5,23 +5,29 @@
     - vars_kube.yaml
   vars:
     confpath: "/etc/etcd"
-    instpath: "/usr/local/etcd"
+    binpath: "/usr/local/bin"
     datapath: "/var/lib/etcd"
     org: etcd-io
     repo: etcd
-    filename: etcd-v3.5.0-linux-amd64.tar.gz
-    version: latest
-    project_url: https://api.github.com/repos/{{ org }}/{{ repo }}/releases
+    filename: "{{repo}}-{{version}}-linux-amd64.tar.gz"
+    version: v3.5.0
+    project_url: https://github.com/{{org}}/{{repo}}/releases/download/{{version}}/{{filename}}
 
   tasks:
-    - name: CA and certs
+    - name: Directories
       block:
-      - name: MKdir
+      - name: MKdir "{{confpath}}"
         file:
           path: "{{confpath}}"
           state: directory
           mode: 0700
-      - name: Copy certs
+        with_items: [ "{{confpath}}", "{{datapath}}" ]
+      - name: create tempdir
+        tempfile:
+          state: directory
+          suffix: _dwnld
+        register: tempfolder_1
+      - name: Copy certs for etcd
         copy:
           src: "files/cfssl/{{item}}"
           dest: "{{confpath}}/{{item}}"
@@ -31,78 +37,48 @@
           - kubernetes-key.pem
           - kubernetes.pem
 
-    - name: check {{ repo }} version
-      uri:
-        url: "{{ project_url }}/{{ version }}"
-        return_content: true
-      register: latest_version
-
-    - name: check if {{ repo }}-{{ version }} is already there
-      stat:
-        path: "{{ instpath }}/{{ repo }}-{{ latest_version.json.tag_name }}"
-      register: newestbinary
-
-    - name: Download and link to version {{ version }}
+    - name: Download {{repo}} {{version}}
       block:
-        - name: "check if {{ datapath }} exists"
-          file:
-            path: "{{ datapath }}"
-            state: directory
-            mode: 0700
 
-        - name: "check if {{ instpath }} exists"
-          file:
-            path: "{{ instpath }}"
-            state: directory
-            mode: 0700
-
-        - name: create tempdir
-          tempfile:
-            state: directory
-            suffix: _dwnld
-          register: tempfolder_1
-
-        - name: "installing {{ repo }} {{ latest_version.json.tag_name }}"
-          # idea from: https://stackoverflow.com/a/62672308/886659
-          loop: "{{ latest_version.json.assets }}"
-          when: "filename|string in item.name"
+        - name: "installing {{ repo }} {{version}}"
           unarchive:
             remote_src: yes
-            src: "{{ item.browser_download_url }}"
-            dest: "{{ tempfolder_1.path }}"
+            src: "{{project_url}}"
+            dest: "{{tempfolder_1.path}}"
             keep_newer: yes
             extra_opts:
             - --strip=1
             - --no-anchored
-            - "{{ repo }}"
 
-        - name: command because no mv available
-          command: mv "{{ tempfolder_1.path }}/{{ repo }}" "{{ instpath }}/{{ repo }}-{{ latest_version.json.tag_name }}"
-          args:
-            creates: "{{ instpath }}/{{ repo }}-{{ latest_version.json.tag_name }}"
+        - name: mv files to bindir
+          find:
+            paths: "{{tempfolder_1.path}}"
+            patterns: "etcd*"
+          register: etcd_files
 
-        - name: "link {{ repo }}-{{ latest_version.json.tag_name }} -> {{ repo }} "
+        # - name: print
+        #   debug:
+        #     msg: "{{etcd_files}}"
+
+        - name: mv files to bindir
+          command: mv "{{item.path}}" "{{binpath}}/{{item.path|basename}}-{{version}}"
+          with_items:  "{{etcd_files.files}}"
+
+        - name: chown files
+          command: chown root:root "{{binpath}}/{{item.path|basename}}-{{version}}"
+          with_items:  "{{etcd_files.files}}"
+
+        - name: ln files to bindir
+          command: ln -sf "{{binpath}}/{{item.path|basename}}-{{version}}" "{{binpath}}/{{item.path|basename}}"
+          with_items:  "{{etcd_files.files}}"
+
+        - name: rm tempdir
           file:
-            src: "{{ instpath }}/{{ repo }}-{{ latest_version.json.tag_name }}"
-            dest: "{{ instpath }}/{{ repo }}"
-            state: link
-            force: yes
-      when: not newestbinary.stat.exists
-      always:
-        - name: delete {{ tempfolder_1.path|default("tempfolder") }}
-          file:
-            path: "{{ tempfolder_1.path }}"
             state: absent
-          when: tempfolder_1.path is defined
-          ignore_errors: true
+            name: "{{tempfolder_1.path}}"
 
     - name: Make the EtcD systemd File
       block:
-        # # Make variables for the etcD configfile
-        # - name: Set variable all_hosts_but_this
-        #   set_fact:
-        #     all_hosts_but_this: "{{ groups['etcd'] | difference([inventory_hostname]) }}"
-
         - name: Get IP for a subset of hosts, store in HOST_IP
           set_fact:
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
@@ -114,11 +90,6 @@
           loop: "{{  HOST_IP | dict2items }}"
           loop_control:
             index_var: index
-
-        # - name: Get IP for all hosts, store in HOST_IP
-        #   set_fact:
-        #     HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-        #   loop: "{{ groups['etcd'] }}"
 
         # Create the config file from template
         - name: systemd Unit file

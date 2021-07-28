@@ -1,4 +1,3 @@
----
 - name: root and system level
   hosts: all
   vars:
@@ -29,7 +28,7 @@
         pkg:
           [
             golang, gcc, zsh, wget, curl, htop, iostat, iotop
-            nmap, make, netcat, strace, fping, bmon,
+            nmap, make, netcat, strace, fping, bmon, jq, yq, ccat
             iptraf-ng, tmux, glances, unzip, ntpdate
           ]
 

@@ -4,7 +4,7 @@ Documentation=https://github.com/coreos
 
 [Service]
 Type=notify
-ExecStart=/usr/local/etcd/etcd \
+ExecStart=/usr/local/bin/etcd \
   --name "{{inventory_hostname}}" \
   --cert-file=/etc/etcd/kubernetes.pem \
   --key-file=/etc/etcd/kubernetes-key.pem \
@@ -27,4 +27,3 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-EOF
