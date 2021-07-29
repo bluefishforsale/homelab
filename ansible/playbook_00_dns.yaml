@@ -22,6 +22,7 @@
 
     - name: configs
       copy:
+        force: yes
         src: bind9/{{ item  }}
         dest: /etc/bind/{{ item  }}
         owner: bind
@@ -41,6 +42,7 @@
 
     - name: zones
       copy:
+        force: yes
         src: bind9/{{ item  }}
         dest:  /var/lib/bind/{{ item  }}
         owner: bind

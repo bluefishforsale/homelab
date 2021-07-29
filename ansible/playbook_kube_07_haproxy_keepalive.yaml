@@ -52,6 +52,7 @@
 
         - name: write configs haproxy
           copy:
+            force: yes
             dest: "/etc/haproxy/haproxy.cfg"
             content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
             mode: 0644
@@ -60,6 +61,7 @@
 
         - name: write configs keepalived
           copy:
+            force: yes
             dest: "/etc/keepalived/keepalived.conf"
             content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
             mode: 0644

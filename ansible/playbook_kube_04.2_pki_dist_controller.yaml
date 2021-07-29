@@ -17,6 +17,7 @@
 
     - name: Copy PEM and Keys (controller)
       copy:
+        force: yes
         dest: "{{ k8s_dir }}/{{ item }}"
         src: "files/cfssl/{{item}}"
         mode: 0644

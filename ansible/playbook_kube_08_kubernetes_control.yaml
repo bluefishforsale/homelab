@@ -76,6 +76,7 @@
         # Create the config file from template
         - name: systemd service
           copy:
+            force: yes
             dest: "/etc/systemd/system/{{item}}.service"
             content: '{{ lookup("template", "files/kubernetes/{{item}}.service.j2") }}'
             mode: 0644
@@ -88,6 +89,7 @@
 
         - name: kube-scheduler yaml
           copy:
+            force: yes
             dest: "/etc/kubernetes/config/kube-scheduler.yaml"
             src: "files/kubernetes/kube-scheduler.yaml"
             mode: 0644

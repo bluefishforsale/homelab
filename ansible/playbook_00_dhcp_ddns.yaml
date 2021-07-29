@@ -42,6 +42,7 @@
 
     - name: Config files
       copy:
+        force: yes
         src: isc-dhcp-server/{{ item  }}
         dest: "{{ item  }}"
         owner: root

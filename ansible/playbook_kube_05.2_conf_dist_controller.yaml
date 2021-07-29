@@ -19,6 +19,7 @@
 
     - name: Copy admin controller and scheduler configs
       copy:
+        force: yes
         dest: "{{ k8s_dir }}/{{ item }}"
         src: "files/kubeconf/{{item}}"
         mode: 0644

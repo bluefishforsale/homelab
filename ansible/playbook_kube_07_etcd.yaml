@@ -29,6 +29,7 @@
         register: tempfolder_1
       - name: Copy certs for etcd
         copy:
+          force: yes
           src: "files/cfssl/{{item}}"
           dest: "{{confpath}}/{{item}}"
           mode: 0700
@@ -94,6 +95,7 @@
         # Create the config file from template
         - name: systemd Unit file
           copy:
+            force: yes
             dest: "/etc/systemd/system/etcd.service"
             content: '{{ lookup("template", "files/etcd/etcd.service.j2") }}'
             mode: 0644

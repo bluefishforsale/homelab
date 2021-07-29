@@ -17,6 +17,7 @@
 
     - name: Copy PEM and Keys (workers)
       copy:
+        force: yes
         dest: "{{ pki_dir }}/{{ item }}"
         src: "files/cfssl/{{item}}"
         mode: 0644

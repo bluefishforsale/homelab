@@ -51,6 +51,7 @@
 
   - name: copy ntpdate cron
     copy:
+      force: yes
       src: files/crons/ntpdate.cron
       dest: /etc/cron.d/cron.ntpdate
       owner: root

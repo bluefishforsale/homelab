@@ -79,6 +79,7 @@
 
       - name: tmux conf
         copy:
+          force: yes
           src: files/tmux.conf
           dest: ~/.tmux.conf
 
@@ -89,6 +90,7 @@
 
       - name: Glances conf
         copy:
+          force: yes
           src: files/glances.conf
           dest: /etc/skel/.config/glances/glances.conf
 

@@ -9,6 +9,10 @@ PEERS_IP: {}
 PEERS_MAP: ""
 ETCD_SERVER_URLS: ""
 
+# Kube Cluster Meta
+KUBE_CLUSER_NAME: "k8s"
+KUBECONFIG: "kubeconfig"
+
 # Kube networking
 KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
 APISERVER: "apiserver.home"
