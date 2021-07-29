@@ -23,46 +23,54 @@
           regexp: '^%sudo'
           line: '%sudo ALL=(ALL) NOPASSWD: ALL'
 
-      - name: install oh my zsh as root
+      - name: install oh-my-zsh into root
         shell:
           cmd: curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -
           creates: /root/.oh-my-zsh
 
+      - name: Change root shell to zsh
+        shell:
+          cmd: chsh -s /bin/zsh root
+
       - name: move oh-my-zsh to /usr/share
         shell:
-          cmd: mv /root/.oh-my-zsh /usr/share/oh-my-zsh
-          creates: /root/.oh-my-zsh
+          cmd: cp -r /root/.oh-my-zsh /usr/share/oh-my-zsh
 
-      - name: copy zshrc template
-        shell:
-          cmd: cp /usr/share/oh-my-zsh/templates/zshrc.zsh-template /usr/share/oh-my-zsh/zshrc
-          creates: /root/.oh-my-zsh
+      # - name: copy zshrc template
+      #   shell:
+      #     cmd: cp /usr/share/oh-my-zsh/templates/zshrc.zsh-template /usr/share/oh-my-zsh/zshrc
 
       # - name: /etc/skel zshrc symlink
       #   shell:
-      #     cmd: ln /usr/share/oh-my-zsh/zshrc /etc/skel/.zshrc
-      #     creates: /etc/skel/.zshrc
+      #     cmd: ln -sf /usr/share/oh-my-zsh/zshrc /etc/skel/.zshrc
 
       - name: install powerlevel10k
         git:
           repo: https://github.com/romkatv/powerlevel10k
-          dest: /usr/share/oh-my-zsh/custom/themes/powerlevel10k
+          dest: /root/.oh-my-zsh/themes/powerlevel10k
           accept_hostkey: yes
           force: yes
           depth: 1
 
-      # - name: Set p10k THEME in .zshrc
-      #   lineinfile:
-      #     path: /etc/skel/.zshrc
-      #     state: present
-      #     backrefs: yes
-      #     regexp: '^ZSH_THEME='
-      #     line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+      - name: Set p10k THEME in .zshrc
+        lineinfile:
+          path: /root/.zshrc
+          state: present
+          backrefs: yes
+          regexp: '^ZSH_THEME='
+          line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
 
-      # - name: p10k config and state
-      #   copy:
-      #     src: files/p10k.zsh
-      #     dest: /etc/skel/.p10k.zsh
+      - name: p10k config file
+        copy:
+          force: yes
+          src: files/shell/p10k.zsh
+          dest: /root/.p10k.zsh
+
+      - name: P10k DISABLE_CONFIGURATION_WIZARD
+        lineinfile:
+          path: /root/.zshrc
+          state: present
+          line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
 
       - name: ultimate vim
         shell:
@@ -80,18 +88,18 @@
       - name: tmux conf
         copy:
           force: yes
-          src: files/tmux.conf
+          src: files/shell/tmux.conf
           dest: ~/.tmux.conf
 
       - name: Ensures /etc/skel/.config/glances path exists
         file:
           path: /etc/skel/.config/glances
-        state: directory
+          state: directory
 
       - name: Glances conf
         copy:
           force: yes
-          src: files/glances.conf
+          src: files/shell/glances.conf
           dest: /etc/skel/.config/glances/glances.conf
 
       # - name: add each user one at a time with some custom setup

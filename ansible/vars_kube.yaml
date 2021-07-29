@@ -15,7 +15,7 @@ KUBECONFIG: "kubeconfig"
 
 # Kube networking
 KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
-APISERVER: "apiserver.home"
+APISERVER: "apiserver"
 APISERVER_IP: ""
 SERVICE_CLUSTER_CIDR: "172.20.0.0/24"
 CLUSTER_CIDR: "172.18.0.0/16"

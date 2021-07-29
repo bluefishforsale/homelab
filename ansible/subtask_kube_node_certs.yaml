@@ -4,16 +4,8 @@
     src: files/cfssl/_instance-template-csr.json
     dest: "files/cfssl/{{ item }}-csr.json"
 
-- name: The Admin Client Certificate
-  delegate_to: localhost
-  shell:
-    cmd:  dig +short "{{item}}"
-  register: node_ip_addr
-
 - name: Kubelet Client Certs
   delegate_to: localhost
   shell:
-    # had to take the IP off the hostname command for ansible tp run it. if this is a problem, find a way to add back
-    # ,{{node_ip_addr}}
     cmd: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{item}} -profile=kubernetes {{item}}-csr.json | cfssljson -bare {{item}}"
     chdir: files/cfssl/
