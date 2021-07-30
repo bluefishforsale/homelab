@@ -6,12 +6,10 @@ Requires=containerd.service
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \
+  --kubeconfig={{pki_dir}}/{{inventory_hostname}}.kubeconfig  \
   --config={{pki_dir}}/kubelet-config.yaml \
   --container-runtime=remote \
   --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \
-  --image-pull-progress-deadline=2m \
-  --kubeconfig={{pki_dir}}/{{inventory_hostname}}.kubeconfig  \
-  --network-plugin=cni \
   --register-node=true \
   --v=2
 Restart=on-failure

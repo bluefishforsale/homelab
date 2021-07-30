@@ -8,7 +8,7 @@
     "ipam": {
         "type": "host-local",
         "ranges": [
-          [{"subnet": "{{ POD_CIDR }}"} ]
+          [{ "subnet": "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{inventory_hostname}}.0/{{POD_NETMASK}}" }]
         ],
         "routes": [{"dst": "0.0.0.0/0"}]
     }

@@ -12,10 +12,11 @@ authorization:
 clusterDomain: "cluster.local"
 clusterDNS:
 {% for item in groups['dns'] %}
-    - {{ lookup('community.general.dig', item) }}
+  - {{ lookup('community.general.dig', item) }}
 {% endfor %}
-podCIDR: "{{POD_CIDR}}"
-resolvConf: "/run/systemd/resolve/resolv.conf"
+cgroupDriver: systemd
+podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{inventory_hostname}}.0/{{POD_NETMASK}}"
+resolvConf: /run/systemd/resolve/resolv.conf
 runtimeRequestTimeout: "15m"
 tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"
 tlsPrivateKeyFile: "{{pki_dir}}/{{inventory_hostname}}-key.pem"

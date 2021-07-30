@@ -60,7 +60,7 @@
     - name: API Server Certificate
       delegate_to: localhost
       shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,{{ '.'.join(SERVICE_CLUSTER_CIDR.split('.')[0:3]) }}.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}} -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=127.0.0.1,{{ '.'.join(SERVICE_CLUSTER_IP_RANGE.split('.')[:3]) }}.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}} -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
         chdir: "{{ cfssl }}"
 
     - name: Service Account Key Pair

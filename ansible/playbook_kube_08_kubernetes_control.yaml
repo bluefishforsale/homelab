@@ -52,7 +52,7 @@
     - name: Kube SystemD templates
       block:
         # Make variables for the Kubernetes configfile
-        - name: Get IP for all hosts, store in HOST_IP
+        - name: "Get IP for {{item}} hosts, store in HOST_IP"
           set_fact:
             HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
           loop: "{{ groups['k8s_controller'] }}"
@@ -74,7 +74,7 @@
             index_var: index
 
         # Create the config file from template
-        - name: systemd service
+        - name: "{{item}} systemd service"
           copy:
             force: yes
             dest: "/etc/systemd/system/{{item}}.service"
@@ -96,7 +96,7 @@
             group: root
             owner: root
 
-        - name: enable and restart kubernetes
+        - name: "Enable and restart {{item}}"
           systemd:
             name: "{{item}}"
             state: restarted
