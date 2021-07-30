@@ -15,7 +15,7 @@ clusterDNS:
   - {{ lookup('community.general.dig', item) }}
 {% endfor %}
 cgroupDriver: systemd
-podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{inventory_hostname}}.0/{{POD_NETMASK}}"
+podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{HOST_IP[inventory_hostname].split('.')[-1]}}.0/{{POD_NETMASK}}"
 resolvConf: /run/systemd/resolve/resolv.conf
 runtimeRequestTimeout: "15m"
 tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"
