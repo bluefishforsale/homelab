@@ -48,7 +48,7 @@
     - name: Hostname expansion into dict of name:ip
       set_fact:
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-      loop: "{{ groups['k8s_controller'] + [APISERVER]}}"
+      loop: "{{ groups['k8s_controller'] + [APISERVER] }}"
 
     - name: Flatten dict to formatted string, store PEERS_MAP
       set_fact:
