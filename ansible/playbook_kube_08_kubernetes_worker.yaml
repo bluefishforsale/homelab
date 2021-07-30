@@ -96,15 +96,6 @@
 ################# Sysctl, modules, swap
     - name: Sysctl, modules, swap
       block:
-      # - name: swapp-off fstab
-      #   shell: sed -i '/swap / s/^\(.*\)$/#\1/g' /etc/fstab
-
-      # - name: Sudo group gets passwordless sudo access
-      #   lineinfile:
-      #     path:  /etc/fstab
-      #     state: present
-      #     regexp: '(^/swap.*)$'
-      #     line: '#\1'
 
       - name: Swap off in /etc/fstab
         replace:

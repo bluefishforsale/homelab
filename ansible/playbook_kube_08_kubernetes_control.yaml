@@ -91,7 +91,7 @@
           copy:
             force: yes
             dest: "/etc/kubernetes/config/kube-scheduler.yaml"
-            src: "files/kubernetes/kube-scheduler.yaml"
+            content: '{{ lookup("template", "files/kubernetes/kube-scheduler.yaml.j2") }}'
             mode: 0644
             group: root
             owner: root
