@@ -1,5 +1,12 @@
 # how to run these playbooks
 
+### TL;DR
+
+Run all kube playbooks in order and setup the cluster from scratch
+```
+for FILE in playbook*kube*.yaml ; do ansible-playbook -i inventory.yaml $FILE ; done
+```
+
 # examples:
 ### Become Root ask pass
 ansible-playbook -i inventory.yaml playbook.yaml -K
