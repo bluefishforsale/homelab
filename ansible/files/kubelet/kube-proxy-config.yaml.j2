@@ -5,7 +5,9 @@ clientConnection:
   acceptContentTypes: ""
   contentType: application/vnd.kubernetes.protobuf
   kubeconfig: "{{pki_dir}}/kube-proxy.kubeconfig"
-mode: "iptables"
+mode: "ipvs"
+ipvs:
+  strictARP: true
 clusterCIDR: "{{CLUSTER_CIDR}}"
 metricsBindAddress: 127.0.0.1:10249
 
