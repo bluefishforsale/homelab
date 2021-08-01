@@ -90,8 +90,8 @@
             group: root
             owner: root
           with_items:
-            - 10-bridge.conf
             - 99-loopback.conf
+            # - 10-bridge.conf
 
 ################# Sysctl, modules, swap
     - name: Sysctl, modules, swap
@@ -188,18 +188,6 @@
             force: yes
             content: "{{ containerd_config.stdout }}"
             dest: /etc/containerd/config.toml
-
-        # - name: change the system cgroup driver from false -> true
-        #   replace:
-        #     path: /etc/containerd/config.toml
-        #     regexp: '^(\s+systemd_cgroup\s+\=\s+)false$'
-        #     replace: '\1true'
-
-        # - name: change the system cgroup driver from false -> true
-        #   replace:
-        #     path: /etc/containerd/config.toml
-        #     regexp: '^(\s+runtime_engine\s+\=\s+).*$'
-        #     replace: '\1"/usr/local/bin/runc"'
 
         - name: Write systemd Startup
           copy:
