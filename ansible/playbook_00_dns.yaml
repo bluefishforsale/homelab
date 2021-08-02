@@ -49,6 +49,7 @@
         group: bind
         mode: 0644
       with_items:
+        - k8s_ingress.zone
         - home.zone
         - db.rev.1.168.192.in-addr.arpa
 

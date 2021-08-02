@@ -8,6 +8,11 @@
 
 include "/etc/bind/rndc.key";
 
+zone "cluster.local" {
+  type master;
+  file "/var/lib/bind/k8s_ingress.zone";
+};
+
 zone "home" {
   type master;
   file "/var/lib/bind/home.zone";

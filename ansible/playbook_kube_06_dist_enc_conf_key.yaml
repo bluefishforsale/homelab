@@ -7,12 +7,11 @@
   vars_files:
     - vars_kube.yaml
   tasks:
-
     - name: Copy Key To Controllers
       copy:
         force: yes
-        dest: "{{ kube_dir }}/{{ item }}"
-        content: '{{ lookup("template", "{{files}}/encryption-config.yaml.j2") }}'
+        dest: "{{kube_dir}}/{{item}}"
+        content: '{{lookup("template", "{{files}}/{{item}}.j2")}}'
         mode: 0644
         group: root
         owner: root

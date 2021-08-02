@@ -1,23 +1,22 @@
 - name: Experimental x-12
-  hosts: etcd
-  vars:
-    dirs:
-      cni:
-        conf: /etc/cni/net.d
-        bin: /opt/cni/bin
-      kubernetes:
-        conf: /etc/kubernetes/config
-        static: /etc/kubernetes/manifests
-        data: /var/lib/kubernetes
-        lock: /var/run/kubernetes
-      system:
-        bin: /usr/local/bin
-      kube-proxy:
-        data: /var/lib/kube-proxy
+  hosts: localhost
+  # vars:
+  #   dirs:
+  #     cni:
+  #       conf: /etc/cni/net.d
+  #       bin: /opt/cni/bin
+  #     kubernetes:
+  #       conf: /etc/kubernetes/config
+  #       static: /etc/kubernetes/manifests
+  #       data: /var/lib/kubernetes
+  #       lock: /var/run/kubernetes
+  #     system:
+  #       bin: /usr/local/bin
+  #     kube-proxy:
+  #       data: /var/lib/kube-proxy
 
   tasks:
+
     - name: print debug
       debug:
-        msg: "{{ item.value }}"
-      with_dict: "{{dirs.values()}}"
-
+        msg: "{{ lookup('community.general.random', base64=true, length=32) }}"

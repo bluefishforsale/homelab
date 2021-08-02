@@ -4,10 +4,6 @@
     new_paths: '/usr/local/go/bin'
 
   tasks:
-  - name: Seconds since last apt-get update
-    shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
-    register: apt_get_update_secs
-
   - name: Stop snapd
     systemd:
       state: "{{ item }}"
@@ -20,7 +16,6 @@
     become: yes
     block:
     - name: apt-get update
-      # when: apt_get_update_secs.stdout|int > 1800
       apt: update_cache=yes
 
     - name: Install a suite of common tools
