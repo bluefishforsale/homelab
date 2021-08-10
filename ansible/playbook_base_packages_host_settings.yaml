@@ -1,43 +1,42 @@
 - name: root and system level
+  become: yes
   hosts: all
+  vars_files:
+    - vars_kube.yaml
   vars:
     new_paths: '/usr/local/go/bin'
 
   tasks:
   - name: Stop snapd
     systemd:
-      state: "{{ item }}"
+      state: stopped
       name: snapd
-    with_items:
-      - stopped
-      - disabled
+      enabled: false
+      daemon_reload: true
 
-  - name: base packages
-    become: yes
-    block:
-    - name: apt-get update
-      apt: update_cache=yes
+  - name: apt-get update
+    apt: update_cache=yes
 
-    - name: Install a suite of common tools
-      apt:
-        pkg:
-          [
-            golang, gcc, zsh, wget, curl, htop, iostat, iotop
-            nmap, make, netcat, strace, fping, bmon, jq, yq, ccat
-            iptraf-ng, tmux, glances, unzip, ntpdate, net-tools
-          ]
+  - name: Install a suite of common tools
+    apt:
+      pkg:
+        [
+          golang, gcc, zsh, wget, curl, htop, sysstat, iotop,
+          nmap, make, netcat, strace, fping, bmon, jq,
+          iptraf-ng, tmux, glances, unzip, ntpdate, net-tools
+        ]
 
-    - name: old_paths
-      shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
-      register: old_paths
+  - name: old_paths
+    shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
+    register: old_paths
 
-    - name: add go to the environment PATH
-      lineinfile:
-        path: /etc/environment
-        state: present
-        backrefs: yes
-        regexp: '^PATH=.*'
-        line: 'PATH={{ old_paths.stdout }}:{{ new_paths }}'
+  - name: add go to the environment PATH
+    lineinfile:
+      path: /etc/environment
+      state: present
+      backrefs: yes
+      regexp: '^PATH=.*'
+      line: 'PATH={{ old_paths.stdout }}:{{ new_paths }}'
 
   - name: Set the Host TZ and hwclock to UTC
     community.general.timezone:
@@ -54,4 +53,21 @@
       mode: 0644
 
   - name: set time and date from NTP upstream
-    shell: /usr/sbin/ntpdate time.nist.gov 
+    shell: /usr/sbin/ntpdate time.nist.gov
+
+  - name: rsyslog remote server
+    copy:
+      force: yes
+      dest: "/etc/rsyslog.d/99-remote-syslog.conf"
+      content: |
+        module(load="omprog")
+        module(load="mmutf8fix")
+        action(type="mmutf8fix" replacementChar="?")
+        action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_TraditionalForwardFormat" TCP_Framing="octet-counted" KeepAlive="on")
+
+  - name: reload rsyslog
+    systemd:
+      name: rsyslog
+      state: restarted
+      enabled: true
+      daemon_reload: true
