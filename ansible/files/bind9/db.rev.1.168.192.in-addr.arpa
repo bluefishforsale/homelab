@@ -2,7 +2,7 @@ $ORIGIN  1.168.192.in-addr.arpa.
 $TTL 86400 ; 1 day
 
 @ IN SOA dns01.home. dnsadmin.home. (
-      2021073000  ; serial
+      2021080700  ; serial
       3600        ; refresh (1 hours)
       3600        ; retry (1 hour)
       3600        ; expire (1 hour)
