@@ -1,0 +1,19 @@
+- name: NFS server install and configure mounts
+  hosts: all
+  become: yes
+  tasks:
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['all'] }}"
+
+    - name: install
+      apt:
+        name: [ nfs-kernel-server ]
+        state: present
+        update_cache: yes
+
+    - name: mkdir the nfsv4 share root
+      file:
+        dest: "/srv/nfs4/"
+        state: directory
