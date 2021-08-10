@@ -25,6 +25,12 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --kubelet-client-certificate={{pki_dir}}/kubernetes.pem \
   --kubelet-client-key={{pki_dir}}/kubernetes-key.pem \
   --requestheader-client-ca-file={{pki_dir}}/ca.pem \
+  --requestheader-allowed-names=apiserver \
+  --requestheader-extra-headers-prefix=X-Remote-Extra- \
+  --requestheader-group-headers=X-Remote-Group \
+  --requestheader-username-headers=X-Remote-User \
+  --proxy-client-cert-file={{pki_dir}}/kubernetes.pem \
+  --proxy-client-key-file={{pki_dir}}/kubernetes-key.pem \
   --runtime-config='api/all=true' \
   --service-account-issuer=https://{{APISERVER}} \
   --service-account-key-file={{pki_dir}}/service-account.pem \
