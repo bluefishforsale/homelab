@@ -24,11 +24,13 @@
         group: root
         owner: root
       with_items:
-        - "ca.pem"
-        - "ca-key.pem"
-        - "kubernetes-key.pem"
-        - "kubernetes.pem"
-        - "service-account-key.pem"
-        - "service-account.pem"
+        - ca.pem
+        - ca-key.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+        - service-account-key.pem
+        - service-account.pem
+        - kube-aggregator.pem
+        - kube-aggregator-key.pem
         - "{{inventory_hostname}}-key.pem"
         - "{{inventory_hostname}}.pem"

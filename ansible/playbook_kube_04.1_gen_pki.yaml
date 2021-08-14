@@ -38,6 +38,12 @@
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
         chdir: "{{ cfssl }}"
 
+    - name: Kube Aggregation Layer Certificate
+      delegate_to: localhost
+      shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-aggregator-csr.json | cfssljson -bare kube-aggregator
+        chdir: "{{ cfssl }}"
+
     - name: Scheduler Client Certificate
       delegate_to: localhost
       shell:

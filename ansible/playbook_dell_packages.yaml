@@ -50,3 +50,12 @@
         src: /opt/MegaRAID/perccli/perccli64
         dest: /usr/local/bin/perccli64
         state: link
+
+    # - name: intel x520-DA2
+    #   unarchive:
+    #     remote_src: https://sourceforge.net/projects/e1000/files/ixgbe%20stable/5.12.5/ixgbe-5.12.5.tar.gz/download
+    #     dest: /tmp/ixgbe-5.12.5.tar.gz
+    # - name: packages needed
+    #   apt:
+    #     name: []
+

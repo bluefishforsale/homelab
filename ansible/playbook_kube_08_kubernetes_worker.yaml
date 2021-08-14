@@ -227,7 +227,7 @@
 
         - name: Worker Apt Packages
           apt:
-            pkg: [ socat, conntrack, ipset ]
+            pkg: [ socat, conntrack, ipset, nfs-common]
 
         - name: "installing {{repo}} {{version}}"
           get_url:
@@ -235,7 +235,7 @@
             dest: "{{dirs['system']['bin']}}/{{ item }}"
             mode: 0755
           with_items: "{{binaries}}"
-  
+
         - name: Kube*-configs
           copy:
             force: yes
@@ -244,8 +244,8 @@
             mode: 0644
             group: root
             owner: root
-          with_dict: { 
-            kubelet: /var/lib/kubernetes/, 
+          with_dict: {
+            kubelet: /var/lib/kubernetes/,
             kube-proxy: /var/lib/kube-proxy/
             }
 

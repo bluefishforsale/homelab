@@ -1,0 +1,10 @@
+# - name: Kube 20 Labels
+#   hosts: localhost
+#   vars_files:
+#     - vars_kube.yaml
+
+#   tasks:
+#     - name: loop through nodes and apply labels
+#       shell:
+#         cmd: kubectl
+#       loop: "{{ groups['k8s_worker']['k8s_labels'] }}"
