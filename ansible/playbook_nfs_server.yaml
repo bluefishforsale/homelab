@@ -2,12 +2,7 @@
   hosts: all
   become: yes
   tasks:
-    - name: Get IP for a subset of hosts, store in HOST_IP
-      set_fact:
-        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-      loop: "{{ groups['all'] }}"
-
-    - name: install
+    - name: install nfs server
       apt:
         name: [ nfs-kernel-server ]
         state: present
@@ -15,5 +10,27 @@
 
     - name: mkdir the nfsv4 share root
       file:
-        dest: "/srv/nfs4/"
+        dest: "/srv/nfs4/root"
         state: directory
+        mode: 0777
+        owner: nobody
+        group: nogroup
+
+    - name: Ensure required entries are made to hosts file
+      lineinfile:
+        path: /etc/exports
+        state: present
+        line: "{{ item }}"
+      with_items:
+        - '/srv/nfs4  *(rw,sync,no_subtree_check,crossmnt,fsid=0)'
+        - '/srv/nfs4/root *(rw,sync,no_subtree_check)'
+
+    - name: systemd enable and restart nfs-server
+      systemd:
+        name: nfs-server
+        state: restarted
+        enabled: true
+        daemon_reload: true
+
+    - name: Re-export the share
+      command: exportfs -rav
