@@ -51,11 +51,60 @@
         dest: /usr/local/bin/perccli64
         state: link
 
-    # - name: intel x520-DA2
-    #   unarchive:
-    #     remote_src: https://sourceforge.net/projects/e1000/files/ixgbe%20stable/5.12.5/ixgbe-5.12.5.tar.gz/download
-    #     dest: /tmp/ixgbe-5.12.5.tar.gz
-    # - name: packages needed
-    #   apt:
-    #     name: []
+    - name: intel x520-DA2 download
+      unarchive:
+        remote_src: yes
+        src: https://sourceforge.net/projects/e1000/files/ixgbe%20stable/5.12.5/ixgbe-5.12.5.tar.gz/download
+        dest: /tmp/
 
+    - name: intel x520-DA2 package setup
+      shell: >
+        cd /tmp/ixgbe-5.12.5
+        make install
+
+    - name: load the module
+      shell: >
+        modprobe ixgbe
+
+    - name: intel x520-DA2 modules file
+      copy:
+        force: yes
+        dest: "/etc/modules-load.d/ixgbe"
+        content: |
+          ixgbe
+
+    - name: netplan for 10G bonded
+      copy:
+        force: yes
+        dest: "/etc/netplan/05-10G-bonding.yaml"
+        content: |
+          network:
+            version: 2
+            renderer: networkd
+            ethernets:
+              enp65s0f0:
+                dhcp4: false
+                dhcp6: false
+              enp65s0f1:
+                dhcp4: false
+                dhcp6: false
+            bonds:
+              bond0:
+                interfaces:
+                  - enp65s0f0
+                  - enp65s0f1
+                addresses: ["{{lookup('community.general.dig', inventory_hostname)}}/24"]
+                gateway4: 192.168.1.1
+                nameservers:
+                  addresses: [192.168.1.2]
+                dhcp4: false
+                dhcp6: false
+                parameters:
+                  mode: 802.3ad
+                  lacp-rate: fast
+                  mii-monitor-interval: 100
+                  transmit-hash-policy: layer2+3
+
+    - name: netplan apply
+      shell: >
+        netplan apply

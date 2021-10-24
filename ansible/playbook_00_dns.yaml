@@ -49,7 +49,7 @@
         group: bind
         mode: 0644
       with_items:
-        - k8s_ingress.zone
+        - cluster.local.zone
         - home.zone
         - db.rev.1.168.192.in-addr.arpa
 
@@ -62,9 +62,9 @@
     - name: Check reverse mapping zone
       shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
 
-    # - name: remove the jnl files before restart
-    #   shell:
-    #     cmd: find /\{etc,var,usr\} -name \"\*\.jnl\" \-delete
+    - name: remove the jnl files before restart
+      shell:
+        cmd: find /var/lib/bind -type f -name "*.jnl" -delete
 
 
     - name: Enable and Start service

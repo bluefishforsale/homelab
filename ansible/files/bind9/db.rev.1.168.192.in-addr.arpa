@@ -30,9 +30,9 @@ $TTL 86400 ; 1 day
 102		IN		PTR		node002.home.
 103		IN		PTR		node003.home.
 104		IN		PTR		node004.home.
+105		IN		PTR		node005.home.
+106		IN		PTR		node006.home.
 
-; 105		IN		PTR		node005.home.
-; 106		IN		PTR		node006.home.
 ; 107		IN		PTR		node007.home.
 ; 108		IN		PTR		node008.home.
 ; 109		IN		PTR		node009.home.
