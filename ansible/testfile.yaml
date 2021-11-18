@@ -1,7 +1,7 @@
 - name: Experimental x-12
-  hosts: localhost
-  # vars:
-  #   dirs:
+  hosts: all
+  vars:
+    iface_names: []
   #     cni:
   #       conf: /etc/cni/net.d
   #       bin: /opt/cni/bin
@@ -16,7 +16,25 @@
   #       data: /var/lib/kube-proxy
 
   tasks:
+    # - name: print debug
+    #   debug:
+    #     msg: "{{ ansible_facts['eno1']['module'] }}"
+    - name: print debug
+      set_fact:
+        iface_names: "{{ iface_names + [item] }}"
+      when: hostvars[inventory_hostname]['ansible_' + item]['type'] == 'ether'
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+
+    # - name: print debug
+    #   debug:
+    #     msg: "{{ hostvars[inventory_hostname]['ansible_' + item]['module'] }}"
+    #   when: hostvars[inventory_hostname]['ansible_' + item]['type'] == 'ether'
+    #   with_items:
+    #     - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
 
     - name: print debug
       debug:
-        msg: "{{ lookup('community.general.random', base64=true, length=32) }}"
+        msg: "{{ sorted_ifaces[-2:] }}"
+      vars:
+        sorted_ifaces: "{{ iface_names | sort }}"

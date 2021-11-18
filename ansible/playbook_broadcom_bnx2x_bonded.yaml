@@ -1,0 +1,70 @@
+- name: bnx2x Network
+  hosts: all
+
+  tasks:
+  - name:  Network driver, netplan and tuning specific to interfaces
+    become: yes
+    block:
+
+    - name: netplan for bnx2x 10G bonded
+      copy:
+        force: yes
+        dest: "/etc/netplan/05-10G-bonding.yaml"
+        content: |
+          network:
+            version: 2
+            renderer: networkd
+            ethernets:
+              eno1:
+                mtu: 8192
+                dhcp4: false
+                dhcp6: false
+              eno2:
+                mtu: 8192
+                dhcp4: false
+                dhcp6: false
+            bonds:
+              bond0:
+                mtu: 8192
+                interfaces:
+                  - eno1
+                  - eno2
+                addresses: ["{{lookup('community.general.dig', inventory_hostname)}}/24"]
+                gateway4: 192.168.1.1
+                nameservers:
+                  addresses: [192.168.1.2]
+                dhcp4: false
+                dhcp6: false
+                parameters:
+                  mode: 802.3ad
+                  lacp-rate: slow
+                  mii-monitor-interval: 500ms
+                  fail-over-mac-policy: follow
+                  transmit-hash-policy: layer3+4
+
+    - name: netplan apply
+      shell: >
+        netplan apply
+
+    - name: 10g tc qdisc boot oneshot service
+      copy:
+        dest: /etc/systemd/system/10g_qdisc.service
+        content: |
+          [Unit]
+          After=network.target
+
+          [Install]
+          WantedBy=multi-user.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=true
+          ExecStart=/sbin/tc qdisc add dev enp65s0f0 root fq maxrate 9gbit
+          ExecStart=/sbin/tc qdisc add dev enp65s0f1 root fq maxrate 9gbit
+
+    - name: Enable and Start service
+      systemd:
+        enabled: yes
+        state: restarted
+        name: 10g_qdisc.service
+        daemon_reload: true
