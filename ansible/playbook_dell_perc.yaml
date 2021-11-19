@@ -1,8 +1,5 @@
----
 - name: root and system level
   hosts: all
-  vars:
-    foo: bar
 
   tasks:
   - name: Tools and Utilities
@@ -50,3 +47,10 @@
         src: /opt/MegaRAID/perccli/perccli64
         dest: /usr/local/bin/perccli64
         state: link
+
+    # todo fix this so it only runs when needed
+    # right now we have a few controller types and only one supports jbod
+    # so we hammer blindly at all the others to make the disks show up
+    - name: make one vd per pd
+      shell: |
+        for ((x=0;x<=7;x++)) ; do sudo perccli64 /c0 add vd r0 drives=32:$x ; done
