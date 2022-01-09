@@ -6,5 +6,5 @@
 #   tasks:
 #     - name: loop through nodes and apply labels
 #       shell:
-#         cmd: kubectl
+#         cmd: "kubectl label nodes {item}"
 #       loop: "{{ groups['k8s_worker']['k8s_labels'] }}"

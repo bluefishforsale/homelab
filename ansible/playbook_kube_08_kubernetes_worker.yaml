@@ -17,15 +17,10 @@
         bin: /usr/local/bin
       kube-proxy:
         data: /var/lib/kube-proxy
-    org: kubernetes
-    repo: kubernetes
     binaries:
       - kube-proxy
       - kubelet
       - kubectl
-    version: v1.21.3
-    project_url: "https://storage.googleapis.com/kubernetes-release/release/{{version}}/bin/linux/amd64"
-    containerd_version: "1.5.2"
 
   tasks:
     - name: Get IP for a subset of hosts, store in HOST_IP
@@ -150,7 +145,7 @@
         - name: Installing containerd
           unarchive:
             remote_src: yes
-            src: https://github.com/containerd/containerd/releases/download/v{{containerd_version}}/containerd-{{containerd_version}}-linux-amd64.tar.gz
+            src: https://github.com/containerd/containerd/releases/download/v{{CONTAINERD_VERSION}}/containerd-{{CONTAINERD_VERSION}}-linux-amd64.tar.gz
             dest: "{{ tmpdir_1.path }}"
 
         - name: get filenames
@@ -160,15 +155,15 @@
           register: cont_files
 
         - name: mv files to bindir
-          command: mv "{{item.path}}" "{{dirs['system']['bin']}}/{{item.path|basename}}-{{containerd_version}}"
+          command: mv "{{item.path}}" "{{dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
           with_items:  "{{cont_files.files}}"
 
         - name: chown files
-          command: chown root:root "{{dirs['system']['bin']}}/{{item.path|basename}}-{{containerd_version}}"
+          command: chown root:root "{{dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
           with_items:  "{{cont_files.files}}"
 
         - name: ln files to bindir
-          command: ln -sf "{{dirs['system']['bin']}}//{{item.path|basename}}-{{containerd_version}}" "{{dirs['system']['bin']}}//{{item.path|basename}}"
+          command: ln -sf "{{dirs['system']['bin']}}//{{item.path|basename}}-{{CONTAINERD_VERSION}}" "{{dirs['system']['bin']}}//{{item.path|basename}}"
           with_items:  "{{cont_files.files}}"
 
         - name: rm tempdir
@@ -188,6 +183,14 @@
             force: yes
             content: "{{ containerd_config.stdout }}"
             dest: /etc/containerd/config.toml
+
+        - name: containerd systemd cgroup enable runtime
+          lineinfile:
+            path: /etc/containerd/config.toml
+            state: present
+            backrefs: yes
+            regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
+            line: '\1true'
 
         - name: Write systemd Startup
           copy:
@@ -229,9 +232,9 @@
           apt:
             pkg: [ socat, conntrack, ipset, nfs-common]
 
-        - name: "installing {{repo}} {{version}}"
+        - name: "installing kubernetes {{version}}"
           get_url:
-            url: "{{project_url}}/{{ item }}"
+            url: "{{KUBE_URL}}/{{ item }}"
             dest: "{{dirs['system']['bin']}}/{{ item }}"
             mode: 0755
           with_items: "{{binaries}}"

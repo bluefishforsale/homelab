@@ -9,8 +9,8 @@
     datapath: "/var/lib/etcd"
     org: etcd-io
     repo: etcd
+    version: v3.5.1
     filename: "{{repo}}-{{version}}-linux-amd64.tar.gz"
-    version: v3.5.0
     project_url: https://github.com/{{org}}/{{repo}}/releases/download/{{version}}/{{filename}}
 
   tasks:

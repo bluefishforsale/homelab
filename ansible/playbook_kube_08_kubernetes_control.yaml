@@ -7,15 +7,11 @@
     confpath: "/etc/kubernetes/config"
     instpath: "/usr/local/bin"
     datapath: "/var/lib/kubernetes"
-    org: kubernetes
-    repo: kubernetes
     filenames:
       - kube-apiserver
       - kube-controller-manager
       - kube-scheduler
       - kubectl
-    version: v1.21.3
-    project_url: "https://storage.googleapis.com/kubernetes-release/release/{{version}}/bin/linux/amd64"
 
   tasks:
     - name: Kubernetes
@@ -42,10 +38,10 @@
             group: root
             owner: root
 
-        - name: "installing {{ repo }} {{ version }}"
+        - name: "installing Kubernetes {{ KUBE_VERSION }}"
           with_items: "{{filenames}}"
           get_url:
-            url: "{{project_url}}/{{ item }}"
+            url: "{{KUBE_URL}}/{{ item }}"
             dest: "{{ instpath }}/{{ item }}"
             mode: 0755
 

@@ -23,7 +23,7 @@
         [
           golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3,
           nmap, make, netcat, strace, fping, bmon, jq, iptraf-ng, tmux,
-          glances, unzip, ntpdate, net-tools
+          glances, unzip, ntpdate, net-tools, lvm2
         ]
 
   - name: old_paths

@@ -1,0 +1,72 @@
+- name: Nvidia Driver, encoding patch, and Containerd config
+  hosts: all
+  vars:
+    nvidia_version: "495.46"
+
+  tasks:
+  - name: Driver and Patch
+    become: yes
+    when: nvidia_gpu is defined
+
+    block:
+    - name: print debug
+      debug:
+        msg: "Installing {{nvidia_version}} driver"
+
+    - name: download CUDA toolkit
+      get_url:
+        url: https://developer.download.nvidia.com/compute/cuda/11.5.1/local_installers/cuda_11.5.1_495.29.05_linux.run
+        dest: "/tmp/cuda_11.5.1_495.29.05_linux.run"
+        mode: "0775"
+
+    - name: install toolkit
+      shell: >
+        /tmp/cuda_11.5.1_495.29.05_linux.run
+        --driver
+        --toolkit
+        --silent
+
+    - name: download driver
+      get_url:
+        url: https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run
+        dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        mode: "0775"
+
+    - name: install driver
+      shell: >
+        "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        -s
+        --accept-license
+        --dkms
+        --no-questions
+        --skip-module-unload
+        --uninstall
+
+    - name: nvidi-smi test
+      shell:
+        cmd: nvidia-smi
+
+    - name: keylase nvidia-patch
+      unarchive:
+        remote_src: yes
+        src: https://github.com/keylase/nvidia-patch/archive/refs/heads/master.zip
+        dest: /tmp
+        keep_newer: yes
+
+    - name: install patch
+      shell: >
+        bash /tmp/nvidia-patch/patch
+
+    - name: containerd runtime config update
+      lineinfile:
+        path: /etc/containerd/config.toml
+        state: present
+        backrefs: yes
+        regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
+        line: '\1true'
+
+    - name: Restart containerd service
+      ansible.builtin.systemd:
+        state: restarted
+        daemon_reload: yes
+        name: containers
