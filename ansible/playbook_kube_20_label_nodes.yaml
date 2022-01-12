@@ -1,10 +1,21 @@
-# - name: Kube 20 Labels
-#   hosts: localhost
-#   vars_files:
-#     - vars_kube.yaml
+- name: Kube 20 Node Labels from Inventory
+  hosts: localhost
+  vars_files:
+    - vars_kube.yaml
 
-#   tasks:
-#     - name: loop through nodes and apply labels
-#       shell:
-#         cmd: "kubectl label nodes {item}"
-#       loop: "{{ groups['k8s_worker']['k8s_labels'] }}"
+  tasks:
+    - name: commands
+      debug:
+        msg: >-
+          {% for label in (hostvars[item]['k8s_labels'].split(',')) %}{
+            kubectl label node --overwrite {{item}} {{label}}
+          }{% endfor %}
+      loop: "{{ groups['k8s'] }}"
+
+    - name: exec labels
+      shell:
+        cmd: >-
+          {% for label in (hostvars[item]['k8s_labels'].split(',')) %}{
+            kubectl label node --overwrite {{item}} {{label}}
+          }{% endfor %}
+      loop: "{{ groups['k8s'] }}"

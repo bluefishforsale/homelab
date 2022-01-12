@@ -13,8 +13,8 @@ ETCD_SERVER_URLS: ""
 KUBE_URL: "https://storage.googleapis.com/kubernetes-release/release/{{KUBE_VERSION}}/bin/linux/amd64"
 KUBE_CLUSER_NAME: "k8s"
 KUBECONFIG: "kubeconfig"
-KUBE_VERSION: v1.23.1
-CONTAINERD_VERSION: 1.5.9
+KUBE_VERSION: "v1.23.1"
+CONTAINERD_VERSION: "1.5.9"
 
 # Kube networking
 KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
@@ -22,6 +22,5 @@ APISERVER: "apiserver"
 SYSLOG: "192.168.1.65"
 APISERVER_IP: ""
 CLUSTER_CIDR: "10.244.0.0/16"
-# CLUSTER_CIDR: "172.18.0.0/16"
 POD_NETMASK: "24"
 SERVICE_CLUSTER_IP_RANGE: "10.32.0.0/24"
