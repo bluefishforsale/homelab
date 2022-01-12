@@ -1,5 +1,5 @@
 - name: Kube 08 Containerd, Kubelet, CNI
-  hosts: k8s_worker
+  hosts: k8s
   become: yes
   vars_files:
     - vars_kube.yaml
@@ -26,7 +26,7 @@
     - name: Get IP for a subset of hosts, store in HOST_IP
       set_fact:
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-      loop: "{{ groups['k8s_worker'] }}"
+      loop: "{{ groups['k8s'] }}"
 
     ######### Dirs for all the things at once
     - name: "Mkdir all"

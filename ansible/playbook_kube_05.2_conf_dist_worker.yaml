@@ -1,5 +1,5 @@
 - name: Kube 05.2 Dist Kubeconfigs Workers
-  hosts: k8s_worker
+  hosts: k8s
   vars:
     k8s_dir: /var/lib/kubernetes
   vars_files:

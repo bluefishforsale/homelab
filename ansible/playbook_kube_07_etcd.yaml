@@ -16,17 +16,20 @@
   tasks:
     - name: Directories
       block:
+
       - name: MKdir "{{confpath}}"
         file:
           path: "{{confpath}}"
           state: directory
           mode: 0700
         with_items: [ "{{confpath}}", "{{datapath}}" ]
+
       - name: create tempdir
         tempfile:
           state: directory
           suffix: _dwnld
         register: tempfolder_1
+
       - name: Copy certs for etcd
         copy:
           force: yes

@@ -76,6 +76,8 @@
     copy:
       dest: "/etc/sysctl.d/00-10g-network-tunings.conf"
       content: |
+        # open files and inodes
+        fs.inotify.max_user_instances = 1024
         # don't cache ssthresh from previous connection
         net.ipv4.tcp_no_metrics_save = 1
         # recommended default congestion control is htcp
