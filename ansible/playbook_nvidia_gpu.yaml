@@ -1,7 +1,8 @@
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
   vars:
-    nvidia_version: "495.46"
+    # nvidia_version: "495.46"
+    nvidia_version: "495.29"
 
   tasks:
   - name: Driver and Patch
@@ -12,6 +13,15 @@
     - name: print debug
       debug:
         msg: "Installing {{nvidia_version}} driver"
+
+    - name: set kernel version
+      register: kernel_version
+      shell:
+        cmd: uname -r
+
+    - name: apt install kernel headers
+      apt:
+        pkg: "linux-headers-{{kernel_version.stdout}}"
 
     - name: download CUDA toolkit
       get_url:
@@ -26,13 +36,13 @@
         --toolkit
         --silent
 
-    - name: download driver
+    - name: download nvidia driver
       get_url:
         url: https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run
         dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
         mode: "0775"
 
-    - name: install driver
+    - name: install nvidia driver
       shell: >
         "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
         -s
@@ -42,7 +52,7 @@
         --skip-module-unload
         --uninstall
 
-    - name: nvidi-smi test
+    - name: run nvidi-smi test
       shell:
         cmd: nvidia-smi
 
