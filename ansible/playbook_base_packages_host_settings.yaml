@@ -21,7 +21,7 @@
     apt:
       pkg:
         [
-          golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3,
+          golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3, impitool,
           nmap, make, netcat, strace, fping, bmon, jq, iptraf-ng, tmux,
           glances, unzip, ntpdate, net-tools, lvm2
         ]
