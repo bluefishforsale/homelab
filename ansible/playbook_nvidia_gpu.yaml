@@ -1,8 +1,8 @@
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
   vars:
-    # nvidia_version: "495.46"
-    nvidia_version: "495.29"
+    nvidia_version: "495.46"
+    # nvidia_version: "495.29"
 
   tasks:
   - name: Driver and Patch
@@ -14,6 +14,19 @@
       debug:
         msg: "Installing {{nvidia_version}} driver"
 
+    - name: stop containerd service
+      systemd:
+        state: stopped
+        name: "{{item}}"
+      ignore_errors: yes
+      with_items:
+        - kube-scheduler
+        - kube-apiserver
+        - kube-controller-manager
+        - kubelet
+        - kube-proxy
+        - containerd
+
     - name: set kernel version
       register: kernel_version
       shell:
@@ -23,18 +36,17 @@
       apt:
         pkg: "linux-headers-{{kernel_version.stdout}}"
 
-    - name: download CUDA toolkit
-      get_url:
-        url: https://developer.download.nvidia.com/compute/cuda/11.5.1/local_installers/cuda_11.5.1_495.29.05_linux.run
-        dest: "/tmp/cuda_11.5.1_495.29.05_linux.run"
-        mode: "0775"
+    # - name: download CUDA toolkit
+    #   get_url:
+    #     url: https://developer.download.nvidia.com/compute/cuda/11.5.1/local_installers/cuda_11.5.1_495.29.05_linux.run
+    #     dest: "/tmp/cuda_11.5.1_495.29.05_linux.run"
+    #     mode: "0775"
 
-    - name: install toolkit
-      shell: >
-        /tmp/cuda_11.5.1_495.29.05_linux.run
-        --driver
-        --toolkit
-        --silent
+    # - name: install toolkit
+    #   shell: >
+    #     /tmp/cuda_11.5.1_495.29.05_linux.run
+    #     --driver
+    #     --toolkit
 
     - name: download nvidia driver
       get_url:
@@ -45,12 +57,10 @@
     - name: install nvidia driver
       shell: >
         "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-        -s
         --accept-license
         --dkms
         --no-questions
         --skip-module-unload
-        --uninstall
 
     - name: run nvidi-smi test
       shell:
@@ -75,8 +85,16 @@
         regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
         line: '\1true'
 
-    - name: Restart containerd service
+    - name: Re-start containerd service
       ansible.builtin.systemd:
         state: restarted
         daemon_reload: yes
-        name: containers
+        name: "{{item}}"
+      ignore_errors: yes
+      with_items:
+        - containerd
+        - kube-scheduler
+        - kube-apiserver
+        - kube-controller-manager
+        - kubelet
+        - kube-proxy
