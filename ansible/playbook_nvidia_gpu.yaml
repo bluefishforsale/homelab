@@ -34,7 +34,10 @@
 
     - name: apt install kernel headers
       apt:
-        pkg: "linux-headers-{{kernel_version.stdout}}"
+        pkg: "{{item}}"
+      with_items:
+      - "linux-headers-{{kernel_version.stdout}}"
+      - "nvidia-utils-495"
 
     # - name: download CUDA toolkit
     #   get_url:
@@ -48,19 +51,22 @@
     #     --driver
     #     --toolkit
 
-    - name: download nvidia driver
-      get_url:
-        url: https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run
-        dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-        mode: "0775"
+    # - name: download nvidia driver
+    #   get_url:
+    #     url: https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run
+    #     dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+    #     mode: "0775"
 
-    - name: install nvidia driver
-      shell: >
-        "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-        --accept-license
-        --dkms
-        --no-questions
-        --skip-module-unload
+    # - name: install nvidia driver
+    #   shell: >
+    #     "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+    #     --silent
+    #     --accept-license
+    #     --no-questions
+    #     --skip-module-unload
+
+
+
 
     - name: run nvidi-smi test
       shell:
@@ -75,7 +81,7 @@
 
     - name: install patch
       shell: >
-        bash /tmp/nvidia-patch/patch
+        bash /tmp/nvidia-patch-master/patch.sh
 
     - name: containerd runtime config update
       lineinfile:
