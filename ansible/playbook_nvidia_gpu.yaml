@@ -2,7 +2,6 @@
   hosts: all
   vars:
     nvidia_version: "495.46"
-    # nvidia_version: "495.29"
 
   tasks:
   - name: Driver and Patch
@@ -32,47 +31,52 @@
       shell:
         cmd: uname -r
 
+    - name: debug
+      debug:
+        msg: "{{kernel_version.stdout}}"
+
     - name: apt install kernel headers
       apt:
-        pkg: "{{item}}"
-      with_items:
-      - "linux-headers-{{kernel_version.stdout}}"
-      - "nvidia-utils-495"
-
-    # - name: download CUDA toolkit
-    #   get_url:
-    #     url: https://developer.download.nvidia.com/compute/cuda/11.5.1/local_installers/cuda_11.5.1_495.29.05_linux.run
-    #     dest: "/tmp/cuda_11.5.1_495.29.05_linux.run"
-    #     mode: "0775"
-
-    # - name: install toolkit
-    #   shell: >
-    #     /tmp/cuda_11.5.1_495.29.05_linux.run
-    #     --driver
-    #     --toolkit
-
-    # - name: download nvidia driver
-    #   get_url:
-    #     url: https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run
-    #     dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-    #     mode: "0775"
-
-    # - name: install nvidia driver
-    #   shell: >
-    #     "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-    #     --silent
-    #     --accept-license
-    #     --no-questions
-    #     --skip-module-unload
+        update_cache: true
+        pkg: "linux-headers-{{kernel_version.stdout}}"
 
 
+    - name: get nvidia binary installer
+      get_url:
+        url: "https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        mode: 0755
+        owner: root
+        group: root
 
+    - name: install nvidia driver from binary
+      ignore_errors: yes
+      shell:
+        cmd: >-
+          "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+          "-a -n -s"
+
+    - name: add nvidia apt gpg key
+      apt_key:
+        url: "https://nvidia.github.io/nvidia-container-runtime/gpgkey"
+
+    - name: nvidia-container-runtime apt repo
+      register: nvidia_apt_repo
+      get_url:
+        url: https://nvidia.github.io/nvidia-container-runtime/ubuntu20.04/nvidia-container-runtime.list
+        dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
+
+    - name: apt install nvidia-container-runtime packages
+      apt:
+        update_cache: true
+        force_apt_get: true
+        pkg: [ "nvidia-utils-{{nvidia_version.split('.')[0]}}", "nvidia-container-runtime" ]
 
     - name: run nvidi-smi test
       shell:
         cmd: nvidia-smi
 
-    - name: keylase nvidia-patch
+    - name: keylase nvidia-patch from source
       unarchive:
         remote_src: yes
         src: https://github.com/keylase/nvidia-patch/archive/refs/heads/master.zip
@@ -80,16 +84,19 @@
         keep_newer: yes
 
     - name: install patch
-      shell: >
-        bash /tmp/nvidia-patch-master/patch.sh
+      shell: "{{item}}"
+      with_items:
+        - "/tmp/nvidia-patch-master/patch.sh -s"
+        - "/tmp/nvidia-patch-master/patch-fbc.sh -s"
 
-    - name: containerd runtime config update
-      lineinfile:
-        path: /etc/containerd/config.toml
-        state: present
-        backrefs: yes
-        regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
-        line: '\1true'
+    - name: containerd runtime nvidia update
+      copy:
+        dest: /etc/containerd/config.toml
+        src: files/containerd/config.nvidia.toml
+        force: yes
+        mode: 0644
+        group: root
+        owner: root
 
     - name: Re-start containerd service
       ansible.builtin.systemd:

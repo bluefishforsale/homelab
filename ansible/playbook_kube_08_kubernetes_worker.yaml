@@ -184,7 +184,7 @@
             content: "{{ containerd_config.stdout }}"
             dest: /etc/containerd/config.toml
 
-        - name: containerd systemd cgroup enable runtime
+        - name: containerd runtime config update
           lineinfile:
             path: /etc/containerd/config.toml
             state: present

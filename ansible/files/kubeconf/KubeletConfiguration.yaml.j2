@@ -1,0 +1,9 @@
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+address: "{{ address }}"
+port: 20250,
+serializeImagePulls: false,
+imageMinimumGCAge: 30d,
+imageGCHighThresholdPercent: 50,
+evictionHard:
+    memory.available:  "800Mi"

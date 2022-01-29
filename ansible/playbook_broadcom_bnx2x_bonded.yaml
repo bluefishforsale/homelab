@@ -60,8 +60,8 @@
           [Service]
           Type=oneshot
           RemainAfterExit=true
-          ExecStart=/sbin/tc qdisc add dev enp65s0f0 root fq maxrate 9gbit
-          ExecStart=/sbin/tc qdisc add dev enp65s0f1 root fq maxrate 9gbit
+          ExecStart=/sbin/tc qdisc add dev eno1 root fq maxrate 9gbit
+          ExecStart=/sbin/tc qdisc add dev eno2 root fq maxrate 9gbit
 
     - name: Enable and Start service
       systemd:
