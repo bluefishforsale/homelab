@@ -77,7 +77,7 @@
       dest: "/etc/sysctl.d/00-10g-network-tunings.conf"
       content: |
         # open files and inodes
-        fs.inotify.max_user_instances = 1024
+        fs.inotify.max_user_instances = 10240
         # don't cache ssthresh from previous connection
         net.ipv4.tcp_no_metrics_save = 1
         # recommended default congestion control is htcp
@@ -92,6 +92,83 @@
         # increase Linux autotuning TCP buffer limit
         net.ipv4.tcp_rmem = 4096 87380 268435456
         net.ipv4.tcp_wmem = 4096 65536 268435456
+        # no swapping
+        vm.swappiness = 0
 
   - name: sysctl reload
     shell: sysctl --system
+
+
+  - name: Write io-scheduler script
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/io-scheduler.sh"
+      mode: 0755
+      content: |
+        for SCH in /sys/block/*/queue/scheduler ; do
+            echo "deadline" > "${SCH}" 2>/dev/null
+        done
+        for DEPTH in /sys/block/*/queue/nr_requests ; do
+            echo "1024" > "${DEPTH}" 2>/dev/null
+        done
+        for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
+            echo "4096" > "${RAHEAD}" 2>/dev/null
+        done
+
+  - name: Write io-scheduler service
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/io-scheduler.service"
+      content: |
+        [Unit]
+        Description=Setup foo
+        #After=network.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=sh -c /etc/systemd/system/io-scheduler.sh
+        RemainAfterExit=true
+        StandardOutput=journal
+
+        [Install]
+        WantedBy=multi-user.target
+
+
+  - name: Write cpu-performance script
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/cpu-performance.sh"
+      mode: 0755
+      content: |
+        for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
+            echo "performance" > "${CPU}" 2>/dev/null
+        done
+
+  - name: Write cpu-performance service
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/cpu-performance.service"
+      content: |
+        [Unit]
+        Description=Setup foo
+        #After=network.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
+        RemainAfterExit=true
+        StandardOutput=journal
+
+        [Install]
+        WantedBy=multi-user.target
+
+
+  - name: enable and restart services
+    systemd:
+      name: "{{item}}"
+      state: restarted
+      enabled: true
+      daemon_reload: true
+    with_items:
+    - io-scheduler
+    - cpu-performance
