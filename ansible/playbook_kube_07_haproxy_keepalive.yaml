@@ -33,17 +33,6 @@
             - haproxy
             - keepalived
 
-        # - name: logs
-        #   file:
-        #     path: "/var/log/{{item}}"
-        #     state: absent
-        #     mode: 0755
-        #     owner: haproxy
-        #     group: haproxy
-        #   with_items:
-        #     - haproxy
-        #     - keepalived
-
         - name: install
           apt:
             name: [ haproxy, keepalived ]
