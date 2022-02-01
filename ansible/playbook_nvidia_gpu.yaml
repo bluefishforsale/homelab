@@ -86,8 +86,8 @@
     - name: install patch
       shell: "{{item}}"
       with_items:
-        - "/tmp/nvidia-patch-master/patch.sh -s"
-        - "/tmp/nvidia-patch-master/patch-fbc.sh -s"
+        - "/tmp/nvidia-patch-master/patch.sh"
+        - "/tmp/nvidia-patch-master/patch-fbc.sh"
 
     - name: containerd runtime nvidia update
       copy:
