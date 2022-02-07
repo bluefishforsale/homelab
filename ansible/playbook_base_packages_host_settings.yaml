@@ -22,9 +22,9 @@
     apt:
       pkg:
         [
-          dstat, golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3, ipmitool,
-          nmap, make, netcat, strace, fping, bmon, jq, iptraf-ng, tmux,
-          unzip, ntpdate, net-tools, lvm2, zsh
+          dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop,
+          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq,
+          iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils
         ]
 
   - name: old_paths
