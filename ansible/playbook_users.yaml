@@ -11,8 +11,9 @@
       block:
 
       - name: install oh-my-zsh
-        shell:
-          cmd: curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -
+        command: "curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -"
+        args:
+          creates: "{{ lookup('env','HOME') }}/.oh-my-zsh"
 
       - name: Change user shell to zsh
         shell:
