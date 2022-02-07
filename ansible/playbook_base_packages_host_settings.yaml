@@ -1,4 +1,5 @@
 - name: root and system level
+  ignore_errors: true
   become: yes
   hosts: all
   vars_files:
@@ -21,9 +22,9 @@
     apt:
       pkg:
         [
-          golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3, ipmitool,
+          dstat, golang, gcc, zsh, wget, curl, htop, sysstat, iotop, iperf3, ipmitool,
           nmap, make, netcat, strace, fping, bmon, jq, iptraf-ng, tmux,
-          glances, unzip, ntpdate, net-tools, lvm2
+          unzip, ntpdate, net-tools, lvm2, zsh
         ]
 
   - name: old_paths
@@ -55,6 +56,13 @@
   - name: set time and date from NTP upstream
     shell: /usr/sbin/ntpdate time.nist.gov
 
+  - name: rsyslog drop IPVS no route messages
+    copy:
+      force: yes
+      dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
+      content: |
+        :msg, regex, ".*IPVS.*no destination available" ~
+
   - name: rsyslog remote server
     copy:
       force: yes
@@ -65,12 +73,6 @@
         action(type="mmutf8fix" replacementChar="?")
         action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
-  - name: reload rsyslog
-    systemd:
-      name: rsyslog
-      state: restarted
-      enabled: true
-      daemon_reload: true
 
   - name: Sysctl Network Tunings
     copy:
@@ -97,7 +99,6 @@
 
   - name: sysctl reload
     shell: sysctl --system
-
 
   - name: Write io-scheduler script
     copy:
@@ -132,7 +133,6 @@
 
         [Install]
         WantedBy=multi-user.target
-
 
   - name: Write cpu-performance script
     copy:
@@ -172,3 +172,4 @@
     with_items:
     - io-scheduler
     - cpu-performance
+    - rsyslog

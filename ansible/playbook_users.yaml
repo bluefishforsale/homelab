@@ -5,12 +5,61 @@
     - vars_users.yaml
   vars:
     github: bluefishforsale
+
   tasks:
-    - name: Global oh-my-zsh shell, theme, and vimrc
-      become: yes
+    - name: Stuff done for logged in user
       block:
 
-      - name: Add github keys to Root
+      - name: install oh-my-zsh
+        shell:
+          cmd: curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -
+
+      - name: Change user shell to zsh
+        shell:
+          cmd: chsh -s /bin/zsh
+
+      - name: install powerlevel10k
+        git:
+          repo: https://github.com/romkatv/powerlevel10k
+          dest: "{{ lookup('env','HOME') }}/.oh-my-zsh/themes/powerlevel10k"
+          accept_hostkey: yes
+          force: yes
+          depth: 1
+
+      - name: Set p10k THEME in .zshrc
+        lineinfile:
+          path: "{{ lookup('env','HOME') }}/.zshrc"
+          state: present
+          backrefs: yes
+          regexp: '^ZSH_THEME='
+          line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+
+      - name: p10k config file
+        copy:
+          force: yes
+          src: files/shell/p10k.zsh
+          dest: "{{ lookup('env','HOME') }}/.p10k.zsh"
+
+      - name: P10k DISABLE_CONFIGURATION_WIZARD
+        lineinfile:
+          path: "{{ lookup('env','HOME') }}/.zshrc"
+          state: present
+          line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
+
+      - name: ultimate vim
+        shell:
+          cmd: git clone --depth=1 https://github.com/amix/vimrc.git "{{ lookup('env','HOME') }}/.vim_runtime"
+
+      - name: tmux conf
+        copy:
+          force: yes
+          src: files/shell/tmux.conf
+          dest: "{{ lookup('env','HOME') }}/.tmux.conf"
+
+    - name: Stuff done for root
+      block:
+      - name: Add github keys to user
+        become: yes
         authorized_key:
           user: root
           state: present
@@ -95,6 +144,10 @@
         file:
           path: /etc/skel/.config/glances
           state: directory
+
+      - name: Install glances (better htop)
+        apt:
+          pkg: glances
 
       - name: Glances conf
         copy:

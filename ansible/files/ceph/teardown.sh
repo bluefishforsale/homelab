@@ -21,7 +21,7 @@ CEPH_ID="$(lsblk ${DISK} | grep ceph | awk '{print $1}'  | sed -e 's/└─//g')
 # These steps only have to be run once on each node
 # If rook sets up osds using ceph-volume, teardown leaves some devices mapped that lock the disks.
 if [ -z ${CEPH_ID} ] ; then
-    eho "could not get lsblk disks labeled as CEPH"
+    echo "could not get lsblk disks labeled as CEPH"
     exit 255
 fi
 dmsetup remove /dev/mapper/${CEPH_ID}

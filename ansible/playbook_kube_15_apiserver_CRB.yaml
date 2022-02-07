@@ -1,10 +1,10 @@
 - name: Kube 99 Setup kubectl
   hosts: k8s_controller
+  become: yes
   vars_files:
     - vars_kube.yaml
   tasks:
   - name: "Copy over kube-apiserver-to-kubelet.yaml"
-    become: yes
     copy:
       force: yes
       dest: "{{pki_dir}}/kube-apiserver-to-kubelet.yaml"

@@ -2,7 +2,7 @@ $ORIGIN cluster.local.
 $TTL 1200 ;
 
 @ IN SOA dns01.home. dnsadmin.home. (
-      2021080200    ; serial
+      {{ ansible_date_time.epoch }}    ; serial
       3600          ; refresh (1 hours)
       3600          ; retry (1 hour)
       3600          ; expire (1 hour)

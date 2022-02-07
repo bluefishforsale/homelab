@@ -40,17 +40,30 @@
         group: bind
         mode: 0755
 
-    - name: zones
+    # - name: zones
+    #   copy:
+    #     force: yes
+    #     src: bind9/{{ item  }}
+    #     dest:  /var/lib/bind/{{ item  }}
+    #     owner: bind
+    #     group: bind
+    #     mode: 0644
+    #   with_items:
+    #     - cluster.local.zone
+    #     - home.zone
+    #     - db.rev.1.168.192.in-addr.arpa
+
+    - name: write zone templates
       copy:
         force: yes
-        src: bind9/{{ item  }}
-        dest:  /var/lib/bind/{{ item  }}
+        dest: "/var/lib/bind/home.zone"
+        content: '{{ lookup("template", "files/bin/{{item}}.j2") }}'
+        mode: 0644
         owner: bind
         group: bind
-        mode: 0644
       with_items:
-        - cluster.local.zone
         - home.zone
+        - cluster.local.zone
         - db.rev.1.168.192.in-addr.arpa
 
     - name: Config Check
@@ -65,7 +78,6 @@
     - name: remove the jnl files before restart
       shell:
         cmd: find /var/lib/bind -type f -name "*.jnl" -delete
-
 
     - name: Enable and Start service
       systemd:

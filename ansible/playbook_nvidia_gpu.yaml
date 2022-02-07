@@ -26,20 +26,25 @@
         - kube-proxy
         - containerd
 
+    - name: blacklist the nuevo driver
+      copy:
+        dest: /etc/containerd/blacklist-nouveau.conf
+        content: |
+          blacklist nouveau
+        force: yes
+        mode: 0644
+        group: root
+        owner: root
+
     - name: set kernel version
       register: kernel_version
       shell:
         cmd: uname -r
 
-    - name: debug
-      debug:
-        msg: "{{kernel_version.stdout}}"
-
     - name: apt install kernel headers
       apt:
         update_cache: true
         pkg: "linux-headers-{{kernel_version.stdout}}"
-
 
     - name: get nvidia binary installer
       get_url:
@@ -48,6 +53,11 @@
         mode: 0755
         owner: root
         group: root
+
+    - name: unload Nouveau kernel driver
+      ignore_errors: true
+      shell:
+        cmd: rmmod nouveau
 
     - name: install nvidia driver from binary
       ignore_errors: yes
@@ -76,18 +86,28 @@
       shell:
         cmd: nvidia-smi
 
-    - name: keylase nvidia-patch from source
-      unarchive:
-        remote_src: yes
-        src: https://github.com/keylase/nvidia-patch/archive/refs/heads/master.zip
-        dest: /tmp
-        keep_newer: yes
+    # - name: keylase nvidia-patch from source
+    #   unarchive:
+    #     remote_src: yes
+    #     src: https://github.com/keylase/nvidia-patch/archive/refs/heads/master.zip
+    #     dest: /tmp
+    #     keep_newer: yes
 
-    - name: install patch
-      shell: "{{item}}"
-      with_items:
-        - "/tmp/nvidia-patch-master/patch.sh"
-        - "/tmp/nvidia-patch-master/patch-fbc.sh"
+    # - name: install patch
+    #   shell: "{{item}}"
+    #   with_items:
+    #     - "/tmp/nvidia-patch-master/patch.sh"
+    #     - "/tmp/nvidia-patch-master/patch-fbc.sh"
+
+    - name: make sure nvidia kernel module is listed at boot
+      copy:
+        dest: /etc/modprobe.d/nvidia.conf
+        content: |
+          nvidia-modprobe -c 0 -c 1
+        force: yes
+        mode: 0644
+        group: root
+        owner: root
 
     - name: containerd runtime nvidia update
       copy:
@@ -97,6 +117,10 @@
         mode: 0644
         group: root
         owner: root
+
+    - name: update init ram fs
+      shell:
+        cmd: update-initramfs -u
 
     - name: Re-start containerd service
       ansible.builtin.systemd:

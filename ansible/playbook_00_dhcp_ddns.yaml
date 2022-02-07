@@ -53,6 +53,16 @@
         - /etc/dhcp/kube-nodes.conf
         - /etc/default/isc-dhcp-server
 
+    - name: write configs keepalived
+      copy:
+        force: yes
+        dest: "/etc/keepalived/keepalived.conf"
+        content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
+        mode: 0644
+        owner: haproxy
+        group: haproxy
+
+
     - name: Enable and Start service
       become: yes
       become_user: root

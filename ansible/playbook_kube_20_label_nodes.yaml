@@ -12,6 +12,11 @@
           }{% endfor %}
       loop: "{{ groups['k8s'] }}"
 
+    - name: exec roles
+      shell:
+        cmd: kubectl label node --overwrite {{item}} kubernetes.io/role={{hostvars[item]['k8s_role']}}
+      loop: "{{ groups['k8s'] }}"
+
     - name: exec labels
       shell:
         cmd: >-

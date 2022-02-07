@@ -1,9 +1,16 @@
+
+ETCDCTL_API=3 etcdctl member list --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/etcd/ca.pem \
+  --cert=/etc/etcd/kubernetes.pem \
+  --key=/etc/etcd/kubernetes-key.pem
+
+
+
 ETCDCTL_API=3 etcdctl del /registry/secrets/kube-node-lease/default-token-fgkrw \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/etcd/ca.pem \
   --cert=/etc/etcd/kubernetes.pem \
   --key=/etc/etcd/kubernetes-key.pem
-
 
 
 export ETCDCTL_API=3
