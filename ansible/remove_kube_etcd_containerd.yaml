@@ -61,6 +61,17 @@
     - /var/lib/kubelet
     - /var/lib/kubernetes
     - /var/lib/rook
+    - /etc/systemd/system/etcd.service
+    - /etc/systemd/system/kube-scheduler.service
+    - /etc/systemd/system/kube-controller-manager.service
+    - /etc/systemd/system/kube-proxy.service
+    - /etc/systemd/system/containerd.service
+    - /etc/systemd/system/kube-apiserver.service
+    - /etc/systemd/system/kubelet.service
+
+    - name: daemon_reload
+      systemd:
+        daemon_reload: true
 
   - name: copy ceph osd disk reset script
     copy:
