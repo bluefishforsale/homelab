@@ -58,7 +58,7 @@
                 gateway4: 192.168.1.1
                 nameservers:
                   addresses: [192.168.1.2]
-                  search: [home]
+                  search: [home, local]
                 dhcp4: false
                 dhcp6: false
                 parameters:
