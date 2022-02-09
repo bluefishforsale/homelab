@@ -50,11 +50,15 @@
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
         chdir: "{{ cfssl }}"
 
-    #### Bulding variables
+    #### Bulding variables k8s_controller
     - name: Hostname expansion into dict of name:ip
       set_fact:
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
       loop: "{{ groups['k8s_controller'] + [APISERVER] }}"
+
+    - name: debug
+      debug:
+        msg: "{{HOST_IP}}"
 
     - name: Flatten dict to formatted string, store PEERS_MAP
       set_fact:
@@ -74,6 +78,16 @@
       shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
         chdir: "{{ cfssl }}"
+
+    #### Bulding variables k8s
+    - name: Hostname expansion into dict of name:ip
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s'] }}"
+
+    - name: debug
+      debug:
+        msg: "{{HOST_IP}}"
 
     # Node Client Certs
     - name: Client Certs
