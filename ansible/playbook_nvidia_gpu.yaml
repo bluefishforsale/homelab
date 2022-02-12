@@ -2,6 +2,7 @@
   hosts: all
   vars:
     nvidia_version: "495.46"
+    # nvidia_version: 510
 
   tasks:
   - name: Driver and Patch
@@ -13,24 +14,25 @@
       debug:
         msg: "Installing {{nvidia_version}} driver"
 
-    - name: stop containerd service
-      systemd:
-        state: stopped
-        name: "{{item}}"
-      ignore_errors: yes
-      with_items:
-        - kube-scheduler
-        - kube-apiserver
-        - kube-controller-manager
-        - kubelet
-        - kube-proxy
-        - containerd
+    # - name: stop containerd service
+    #   systemd:
+    #     state: stopped
+    #     name: "{{item}}"
+    #   ignore_errors: yes
+    #   with_items:
+    #     - kube-scheduler
+    #     - kube-apiserver
+    #     - kube-controller-manager
+    #     - kubelet
+    #     - kube-proxy
+    #     - containerd
 
     - name: blacklist the nuevo driver
       copy:
-        dest: /etc/containerd/blacklist-nouveau.conf
+        dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
         content: |
           blacklist nouveau
+          options nouveau modeset=0
         force: yes
         mode: 0644
         group: root
@@ -56,19 +58,22 @@
 
     - name: unload Nouveau kernel driver
       ignore_errors: true
-      shell:
-        cmd: rmmod nouveau
+      command: rmmod nouveau
+
+    - name: remove nvidia driver just in case
+      ignore_errors: yes
+      command: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run --uninstall -s -n -a
 
     - name: install nvidia driver from binary
       ignore_errors: yes
-      shell:
-        cmd: >-
-          "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-          "-a -n -s"
+      shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s
 
     - name: add nvidia apt gpg key
       apt_key:
-        url: "https://nvidia.github.io/nvidia-container-runtime/gpgkey"
+        url: "{{item}}"
+      with_items:
+      - https://nvidia.github.io/nvidia-container-runtime/gpgkey
+      - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
 
     - name: nvidia-container-runtime apt repo
       register: nvidia_apt_repo
@@ -76,11 +81,22 @@
         url: https://nvidia.github.io/nvidia-container-runtime/ubuntu20.04/nvidia-container-runtime.list
         dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
 
-    - name: apt install nvidia-container-runtime packages
+    - name: add the cuda repo
+      register: nvidia_apt_repo
+      copy:
+        dest: /etc/apt/sources.list.d/nvidia-cuda.list
+        content: |
+          deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
+
+        # - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
+        # - cuda
+    - name: apt install nvidia packages
       apt:
         update_cache: true
         force_apt_get: true
-        pkg: [ "nvidia-utils-{{nvidia_version.split('.')[0]}}", "nvidia-container-runtime" ]
+        pkg:
+        - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
+        - nvidia-container-runtime
 
     - name: run nvidi-smi test
       shell:
@@ -103,7 +119,7 @@
       copy:
         dest: /etc/modprobe.d/nvidia.conf
         content: |
-          nvidia-modprobe -c 0 -c 1
+          # install nvidia nvidia-modprobe -c 0 -c 1
         force: yes
         mode: 0644
         group: root
@@ -130,8 +146,8 @@
       ignore_errors: yes
       with_items:
         - containerd
-        - kube-scheduler
-        - kube-apiserver
-        - kube-controller-manager
-        - kubelet
-        - kube-proxy
+        # - kube-scheduler
+        # - kube-apiserver
+        # - kube-controller-manager
+        # - kubelet
+        # - kube-proxy
