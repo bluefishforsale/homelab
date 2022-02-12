@@ -74,6 +74,16 @@
         action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
 
+  - name: increase file limits
+    copy:
+      force: yes
+      dest: "/etc/security/limits.conf"
+      mode: 0644
+      content: |
+        soft nofile 1048576
+        hard nofile 1048576
+        session required pam_limits.so
+
   - name: Sysctl Network Tunings
     copy:
       dest: "/etc/sysctl.d/00-10g-network-tunings.conf"
