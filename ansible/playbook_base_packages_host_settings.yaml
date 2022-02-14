@@ -84,7 +84,7 @@
         hard nofile 1048576
         session required pam_limits.so
 
-  - name: Sysctl Network Tunings
+  - name: Sysctl Tunings
     copy:
       dest: "/etc/sysctl.d/00-10g-network-tunings.conf"
       content: |
@@ -106,6 +106,12 @@
         net.ipv4.tcp_wmem = 4096 65536 268435456
         # no swapping
         vm.swappiness = 0
+        # file watches increase
+        fs.inotify.max_queued_events = 131072
+        fs.inotify.max_user_instances = 1024
+        fs.inotify.max_user_watches = 65536
+        user.max_inotify_instances = 1024
+        user.max_inotify_watches = 65536
 
   - name: sysctl reload
     shell: sysctl --system

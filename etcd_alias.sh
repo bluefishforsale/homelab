@@ -23,5 +23,16 @@ etcdctl member list --endpoints=https://127.0.0.1:2379
 etcdctl snapshot save ~/etcd.backup
 
 
-ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 get --prefix --keys-only /  \
-  | xargs -n1 -I{} -P9999 etcdctl --endpoints=https://127.0.0.1:2379  del {}
+# delete all etcd
+ETCDCTL_API=3 \
+  etcdctl \
+    --cacert=/etc/etcd/ca.pem \
+    --cert=/etc/etcd/kubernetes.pem \
+    --key=/etc/etcd/kubernetes-key.pem \
+    --endpoints=https://127.0.0.1:2379 \
+    get --prefix --keys-only /  |\
+  xargs -n1 -I{} -P9999 etcdctl \
+    --cacert=/etc/etcd/ca.pem \
+    --cert=/etc/etcd/kubernetes.pem \
+    --key=/etc/etcd/kubernetes-key.pem \
+    --endpoints=https://127.0.0.1:2379  del {}

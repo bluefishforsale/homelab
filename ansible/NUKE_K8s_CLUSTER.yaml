@@ -35,32 +35,40 @@
     register: running_processes
 
   - name: Kill running processes
-    shell: "kill {{ item }}"
+    shell: "kill -9 {{item}}"
     with_items: "{{ running_processes.stdout_lines }}"
 
-  # - name: Waiting until all running processes are killed
-  #   wait_for:
-  #     path: "/proc/{{ item }}/status"
-  #     state: absent
-  #   with_items: "{{ running_processes.stdout_lines }}"
+  # # - name: Waiting until all running processes are killed
+  # #   wait_for:
+  # #     path: "/proc/{{ item }}/status"
+  # #     state: absent
+  # #   with_items: "{{ running_processes.stdout_lines }}"
 
-  - name: remove dirs
+  - name: remove trees
+    ignore_errors: yes
+    shell:
+      rm -rf '{{ item }}/*'
+    with_items:
+    - /var/lib/rook
+    - /etc/etcd
+    - /var/lib/etcd
+    - /etc/haproxy
+    - /etc/containerd
+    - /opt/containerd
+    - /run/containerd
+    - /run/systemd/transient
+    - /usr/libexec/kubernetes
+    - /var/lib/containerd
+    - /var/lib/kubelet
+    - /var/lib/kubernetes
+    - /var/log
+
+  - name: remove files
     ignore_errors: yes
     file:
       path: "{{ item }}"
       state: absent
     with_items:
-    - /etc/containerd
-    - /etc/etcd
-    - /etc/haproxy
-    - /run/containerd
-    - /run/systemd/transient
-    - /usr/libexec/kubernetes
-    - /var/lib/containerd
-    - /var/lib/etcd
-    - /var/lib/kubelet
-    - /var/lib/kubernetes
-    - /var/lib/rook
     - /etc/systemd/system/etcd.service
     - /etc/systemd/system/kube-scheduler.service
     - /etc/systemd/system/kube-controller-manager.service
@@ -97,7 +105,7 @@
   - name: delete flannel links
     ignore_errors: yes
     shell:
-      cmd: ip link delete {}
+      cmd: ip link delete '{{}}'
     with_items:
     - cni0
     - flannel.0
