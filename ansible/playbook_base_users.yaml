@@ -7,29 +7,51 @@
     github: bluefishforsale
 
   tasks:
-    - name: Stuff done for logged in user
+    - name: install zsh first
+      become: true
+      apt:
+        pkg: [ zsh, git ]
+
+    - name: Shell, Theme, and config for logged in user
       block:
+      - name: get oh-my-zsh
+        get_url:
+          url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+          dest: /tmp/oh-my-zsh-installer.sh
+          force: true
+          mode: 0755
 
       - name: install oh-my-zsh
-        command: "curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -"
+        shell: /tmp/oh-my-zsh-installer.sh
         args:
-          creates: "{{ lookup('env','HOME') }}/.oh-my-zsh"
+          creates: ~/.oh-my-zsh
+
+      # - name: Remove the oh-my-zsh-installer
+      #   file:
+      #     path: /tmp/oh-my-zsh-installer.sh
+      #     state: absent
+
+      - name: register logged in username
+        set_fact:
+          login_user: "{{ansible_user_id}}"
 
       - name: Change user shell to zsh
-        shell:
-          cmd: chsh -s /bin/zsh
+        become: true
+        user:
+          name: "{{login_user}}"
+          shell: /bin/zsh
 
       - name: install powerlevel10k
         git:
           repo: https://github.com/romkatv/powerlevel10k
-          dest: "{{ lookup('env','HOME') }}/.oh-my-zsh/themes/powerlevel10k"
+          dest: ~/.oh-my-zsh/themes/powerlevel10k
           accept_hostkey: yes
           force: yes
           depth: 1
 
       - name: Set p10k THEME in .zshrc
         lineinfile:
-          path: "{{ lookup('env','HOME') }}/.zshrc"
+          path: ~/.zshrc
           state: present
           backrefs: yes
           regexp: '^ZSH_THEME='
@@ -39,28 +61,46 @@
         copy:
           force: yes
           src: files/shell/p10k.zsh
-          dest: "{{ lookup('env','HOME') }}/.p10k.zsh"
+          dest: ~/.p10k.zsh"
 
       - name: P10k DISABLE_CONFIGURATION_WIZARD
         lineinfile:
-          path: "{{ lookup('env','HOME') }}/.zshrc"
+          path: ~/.zshrc
           state: present
           line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
 
       - name: ultimate vim
         shell:
-          cmd: git clone --depth=1 https://github.com/amix/vimrc.git "{{ lookup('env','HOME') }}/.vim_runtime"
+          cmd: git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
+        args:
+          creates: ~/.vim_runtime
 
       - name: tmux conf
         copy:
           force: yes
           src: files/shell/tmux.conf
-          dest: "{{ lookup('env','HOME') }}/.tmux.conf"
+          dest: ~/.tmux.conf
 
+      - name: mkdir conf & glances
+        file:
+          path: "{{item}}"
+          state: directory
+        with_items:
+        - ~/.config
+        - ~/.config/glances
+
+      - name: Glances conf
+        copy:
+          force: yes
+          src: files/shell/glances.conf
+          dest: ~/.config/glances/glances.conf
+
+    ################ Root user ###################
     - name: Stuff done for root
+      become: yes
+
       block:
       - name: Add github keys to user
-        become: yes
         authorized_key:
           user: root
           state: present
@@ -73,26 +113,22 @@
           regexp: '^%sudo'
           line: '%sudo ALL=(ALL) NOPASSWD: ALL'
 
-      - name: install oh-my-zsh into root
-        shell:
-          cmd: curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -
+      - name: get oh-my-zsh
+        get_url:
+          url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+          dest: /tmp/oh-my-zsh-installer.sh
+          force: true
+          mode: 0755
+
+      - name: install oh-my-zsh
+        shell: /tmp/oh-my-zsh-installer.sh
+        args:
           creates: /root/.oh-my-zsh
 
-      - name: Change root shell to zsh
-        shell:
-          cmd: chsh -s /bin/zsh root
-
-      - name: move oh-my-zsh to /usr/share
-        shell:
-          cmd: cp -r /root/.oh-my-zsh /usr/share/oh-my-zsh
-
-      # - name: copy zshrc template
-      #   shell:
-      #     cmd: cp /usr/share/oh-my-zsh/templates/zshrc.zsh-template /usr/share/oh-my-zsh/zshrc
-
-      # - name: /etc/skel zshrc symlink
-      #   shell:
-      #     cmd: ln -sf /usr/share/oh-my-zsh/zshrc /etc/skel/.zshrc
+      - name: Change user shell to zsh
+        user:
+          name: root
+          shell: /bin/zsh
 
       - name: install powerlevel10k
         git:
@@ -124,37 +160,29 @@
 
       - name: ultimate vim
         shell:
-          cmd: "{{ local_item }}"
-          creates: /etc/skel/.vim_runtime
-        with_items:
-          - git clone --depth=1 https://github.com/amix/vimrc.git /etc/skel/.vim_runtime
-          - mkdir -p /usr/share/vim_runtime
-          - cmod -R 1755 /usr/share/vim_runtime
-          - sh /tmp/.vim_runtime/install_awesome_vimrc.shsh /etc/skel/.vim_runtime/install_awesome_vimrc.sh
-          - cp -rp /root/.vimrc /etc/skel
-        loop_control:
-          loop_var: local_item
+          cmd: git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
+        args:
+          creates: /root/.vim_runtime
 
       - name: tmux conf
         copy:
           force: yes
           src: files/shell/tmux.conf
-          dest: ~/.tmux.conf
+          dest: /root/.tmux.conf
 
-      - name: Ensures /etc/skel/.config/glances path exists
+      - name: mkdir conf & glances
         file:
-          path: /etc/skel/.config/glances
+          path: "{{item}}"
           state: directory
-
-      - name: Install glances (better htop)
-        apt:
-          pkg: glances
+        with_items:
+        - /root/.config
+        - /root/.config/glances
 
       - name: Glances conf
         copy:
           force: yes
           src: files/shell/glances.conf
-          dest: /etc/skel/.config/glances/glances.conf
+          dest: ~/.config/glances/glances.conf
 
       # - name: add each user one at a time with some custom setup
       #   include_tasks: subtask_user.yaml

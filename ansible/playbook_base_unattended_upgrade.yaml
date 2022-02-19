@@ -1,0 +1,6 @@
+- name: unattended upgrade
+  become: yes
+  hosts: all
+  tasks:
+    - name: unattended upgrade
+      command: unattended-upgrade
