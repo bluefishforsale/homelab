@@ -5,6 +5,22 @@
     - vars_kube.yaml
 
   tasks:
+    - name: HAproxy and Keepalived grouop
+      group:
+        name: "{{item}}"
+      with_items:
+      - haproxy
+      - keepalived
+
+    - name: HAproxy and Keepalived users
+      user:
+        name: "{{item}}"
+        group: "{{item}}"
+        shell: /usr/bin/false
+      with_items:
+      - haproxy
+      - keepalived
+
     # Make variables for the Kubernetes configfile
     - name: Get IP for a subset of hosts, store in PEERS_IP
       shell:

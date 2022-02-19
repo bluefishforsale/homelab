@@ -6,14 +6,35 @@
     - vars_kube.yaml
   vars:
     new_paths: '/usr/local/go/bin'
-
   tasks:
+  ############ HIGHLY OPINIONATED #####################
+  # We hate snap for system services and applications #
+  #####################################################
+  - name: Get snap installed apps
+    shell: "snap list | awk '(!/Name/){print $1}'"
+    register: snap_apps
+
+  - name: stop all snap apps
+    ignore_errors: yes
+    shell: snap remove "{{item}}"
+    loop: "{{ snap_apps.stdout.split('\n') }}"
+
   - name: Stop snapd
     systemd:
       state: stopped
       name: snapd
       enabled: false
       daemon_reload: true
+
+  - name: remove snap chache dir
+    file:
+      state: absent
+      path: /var/cache/snapd
+
+  - name: remove all snap packages
+    apt:
+      pkg:
+        [snapd, gnome-software-plugin-snap ]
 
   - name: apt-get update
     apt: update_cache=yes
@@ -24,8 +45,13 @@
         [
           dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop,
           iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq,
-          iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils
+          iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils, rsyslog
         ]
+
+  - name: Glances has issues installing on some platforms
+    ignore_errors: true
+    apt:
+      pkg: glances
 
   - name: old_paths
     shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
@@ -80,9 +106,7 @@
       dest: "/etc/security/limits.conf"
       mode: 0644
       content: |
-        soft nofile 1048576
-        hard nofile 1048576
-        session required pam_limits.so
+        # put stuff here
 
   - name: Sysctl Tunings
     copy:

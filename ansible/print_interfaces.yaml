@@ -1,3 +1,0 @@
-hosts: all
-vars_files:
-  - vars_users.yaml

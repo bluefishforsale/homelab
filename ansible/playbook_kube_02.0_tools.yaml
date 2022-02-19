@@ -1,6 +1,6 @@
 ---
 - name: Kube 02 Tools
-  hosts: k8s
+  hosts: all
   tasks:
   - name: Seconds since last apt-get update
     shell: echo $(($(date +"%s") - $(stat -c %Y /var/cache/apt/)))
