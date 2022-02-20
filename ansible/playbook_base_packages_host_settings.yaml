@@ -43,8 +43,8 @@
     apt:
       pkg:
         [
-          dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop,
-          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq,
+          dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop, libaa-bin,
+          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq, pv,
           iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils, rsyslog
         ]
 

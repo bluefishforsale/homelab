@@ -126,6 +126,7 @@
         owner: root
 
     - name: containerd runtime nvidia update
+      ignore_errors: true
       copy:
         dest: /etc/containerd/config.toml
         src: files/containerd/config.nvidia.toml
@@ -141,9 +142,9 @@
     - name: Re-start containerd service
       ansible.builtin.systemd:
         state: restarted
-        daemon_reload: yes
+        daemon_reload: true
         name: "{{item}}"
-      ignore_errors: yes
+      ignore_errors: true
       with_items:
         - containerd
         # - kube-scheduler

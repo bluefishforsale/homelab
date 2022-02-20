@@ -106,7 +106,7 @@
           state: present
           key: "https://github.com/{{github}}.keys"
 
-      - name: Sudo group gets passwordless sudo access
+      - name: Passwordless sudo for 'sudo' group
         lineinfile:
           path: /etc/sudoers
           state: present
@@ -120,17 +120,17 @@
           force: true
           mode: 0755
 
-      - name: install oh-my-zsh
+      - name: Root install oh-my-zsh
         shell: /tmp/oh-my-zsh-installer.sh
         args:
           creates: /root/.oh-my-zsh
 
-      - name: Change user shell to zsh
+      - name: Root Change user shell to zsh
         user:
           name: root
           shell: /bin/zsh
 
-      - name: install powerlevel10k
+      - name: Root install powerlevel10k
         git:
           repo: https://github.com/romkatv/powerlevel10k
           dest: /root/.oh-my-zsh/themes/powerlevel10k
@@ -138,7 +138,7 @@
           force: yes
           depth: 1
 
-      - name: Set p10k THEME in .zshrc
+      - name: Root Set p10k THEME in .zshrc
         lineinfile:
           path: /root/.zshrc
           state: present
@@ -146,31 +146,31 @@
           regexp: '^ZSH_THEME='
           line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
 
-      - name: p10k config file
+      - name: Root p10k config file
         copy:
           force: yes
           src: files/shell/p10k.zsh
           dest: /root/.p10k.zsh
 
-      - name: P10k DISABLE_CONFIGURATION_WIZARD
+      - name: Root P10k DISABLE_CONFIGURATION_WIZARD
         lineinfile:
           path: /root/.zshrc
           state: present
           line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
 
-      - name: ultimate vim
+      - name: Root ultimate vim
         shell:
           cmd: git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
         args:
           creates: /root/.vim_runtime
 
-      - name: tmux conf
+      - name: Root tmux conf
         copy:
           force: yes
           src: files/shell/tmux.conf
           dest: /root/.tmux.conf
 
-      - name: mkdir conf & glances
+      - name: Root mkdir conf & glances
         file:
           path: "{{item}}"
           state: directory
@@ -178,7 +178,7 @@
         - /root/.config
         - /root/.config/glances
 
-      - name: Glances conf
+      - name: Root Glances conf
         copy:
           force: yes
           src: files/shell/glances.conf
