@@ -1,10 +1,10 @@
 - name: nuke kubernetes, ceph, and containers.
+  ignore_errors: yes
   hosts: k8s
   become: yes
   tasks:
 
   - name: stop all services
-    ignore_errors: yes
     systemd:
       name: "{{item}}"
       state: stopped
@@ -45,26 +45,25 @@
   # #   with_items: "{{ running_processes.stdout_lines }}"
 
   - name: remove trees
-    ignore_errors: yes
     shell:
-      rm -rf '{{ item }}/*'
+      find '{{ item }}/' -type f -delete
     with_items:
-    - /var/lib/rook
-    - /etc/etcd
-    - /var/lib/etcd
-    - /etc/haproxy
     - /etc/containerd
+    - /etc/etcd
+    - /etc/haproxy
     - /opt/containerd
     - /run/containerd
     - /run/systemd/transient
     - /usr/libexec/kubernetes
     - /var/lib/containerd
+    - /var/lib/etcd
     - /var/lib/kubelet
     - /var/lib/kubernetes
+    - /var/lib/rook
+    - /var/lib/ceph
     - /var/log
 
   - name: remove files
-    ignore_errors: yes
     file:
       path: "{{ item }}"
       state: absent
@@ -90,7 +89,6 @@
       mode: 0755
 
   - name: run ceph osd disk reset script for each disk
-    ignore_errors: yes
     shell:
       cmd: /tmp/teardown.sh {{item}}
     with_items:
@@ -101,9 +99,9 @@
     - sde
     - sdf
     - sdg
+    - sdh
 
   - name: delete flannel links
-    ignore_errors: yes
     shell:
       cmd: ip link delete '{{}}'
     with_items:
