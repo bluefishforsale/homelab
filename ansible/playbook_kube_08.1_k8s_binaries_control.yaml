@@ -20,7 +20,7 @@
           file:
             path: "{{ datapath }}"
             state: directory
-            mode: 0700
+            mode: 0755
             group: root
             owner: root
 
@@ -34,7 +34,7 @@
           file:
             path: "{{ confpath }}"
             state: directory
-            mode: 0700
+            mode: 0755
             group: root
             owner: root
 

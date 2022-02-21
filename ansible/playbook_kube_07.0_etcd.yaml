@@ -21,7 +21,7 @@
         file:
           path: "{{confpath}}"
           state: directory
-          mode: 0700
+          mode: 0755
         with_items: [ "{{confpath}}", "{{datapath}}" ]
 
       - name: create tempdir
@@ -35,7 +35,7 @@
           force: yes
           src: "files/cfssl/{{item}}"
           dest: "{{confpath}}/{{item}}"
-          mode: 0700
+          mode: 0755
         with_items:
           - ca.pem
           - kubernetes-key.pem
