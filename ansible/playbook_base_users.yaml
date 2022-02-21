@@ -26,10 +26,11 @@
         args:
           creates: ~/.oh-my-zsh
 
-      # - name: Remove the oh-my-zsh-installer
-      #   file:
-      #     path: /tmp/oh-my-zsh-installer.sh
-      #     state: absent
+      - name: copy aliases into custom zsh dir
+        copy:
+          force: yes
+          src: files/shell/aliases.sh
+          dest: ~/.oh-my-zsh/custom/
 
       - name: register logged in username
         set_fact:
