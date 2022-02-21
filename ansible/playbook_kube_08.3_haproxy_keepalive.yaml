@@ -5,7 +5,7 @@
     - vars_kube.yaml
 
   tasks:
-    - name: HAproxy and Keepalived grouop
+    - name: HAproxy and Keepalived group
       group:
         name: "{{item}}"
       with_items:
@@ -16,6 +16,7 @@
       user:
         name: "{{item}}"
         group: "{{item}}"
+        system: true
         shell: /usr/bin/false
       with_items:
       - haproxy
