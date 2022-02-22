@@ -46,7 +46,7 @@
 
   - name: remove trees
     shell:
-      find '{{ item }}/' -type f -delete
+      find "{{ item }}/" -delete
     with_items:
     - /etc/containerd
     - /etc/etcd
@@ -89,8 +89,7 @@
       mode: 0755
 
   - name: run ceph osd disk reset script for each disk
-    shell:
-      cmd: /tmp/teardown.sh {{item}}
+    shell: /tmp/teardown.sh {{item}}
     with_items:
     - sda
     - sdb
@@ -102,11 +101,20 @@
     - sdh
 
   - name: delete flannel links
-    shell:
-      cmd: ip link delete '{{}}'
+    shell: ip link delete {{item}}
     with_items:
     - cni0
     - flannel.0
     - flannel.1
     - kube-ipvs0
     - kube-ipvs1
+
+
+  - name: Get veth link names
+    shell: ip link | awk '(/veth/){print $2}' | sed -e 's/\@.*//g'
+    register: veth
+
+  - name: delete veth link
+    ignore_errors: yes
+    shell: ip link delete {{item}}
+    loop: "{{ veth.stdout.split('\n') }}"

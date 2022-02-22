@@ -44,7 +44,7 @@
       pkg:
         [
           dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop, libaa-bin,
-          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq, pv,
+          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq, pv, iputils-ping,
           iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils, rsyslog
         ]
 
@@ -73,8 +73,8 @@
   - name: copy ntpdate cron
     copy:
       force: yes
-      src: files/crons/ntpdate.cron
-      dest: /etc/cron.d/cron.ntpdate
+      src: files/crons/ntpdate
+      dest: /etc/cron.d/ntpdate
       owner: root
       group: root
       mode: 0644
