@@ -132,9 +132,9 @@
         vm.swappiness = 0
         # file watches increase
         fs.inotify.max_queued_events = 131072
-        fs.inotify.max_user_instances = 1024
+        fs.inotify.max_user_instances = 20480
         fs.inotify.max_user_watches = 65536
-        user.max_inotify_instances = 1024
+        user.max_inotify_instances = 20480
         user.max_inotify_watches = 65536
 
   - name: sysctl reload
