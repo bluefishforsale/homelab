@@ -131,11 +131,11 @@
         # no swapping
         vm.swappiness = 0
         # file watches increase
-        fs.inotify.max_queued_events = 131072
+        fs.inotify.max_queued_events = 1310720
         fs.inotify.max_user_instances = 20480
-        fs.inotify.max_user_watches = 65536
+        fs.inotify.max_user_watches = 655360
         user.max_inotify_instances = 20480
-        user.max_inotify_watches = 65536
+        user.max_inotify_watches = 655360
 
   - name: sysctl reload
     shell: sysctl --system
