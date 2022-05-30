@@ -1,4 +1,16 @@
 
+# node migration insttructions
+# https://docs.ondat.io/docs/operations/etcd/migrate-etcd-cluster/
+
+
+export ETCDCTL_API=3
+export endpoints=https://127.0.0.1:2379
+export ETCDCTL_CACERT=/etc/etcd/ca.pem
+export ETCDCTL_CERT=/etc/etcd/kubernetes.pem
+export ETCDCTL_KEY=/etc/etcd/kubernetes-key.pem
+
+exit
+
 ETCDCTL_API=3 etcdctl member list --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/etcd/ca.pem \
   --cert=/etc/etcd/kubernetes.pem \
@@ -13,10 +25,6 @@ ETCDCTL_API=3 etcdctl del /registry/secrets/kube-node-lease/default-token-fgkrw 
   --key=/etc/etcd/kubernetes-key.pem
 
 
-export ETCDCTL_API=3
-export ETCDCTL_CACERT=/etc/etcd/ca.pem
-export ETCDCTL_CERT=/etc/etcd/kubernetes.pem
-export ETCDCTL_KEY=/etc/etcd/kubernetes-key.pem
 
 etcdctl get --prefix --keys-only /
 etcdctl member list --endpoints=https://127.0.0.1:2379

@@ -33,5 +33,4 @@ https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_conf
     show port-channel 3/4
     exit
     write memory
-y
 ```

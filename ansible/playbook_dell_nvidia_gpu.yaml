@@ -84,9 +84,10 @@
     - name: add the cuda repo
       register: nvidia_apt_repo
       copy:
+        force: yes
         dest: /etc/apt/sources.list.d/nvidia-cuda.list
         content: |
-          deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
+          deb [trusted=yes] http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
 
         # - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
         # - cuda
@@ -94,6 +95,7 @@
       apt:
         update_cache: true
         force_apt_get: true
+        allow-unauthenticated: true
         pkg:
         - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
         - nvidia-container-runtime

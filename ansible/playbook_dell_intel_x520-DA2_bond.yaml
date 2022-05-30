@@ -1,10 +1,9 @@
 - name: igxbe Network
   hosts: all
-  vars:
-    foo: bar
 
   tasks:
   - name: Network driver, netplan and tuning specific to interfaces
+    when: x520_da2_nic is defined
     become: yes
     block:
 
@@ -67,6 +66,11 @@
                   mii-monitor-interval: 500ms
                   fail-over-mac-policy: follow
                   transmit-hash-policy: layer3+4
+
+    - name: remove default netplan config
+      file:
+        path: /etc/netplan/00-installer-config.yaml
+        state: absent
 
     - name: netplan apply
       shell: >

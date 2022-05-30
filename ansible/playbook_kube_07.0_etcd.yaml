@@ -90,7 +90,7 @@
 
         - name: Flatten dict to formatted string, store PEERS_MAP
           set_fact:
-            PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0)|ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
+            PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0) | ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
           loop: "{{  HOST_IP | dict2items }}"
           loop_control:
             index_var: index
