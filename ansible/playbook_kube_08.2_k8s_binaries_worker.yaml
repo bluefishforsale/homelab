@@ -49,7 +49,7 @@
         - name: Installing crictl
           unarchive:
             remote_src: yes
-            src: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-linux-amd64.tar.gz
+            src: https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{CRI_UTIL_VERSION}}/crictl-v{{CRI_UTIL_VERSION}}-linux-amd64.tar.gz
             dest: "{{ tmpdir_1.path }}"
             keep_newer: yes
 
@@ -64,7 +64,7 @@
 ############ runc
         - name: Installing runc
           get_url:
-            url: https://github.com/opencontainers/runc/releases/download/v1.0.1/runc.amd64
+            url: https://github.com/opencontainers/runc/releases/download/v{{RUNC_VERSION}}/runc.amd64
             dest: "{{dirs['system']['bin']}}/runc"
             mode: 0755
 
@@ -72,7 +72,7 @@
         - name: Installing CNI-PLUGINS
           unarchive:
             remote_src: yes
-            src: https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
+            src: https://github.com/containernetworking/plugins/releases/download/v{{CNI_PLUGIN_VERSION}}/cni-plugins-linux-amd64-v{{CNI_PLUGIN_VERSION}}.tgz
             dest: "{{dirs['cni']['bin']}}"
             keep_newer: yes
 
@@ -86,7 +86,6 @@
             owner: root
           with_items:
             - 99-loopback.conf
-            # - 10-bridge.conf
 
 ################# Sysctl, modules, swap
     - name: Sysctl, modules, swap

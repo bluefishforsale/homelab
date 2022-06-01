@@ -80,6 +80,24 @@
       systemd:
         daemon_reload: true
 
+  - name: get CNI
+    shell: "ip link show | awk '(/cni|flannel|ipvs|lxc|cilium/ && /BROADCAST/){print $2}' | sort -uh | sed -e 's/://g'"
+    register: lxc_int
+
+  - name: delete CNI
+    shell: ip link delete {{item}}
+    with_items:
+    - "{{ lxc_int.stdout_lines }}"
+
+  - name: Get veth link names
+    shell: ip link | awk '(/veth/){print $2}' | sed -e 's/\@.*//g'
+    register: veth
+
+  - name: delete veth link
+    ignore_errors: yes
+    shell: ip link delete {{item}}
+    loop: "{{ veth.stdout.split('\n') }}"
+
   - name: copy ceph osd disk reset script
     copy:
       src: ceph/teardown.sh
@@ -99,22 +117,3 @@
     - sdf
     - sdg
     - sdh
-
-  - name: delete flannel links
-    shell: ip link delete {{item}}
-    with_items:
-    - cni0
-    - flannel.0
-    - flannel.1
-    - kube-ipvs0
-    - kube-ipvs1
-
-
-  - name: Get veth link names
-    shell: ip link | awk '(/veth/){print $2}' | sed -e 's/\@.*//g'
-    register: veth
-
-  - name: delete veth link
-    ignore_errors: yes
-    shell: ip link delete {{item}}
-    loop: "{{ veth.stdout.split('\n') }}"

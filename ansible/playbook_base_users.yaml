@@ -185,6 +185,6 @@
           src: files/shell/glances.conf
           dest: ~/.config/glances/glances.conf
 
-      # - name: add each user one at a time with some custom setup
-      #   include_tasks: subtask_user.yaml
-      #   loop: "{{ user }}"
+      - name: add users
+        include_tasks: subtask_user.yaml
+        loop: "{{ user }}"
