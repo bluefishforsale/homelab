@@ -151,6 +151,9 @@
         kern.maxfilesperproc = 524288
         # no swapping
         vm.swappiness = 0
+        # ciliumn rp_filter
+        # https://github.com/cilium/cilium/issues/10645
+        net.ipv4.conf.lxc*.rp_filter = 0
 
   - name: sysctl reload
     shell: sysctl --system
