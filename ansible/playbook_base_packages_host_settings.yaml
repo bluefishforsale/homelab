@@ -200,6 +200,22 @@
         [Install]
         WantedBy=multi-user.target
 
+  - name: Write blockdev readahead service
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/blockdev-setra.service"
+      content: |
+        [Unit]
+        Description=Set readahead for the hard drive device
+        After=local-fs.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=bash -c '/sbin/blockdev --setra 8192 /dev/sd*'
+
+        [Install]
+        WantedBy=multi-user.target
+
   - name: Write cpu-performance script
     copy:
       force: yes
@@ -235,6 +251,7 @@
       enabled: true
       daemon_reload: true
     with_items:
+    - blockdev-setra
     - io-scheduler
     - cpu-performance
     - rsyslog
