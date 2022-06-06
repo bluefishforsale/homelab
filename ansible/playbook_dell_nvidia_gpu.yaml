@@ -137,11 +137,11 @@
         group: root
         owner: root
 
-    - name: update init ram fs
+    - name: update init ramfs
       shell:
         cmd: update-initramfs -u
 
-    - name: Re-start containerd service
+    - name: Re-start related services
       ansible.builtin.systemd:
         state: restarted
         daemon_reload: true
@@ -149,8 +149,8 @@
       ignore_errors: true
       with_items:
         - containerd
+        - kubelet
         # - kube-scheduler
         # - kube-apiserver
         # - kube-controller-manager
-        # - kubelet
         # - kube-proxy

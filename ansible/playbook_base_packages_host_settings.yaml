@@ -5,7 +5,7 @@
   vars_files:
     - vars_kube.yaml
   vars:
-    new_paths: '/usr/local/go/bin'
+    go_paths: '/usr/local/go/bin'
   tasks:
   ############ HIGHLY OPINIONATED #####################
   # We hate snap for system services and applications #
@@ -43,9 +43,9 @@
     apt:
       pkg:
         [
-          dstat, golang, git, gcc, zsh, wget, curl, htop, sysstat, iotop, libaa-bin, pciutils,
-          iperf3, ipmitool, nmap, make, netcat, strace, fping, bmon, jq, pv, iputils-ping,
-          iptraf-ng, tmux, unzip, ntpdate, net-tools, lvm2, zsh, dnsutils, rsyslog, vim
+        bmon, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+        iptraf-ng, iputils-ping, jq, libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
+        pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
         ]
 
   - name: Glances has issues installing on some platforms
@@ -63,7 +63,7 @@
       state: present
       backrefs: yes
       regexp: '^PATH=.*'
-      line: 'PATH={{ old_paths.stdout }}:{{ new_paths }}'
+      line: 'PATH={{ old_paths.stdout }}:{{ go_paths }}'
 
   - name: Set the Host TZ and hwclock to UTC
     community.general.timezone:
@@ -99,6 +99,14 @@
         action(type="mmutf8fix" replacementChar="?")
         action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
+  - name: systemd-udev MAC link
+    copy:
+      force: yes
+      dest: "/etc/systemd/network/99-default.link"
+      content: |
+        [Link]
+        NamePolicy=kernel database onboard slot path
+        MACAddressPolicy=none
 
   - name: increase file limits
     copy:
@@ -110,7 +118,7 @@
 
   - name: Sysctl Tunings
     copy:
-      dest: "/etc/sysctl.d/00-10g-network-tunings.conf"
+      dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
       content: |
         # don't cache ss-thresh from previous connection
         net.ipv4.tcp_no_metrics_save = 1
@@ -220,8 +228,7 @@
         [Install]
         WantedBy=multi-user.target
 
-
-  - name: enable and restart services
+  - name: enable and restart performance services
     systemd:
       name: "{{item}}"
       state: restarted
@@ -231,3 +238,46 @@
     - io-scheduler
     - cpu-performance
     - rsyslog
+
+  - name: UPS battery backups
+    when: apcupsd is defined
+    block:
+    - name: print debug
+      debug:
+        msg: "APC UPSd software and config"
+    - name: Install a suite of common tools
+      apt:
+        pkg: [apcupsd]
+    - name: APCUPSd config
+      copy:
+        force: yes
+        dest: "/etc/apcupsd/apcupsd.conf"
+        content: |
+          UPSNAME smartups1500
+          UPSCABLE usb
+          UPSTYPE usb
+          MINUTES 7
+          DEVICE
+          POLLTIME 60
+    - name: UPSd /etc/default
+      copy:
+        force: yes
+        dest: "/etc/default/apcupsd"
+        content: |
+          ISCONFIGURED=yes
+    - name: min time left script
+      copy:
+        force: yes
+        mode: 0755
+        dest: "/etc/apcupsd/runlimit"
+        content: |
+          #!/bin/bash
+          # http://www.apcupsd.org/manual/manual.html#configure-options
+          for host in ocean.home $(printf "node%03d " $(seq 1 6)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
+          shutdown -h now
+    - name: enable and restart services
+      systemd:
+        name: apcupsd
+        state: restarted
+        enabled: true
+        daemon_reload: true

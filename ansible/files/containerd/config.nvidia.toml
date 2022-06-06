@@ -112,7 +112,7 @@ version = 2
             SystemdCgroup = true
 
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia-container-runtime]
-        runtime_type = "io.containerd.runc.v1"
+        runtime_type = "io.containerd.runc.v2"
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia-container-runtime.options]
           BinaryName = "/bin/nvidia-container-runtime"
           SystemdCgroup = true

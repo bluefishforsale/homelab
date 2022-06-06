@@ -48,6 +48,7 @@
     shell:
       find "{{ item }}/" -delete
     with_items:
+    - /etc/cni
     - /etc/containerd
     - /etc/etcd
     - /etc/haproxy
@@ -81,22 +82,13 @@
         daemon_reload: true
 
   - name: get CNI
-    shell: "ip link show | awk '(/cni|flannel|ipvs|lxc|cilium/ && /BROADCAST/){print $2}' | sort -uh | sed -e 's/://g'"
+    shell: "ip link show | awk '(/veth|cni|flannel|ipvs|lxc|cilium|kube-ipvs/ && /BROADCAST/){print $2}' | sort -uh | sed -e 's/://g' -e 's/@.*//g'"
     register: lxc_int
 
   - name: delete CNI
     shell: ip link delete {{item}}
     with_items:
     - "{{ lxc_int.stdout_lines }}"
-
-  - name: Get veth link names
-    shell: ip link | awk '(/veth/){print $2}' | sed -e 's/\@.*//g'
-    register: veth
-
-  - name: delete veth link
-    ignore_errors: yes
-    shell: ip link delete {{item}}
-    loop: "{{ veth.stdout.split('\n') }}"
 
   - name: copy ceph osd disk reset script
     copy:

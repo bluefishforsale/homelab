@@ -261,7 +261,16 @@
             owner: root
           with_items:
             - kubelet
-            - kube-proxy
+            # - kube-proxy
+
+        - name: copy ntpdate cron
+          copy:
+            force: yes
+            src: files/crons/ntpdate
+            dest: /etc/cron.d/ntpdate
+            owner: root
+            group: root
+            mode: 0644
 
         - name: systemd enable and restart kubelet and proxy
           systemd:
