@@ -103,7 +103,7 @@
       - name: Container Modules
         copy:
           force: yes
-          dest: "/etc/modules-load.d/containerd.conf"
+          dest: "/etc/modules-load.d/99-containerd.conf"
           content: |
             overlay
             br_netfilter

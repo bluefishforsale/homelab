@@ -14,19 +14,6 @@
       debug:
         msg: "Installing {{nvidia_version}} driver"
 
-    # - name: stop containerd service
-    #   systemd:
-    #     state: stopped
-    #     name: "{{item}}"
-    #   ignore_errors: yes
-    #   with_items:
-    #     - kube-scheduler
-    #     - kube-apiserver
-    #     - kube-controller-manager
-    #     - kubelet
-    #     - kube-proxy
-    #     - containerd
-
     - name: blacklist the nuevo driver
       copy:
         dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
@@ -66,7 +53,7 @@
 
     - name: install nvidia driver from binary
       ignore_errors: yes
-      shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s
+      shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s --systemd -z --no-x-check -b -r
 
     - name: add nvidia apt gpg key
       apt_key:
