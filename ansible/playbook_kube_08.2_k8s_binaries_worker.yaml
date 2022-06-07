@@ -172,12 +172,12 @@
 
        ############### Config
 
-        - name: Generate vanilla containerd config
-          shell: containerd config default
-          register: containerd_config
+        # - name: Generate vanilla containerd config
+        #   shell: containerd config default
+        #   register: containerd_config
 
         - name: Write Containerd config
-          when: containerd_config.stdout | length > 0
+          # when: containerd_config.stdout | length > 0
           copy:
             force: yes
             # content: "{{ containerd_config.stdout }}"

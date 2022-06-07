@@ -1,5 +1,7 @@
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
+  vars_files:
+    - vars_kube.yaml
   vars:
     nvidia_version: "495.46"
     # nvidia_version: 510
@@ -45,13 +47,13 @@
         update_cache: true
         pkg: "linux-headers-{{kernel_version.stdout}}"
 
-    - name: download nvidia binary installer
-      get_url:
-        url: "https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-        dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
-        mode: 0755
-        owner: root
-        group: root
+    # - name: download nvidia binary installer
+    #   get_url:
+    #     url: "https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+    #     dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+    #     mode: 0755
+    #     owner: root
+    #     group: root
 
     - name: unload kernel drivers
       ignore_errors: true
@@ -62,13 +64,36 @@
       - nvidia_modeset
       - nvidia
 
-    - name: remove nvidia driver just in case
-      ignore_errors: yes
-      command: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run --uninstall -s -n -a
+    - name: remove nvidia files
+      ignore_errors: true
+      shell: rm -fv "{{item}}"
+      with_items:
+      - /kernel/drivers/video/nvidia*
+      - /usr/bin/nvidia*
+      - /usr/lib/libcuda*
+      - /usr/lib/libGL*
+      - /usr/lib/libnvcuvid*
+      - /usr/lib/libnvidia*
+      - /usr/lib/libOpenCL*
+      - /usr/lib/tls/libnvidia*
+      - /usr/lib/vendors/nvidia*
 
-    - name: install nvidia driver from binary
+    - name: run nvidia uninstallers
       ignore_errors: yes
-      shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s --systemd -z --no-x-check -b -r
+      apt:
+        name: "{{item}}"
+        state: absent
+        purge: true
+      with_items:
+      - nvidia-container-runtime
+      - nvidia-container-toolkit
+      - nvidia-utils-{{nvidia_version.split('.')[0]}}
+      - nvidia-driver-{{nvidia_version.split('.')[0]}}"
+      # - /usr/bin/nvidia-uninstall
+
+    # - name: install nvidia driver from binary
+    #   ignore_errors: yes
+    #   shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s --systemd -z --no-x-check -b -r
 
     - name: add nvidia apt gpg key
       apt_key:
@@ -99,8 +124,11 @@
         force_apt_get: true
         allow-unauthenticated: true
         pkg:
-        - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
+        - nvidia-container-toolkit
         - nvidia-container-runtime
+        - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
+        - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
+        # - "cuda-drivers-{{nvidia_version.split('.')[0]}}"
 
     - name: run nvidi-smi test
       ignore_errors: true
@@ -130,15 +158,14 @@
         group: root
         owner: root
 
-    # - name: containerd runtime nvidia update
-    #   ignore_errors: true
-    #   copy:
-    #     dest: /etc/containerd/config.toml
-    #     src: files/containerd/config.nvidia.toml
-    #     force: yes
-    #     mode: 0644
-    #     group: root
-    #     owner: root
+    - name: Write Containerd config
+      # when: containerd_config.stdout | length > 0
+      copy:
+        force: yes
+        # content: "{{ containerd_config.stdout }}"
+        content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
+        dest: /etc/containerd/config.toml
+
 
     - name: update init ramfs
       shell:
