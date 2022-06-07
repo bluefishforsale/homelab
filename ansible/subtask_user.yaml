@@ -1,4 +1,4 @@
-- name: Create the user and ensure grpups and sudo (done as root)
+- name: Create the user and ensure groups and sudo (done as root)
   become: yes
   become_user: root
   block:

@@ -96,7 +96,7 @@
           src: files/shell/glances.conf
           dest: ~/.config/glances/glances.conf
 
-    ################ Root user ###################
+    ################ Done for Root user ###################
     - name: Stuff done for root
       become: yes
 

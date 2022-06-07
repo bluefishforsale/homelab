@@ -290,7 +290,8 @@
         content: |
           #!/bin/bash
           # http://www.apcupsd.org/manual/manual.html#configure-options
-          for host in ocean.home $(printf "node%03d " $(seq 1 6)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
+          for host in ocean.home $(printf "node%03d " $(seq 1 6) | xargs -n1 | grep -vi $(hostname)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
+          wait
           shutdown -h now
     - name: enable and restart services
       systemd:
