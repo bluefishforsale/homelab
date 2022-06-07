@@ -10,6 +10,16 @@
     when: nvidia_gpu is defined
 
     block:
+    - name: stop  services using driver
+      ansible.builtin.systemd:
+        state: stopped
+        daemon_reload: true
+        name: "{{item}}"
+      ignore_errors: true
+      with_items:
+        - containerd
+        - kubelet
+
     - name: print debug
       debug:
         msg: "Installing {{nvidia_version}} driver"
@@ -35,7 +45,7 @@
         update_cache: true
         pkg: "linux-headers-{{kernel_version.stdout}}"
 
-    - name: get nvidia binary installer
+    - name: download nvidia binary installer
       get_url:
         url: "https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
         dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
@@ -43,9 +53,14 @@
         owner: root
         group: root
 
-    - name: unload Nouveau kernel driver
+    - name: unload kernel drivers
       ignore_errors: true
-      command: rmmod nouveau
+      command: rmmod "{{item}}"
+      with_items:
+      - nouveau
+      - nvidia_drm
+      - nvidia_modeset
+      - nvidia
 
     - name: remove nvidia driver just in case
       ignore_errors: yes
@@ -88,6 +103,7 @@
         - nvidia-container-runtime
 
     - name: run nvidi-smi test
+      ignore_errors: true
       shell:
         cmd: nvidia-smi
 
@@ -114,15 +130,15 @@
         group: root
         owner: root
 
-    - name: containerd runtime nvidia update
-      ignore_errors: true
-      copy:
-        dest: /etc/containerd/config.toml
-        src: files/containerd/config.nvidia.toml
-        force: yes
-        mode: 0644
-        group: root
-        owner: root
+    # - name: containerd runtime nvidia update
+    #   ignore_errors: true
+    #   copy:
+    #     dest: /etc/containerd/config.toml
+    #     src: files/containerd/config.nvidia.toml
+    #     force: yes
+    #     mode: 0644
+    #     group: root
+    #     owner: root
 
     - name: update init ramfs
       shell:
@@ -137,7 +153,3 @@
       with_items:
         - containerd
         - kubelet
-        # - kube-scheduler
-        # - kube-apiserver
-        # - kube-controller-manager
-        # - kube-proxy

@@ -180,16 +180,17 @@
           when: containerd_config.stdout | length > 0
           copy:
             force: yes
-            content: "{{ containerd_config.stdout }}"
+            # content: "{{ containerd_config.stdout }}"
+            content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
             dest: /etc/containerd/config.toml
 
-        - name: containerd runtime config update
-          lineinfile:
-            path: /etc/containerd/config.toml
-            state: present
-            backrefs: yes
-            regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
-            line: '\1true'
+        # - name: containerd runtime config update
+        #   lineinfile:
+        #     path: /etc/containerd/config.toml
+        #     state: present
+        #     backrefs: yes
+        #     regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
+        #     line: '\1true'
 
         - name: Write systemd Startup
           copy:
