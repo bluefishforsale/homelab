@@ -177,16 +177,9 @@
         #   shell: containerd config default
         #   register: containerd_config
 
-        # jinja template uses gpu var
-        - name: register gpu var
-          set_fact:
-            nvidia_gpu: "{{nvidia_gpu}}"
-
         - name: Write Containerd config
-          # when: containerd_config.stdout | length > 0
           copy:
             force: yes
-            # content: "{{ containerd_config.stdout }}"
             content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
             dest: /etc/containerd/config.toml
 
