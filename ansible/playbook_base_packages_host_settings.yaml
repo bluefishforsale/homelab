@@ -106,7 +106,7 @@
       content: |
         [Link]
         NamePolicy=kernel database onboard slot path
-        MACAddressPolicy=none
+        MACAddressPolicy=persistent
 
   - name: increase file limits
     copy:
@@ -129,26 +129,25 @@
         # The maximum number of packets queued in received state
         net.core.netdev_max_backlog = 30000
         # Enable selective acknowledgment, which improves performance by selectively acknowledging packets received out of order.
-        net.ipv4.tcp_sack = 0
+        net.ipv4.tcp_sack = 1
         # Enable calculation of RTT in a more accurate way (see RFC 1323) than the retransmission timeout.
-        net.ipv4.tcp_timestamps = 0
+        net.ipv4.tcp_timestamps = 1
         # If you are using Jumbo Frames, also set this
         net.ipv4.tcp_mtu_probing = 1
         # Avoid falling back to slow start after a connection goes idle.
         net.ipv4.tcp_slow_start_after_idle = 0
         # recommended to enable 'fair queueing'
         net.core.default_qdisc = fq
-        # increase TCP max buffer size setable using setsockopt()
-        net.core.rmem_max = 536870912
-        net.core.wmem_max = 536870912
+        # increase TCP max buffer sizes 512MB
+        net.core.rmem_max = 512000000
+        net.core.wmem_max = 512000000
         # Support windows larger than 64KB.
         net.ipv4.tcp_window_scaling = 1
-        fs.inotify.max_user_instances = 10240
         # jumbo frames needs probing
         net.ipv4.tcp_mtu_probing = 1
         # increase Linux autotuning TCP buffer limit
-        net.ipv4.tcp_rmem = 4096 87380 268435456
-        net.ipv4.tcp_wmem = 4096 65536 268435456
+        net.ipv4.tcp_rmem = 4096 87380 512000000
+        net.ipv4.tcp_wmem = 4096 65536 512000000
         # file watches increase
         fs.inotify.max_queued_events = 1310720
         fs.inotify.max_user_instances = 20480
