@@ -129,6 +129,10 @@
         group: root
         owner: root
 
+    # jinja template uses gpu var
+    - name: register gpu var
+      set_fact:
+        nvidia_gpu: "{{nvidia_gpu}}"
     - name: Write Containerd config
       copy:
         force: yes

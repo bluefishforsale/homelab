@@ -2,6 +2,16 @@
   hosts: all
 
   tasks:
+  - name: register interfaces carrier
+    shell: |
+      grep -l 1 /sys/class/net/e*/carrier | xargs -n1 dirname | xargs -n1 basename
+    register: carrier_up
+
+  - name: register interfaces speeds
+    shell: |
+      grep -v -- -1 /sys/class/net/e*/speed | sed -e 's/\// /g'
+    register: iface_speed
+
   - name: netplan for 10G bonded
     copy:
       force: yes
@@ -40,28 +50,3 @@
       state: restarted
       name: 10g_qdisc.service
       daemon_reload: true
-
-    - name: 10g tc qdisc boot oneshot service
-      copy:
-        dest: /etc/systemd/system/10g_qdisc.service
-        content: |
-          [Unit]
-          After=network.target
-
-          [Install]
-          WantedBy=multi-user.target
-
-          [Service]
-          Type=oneshot
-          RemainAfterExit=true
-          ExecStart=/sbin/tc qdisc add dev eth0 root fq maxrate 9gbit
-          ExecStart=/sbin/tc qdisc add dev eth1 root fq maxrate 9gbit
-          ExecStart=/sbin/tc qdisc add dev eth2 root fq maxrate 9gbit
-          ExecStart=/sbin/tc qdisc add dev eth3 root fq maxrate 9gbit
-
-    - name: Enable and Start service
-      systemd:
-        enabled: yes
-        state: restarted
-        name: 10g_qdisc.service
-        daemon_reload: true

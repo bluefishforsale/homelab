@@ -2,52 +2,61 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    eno1:
-      mtu: 8192
+{% for key, vals in interfaces.items() %}
+    {{key}}:
+      mtu: {{vals["mtu"]}}
       dhcp4: false
       dhcp6: false
-    eno2:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    enp65s0f0:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    enp65s0f1:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    eth0:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    eth1:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    eth2:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
-    eth3:
-      mtu: 8192
-      dhcp4: false
-      dhcp6: false
+{% endfor %}
+    # eno1:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # eno2:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # enp65s0f0:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # enp65s0f1:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # eth0:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # eth1:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # eth2:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
+    # eth3:
+    #   mtu: 8192
+    #   dhcp4: false
+    #   dhcp6: false
   bonds:
     bond0:
       mtu: 8192
       interfaces:
-        - eno1
-        - eno2
-        - enp65s0f0
-        - enp65s0f1
-        - eth0
-        - eth1
-        - eth2
-        - eth3
+{% for key in interfaces.keys() %}
+      - {{key}}
+{% endfor %}
+        # - eno1
+        # - eno2
+        # - enp65s0f0
+        # - enp65s0f1
+        # - eth0
+        # - eth1
+        # - eth2
+        # - eth3
       addresses: ["192.168.1.104/24"]
-      routes: 
+      routes:
         - to: default
           via: 192.168.1.1
       nameservers:

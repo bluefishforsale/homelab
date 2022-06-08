@@ -23,6 +23,7 @@
       - kubectl
 
   tasks:
+
     - name: Get IP for a subset of hosts, store in HOST_IP
       set_fact:
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
@@ -175,6 +176,11 @@
         # - name: Generate vanilla containerd config
         #   shell: containerd config default
         #   register: containerd_config
+
+        # jinja template uses gpu var
+        - name: register gpu var
+          set_fact:
+            nvidia_gpu: "{{nvidia_gpu}}"
 
         - name: Write Containerd config
           # when: containerd_config.stdout | length > 0

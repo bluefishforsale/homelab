@@ -254,6 +254,7 @@
     - io-scheduler
     - cpu-performance
     - rsyslog
+    - logrotate
 
   - name: UPS battery backups
     when: apcupsd is defined
