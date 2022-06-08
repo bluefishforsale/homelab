@@ -104,14 +104,11 @@ version = 2
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
 {% if 'nvidia_gpu' in hostvars[inventory_hostname] %}
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
-          privileged_without_host_devices = false
-          runtime_engine = ""
-          runtime_root = ""
           runtime_type = "io.containerd.runc.v2"
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
             BinaryName = "/bin/nvidia-container-runtime"
+            SystemdCgroup = true
 {% endif %}
-
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
           base_runtime_spec = ""
           cni_conf_dir = ""
@@ -187,10 +184,15 @@ version = 2
 
   [plugins."io.containerd.runtime.v1.linux"]
     no_shim = false
+{% if 'nvidia_gpu' in hostvars[inventory_hostname] %}
+    runtime = "nvidia"
+{% else %}
     runtime = "runc"
+{% endif %}
     runtime_root = ""
     shim = "containerd-shim"
     shim_debug = false
+    no_shim = false
 
   [plugins."io.containerd.runtime.v2.task"]
     platforms = ["linux/amd64"]
