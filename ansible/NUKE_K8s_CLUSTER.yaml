@@ -54,15 +54,13 @@
     - /etc/haproxy
     - /opt/containerd
     - /run/containerd
-    - /run/systemd/transient
     - /usr/libexec/kubernetes
     - /var/lib/containerd
     - /var/lib/etcd
     - /var/lib/kubelet
-    - /var/lib/kubernetes
+    - /var/lib/kubernetes/var/lib/kubernetes
     - /var/lib/rook
     - /var/lib/ceph
-    - /var/log
 
   - name: remove files
     file:
