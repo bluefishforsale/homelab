@@ -3,7 +3,8 @@
   vars_files:
     - vars_kube.yaml
   vars:
-    nvidia_version: "495.46"
+    old_nvidia_version: "495.46"
+    nvidia_version: "515"
 
   tasks:
   - name: Driver and Patch
@@ -78,29 +79,36 @@
       with_items:
       - nvidia-container-runtime
       - nvidia-container-toolkit
-      - nvidia-utils-{{nvidia_version.split('.')[0]}}
-      - nvidia-driver-{{nvidia_version.split('.')[0]}}"
+      - nvidia-utils-{{old_nvidia_version.split('.')[0]}}
+      - nvidia-driver-{{old_nvidia_version.split('.')[0]}}"
+      - "nvidia-utils{{nvidia_version}}-server"
+      - "nvidia-driver-{{nvidia_version}}-server"
 
     - name: add nvidia apt gpg key
       apt_key:
         url: "{{item}}"
       with_items:
+      - https://nvidia.github.io/libnvidia-container/gpgkey
       - https://nvidia.github.io/nvidia-container-runtime/gpgkey
       - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
 
+    - name: nvidia-container-toolkit apt repo
+      get_url:
+        url: https://nvidia.github.io/libnvidia-container/ubuntu20.04/libnvidia-container.list
+        dest: /etc/apt/sources.list.d/nvidia-container-toolkituntime.list
+
     - name: nvidia-container-runtime apt repo
-      register: nvidia_apt_repo
       get_url:
         url: https://nvidia.github.io/nvidia-container-runtime/ubuntu20.04/nvidia-container-runtime.list
         dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
 
-    - name: add the cuda repo
-      register: nvidia_apt_repo
-      copy:
-        force: yes
-        dest: /etc/apt/sources.list.d/nvidia-cuda.list
-        content: |
-          deb [trusted=yes] http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
+    # - name: add the cuda repo
+    #   register: nvidia_apt_repo
+    #   copy:
+    #     force: yes
+    #     dest: /etc/apt/sources.list.d/nvidia-cuda.list
+    #     content: |
+    #       deb [trusted=yes] http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
 
     - name: apt install nvidia packages
       apt:
@@ -108,11 +116,12 @@
         force_apt_get: true
         allow-unauthenticated: true
         pkg:
+        - "nvidia-utils-{{nvidia_version}}-server"
+        - "nvidia-driver-{{nvidia_version}}-server"
         - nvidia-container-toolkit
         - nvidia-container-runtime
-        - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
-        - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
-        # - "cuda-drivers-{{nvidia_version.split('.')[0]}}"
+        # - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
+        # - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
 
     - name: run nvidi-smi test
       ignore_errors: true
