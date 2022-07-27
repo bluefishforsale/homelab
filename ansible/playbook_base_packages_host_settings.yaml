@@ -10,31 +10,10 @@
   ############ HIGHLY OPINIONATED #####################
   # We hate snap for system services and applications #
   #####################################################
-  - name: Get snap installed apps
-    shell: "snap list | awk '(!/Name/){print $1}'"
-    register: snap_apps
-
-  - name: stop all snap apps
-    ignore_errors: yes
-    shell: snap remove "{{item}}"
-    loop: "{{ snap_apps.stdout.split('\n') }}"
-
-  - name: Stop snapd
-    systemd:
-      state: stopped
-      name: snapd
-      enabled: false
-      daemon_reload: true
-
-  - name: remove snap chache dir
-    file:
-      state: absent
-      path: /var/cache/snapd
-
-  - name: remove all snap packages
-    apt:
-      pkg:
-        [snapd, gnome-software-plugin-snap ]
+  - name: set kernel version
+    register: kernel_version
+    shell:
+      cmd: uname -r
 
   - name: apt-get update
     apt: update_cache=yes
@@ -43,8 +22,10 @@
     apt:
       pkg:
         [
-        bmon, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-        iptraf-ng, iputils-ping, jq, libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
+        bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+        iptraf-ng, iputils-ping, jq, linux-tools-common,
+        "linux-tools-{{kernel_version.stdout}}", "linux-cloud-tools-{{kernel_version.stdout}}",
+        libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
         ]
 
@@ -67,8 +48,8 @@
 
   - name: Set the Host TZ and hwclock to UTC
     community.general.timezone:
-      hwclock: UTC
-      name: UTC
+      hwclock: local
+      name: America/Los_Angeles
 
   - name: copy ntpdate cron
     copy:
@@ -215,33 +196,49 @@
         [Install]
         WantedBy=multi-user.target
 
-  - name: Write cpu-performance script
+  - name: Write cpufrequtils GOVERNOR
     copy:
       force: yes
-      dest: "/etc/systemd/system/cpu-performance.sh"
-      mode: 0755
-      content: |
-        for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
-            echo "performance" > "${CPU}" 2>/dev/null
-        done
+      dest: /etc/default/cpufrequtils
+      mode: 0644
+      content: GOVERNOR="powersave"
 
-  - name: Write cpu-performance service
-    copy:
-      force: yes
-      dest: "/etc/systemd/system/cpu-performance.service"
-      content: |
-        [Unit]
-        Description=Setup foo
-        #After=network.target
+  # - name: Write cpu-performance script
+  #   copy:
+  #     force: yes
+  #     dest: "/etc/systemd/system/cpu-performance.sh"
+  #     mode: 0755
+  #     content: |
+  #       for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
+  #           echo "performance" > "${CPU}" 2>/dev/null
+  #       done
 
-        [Service]
-        Type=oneshot
-        ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
-        RemainAfterExit=true
-        StandardOutput=journal
+  # - name: Write cpu-performance service
+  #   copy:
+  #     force: yes
+  #     dest: "/etc/systemd/system/cpu-performance.service"
+  #     content: |
+  #       [Unit]
+  #       Description=Setup foo
+  #       #After=network.target
 
-        [Install]
-        WantedBy=multi-user.target
+  #       [Service]
+  #       Type=oneshot
+  #       ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
+  #       RemainAfterExit=true
+  #       StandardOutput=journal
+
+  #       [Install]
+  #       WantedBy=multi-user.target
+
+  - name: TEMP disable services
+    systemd:
+      name: "{{item}}"
+      state: stopped
+      enabled: false
+      daemon_reload: true
+    with_items:
+    - cpu-performance
 
   - name: enable and restart performance services
     systemd:
@@ -252,19 +249,22 @@
     with_items:
     - blockdev-setra
     - io-scheduler
-    - cpu-performance
     - rsyslog
     - logrotate
+    - cpufrequtils
 
   - name: UPS battery backups
     when: apcupsd is defined
     block:
+
     - name: print debug
       debug:
         msg: "APC UPSd software and config"
+
     - name: Install a suite of common tools
       apt:
         pkg: [apcupsd]
+
     - name: APCUPSd config
       copy:
         force: yes
@@ -276,12 +276,14 @@
           MINUTES 7
           DEVICE
           POLLTIME 60
+
     - name: UPSd /etc/default
       copy:
         force: yes
         dest: "/etc/default/apcupsd"
         content: |
           ISCONFIGURED=yes
+
     - name: min time left script
       copy:
         force: yes
