@@ -141,7 +141,7 @@
     - name: Write Containerd config
       copy:
         force: yes
-        content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
+        content: '{{ lookup("template", "files/containerd/config.nvidia.toml") }}'
         dest: /etc/containerd/config.toml
 
     - name: update init ramfs
