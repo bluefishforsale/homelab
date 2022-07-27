@@ -74,6 +74,18 @@
             owner: haproxy
             group: haproxy
 
+        - name: write haproxy / keepalived systemd services
+          copy:
+            force: yes
+            dest: "/etc/systemd/system/{{item}}"
+            content: '{{ lookup("template", "files/{{item}}/{{item}}.service.j2") }}'
+            mode: 0644
+            owner: root
+            group: root
+          with_items:
+          - keepalived
+          - haproxy
+
         - name: enable and restart
           systemd:
             name: "{{item}}"
