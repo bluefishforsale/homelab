@@ -183,7 +183,6 @@ version = 2
     no_prometheus = false
 
   [plugins."io.containerd.runtime.v1.linux"]
-    no_shim = false
 {% if 'nvidia_gpu' in hostvars[inventory_hostname] %}
     runtime = "nvidia"
 {% else %}
