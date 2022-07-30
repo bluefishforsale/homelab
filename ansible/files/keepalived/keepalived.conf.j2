@@ -6,11 +6,11 @@ vrrp_script haproxy-check {
 
 vrrp_instance haproxy-vip {
     state BACKUP
-    priority {{ HOST_IP[inventory_hostname].split(".")[-1] }}
-    interface {{iface.stdout}}
-    virtual_router_id {{ HOST_IP[inventory_hostname].split(".")[-1] }}
+    interface {{ iface.stdout }}
+    priority {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
+    virtual_router_id {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
     advert_int 3
-    unicast_src_ip {{HOST_IP[inventory_hostname]}}
+    unicast_src_ip {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
     unicast_peer {
 {% for value in HOST_IP.values() if HOST_IP[inventory_hostname] not in value %}
         {{value}}

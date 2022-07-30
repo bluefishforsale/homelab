@@ -48,9 +48,16 @@ listen stats
   stats   realm     Haproxy\ Statistics
   stats   auth      Admin:Password
 
-frontend k8s-api
-  bind {{APISERVER_IP}}:443
+frontend k8s-api-localhost
   bind 127.0.0.1:443
+  mode tcp
+  option tcplog
+  tcp-request inspect-delay 5s
+  tcp-request content accept if { req.ssl_hello_type 1 }
+  default_backend k8s-api
+
+frontend k8s-api-vrrp
+  bind {{APISERVER_IP}}:443
   mode tcp
   option tcplog
   tcp-request inspect-delay 5s

@@ -2,8 +2,10 @@
 Description=HAProxy Load Balancer
 Documentation=man:haproxy(1)
 Documentation=file:/usr/share/doc/haproxy/configuration.txt.gz
-After=network-online.target rsyslog.service
+After=network-online.target rsyslog.service kube-apiserver.service keepalived.service
 Wants=network-online.target
+Requires=kube-apiserver.service
+RestartSec=2
 
 [Service]
 EnvironmentFile=-/etc/default/haproxy
@@ -14,7 +16,7 @@ ExecStart=/usr/sbin/haproxy -Ws -f $CONFIG -p $PIDFILE $EXTRAOPTS
 ExecReload=/usr/sbin/haproxy -Ws -f $CONFIG -c -q $EXTRAOPTS
 ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
-Restart=always
+Restart=on-failure
 SuccessExitStatus=143
 Type=notify
 
@@ -37,5 +39,4 @@ Type=notify
 # SystemCallFilter=~@cpu-emulation @keyring @module @obsolete @raw-io
 
 [Install]
-Requires=kube-apiserver.service
 WantedBy=multi-user.target

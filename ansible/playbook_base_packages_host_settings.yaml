@@ -101,6 +101,8 @@
     copy:
       dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
       content: |
+        # allow binding to interfaces not yet up (haproxy/keepalived)
+        net.ipv4.ip_nonlocal_bind = 1
         # don't cache ss-thresh from previous connection
         net.ipv4.tcp_no_metrics_save = 1
         # Enable Forward Acknowledgment, which operates with Selective Acknowledgment (SACK) to reduce congestion.
