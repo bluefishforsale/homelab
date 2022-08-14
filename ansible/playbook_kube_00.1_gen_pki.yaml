@@ -12,6 +12,13 @@
       community.general.homebrew:
         name: cfssl
         state: present
+      when: ansible_distribution == 'MacOSX'
+
+    - name: install cfssl
+      delegate_to: localhost
+      apt:
+        name: cfssl
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
 
     - name: Certificate Authority
       delegate_to: localhost
