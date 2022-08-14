@@ -172,24 +172,11 @@
             name: "{{tmpdir_1.path}}"
 
        ############### Config
-
-        # - name: Generate vanilla containerd config
-        #   shell: containerd config default
-        #   register: containerd_config
-
         - name: Write Containerd config
           copy:
             force: yes
             content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
             dest: /etc/containerd/config.toml
-
-        # - name: containerd runtime config update
-        #   lineinfile:
-        #     path: /etc/containerd/config.toml
-        #     state: present
-        #     backrefs: yes
-        #     regexp: '^([ \t]+SystemdCgroup[ \t]+=[ \t]+)false'
-        #     line: '\1true'
 
         - name: Write systemd Startup
           copy:

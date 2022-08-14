@@ -102,14 +102,6 @@
         url: https://nvidia.github.io/nvidia-container-runtime/ubuntu20.04/nvidia-container-runtime.list
         dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
 
-    # - name: add the cuda repo
-    #   register: nvidia_apt_repo
-    #   copy:
-    #     force: yes
-    #     dest: /etc/apt/sources.list.d/nvidia-cuda.list
-    #     content: |
-    #       deb [trusted=yes] http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /
-
     - name: apt install nvidia packages
       apt:
         update_cache: true
@@ -120,8 +112,6 @@
         - "nvidia-driver-{{nvidia_version}}-server"
         - nvidia-container-toolkit
         - nvidia-container-runtime
-        # - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
-        # - "nvidia-driver-{{nvidia_version.split('.')[0]}}"
 
     - name: run nvidi-smi test
       ignore_errors: true

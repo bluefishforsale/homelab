@@ -16,8 +16,9 @@
 
     - name: install cfssl
       delegate_to: localhost
+      become: true
       apt:
-        name: cfssl
+        name: golang-cfssl
       when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
 
     - name: Certificate Authority
