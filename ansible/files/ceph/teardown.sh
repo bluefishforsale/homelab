@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
+
 DISK="/dev/${1}"
+
 if [ -z ${DISK} ] ; then
     echo "Usage: $0 <disk>"
     echo "where <disk> is like hda or sdb"
@@ -15,7 +17,7 @@ sgdisk --zap-all $DISK
 dd if=/dev/zero of="$DISK" bs=1M count=100 oflag=direct,dsync
 
 # Clean disks such as ssd with blkdiscard instead of dd
-blkdiscard $DISK
+# blkdiscard $DISK
 
 CEPH_ID="$(lsblk ${DISK} | grep ceph | awk '{print $1}'  | sed -e 's/└─//g')"
 # These steps only have to be run once on each node
