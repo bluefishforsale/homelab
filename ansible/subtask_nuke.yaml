@@ -14,16 +14,17 @@
   - kube-controller-manager
   - kubelet
 
-# - name: Get kube-pods services
-#   shell: "systemctl status *kube* 2>/dev/null | grep ● | awk '{print $2}'"
-#   register: running_kube_systemd
+- name: Get kube-pods services
+  shell: "systemctl status *kube* 2>/dev/null | grep ● | awk '{print $2}'"
+  register: running_kube_systemd
 
-# - name: stop kube-pods
-#   ignore_errors: yes
-#   systemd:
-#     name: "{{item}}"
-#     state: stopped
-#   loop: "{{ running_kube_systemd.stdout.split('\n') }}"
+- name: stop kube-pods
+  ignore_errors: true
+  systemd:
+    name: "{{item}}"
+    state: stopped
+    enabled: false
+  loop: "{{ running_kube_systemd.stdout.split('\n') }}"
 
 - name: Get running processes
   ignore_errors: true
