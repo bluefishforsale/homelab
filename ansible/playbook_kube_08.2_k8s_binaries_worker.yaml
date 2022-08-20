@@ -225,6 +225,10 @@
             mode: 0755
           with_items: "{{binaries}}"
 
+        - name: register gpu var
+          set_fact:
+            nvidia_gpu: "{{nvidia_gpu}}"
+
         - name: Kube*-configs
           copy:
             force: yes

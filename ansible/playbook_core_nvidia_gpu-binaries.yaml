@@ -1,17 +1,8 @@
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
-  vars_files:
-    - vars_kube.yaml
   vars:
-    old_nvidia_version: "495.46"
-    nvidia_version: "515"
-    nvidia_apt_packages:
-      - "nvidia-utils-{{nvidia_version}}-server"
-      - "nvidia-driver-{{nvidia_version}}-server"
-      - nvidia-container-toolkit
-      - libnvidia-container-tools
-      # - libnvidia-container1
-
+    nvidia_version: "495.46"
+    # nvidia_version: 510
 
   tasks:
   - name: Driver and Patch
@@ -44,6 +35,20 @@
         group: root
         owner: root
 
+    - name: download nvidia binary installer
+      get_url:
+        url: "https://international.download.nvidia.com/XFree86/Linux-x86_64/{{nvidia_version}}/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        dest: "/tmp/NVIDIA-Linux-x86_64-{{nvidia_version}}.run"
+        mode: 0755
+        owner: root
+        group: root
+
+    - name: unload kernel drivers
+      ignore_errors: true
+      command: rmmod "{{item}}"
+      with_items:
+      - nouveau
+
     - name: set kernel version
       register: kernel_version
       shell:
@@ -54,20 +59,19 @@
         update_cache: true
         pkg: "linux-headers-{{kernel_version.stdout}}"
 
+    - name: install nvidia driver from binary
+      ignore_errors: yes
+      shell: /tmp/NVIDIA-Linux-x86_64-"{{nvidia_version}}".run -a -n -s --systemd -z --no-x-check -b -r
+
     - name: add nvidia apt gpg key
       apt_key:
         url: "{{item}}"
       with_items:
-      - https://nvidia.github.io/libnvidia-container/gpgkey
       - https://nvidia.github.io/nvidia-container-runtime/gpgkey
       - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
 
-    - name: nvidia-container-toolkit apt repo
-      get_url:
-        url: https://nvidia.github.io/libnvidia-container/ubuntu20.04/libnvidia-container.list
-        dest: /etc/apt/sources.list.d/nvidia-container-toolkituntime.list
-
     - name: nvidia-container-runtime apt repo
+      register: nvidia_apt_repo
       get_url:
         url: https://nvidia.github.io/nvidia-container-runtime/ubuntu20.04/nvidia-container-runtime.list
         dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
@@ -77,16 +81,11 @@
         update_cache: true
         force_apt_get: true
         allow-unauthenticated: true
-        pkg: "{{nvidia_apt_packages}}"
-
-    - name: hold nvidia package versions
-      dpkg_selections:
-        selection: hold
-        name: "{{item}}"
-      with_items: "{{nvidia_apt_packages}}"
+        pkg:
+        - "nvidia-utils-{{nvidia_version.split('.')[0]}}"
+        - nvidia-container-runtime
 
     - name: run nvidi-smi test
-      ignore_errors: true
       shell:
         cmd: nvidia-smi
 

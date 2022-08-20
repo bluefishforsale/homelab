@@ -1,0 +1,77 @@
+- name: Nvidia Driver, encoding patch, and Containerd config
+  hosts: all
+  vars:
+    nvidia_version: "495.46"
+    # nvidia_version: 510
+
+  tasks:
+  - name: Driver and Patch
+    become: yes
+    when: nvidia_gpu is defined
+
+    block:
+    - name: stop  services using driver
+      ansible.builtin.systemd:
+        state: stopped
+        daemon_reload: true
+        name: "{{item}}"
+      ignore_errors: true
+      with_items:
+        - containerd
+        - kubelet
+
+    - name: print debug
+      debug:
+        msg: "Installing {{nvidia_version}} driver"
+
+    - name: blacklist the nuevo driver
+      copy:
+        dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
+        content: |
+          blacklist nouveau
+          options nouveau modeset=0
+        force: yes
+        mode: 0644
+        group: root
+        owner: root
+
+    - name: unload kernel drivers
+      ignore_errors: true
+      command: rmmod "{{item}}"
+      with_items:
+      - nouveau
+      - nvidia_drm
+      - nvidia_modeset
+      - nvidia
+
+    - name: run nvidia uninstallers
+      ignore_errors: yes
+      apt:
+        name: "{{item}}"
+        state: absent
+        purge: true
+      with_items:
+      - nvidia-container-runtime
+      - nvidia-container-toolkit
+      - nvidia-utils-{{nvidia_version.split('.')[0]}}
+      - nvidia-driver-{nvidia_version.split('.')[0]}}
+      - nvidia-utils-{{nvidia_version.split('.')[0]}}-server
+      - nvidia-driver-{nvidia_version.split('.')[0]}}-server
+
+    - name: remove nvidia files
+      ignore_errors: true
+      shell: 'find /usr -name "*nvidia*" -exec rm -rf  {} \;'
+
+    - name: update init ramfs
+      shell:
+        cmd: update-initramfs -u
+
+    - name: Re-start related services
+      ansible.builtin.systemd:
+        state: restarted
+        daemon_reload: true
+        name: "{{item}}"
+      ignore_errors: true
+      with_items:
+        - containerd
+        - kubelet
