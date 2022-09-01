@@ -1,0 +1,31 @@
+- name: Kube 05.2 Dist Kubeconfigs Controllers
+  hosts: k8s_controller
+  become: yes
+  vars:
+    k8s_dir: /var/lib/kubernetes
+  vars_files:
+    - vars_kube.yaml
+  tasks:
+  - name: Distribute the files made in previous steps
+    block:
+
+    - name: Ensure we have a directory to place files
+      file:
+        path: "{{ k8s_dir }}"
+        mode: 0755
+        owner: root
+        group: root
+        state: directory
+
+    - name: Copy admin controller and scheduler configs
+      copy:
+        force: yes
+        dest: "{{ k8s_dir }}/{{ item }}"
+        src: "files/kubeconf/{{item}}"
+        mode: 0644
+        group: root
+        owner: root
+      with_items:
+        - admin.kubeconfig
+        - kube-controller-manager.kubeconfig
+        - kube-scheduler.kubeconfig

@@ -1,0 +1,12 @@
+- name: unattended upgrade
+  become: yes
+  hosts: all
+  tasks:
+
+    - name: install unattended-upgrade package
+      apt:
+        pkg: unattended-upgrades
+        state: present
+
+    - name: unattended upgrade
+      command: unattended-upgrade

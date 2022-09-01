@@ -1,0 +1,13 @@
+- name: grub device names
+  hosts: all
+  become: yes
+  tasks:
+
+  - name: update grub file
+    replace:
+      path: /etc/default/grub
+      regexp: '^(GRUB_CMDLINE_LINUX=).*$'
+      replace: '\1"net.ifnames=0 biosdevname=0"'
+
+  - name: grub-mkconfig
+    shell: grub-mkconfig -o /boot/grub/grub.cfg

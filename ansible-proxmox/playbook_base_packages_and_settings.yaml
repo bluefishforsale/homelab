@@ -23,30 +23,11 @@
       pkg:
         [
         bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-        iptraf-ng, iputils-ping, jq, linux-tools-common, fail2ban,
-        "linux-tools-{{kernel_version.stdout}}", "linux-cloud-tools-{{kernel_version.stdout}}",
-        libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
+        iptraf-ng, iputils-ping, jq, fail2ban, libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
         ]
 
-  - name: Glances has issues installing on some platforms
-    ignore_errors: true
-    apt:
-      pkg: glances
-
-  - name: old_paths
-    shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
-    register: old_paths
-
-  - name: add go to the environment PATH
-    lineinfile:
-      path: /etc/environment
-      state: present
-      backrefs: yes
-      regexp: '^PATH=.*'
-      line: 'PATH={{ old_paths.stdout }}:{{ go_paths }}'
-
-  - name: Set the Host TZ and hwclock to UTC
+  - name: Set the Host TZ and hwclock to PST
     community.general.timezone:
       hwclock: local
       name: America/Los_Angeles
@@ -88,14 +69,6 @@
         [Link]
         NamePolicy=kernel database onboard slot path
         MACAddressPolicy=persistent
-
-  - name: increase file limits
-    copy:
-      force: yes
-      dest: "/etc/security/limits.conf"
-      mode: 0644
-      content: |
-        # put stuff here
 
   - name: Sysctl Tunings
     copy:
@@ -203,7 +176,7 @@
       force: yes
       dest: /etc/default/cpufrequtils
       mode: 0644
-      content: GOVERNOR="powersave"
+      content: GOVERNOR="performance"
 
   # - name: Write cpu-performance script
   #   copy:
@@ -254,6 +227,7 @@
     - rsyslog
     - logrotate
     - cpufrequtils
+    - systemd-resolved
 
   - name: UPS battery backups
     when: apcupsd is defined

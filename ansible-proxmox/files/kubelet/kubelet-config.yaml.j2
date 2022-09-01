@@ -1,0 +1,20 @@
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+authorization:
+  mode: Webhook
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    enabled: true
+  x509:
+    clientCAFile: "{{pki_dir}}/ca.pem"
+clusterDomain: "cluster.local"
+clusterDNS:
+  - "10.32.0.10"
+cgroupDriver: "systemd"
+podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{HOST_IP[inventory_hostname].split('.')[-1]}}.0/{{POD_NETMASK}}"
+resolvConf: /run/systemd/resolve/resolv.conf
+runtimeRequestTimeout: "5m"
+tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"
+tlsPrivateKeyFile: "{{pki_dir}}/{{inventory_hostname}}-key.pem"

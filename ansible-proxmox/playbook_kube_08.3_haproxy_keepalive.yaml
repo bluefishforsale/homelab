@@ -1,0 +1,105 @@
+- name: Kube 07 Haproxy keepalived
+  hosts: k8s_controller
+  become: yes
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    - name: HAproxy and Keepalived group
+      group:
+        name: "{{item}}"
+      with_items:
+      - haproxy
+      - keepalived
+
+    - name: HAproxy and Keepalived users
+      user:
+        name: "{{item}}"
+        group: "{{item}}"
+        system: true
+        shell: /usr/bin/false
+      with_items:
+      - haproxy
+      - keepalived
+
+    # Make variables for the Kubernetes configfile
+    - name: Get IP for a subset of hosts, store in PEERS_IP
+      shell:
+        cmd: ip route | awk '(/default/){print $5}'
+      register: iface
+
+    - name: Get IP for all hosts, store in HOST_IP
+      set_fact:
+        APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s_controller'] }}"
+
+    - name: haproxy + keepalive
+      block:
+        - name: config
+          file:
+            path: "/etc/{{item}}"
+            state: directory
+            mode: 0755
+            owner: haproxy
+            group: haproxy
+          with_items:
+            - haproxy
+            - keepalived
+
+        - name: install
+          apt:
+            name: [ haproxy, keepalived ]
+            state: present
+            update_cache: yes
+
+        - name: write configs haproxy
+          copy:
+            force: yes
+            dest: "/etc/haproxy/haproxy.cfg"
+            content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
+            mode: 0644
+            owner: haproxy
+            group: haproxy
+
+        - name: write configs keepalived
+          copy:
+            force: yes
+            dest: "/etc/keepalived/keepalived.conf"
+            content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
+            mode: 0644
+            owner: haproxy
+            group: haproxy
+
+        - name: write haproxy / keepalived systemd services
+          copy:
+            force: yes
+            dest: "/etc/systemd/system/{{item}}"
+            content: '{{ lookup("template", "files/{{item}}/{{item}}.service.j2") }}'
+            mode: 0644
+            owner: root
+            group: root
+          with_items:
+          - keepalived
+          - haproxy
+
+        - name: daemon-reload and stop
+          systemd:
+            name: "{{item}}"
+            state: stopped
+            daemon_reload: yes
+          with_items:
+            - haproxy
+            - keepalived
+
+        - name: enable and start
+          systemd:
+            name: "{{item}}"
+            state: started
+            enabled: yes
+          with_items:
+            - haproxy
+            - keepalived

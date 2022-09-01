@@ -1,0 +1,105 @@
+- name: Kube 08 Kubernetes apiserver, controller-manager, scheduler
+  hosts: k8s_controller
+  become: yes
+  vars_files:
+    - vars_kube.yaml
+  vars:
+    confpath: "/etc/kubernetes/config"
+    instpath: "/usr/local/bin"
+    datapath: "/var/lib/kubernetes"
+    filenames:
+      - kube-apiserver
+      - kube-controller-manager
+      - kube-scheduler
+      - kubectl
+
+  tasks:
+    - name: Kubernetes
+      block:
+        - name: "check if {{ datapath }} exists"
+          file:
+            path: "{{ datapath }}"
+            state: directory
+            mode: 0755
+            group: root
+            owner: root
+
+        - name: "check if {{ instpath }} exists"
+          file:
+            path: "{{ instpath }}"
+            state: directory
+            mode: 0755
+
+        - name: "check if {{ confpath }} exists"
+          file:
+            path: "{{ confpath }}"
+            state: directory
+            mode: 0755
+            group: root
+            owner: root
+
+        - name: "installing Kubernetes {{ KUBE_VERSION }}"
+          with_items: "{{filenames}}"
+          get_url:
+            url: "{{KUBE_URL}}/{{ item }}"
+            dest: "{{ instpath }}/{{ item }}"
+            mode: 0755
+
+    - name: Kube SystemD templates
+      block:
+        # Make variables for the Kubernetes configfile
+        - name: "Get IP for {{item}} hosts, store in HOST_IP"
+          set_fact:
+            HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+          loop: "{{ groups['k8s_controller'] }}"
+
+        - name: Get IP for single APISERVER
+          set_fact:
+            APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+        - name: Get IP for all host list
+          set_fact:
+            PEERS_IP: "{{ PEERS_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+          loop: "{{ groups['etcd'] }}"
+
+        - name: Flatten dict to formatted string
+          set_fact:
+            ETCD_SERVER_URLS : "{{ ETCD_SERVER_URLS }}{{ (index > 0)|ternary(',','') }}https://{{item.value}}:2379"
+          loop: "{{  PEERS_IP | dict2items }}"
+          loop_control:
+            index_var: index
+
+        # Create the config file from template
+        - name: "{{item}} systemd service"
+          copy:
+            force: yes
+            dest: "/etc/systemd/system/{{item}}.service"
+            content: '{{ lookup("template", "files/kubernetes/{{item}}.service.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
+          with_items:
+            - kube-apiserver
+            - kube-scheduler
+            - kube-controller-manager
+
+        - name: kube-scheduler yaml
+          copy:
+            force: yes
+            dest: "/etc/kubernetes/config/kube-scheduler.yaml"
+            content: '{{ lookup("template", "files/kubernetes/kube-scheduler.yaml.j2") }}'
+            mode: 0644
+            group: root
+            owner: root
+
+        - name: "Enable and restart {{item}}"
+          systemd:
+            name: "{{item}}"
+            state: restarted
+            enabled: true
+            daemon_reload: true
+          with_items:
+            - kube-scheduler
+            - kube-apiserver
+            - kube-controller-manager
+

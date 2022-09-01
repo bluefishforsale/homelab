@@ -1,0 +1,33 @@
+- name: Kube 99 Setup kubectl
+  hosts: local
+  vars_files:
+    - vars_kube.yaml
+  tasks:
+  - name: kubectl config
+    block:
+    - name: set-cluster
+      delegate_to: localhost
+      shell: >-
+        kubectl config set-cluster k8s
+        --certificate-authority=files/cfssl/ca.pem
+        --embed-certs=true
+        --server=https://{{APISERVER}}:6443
+
+    - name: set-credentials
+      delegate_to: localhost
+      shell: >-
+        kubectl config set-credentials admin
+        --client-certificate=files/cfssl/admin.pem
+        --client-key=files/cfssl/admin-key.pem
+
+    - name: set-context
+      delegate_to: localhost
+      shell: >-
+        kubectl config set-context k8s
+        --cluster=k8s
+        --user=admin
+
+    - name: use-context
+      delegate_to: localhost
+      shell: >-
+        kubectl config use-context k8s
