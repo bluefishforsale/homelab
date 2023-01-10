@@ -1,0 +1,5 @@
+- hosts: all
+  name: Catch-all playbook that runs all roles on all hosts
+  roles:
+    - {role: common}
+    - {role: dns}

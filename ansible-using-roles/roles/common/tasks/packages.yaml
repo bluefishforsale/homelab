@@ -1,0 +1,14 @@
+- name: Debian Packages
+  ignore_errors: true
+  when: ansible_facts['os_family'] == "Debian"
+  block:
+
+  - name: Packages debian
+    ansible.builtin.apt:
+      update_cache: true
+      pkg:
+        [
+          bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+          iptraf-ng, iputils-ping, jq, fail2ban, libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
+          pv, rsyslog, strace, sysstat, unzip, wget
+        ]

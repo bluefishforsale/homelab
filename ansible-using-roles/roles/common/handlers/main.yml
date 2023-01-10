@@ -1,0 +1,9 @@
+---
+# handlers file for common
+handlers:
+  - name: Enable and Start service
+    ansible.builtin.systemd:
+      enabled: true
+      daemon_reload: true
+      state: restarted
+      name: "{{ item }}"

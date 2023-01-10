@@ -1,0 +1,19 @@
+- name: Unattended Upgrade Cron
+  when: ansible_facts['os_family'] == "Debian"
+  block:
+
+    - name: install package
+      apt:
+        pkg: unattended-upgrades
+        update_cache: true
+        state: present
+
+    - name: get ssh-keys from github as cron job
+      cron:
+        name: unattended-upgrade cron
+        weekday: "4"
+        minute: "30"
+        hour: "12"
+        user: root
+        job: unattended-upgrade
+        cron_file: weekly-unattended-upgrade

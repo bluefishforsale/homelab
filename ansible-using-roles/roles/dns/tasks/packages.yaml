@@ -1,0 +1,8 @@
+  - name: Packages
+    block:
+
+      - name: bind9 and utils
+        ansible.builtin.apt:
+          update_cache: true
+          pkg:
+            [ bind9, bind9utils, dnsutils]

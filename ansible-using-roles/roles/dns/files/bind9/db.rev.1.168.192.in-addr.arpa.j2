@@ -1,0 +1,101 @@
+$ORIGIN  1.168.192.in-addr.arpa.
+$TTL 86400 ; 1 day
+
+@ IN SOA dns01.home. dnsadmin.home. (
+      {{ ansible_date_time.epoch }}  ; serial
+      3600        ; refresh (1 hours)
+      3600        ; retry (1 hour)
+      3600        ; expire (1 hour)
+      3600        ; minimum (1 hour)
+)
+
+@           IN          NS          dns01.home.
+1           IN          PTR         gw.home.
+2           IN          PTR         dns01.home.
+3           IN          PTR         dns02.home.
+
+
+; Dell iDrac impi OOB starts at .10 and is last digit of IP/name
+14          IN         PTR        node004-idrac.home.
+15          IN         PTR        node005-idrac.home.
+16          IN         PTR        node006-idrac.home.
+
+;; .64.168.192.in-addrarpa. assigned yo MetalLB
+;;    [CIDR]
+;;    Network range		- 192.168.1.64 - 192.168.1.95
+;;    Network address		- 192.168.1.64
+;;    Broadcast address	      - 192.168.1.95
+;;    Network mask		- 255.255.255.224
+;;    Network mask (bits)	- 27
+;;    Addresses in network	- 35
+
+41		IN		PTR		kube401.home.
+42		IN		PTR		kube402.home.
+43		IN		PTR		kube403.home.
+44		IN		PTR		kube404.home.
+45		IN		PTR		kube405.home.
+46		IN		PTR		kube406.home.
+47		IN		PTR		kube407.home.
+48		IN		PTR		kube408.home.
+49		IN		PTR		kube409.home.
+
+51		IN		PTR		kube501.home.
+52		IN		PTR		kube502.home.
+53		IN		PTR		kube503.home.
+54		IN		PTR		kube504.home.
+55		IN		PTR		kube505.home.
+56		IN		PTR		kube506.home.
+57		IN		PTR		kube507.home.
+58		IN		PTR		kube508.home.
+59		IN		PTR		kube509.home.
+
+61		IN		PTR		kube601.home.
+62		IN		PTR		kube602.home.
+63		IN		PTR		kube603.home.
+64		IN		PTR		kube604.home.
+65		IN		PTR		kube605.home.
+66		IN		PTR		kube606.home.
+67		IN		PTR		kube607.home.
+68		IN		PTR		kube608.home.
+69		IN		PTR		kube609.home.
+
+99          IN          PTR         apiserver.home.
+
+100		IN		PTR		node000.home.
+101		IN		PTR		node001.home.
+102		IN		PTR		node002.home.
+103		IN		PTR		node003.home.
+104		IN		PTR		node004.home.
+105		IN		PTR		node005.home.
+106		IN		PTR		node006.home.
+
+; 107		IN		PTR		node007.home.
+; 108		IN		PTR		node008.home.
+; 109		IN		PTR		node009.home.
+; 110		IN		PTR		node010.home.
+; 111		IN		PTR		node011.home.
+; 112		IN		PTR		node012.home.
+; 113		IN		PTR		node013.home.
+; 114		IN		PTR		node014.home.
+; 115		IN		PTR		node015.home.
+; 116		IN		PTR		node016.home.
+; 117		IN		PTR		node017.home.
+; 118		IN		PTR		node018.home.
+; 119		IN		PTR		node019.home.
+; 120		IN		PTR		node020.home.
+; 121		IN		PTR		node021.home.
+; 122		IN		PTR		node022.home.
+; 123		IN		PTR		node023.home.
+; 124		IN		PTR		node024.home.
+; 125		IN		PTR		node025.home.
+; 126		IN		PTR		node026.home.
+; 127		IN		PTR		node027.home.
+; 128		IN		PTR		node028.home.
+; 129		IN		PTR		node029.home.
+; 130		IN		PTR		node030.home.
+; 131		IN		PTR		node031.home.
+; 132		IN		PTR		node032.home.
+
+143		IN		PTR		ocean.home.
+144		IN		PTR		ocean-eth0.home.
+

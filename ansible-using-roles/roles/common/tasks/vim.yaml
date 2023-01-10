@@ -1,0 +1,14 @@
+- name: vim and config
+  ignore_errors: true
+  when: ansible_os_family == 'Linux'
+  block:
+
+    - name: Packages debian
+      ansible.builtin.apt:
+        pkg: [vim, git]
+
+    - name: ultimate vim
+      shell:
+        cmd: git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
+      args:
+        creates: ~/.vim_runtime

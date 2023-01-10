@@ -1,0 +1,25 @@
+- name: Time and Date
+  become: true
+  become_user: root
+  when: ansible_os_family == 'Linux'
+  block:
+
+    - name: Update Timezone to America/Los_Angeles
+      ansible.builtin.copy: content="America/Los_Angeles\n" dest=/etc/timezone owner=root group=root mode=0644
+      register: timezone
+
+    - name: Reconfigure Timezone Data (if changed)
+      ansible.builtin.shell: dpkg-reconfigure -f noninteractive tzdata
+      when: timezone.change && ansible_facts['os_family'] == "Debian"
+
+    - name: NTPdate cron
+      ansible.builtin.copy:
+        force: true
+        src: files/ntpdate
+        dest: /etc/cron.d/ntpdate
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Run ntpdate
+      ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov

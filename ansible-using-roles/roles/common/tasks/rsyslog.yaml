@@ -1,0 +1,29 @@
+- name: Linux Syslog
+  when: ansible_os_family == 'Linux'
+  block:
+
+  - name: drop IPVS no route messages
+    ansible.builtin.copy:
+      force: true
+      dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
+      content: |
+        :msg, regex, ".*IPVS.*no destination available" ~
+
+  - name: rsyslog remote server
+    ansible.builtin.copy:
+      force: true
+      dest: "/etc/rsyslog.d/99-remote-syslog.conf"
+      content: |
+        module(load="omprog")
+        module(load="mmutf8fix")
+        action(type="mmutf8fix" replacementChar="?")
+        action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
+
+  - name: Restart Rsyslog
+    ansible.builtin.systemd:
+      name: "{{item}}"
+      state: restarted
+      enabled: true
+      daemon_reload: true
+    with_items:
+    - rsyslog

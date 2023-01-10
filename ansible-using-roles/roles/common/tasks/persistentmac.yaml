@@ -1,0 +1,19 @@
+- name: Persistent MAC Address
+  when: ansible_os_family == 'Linux'
+  block:
+
+    - name: systemd-udev MAC link
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/network/99-default.link"
+        content: |
+          [Link]
+          NamePolicy=kernel database onboard slot path
+          MACAddressPolicy=persistent
+
+    - name: systemd reload and restart
+      ansible.builtin.systemd:
+        name: 99-default.link
+        state: restarted
+        enabled: true
+        daemon_reload: true

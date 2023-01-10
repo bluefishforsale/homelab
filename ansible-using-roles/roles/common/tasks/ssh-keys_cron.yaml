@@ -1,0 +1,21 @@
+- name: ssh-keys cron
+  ignore_errors: true
+  when: ansible_os_family == 'Linux'
+  block:
+
+    - name: install package
+      apt:
+        update_cache: true
+        pkg: ssh-import-ids
+        state: present
+
+    - name: get ssh-keys from github as cron job
+      become: true
+      cron:
+        name: ssh-import-id-gh bluefishforsale
+        weekday: "*"
+        minute: "*/15"
+        hour: "*"
+        user: ubuntu
+        job: ssh-import-id-gh bluefishforsale
+        cron_file: ssh-import-id-gh-bluefishforsale

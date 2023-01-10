@@ -1,0 +1,41 @@
+  - name: Config
+    block:
+
+      - name: rndc-key-write
+        shell:
+          creates: /etc/bind/rndc.key
+          cmd: rndc-confgen -a -b 512
+
+      - name: configs
+        ansible.builtin.copy:
+          force: yes
+          src: bind9/{{ item  }}
+          dest: /etc/bind/{{ item  }}
+          owner: bind
+          group: bind
+          mode: 0644
+        with_items:
+          - named.conf.local
+          - named.conf.options
+
+      - name: make conf dirs
+        ansible.builtin.file:
+          path: /var/lib/bind/
+          state: directory
+          owner: bind
+          group: bind
+          mode: 0755
+
+      - name: write zone templates
+        ansible.builtin.copy:
+          force: yes
+          dest: "/var/lib/bind/{{item}}"
+          content: '{{ lookup("template", "files/bind9/{{item}}.j2") }}'
+          mode: 0644
+          owner: bind
+          group: bind
+        with_items:
+          - home.zone
+          - cluster.local.zone
+          - db.rev.1.168.192.in-addr.arpa
+
