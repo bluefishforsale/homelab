@@ -11,7 +11,7 @@
       become: true
       apt:
         update_cache: true
-        pkg: [ python, zsh, git, ssh-import-id ]
+        pkg: [ python3, zsh, git, ssh-import-id ]
 
     - name: get ssh-keys from github as cron job
       become: true

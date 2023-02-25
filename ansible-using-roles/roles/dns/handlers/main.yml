@@ -1,26 +1,17 @@
----
 # handlers file for dns
+---
+- name: Config Check
+  block:
 
-handlers:
-  - name: Check Config and Restart
-    block:
+    - name: Config Check
+      ansible.builtin.shell: named-checkconf
 
-      - name: Config Check
-        ansible.builtin.shell: named-checkconf
+    - name: Check home zone
+      ansible.builtin.shell: named-checkzone  home /var/lib/bind/home.zone
 
-      - name: Check home zone
-        ansible.builtin.shell: named-checkzone  home /var/lib/bind/home.zone
+    - name: Check reverse mapping zone
+      ansible.builtin.shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
 
-      - name: Check reverse mapping zone
-        ansible.builtin.shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
-
-      - name: remove the jnl files before restart
-        ansible.builtin.shell:
-          cmd: find /var/lib/bind -type f -name "*.jnl" -delete
-
-  - name: Enable and Start service
-        ansible.builtin.systemd:
-          enabled: true
-          daemon_reload: true
-          state: restarted
-          name: "{{ item }}"
+    - name: remove the jnl files before restart
+      ansible.builtin.shell:
+        cmd: find /var/lib/bind -type f -name "*.jnl" -delete
