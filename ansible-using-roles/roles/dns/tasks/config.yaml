@@ -10,17 +10,17 @@
           creates: /etc/bind/rndc.key
           cmd: rndc-confgen -a -b 512
 
-      - name: configs
-        ansible.builtin.copy:
-          force: yes
-          src: bind9/{{ item  }}
-          dest: /etc/bind/{{ item  }}
-          owner: bind
-          group: bind
-          mode: 0644
-        with_items:
-          - named.conf.local
-          - named.conf.options
+      # - name: configs
+      #   ansible.builtin.copy:
+      #     force: yes
+      #     src: files/conf/{{ item  }}
+      #     dest: /etc/bind/{{ item  }}
+      #     owner: bind
+      #     group: bind
+      #     mode: 0644
+      #   with_items:
+      #     - named.conf.local
+      #     - named.conf.options
 
       - name: make conf dirs
         ansible.builtin.file:
@@ -30,18 +30,34 @@
           group: bind
           mode: 0755
 
-      - name: write zone templates
+      - name: write out template files
         ansible.builtin.copy:
           force: yes
-          dest: "{{ zone_dir }}/{{item}}"
-          content: '{{ lookup("template", "{{ role_path }}/files/bind9/{{item}}.j2") }}'
+          dest: "{{ item }}"
+          content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}.j2") }}'
           mode: 0644
           owner: bind
           group: bind
         with_items:
-          - home.zone
-          - cluster.local.zone
-          - db.rev.1.168.192.in-addr.arpa
+          - /etc/systemd/system/named.service
+          - /etc/bind/named.conf.local
+          - /etc/bind/named.conf.options
+          - "/{{ zone_dir }}/home.zone"
+          - "/{{ zone_dir }}/cluster.local.zone"
+          - "/{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa"
+
+      # - name: write zone templates
+      #   ansible.builtin.copy:
+      #     force: yes
+      #     dest: "{{ zone_dir }}/{{item}}"
+      #     content: '{{ lookup("template", "{{ role_path }}/files/zones/{{item}}.j2") }}'
+      #     mode: 0644
+      #     owner: bind
+      #     group: bind
+      #   with_items:
+      #     - home.zone
+      #     - cluster.local.zone
+      #     - db.rev.1.168.192.in-addr.arpa
 
       - name: set dict for zones
         ansible.builtin.set_fact:
