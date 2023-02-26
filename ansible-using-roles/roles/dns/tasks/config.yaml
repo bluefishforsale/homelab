@@ -5,22 +5,11 @@
         ansible.builtin.set_fact:
           zone_dir: "/var/lib/bind/"
 
+      # this is used to validate dhcp records
       - name: rndc-key-write
         shell:
           creates: /etc/bind/rndc.key
           cmd: rndc-confgen -a -b 512
-
-      # - name: configs
-      #   ansible.builtin.copy:
-      #     force: yes
-      #     src: files/conf/{{ item  }}
-      #     dest: /etc/bind/{{ item  }}
-      #     owner: bind
-      #     group: bind
-      #     mode: 0644
-      #   with_items:
-      #     - named.conf.local
-      #     - named.conf.options
 
       - name: make conf dirs
         ansible.builtin.file:
@@ -46,19 +35,6 @@
           - "/{{ zone_dir }}/cluster.local.zone"
           - "/{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa"
 
-      # - name: write zone templates
-      #   ansible.builtin.copy:
-      #     force: yes
-      #     dest: "{{ zone_dir }}/{{item}}"
-      #     content: '{{ lookup("template", "{{ role_path }}/files/zones/{{item}}.j2") }}'
-      #     mode: 0644
-      #     owner: bind
-      #     group: bind
-      #   with_items:
-      #     - home.zone
-      #     - cluster.local.zone
-      #     - db.rev.1.168.192.in-addr.arpa
-
       - name: set dict for zones
         ansible.builtin.set_fact:
           zones_files:
@@ -73,6 +49,22 @@
         ansible.builtin.set_fact:
           services: "{{ services + local_services }}"
 
+      - name: config_check
+        become: true
+        block:
+
+          - name: Config Check
+            ansible.builtin.shell: /usr/sbin/named-checkconf
+
+          - name: Check forwards
+            ansible.builtin.shell: /usr/sbin/named-checkzone  "{{ item.forward }}" "{{ item.forward_file }}"
+            # ansible.builtin.shell: /usr/sbin/named-checkzone  home /var/lib/bind/home.zone
+            with_items: "{{ zones_files }}"
+
+          - name: Check reverses
+            ansible.builtin.shell: /usr/sbin/named-checkzone "{{ item.reverse }}"   "{{ item.reverse_file }}"
+            # ansible.builtin.shell: /usr/sbin/named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
+            with_items: "{{ zones_files }}"
+
     notify:
-      - dns_config_check
       - enable_and_restart

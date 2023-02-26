@@ -9,13 +9,11 @@
       when: rndc_keyfile.stdout | length > 0
       ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
 
-    - name: Config files
+    - name: write out template files
       ansible.builtin.copy:
         force: yes
-        src: "{{ role_path }}/files/{{ item  }}"
-        dest: "{{ item  }}"
-        owner: root
-        group: root
+        dest: "{{ item }}"
+        content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}") }}'
         mode: 0644
       with_items:
         - /etc/systemd/system/isc-dhcp-server.service

@@ -1,4 +1,2 @@
 # handlers file for dns
 ---
-- name: dns_config_check
-  include_tasks: handlers/config_check.yaml

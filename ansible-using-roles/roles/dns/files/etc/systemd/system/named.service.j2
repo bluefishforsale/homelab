@@ -10,7 +10,7 @@ Before=nss-lookup.target
 [Service]
 EnvironmentFile=-/etc/default/named
 ExecStart=/usr/sbin/named -f $OPTIONS
-ExecReload=find /var/lib/bind -type f -name "*.jnl" -delete
+ExecReload=find {{ zone_dir }} -type f -name "*.jnl" -delete
 ExecReload=/usr/sbin/rndc reload
 ExecStop=/usr/sbin/rndc stop
 Restart=always
