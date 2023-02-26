@@ -1,0 +1,9 @@
+# tasks file for isc-dhcp-server
+---
+- name: isc-dhcp-server setup
+  become: true
+  block:
+
+    - name: Tasks
+      ansible.builtin.include_tasks: "{{ item }}"
+      loop: "{{ query('fileglob', '{{playbook_dir}}/roles/dhcp-server/tasks/*.yaml') | reject('search', 'main') | list }}"

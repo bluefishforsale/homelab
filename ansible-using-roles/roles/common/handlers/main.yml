@@ -1,8 +1,0 @@
-# handlers file for common
----
-- name: Restart
-  ansible.builtin.systemd:
-    enabled: true
-    daemon_reload: true
-    state: restarted
-    name: "{{ item }}"

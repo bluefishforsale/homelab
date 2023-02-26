@@ -3,6 +3,8 @@
   when: ansible_os_family == 'Linux'
   block:
 
+
+
   - name: Write io-scheduler script
     ansible.builtin.copy:
       force: yes
@@ -60,13 +62,23 @@
       mode: 0644
       content: GOVERNOR="performance"
 
-  - name: enable and restart performance services
-    ansible.builtin.systemd:
-      name: "{{item}}"
-      state: restarted
-      enabled: true
-      daemon_reload: true
-    with_items:
-    - blockdev-setra
-    - io-scheduler
-    - cpufrequtils
+  # - name: enable and restart performance services
+  #   ansible.builtin.systemd:
+  #     name: "{{item}}"
+  #     state: restarted
+  #     enabled: true
+  #     daemon_reload: true
+  #   with_items:
+  #   - blockdev-setra
+  #   - io-scheduler
+  #   - cpufrequtils
+
+  - name: set services dict for handler
+    ansible.builtin.set_fact:
+      services:
+        - { name: 'blockdev-setra', enabled: true, state: 'restarted' }
+        - { name: 'io-scheduler', enabled: true, state: 'restarted' }
+        - { name: 'cpufrequtils', enabled: true, state: 'restarted' }
+
+  notify:
+    - enable_and_restart

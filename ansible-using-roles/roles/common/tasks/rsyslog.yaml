@@ -19,11 +19,10 @@
         action(type="mmutf8fix" replacementChar="?")
         action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
-  - name: Restart Rsyslog
-    ansible.builtin.systemd:
-      name: "{{item}}"
-      state: restarted
-      enabled: true
-      daemon_reload: true
-    with_items:
-    - rsyslog
+  - name: set services dict for handler
+    ansible.builtin.set_fact:
+      services:
+        - { name: 'rsyslog', enabled: true, state: 'restarted' }
+
+  notify:
+    - enable_and_restart

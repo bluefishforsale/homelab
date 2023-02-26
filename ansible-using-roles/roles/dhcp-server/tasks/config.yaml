@@ -1,0 +1,32 @@
+  - name: Config
+    block:
+
+    - name: rndc-key-check
+      shell: cat /etc/bind/rndc.key
+      register: rndc_keyfile
+
+    - name: rndc-key-copy
+      when: rndc_keyfile.stdout | length > 0
+      ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
+
+    - name: Config files
+      ansible.builtin.copy:
+        force: yes
+        src: "{{ role_path }}/files/{{ item  }}"
+        dest: "{{ item  }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_items:
+        - /etc/systemd/system/isc-dhcp-server.service
+        - /etc/dhcp/dhcpd.conf
+        - /etc/dhcp/kube-nodes.conf
+        - /etc/default/isc-dhcp-server
+
+    - name: set services dict for handler
+      ansible.builtin.set_fact:
+        services:
+          - { name: 'isc-dhcp-server.service', enabled: true, state: 'restarted' }
+
+    notify:
+      - enable_and_restart

@@ -1,6 +1,10 @@
   - name: Config
     block:
 
+      - name: set dict for zones
+        ansible.builtin.set_fact:
+          zone_dir: "/var/lib/bind/"
+
       - name: rndc-key-write
         shell:
           creates: /etc/bind/rndc.key
@@ -20,7 +24,7 @@
 
       - name: make conf dirs
         ansible.builtin.file:
-          path: /var/lib/bind/
+          path: "{{ zone_dir }}"
           state: directory
           owner: bind
           group: bind
@@ -29,8 +33,8 @@
       - name: write zone templates
         ansible.builtin.copy:
           force: yes
-          dest: "/var/lib/bind/{{item}}"
-          content: '{{ lookup("template", "files/bind9/{{item}}.j2") }}'
+          dest: "{{ zone_dir }}/{{item}}"
+          content: '{{ lookup("template", "{{ role_path }}/files/bind9/{{item}}.j2") }}'
           mode: 0644
           owner: bind
           group: bind
@@ -39,3 +43,16 @@
           - cluster.local.zone
           - db.rev.1.168.192.in-addr.arpa
 
+      - name: set dict for zones
+        ansible.builtin.set_fact:
+          zones_files:
+            - { forward: 'home', forward_file: "{{ zone_dir }}/home.zone", reverse: "1.168.192.in-addr.arpa", reverse_file: "{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa" }
+
+      - name: set services dict for handler
+        ansible.builtin.set_fact:
+          services:
+            - { name: 'bind9', enabled: true, state: 'restarted' }
+
+    notify:
+      - dns_config_check
+      - enable_and_restart
