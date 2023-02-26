@@ -1,21 +1,19 @@
 - name: ssh-keys cron
-  ignore_errors: true
-  when: ansible_os_family == 'Linux'
+  when: ansible_facts['os_family'] == "Debian"
   block:
 
     - name: install package
-      apt:
+      ansible.builtin.apt:
         update_cache: true
-        pkg: ssh-import-ids
+        pkg: ssh-import-id
         state: present
 
-    - name: get ssh-keys from github as cron job
-      become: true
-      cron:
+    - name: ssh-keys from github cron
+      ansible.builtin.cron:
         name: ssh-import-id-gh bluefishforsale
-        weekday: "*"
         minute: "*/15"
         hour: "*"
-        user: ubuntu
+        weekday: "*"
+        user: "{{ ansible_user }}"
         job: ssh-import-id-gh bluefishforsale
-        cron_file: ssh-import-id-gh-bluefishforsale
+        cron_file: "ssh-import-github-keys-bluefishforsale-{{ ansible_user }}"

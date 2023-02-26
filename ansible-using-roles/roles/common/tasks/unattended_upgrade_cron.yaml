@@ -3,13 +3,13 @@
   block:
 
     - name: install package
-      apt:
+      ansible.builtin.apt:
         pkg: unattended-upgrades
         update_cache: true
         state: present
 
     - name: get ssh-keys from github as cron job
-      cron:
+      ansible.builtin.cron:
         name: unattended-upgrade cron
         weekday: "4"
         minute: "30"
