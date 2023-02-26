@@ -11,17 +11,14 @@
           NamePolicy=kernel database onboard slot path
           MACAddressPolicy=persistent
 
-    # - name: systemd reload and restart
-    #   ansible.builtin.systemd:
-    #     name: 99-default.link
-    #     state: restarted
-    #     enabled: true
-    #     daemon_reload: true
+    - name: set services dict for handler
+      ansible.builtin.set_fact:
+        local_services:
+          - { name: '99-default.link', enabled: true, state: 'restarted' }
 
     - name: set services dict for handler
       ansible.builtin.set_fact:
-        services:
-          - { name: '99-default.link', enabled: true, state: 'restarted' }
+        services: "{{ services + local_services }}"
 
   notify:
     - enable_and_restart

@@ -4,6 +4,11 @@
   become: true
   block:
 
+    - name: global services list
+      ansible.builtin.set_fact:
+        services: []
+
+
     - name: Tasks
       ansible.builtin.include_tasks: "{{ item }}"
       loop: "{{ query('fileglob', '{{playbook_dir}}/roles/common/tasks/*.yaml') | reject('search', 'main') | list }}"

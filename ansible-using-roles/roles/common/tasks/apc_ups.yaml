@@ -41,17 +41,14 @@
           wait
           shutdown -h now
 
-    # - name: enable and restart services
-    #   systemd:
-    #     name: apcupsd
-    #     state: restarted
-    #     enabled: true
-    #     daemon_reload: true
+    - name: set services dict for handler
+      ansible.builtin.set_fact:
+        local_services:
+          - { name: 'apcupsd', enabled: true, state: 'restarted' }
 
     - name: set services dict for handler
       ansible.builtin.set_fact:
-        services:
-          - { name: 'apcupsd', enabled: true, state: 'restarted' }
+        services: "{{ services + local_services }}"
 
     notify:
       - enable_and_restart

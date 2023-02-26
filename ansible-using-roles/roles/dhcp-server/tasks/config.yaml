@@ -25,8 +25,12 @@
 
     - name: set services dict for handler
       ansible.builtin.set_fact:
-        services:
+        local_services:
           - { name: 'isc-dhcp-server.service', enabled: true, state: 'restarted' }
+
+    - name: set services dict for handler
+      ansible.builtin.set_fact:
+        services: "{{ services + local_services }}"
 
     notify:
       - enable_and_restart
