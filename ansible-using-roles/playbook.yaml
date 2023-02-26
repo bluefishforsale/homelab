@@ -7,3 +7,8 @@
   roles:
     - {role: dns}
     - {role: dhcp-server}
+
+- hosts: dns
+  roles:
+    - {role: dns}
+    - {role: dhcp-server}
