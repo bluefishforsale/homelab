@@ -51,7 +51,7 @@
       - name: set services dict for handler
         ansible.builtin.set_fact:
           services:
-            - { name: 'bind9', enabled: true, state: 'restarted' }
+            - { name: 'named', enabled: true, state: 'restarted' }
 
     notify:
       - dns_config_check
