@@ -1,14 +1,9 @@
 - hosts: all
   roles:
     - {role: handlers}
-    - {role: common}
+    - {role: common, tags: common}
 
 - hosts: dns
   roles:
-    - {role: dns}
-    - {role: dhcp-server}
-
-- hosts: dns
-  roles:
-    - {role: dns}
-    - {role: dhcp-server}
+    - {role: dns , tags: dns}
+    - {role: dhcp-server, tags: dhcp}

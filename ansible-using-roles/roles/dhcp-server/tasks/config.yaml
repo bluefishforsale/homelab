@@ -1,17 +1,17 @@
   - name: Config
     block:
 
-    - name: rndc-key-check
+    - name: RNDC-key-check
       shell: cat /etc/bind/rndc.key
       register: rndc_keyfile
 
-    - name: rndc-key-copy
+    - name: RNDC-key-copy
       when: rndc_keyfile.stdout | length > 0
       ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
 
-    - name: write out template files
+    - name: Write out template files
       ansible.builtin.copy:
-        force: yes
+        force: true
         dest: "{{ item }}"
         content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}") }}'
         mode: 0644
@@ -21,12 +21,15 @@
         - /etc/dhcp/kube-nodes.conf
         - /etc/default/isc-dhcp-server
 
-    - name: set services dict for handler
+    - name: Check the config
+      ansible.builtin.shell: /usr/sbin/dhcpd -q -t -cf /etc/dhcp/dhcpd.conf
+
+    - name: Set services dict for handler
       ansible.builtin.set_fact:
         local_services:
           - { name: 'isc-dhcp-server.service', enabled: true, state: 'restarted' }
 
-    - name: set services dict for handler
+    - name: Set services dict for handler
       ansible.builtin.set_fact:
         services: "{{ services + local_services }}"
 
