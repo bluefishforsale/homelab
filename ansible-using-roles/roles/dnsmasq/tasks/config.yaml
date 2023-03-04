@@ -1,0 +1,70 @@
+  - name: Config
+    block:
+
+      - name: set dict for zones
+        ansible.builtin.set_fact:
+          zone_dir: "/var/lib/bind/"
+
+      # this is used to validate dhcp records
+      - name: rndc-key-write
+        shell:
+          creates: /etc/bind/rndc.key
+          cmd: rndc-confgen -a -b 512
+
+      - name: make conf dirs
+        ansible.builtin.file:
+          path: "{{ zone_dir }}"
+          state: directory
+          owner: bind
+          group: bind
+          mode: 0755
+
+      - name: write out template files
+        ansible.builtin.copy:
+          force: yes
+          dest: "{{ item }}"
+          content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}.j2") }}'
+          mode: 0644
+          owner: bind
+          group: bind
+        with_items:
+          - /etc/systemd/system/named.service
+          - /etc/bind/named.conf.local
+          - /etc/bind/named.conf.options
+          - "/{{ zone_dir }}/home.zone"
+          - "/{{ zone_dir }}/cluster.local.zone"
+          - "/{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa"
+
+      - name: set dict for zones
+        ansible.builtin.set_fact:
+          zones_files:
+            - { forward: 'home', forward_file: "{{ zone_dir }}/home.zone", reverse: "1.168.192.in-addr.arpa", reverse_file: "{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa" }
+
+      - name: set services dict for handler
+        ansible.builtin.set_fact:
+          local_services:
+            - { name: 'named', enabled: true, state: 'restarted' }
+
+      - name: set services dict for handler
+        ansible.builtin.set_fact:
+          services: "{{ services + local_services }}"
+
+      - name: config_check
+        become: true
+        block:
+
+          - name: Config Check
+            ansible.builtin.shell: /usr/sbin/named-checkconf
+
+          - name: Check forwards
+            ansible.builtin.shell: /usr/sbin/named-checkzone  "{{ item.forward }}" "{{ item.forward_file }}"
+            # ansible.builtin.shell: /usr/sbin/named-checkzone  home /var/lib/bind/home.zone
+            with_items: "{{ zones_files }}"
+
+          - name: Check reverses
+            ansible.builtin.shell: /usr/sbin/named-checkzone "{{ item.reverse }}"   "{{ item.reverse_file }}"
+            # ansible.builtin.shell: /usr/sbin/named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
+            with_items: "{{ zones_files }}"
+
+    notify:
+      - enable_and_restart

@@ -1,0 +1,9 @@
+# tasks file for dnsmasq
+---
+- name: dnsmasq server setup
+  become: true
+  block:
+
+    - name: Tasks
+      ansible.builtin.include_tasks: "{{ item }}"
+      loop: "{{ query('fileglob', '{{playbook_dir}}/roles/dnsmasq/tasks/*.yaml') | reject('search', 'main') | list }}"

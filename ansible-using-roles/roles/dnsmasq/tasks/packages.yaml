@@ -1,0 +1,8 @@
+  - name: Packages
+    block:
+
+      - name: dnsmasq and utils
+        ansible.builtin.apt:
+          update_cache: true
+          pkg:
+            [ dnsmasq ]

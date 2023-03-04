@@ -52,4 +52,3 @@ galaxy_info:
   # if you add dependencies to this list.
 dependencies:
   - role: handlers
-  - role: common
