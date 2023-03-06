@@ -4,5 +4,6 @@
       - name: dnsmasq and utils
         ansible.builtin.apt:
           update_cache: true
+          state: latest
           pkg:
-            [ dnsmasq ]
+            [ dnsmasq , dnsmasq-utils ]

@@ -1,0 +1,42 @@
+fwd_only:
+  - { name: 'gw', ip: '192.168.1.1' }
+  - { name: 'apiserver', ip: '192.168.1.99' }
+
+cnames:
+  - { name: 'ocean', target: 'ocean-bond0' }
+
+reverse_and_dhcp:
+  - {name: 'ocean-bond0', ip: '192.168.1.143', mac: ''}
+  - {name: 'ocean-eth0', ip: '192.168.1.144', mac: ''}
+
+  - {name: 'node004-idrac', ip: '192.168.1.14', mac: '90:e2:ba:19:50:01'}
+  - {name: 'node005-idrac', ip: '192.168.1.15', mac: '92:6c:9a:65:20:24'}
+  - {name: 'node006-idrac', ip: '192.168.1.16', mac: 'f0:1f:af:ed:8c:d5'}
+
+  - {name: 'node001', ip: '192.168.1.101', mac: '00:07:32:49:f6:90'}
+  - {name: 'node002', ip: '192.168.1.102', mac: '00:07:32:49:bb:15'}
+  - {name: 'node003', ip: '192.168.1.103', mac: '00:07:32:4a:7c:6c'}
+  - {name: 'node004', ip: '192.168.1.104', mac: '90:e2:ba:19:50:00'}
+  - {name: 'node005', ip: '192.168.1.105', mac: '92:6c:9a:65:20:23'}
+  - {name: 'node006', ip: '192.168.1.106', mac: 'e6:c4:33:11:bd:07'}
+
+  - {name: 'kube401', ip: '192.168.1.111', mac: ''}
+  - {name: 'kube402', ip: '192.168.1.112', mac: ''}
+  - {name: 'kube403', ip: '192.168.1.113', mac: ''}
+  - {name: 'kube404', ip: '192.168.1.114', mac: ''}
+  - {name: 'kube405', ip: '192.168.1.115', mac: ''}
+  - {name: 'kube406', ip: '192.168.1.116', mac: ''}
+
+  - {name: 'kube501', ip: '192.168.1.121', mac: ''}
+  - {name: 'kube502', ip: '192.168.1.122', mac: ''}
+  - {name: 'kube503', ip: '192.168.1.123', mac: ''}
+  - {name: 'kube504', ip: '192.168.1.124', mac: ''}
+  - {name: 'kube505', ip: '192.168.1.125', mac: ''}
+  - {name: 'kube506', ip: '192.168.1.126', mac: ''}
+
+  - {name: 'kube601', ip: '192.168.1.131', mac: ''}
+  - {name: 'kube602', ip: '192.168.1.132', mac: ''}
+  - {name: 'kube603', ip: '192.168.1.133', mac: ''}
+  - {name: 'kube604', ip: '192.168.1.134', mac: ''}
+  - {name: 'kube605', ip: '192.168.1.135', mac: ''}
+  - {name: 'kube606', ip: '192.168.1.136', mac: ''}

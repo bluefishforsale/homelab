@@ -7,4 +7,4 @@
     - {role: common, tags: common}
     - {role: dns , tags: dns}
     - {role: dhcp-server, tags: dhcp}
-    - {role: tftpd, tags: tftp}
+    - {role: dnsmasq, tags: dnsmasq}
