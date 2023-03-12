@@ -6,5 +6,5 @@ alias ktx=kubectx
 alias zshrc="source ${HOME}/.zshrc"
 alias ls=lsd
 
-
+export SYSTEMD_PAGER=
 export PATH="/usr/local/bin:$PATH"
