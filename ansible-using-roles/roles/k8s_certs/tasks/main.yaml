@@ -1,0 +1,9 @@
+# tasks file for bind9
+---
+- name: k8s_certs
+  become: true
+  block:
+
+    - name: Tasks
+      ansible.builtin.include_tasks: "{{ item }}"
+      loop: "{{ query('fileglob', '{{playbook_dir}}/roles/k8s_certs/tasks/*.yaml') | reject('search', 'main') | list }}"

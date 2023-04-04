@@ -15,13 +15,6 @@ KUBE_CLUSER_NAME: "k8s"
 KUBECONFIG: "kubeconfig"
 KUBE_VERSION: "v1.23.7"
 
-# support verions
-ETCD_VERSION: "3.5.4"
-RUNC_VERSION: "1.1.2"
-CRI_UTIL_VERSION: "1.24.2"
-CNI_PLUGIN_VERSION: "1.1.1"
-CONTAINERD_VERSION: "1.6.4"
-
 # Kube networking
 KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
 APISERVER: "apiserver"

@@ -6,4 +6,4 @@
 
     - name: Tasks
       ansible.builtin.include_tasks: "{{ item }}"
-      loop: "{{ query('fileglob', {{ playbook_dir }}/roles/etcd/tasks/*.yaml) | reject('main') }}"
+      loop: "{{ query('fileglob', '{{playbook_dir}}/roles/etcd/tasks/*.yaml') | reject('search', 'main') | list }}"

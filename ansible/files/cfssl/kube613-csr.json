@@ -1,0 +1,16 @@
+{
+    "CN": "system:node:kube613",
+    "key": {
+      "algo": "rsa",
+      "size": 2048
+    },
+    "names": [
+      {
+        "C": "US",
+        "L": "BearEay",
+        "O": "system:nodes",
+        "OU": "KxTHW Bare Metal",
+        "ST": "California"
+      }
+    ]
+  }

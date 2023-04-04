@@ -9,6 +9,7 @@
     version: "v{{ETCD_VERSION}}"
     filename: "{{repo}}-{{version}}-linux-amd64.tar.gz"
     project_url: https://github.com/{{org}}/{{repo}}/releases/download/{{version}}/{{filename}}
+
   block:
 
       - name: Mkdir "{{confpath}}"
@@ -35,70 +36,72 @@
           - kubernetes-key.pem
           - kubernetes.pem
 
-        - name: "installing {{ repo }} {{version}}"
-          unarchive:
-            remote_src: yes
-            src: "{{project_url}}"
-            dest: "{{tempfolder_1.path}}"
-            keep_newer: yes
-            extra_opts:
-            - --strip=1
-            - --no-anchored
+      - name: "installing {{ repo }} {{version}}"
+        unarchive:
+          remote_src: yes
+          src: "{{project_url}}"
+          dest: "{{tempfolder_1.path}}"
+          keep_newer: yes
+          extra_opts:
+          - --strip=1
+          - --no-anchored
 
-        - name: mv files to bindir
-          find:
-            paths: "{{tempfolder_1.path}}"
-            patterns: "etcd*"
-          register: etcd_files
+      - name: mv files to bindir
+        find:
+          paths: "{{tempfolder_1.path}}"
+          patterns: "etcd*"
+        register: etcd_files
 
         # - name: print
         #   debug:
         #     msg: "{{etcd_files}}"
 
-        - name: mv files to bindir
-          command: mv "{{item.path}}" "{{binpath}}/{{item.path|basename}}-{{version}}"
-          with_items:  "{{etcd_files.files}}"
+      - name: mv files to bindir
+        command: mv "{{item.path}}" "{{binpath}}/{{item.path|basename}}-{{version}}"
+        with_items:  "{{etcd_files.files}}"
 
-        - name: chown files
-          command: chown root:root "{{binpath}}/{{item.path|basename}}-{{version}}"
-          with_items:  "{{etcd_files.files}}"
+      - name: chown files
+        command: chown root:root "{{binpath}}/{{item.path|basename}}-{{version}}"
+        with_items:  "{{etcd_files.files}}"
 
-        - name: ln files to bindir
-          command: ln -sf "{{binpath}}/{{item.path|basename}}-{{version}}" "{{binpath}}/{{item.path|basename}}"
-          with_items:  "{{etcd_files.files}}"
+      - name: ln files to bindir
+        command: ln -sf "{{binpath}}/{{item.path|basename}}-{{version}}" "{{binpath}}/{{item.path|basename}}"
+        with_items:  "{{etcd_files.files}}"
 
-        - name: rm tempdir
-          file:
-            state: absent
-            name: "{{tempfolder_1.path}}"
+      - name: rm tempdir
+        file:
+          state: absent
+          name: "{{tempfolder_1.path}}"
 
-    - name: Make the EtcD systemd File
-      block:
-        - name: Get IP for a subset of hosts, store in HOST_IP
-          set_fact:
-            HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
-          loop: "{{ groups['etcd'] }}"
+- name: Make the EtcD systemd File
+  block:
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['etcd'] }}"
 
-        - name: Flatten dict to formatted string, store PEERS_MAP
-          set_fact:
-            PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0) | ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
-          loop: "{{  HOST_IP | dict2items }}"
-          loop_control:
-            index_var: index
+    - name: Flatten dict to formatted string, store PEERS_MAP
+      set_fact:
+        PEERS_MAP: "{{ PEERS_MAP }}{{ (index > 0) | ternary(',','') }}{{ item.key }}=https://{{ item.value }}:2380"
+      loop: "{{  HOST_IP | dict2items }}"
+      loop_control:
+        index_var: index
 
-        # Create the config file from template
-        - name: systemd Unit file
-          copy:
-            force: yes
-            dest: "/etc/systemd/system/etcd.service"
-            content: '{{ lookup("template", "files/etcd/etcd.service.j2") }}'
-            mode: 0644
-            group: root
-            owner: root
+    # Create the config file from template
+    - name: systemd Unit file
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/etcd.service"
+        content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}") }}'
+        mode: 0644
+        group: root
+        owner: root
+        with_items:
+        - "etcd/etcd.service.j2"
 
-        - name: enable and restart etcd
-          systemd:
-            name: etcd
-            state: restarted
-            enabled: true
-            daemon_reload: true
+    - name: enable and restart etcd
+      systemd:
+        name: etcd
+        state: restarted
+        enabled: true
+        daemon_reload: true

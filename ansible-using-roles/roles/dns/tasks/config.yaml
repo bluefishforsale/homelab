@@ -21,7 +21,7 @@
 
       - name: write out template files
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "{{ item }}"
           content: '{{ lookup("template", "{{ role_path }}/files/{{ item }}.j2") }}'
           mode: 0644
@@ -38,12 +38,12 @@
       - name: set dict for zones
         ansible.builtin.set_fact:
           zones_files:
-            - { forward: 'home', forward_file: "{{ zone_dir }}/home.zone", reverse: "1.168.192.in-addr.arpa", reverse_file: "{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa" }
+          - { forward: 'home', forward_file: "{{ zone_dir }}/home.zone", reverse: "1.168.192.in-addr.arpa", reverse_file: "{{ zone_dir }}/db.rev.1.168.192.in-addr.arpa" }
 
       - name: set services dict for handler
         ansible.builtin.set_fact:
           local_services:
-            - { name: 'named', enabled: true, state: 'restarted' }
+          - { name: 'named', enabled: true, state: 'restarted' }
 
       - name: set services dict for handler
         ansible.builtin.set_fact:
