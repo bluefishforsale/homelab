@@ -1,0 +1,16 @@
+[Unit]
+Description=pihole
+Requires=docker.service multi-user.target
+PartOf=docker.service
+After=docker.service network-online.target named.service isc-dhcp-server.service
+
+[Service]
+Restart=always
+RemainAfterExit=true
+Type=simple
+WorkingDirectory=/opt/docker/
+ExecStart=/usr/bin/docker compose -f /opt/docker/pihole.compose up -d --remove-orphans --wait
+ExecStop=/usr/bin/docker compose -f /opt/docker/pihole.compose down
+
+[Install]
+WantedBy=multi-user.target
