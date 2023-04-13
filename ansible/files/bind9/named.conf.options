@@ -51,5 +51,6 @@ acl localnet {
   // dnssec-validation auto;
 
   auth-nxdomain no;  # conform to RFC1035
+  listen-on { 192.168.1.2 ; 127.0.0.1; };
   listen-on-v6 { none; };
  };

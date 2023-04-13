@@ -52,6 +52,7 @@
         - /etc/dhcp/dhcpd.conf
         - /etc/dhcp/kube-nodes.conf
         - /etc/default/isc-dhcp-server
+        - /etc/systemd/system/isc-dhcp-server.service
 
     - name: Enable and Start service
       become: yes

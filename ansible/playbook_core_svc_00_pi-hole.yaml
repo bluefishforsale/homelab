@@ -1,0 +1,26 @@
+---
+- name: pi-hole
+  hosts: dns
+
+  tasks:
+  - name: pihole and config
+    become: yes
+    block:
+
+
+    - name: configs
+      copy:
+        force: yes
+        src: pihole/{{ item  }}
+        dest: /opt/docker/{{ item  }}
+        mode: 0644
+      with_items:
+        - /etc/systemd/system/pihole.service
+        - /opt/docker/pihole.compose
+
+    - name: Enable and Start service
+      systemd:
+        enabled: yes
+        state: restarted
+        name: pihole.service
+        daemon_reload: true
