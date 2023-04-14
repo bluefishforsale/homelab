@@ -76,12 +76,11 @@
       shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
 
     - name: remove the jnl files before restart
-      shell:
-        cmd: find /var/lib/bind -type f -name "*.jnl" -delete
+      shell: find /var/lib/bind -type f -name "*.jnl" -delete
 
     - name: Enable and Start service
       systemd:
         enabled: yes
         state: restarted
-        name: bind9
+        name: named
         daemon_reload: true

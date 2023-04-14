@@ -53,6 +53,7 @@
         - /etc/systemd/system/isc-dhcp-server.service
 
     - name: remove LSB init
+      ignore_errors: True
       shell: rm /etc/init.d/isc-dhcp-server
 
 
