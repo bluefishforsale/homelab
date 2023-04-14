@@ -1,11 +1,9 @@
 - name: DCHP server
   hosts: dns
-  vars:
-    dummy: Null
 
   tasks:
   - name: packages and config
-    become: yes
+    become: True
     block:
 
     - name: apt-get update
@@ -54,11 +52,13 @@
         - /etc/default/isc-dhcp-server
         - /etc/systemd/system/isc-dhcp-server.service
 
+    - name: remove LSB init
+      shell: rm /etc/init.d/isc-dhcp-server
+
+
     - name: Enable and Start service
-      become: yes
-      become_user: root
       systemd:
         enabled: yes
         state: restarted
-        name: isc-dhcp-server
+        name: isc-dhcp-server.service
         daemon_reload: true
