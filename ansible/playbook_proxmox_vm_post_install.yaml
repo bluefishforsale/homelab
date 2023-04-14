@@ -1,0 +1,13 @@
+- name: proxmox vm setup
+  hosts: all
+  become: yes
+  tasks:
+
+  - name: disable eth0 dhcp
+    ansible.builtin.lineinfile:
+      path: /etc/network/interfaces
+      state: present
+      backrefs: true
+      regexp: '^(iface eth0 inet dhcp)$'
+      line: '#\g<1>'
+  -

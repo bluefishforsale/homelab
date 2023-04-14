@@ -60,10 +60,6 @@
             patterns: "etcd*"
           register: etcd_files
 
-        # - name: print
-        #   debug:
-        #     msg: "{{etcd_files}}"
-
         - name: mv files to bindir
           command: mv "{{item.path}}" "{{binpath}}/{{item.path|basename}}-{{version}}"
           with_items:  "{{etcd_files.files}}"

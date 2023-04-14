@@ -31,75 +31,32 @@ pihole            IN          A     192.168.1.9
 apiserver      IN        A    192.168.1.99
 
 ; Dell iDrac impi OOB starts at 192.168.1.10 and is last digit of IP/name
-node004-idrac    IN        A     192.168.1.14
-node005-idrac    IN        A     192.168.1.15
 node006-idrac    IN        A     192.168.1.16
 
-kube401         IN      A       192.168.1.41
-kube402         IN      A       192.168.1.42
-kube403         IN      A       192.168.1.43
-kube404         IN      A       192.168.1.44
-kube405         IN      A       192.168.1.45
-kube406         IN      A       192.168.1.46
-kube407         IN      A       192.168.1.47
-kube408         IN      A       192.168.1.48
-kube409         IN      A       192.168.1.49
-
-kube501         IN      A       192.168.1.51
-kube502         IN      A       192.168.1.52
-kube503         IN      A       192.168.1.53
-kube504         IN      A       192.168.1.54
-kube505         IN      A       192.168.1.55
-kube506         IN      A       192.168.1.56
-kube507         IN      A       192.168.1.57
-kube508         IN      A       192.168.1.58
-kube509         IN      A       192.168.1.59
-
+; proxmox vms
+kube600         IN      A       192.168.1.61
 kube601         IN      A       192.168.1.61
 kube602         IN      A       192.168.1.62
 kube603         IN      A       192.168.1.63
 kube604         IN      A       192.168.1.64
-kube605         IN      A       192.168.1.65
-kube606         IN      A       192.168.1.66
-kube607         IN      A       192.168.1.67
-kube608         IN      A       192.168.1.68
-kube609         IN      A       192.168.1.69
+kube611         IN      A       192.168.1.65
+kube612         IN      A       192.168.1.66
+kube613         IN      A       192.168.1.67
+kube614         IN      A       192.168.1.68
+kube615         IN      A       192.168.1.69
 
-node000          IN        A    192.168.1.100
+;node000          IN        A    192.168.1.100
+; up squared
 node001          IN        A    192.168.1.101
 node002          IN        A    192.168.1.102
 node003          IN        A    192.168.1.103
+
+; dells
 node004          IN        A    192.168.1.104
 node005          IN        A    192.168.1.105
 node006          IN        A    192.168.1.106
 
-; node007        IN        A    192.168.1.107
-; node008        IN        A    192.168.1.108
-; node009        IN        A    192.168.1.109
-; node010        IN        A    192.168.1.110
-; node011        IN        A    192.168.1.111
-; node012        IN        A    192.168.1.112
-; node013        IN        A    192.168.1.113
-; node014        IN        A    192.168.1.114
-; node015        IN        A    192.168.1.115
-; node016        IN        A    192.168.1.116
-; node017        IN        A    192.168.1.117
-; node018        IN        A    192.168.1.118
-; node019        IN        A    192.168.1.119
-; node020        IN        A    192.168.1.120
-; node021        IN        A    192.168.1.121
-; node022        IN        A    192.168.1.122
-; node023        IN        A    192.168.1.123
-; node024        IN        A    192.168.1.124
-; node025        IN        A    192.168.1.125
-; node026        IN        A    192.168.1.126
-; node027        IN        A    192.168.1.127
-; node028        IN        A    192.168.1.128
-; node029        IN        A    192.168.1.129
-; node030        IN        A    192.168.1.130
-; node031        IN        A    192.168.1.131
-; node032        IN        A    192.168.1.132
-
+; Ocean, do not touch
 ocean            CNAME          ocean-bond0
 ocean-bond0      IN        A    192.168.1.143
 ocean-eth0       IN        A    192.168.1.144
