@@ -11,6 +11,7 @@
       with_items:
       - haproxy
       - keepalived
+      - keepalived_script
 
     - name: HAproxy and Keepalived users
       user:
@@ -21,6 +22,7 @@
       with_items:
       - haproxy
       - keepalived
+      - keepalived_script
 
     # Make variables for the Kubernetes configfile
     - name: Get IP for a subset of hosts, store in PEERS_IP
@@ -52,7 +54,7 @@
 
         - name: install
           apt:
-            name: [ haproxy, keepalived ]
+            name: [ haproxy, keepalived, psmisc ]
             state: present
             update_cache: yes
 
@@ -77,7 +79,7 @@
         - name: write haproxy / keepalived systemd services
           copy:
             force: yes
-            dest: "/etc/systemd/system/{{item}}"
+            dest: "/etc/systemd/system/{{item}}.service"
             content: '{{ lookup("template", "files/{{item}}/{{item}}.service.j2") }}'
             mode: 0644
             owner: root
@@ -86,20 +88,26 @@
           - keepalived
           - haproxy
 
-        - name: daemon-reload and stop
-          systemd:
-            name: "{{item}}"
-            state: stopped
-            daemon_reload: yes
+        # - name: daemon-reload and stop
+        #   systemd:
+        #     name: "{{item}}"
+        #     state: stopped
+        #     daemon_reload: yes
+        #   with_items:
+        #     - haproxy
+        #     - keepalived
+        - name: reset failed
+          shell: systemctl reset-failed "{{item}}"
           with_items:
-            - haproxy
             - keepalived
+            - haproxy
 
         - name: enable and start
           systemd:
             name: "{{item}}"
-            state: started
+            state: restarted
             enabled: yes
+            daemon_reload: true
           with_items:
             - haproxy
             - keepalived
