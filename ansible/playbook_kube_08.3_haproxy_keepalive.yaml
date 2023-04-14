@@ -69,7 +69,7 @@
 
         - name: write configs keepalived
           copy:
-            force: yes
+            force: true
             dest: "/etc/keepalived/keepalived.conf"
             content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
             mode: 0644
@@ -78,7 +78,7 @@
 
         - name: write haproxy / keepalived systemd services
           copy:
-            force: yes
+            force: true
             dest: "/etc/systemd/system/{{item}}.service"
             content: '{{ lookup("template", "files/{{item}}/{{item}}.service.j2") }}'
             mode: 0644
@@ -99,15 +99,15 @@
         - name: reset failed
           shell: systemctl reset-failed "{{item}}"
           with_items:
-            - keepalived
-            - haproxy
+            - keepalived.service
+            - haproxy.service
 
         - name: enable and start
           systemd:
             name: "{{item}}"
             state: restarted
-            enabled: yes
+            enabled: true
             daemon_reload: true
           with_items:
-            - haproxy
-            - keepalived
+            - haproxy.service
+            - keepalived.service

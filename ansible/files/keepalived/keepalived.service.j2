@@ -2,19 +2,15 @@
 Description=Keepalive Daemon (LVS and VRRP)
 After=network-online.target
 Wants=network-online.target
-
 # Only start if there is a configuration file
 ConditionFileNotEmpty=/etc/keepalived/keepalived.conf
 
 [Service]
-Restart=always
-RestartSec=30s
-TimeoutSec=120s
 Type=simple
+Restart=always
 # Read configuration variable file if it is present
 EnvironmentFile=-/etc/default/keepalived
 ExecStart=/usr/sbin/keepalived --dont-fork $DAEMON_ARGS
-ExecStartPost=/bin/systemctl restart haproxy.service
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]

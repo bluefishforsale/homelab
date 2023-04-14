@@ -2,25 +2,19 @@
 Description=HAProxy Load Balancer
 Documentation=man:haproxy(1)
 Documentation=file:/usr/share/doc/haproxy/configuration.txt.gz
-After=network-online.target rsyslog.service
-Wants=network-online.target
-Requires=kube-apiserver.service
-StartLimitInterval=0
-StartLimitBurst=0
+After=network.target rsyslog.service
 
 [Service]
+EnvironmentFile=-/etc/default/haproxy
+Environment="CONFIG=/etc/haproxy/haproxy.cfg" "PIDFILE=/run/haproxy.pid"
+ExecStartPre=/usr/sbin/haproxy -f $CONFIG -c -q $EXTRAOPTS
+ExecStart=/usr/sbin/haproxy -Ws -f $CONFIG -p $PIDFILE $EXTRAOPTS
+ExecReload=/usr/sbin/haproxy -f $CONFIG -c -q $EXTRAOPTS
+ExecReload=/bin/kill -USR2 $MAINPID
 KillMode=mixed
 Restart=always
-RestartSec=30s
-TimeoutSec=30s
 SuccessExitStatus=143
 Type=notify
-EnvironmentFile=-/etc/default/haproxy
-Environment="CONFIG=/etc/haproxy/haproxy.cfg" "PIDFILE=/run/haproxy.pid" "EXTRAOPTS=-S /run/haproxy-master.sock"
-ExecStartPre=/usr/sbin/haproxy -Ws -f $CONFIG -c -q $EXTRAOPTS
-ExecStart=/usr/sbin/haproxy -Ws -f $CONFIG -p $PIDFILE $EXTRAOPTS
-ExecReload=/usr/sbin/haproxy -Ws -f $CONFIG -c -q $EXTRAOPTS
-ExecReload=/bin/kill -USR2 $MAINPID
 
 # The following lines leverage SystemD's sandboxing options to provide
 # defense in depth protection at the expense of restricting some flexibility
