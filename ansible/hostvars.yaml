@@ -1,0 +1,13 @@
+- name: Retrieve host vars
+  hosts: all
+  vars:
+    HOST_IP: {}
+  tasks:
+    # - debug:
+    #     var=hostvars[inventory_hostname]
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s'] }}"
+    - debug:
+        var=HOST_IP['kube613']

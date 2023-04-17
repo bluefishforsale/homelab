@@ -14,7 +14,7 @@ clusterDNS:
   - "10.32.0.10"
 cgroupDriver: "systemd"
 podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{HOST_IP[inventory_hostname].split('.')[-1]}}.0/{{POD_NETMASK}}"
-resolvConf: /run/systemd/resolve/resolv.conf
+resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: "5m"
 tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"
 tlsPrivateKeyFile: "{{pki_dir}}/{{inventory_hostname}}-key.pem"

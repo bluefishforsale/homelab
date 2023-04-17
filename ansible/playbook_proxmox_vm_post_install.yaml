@@ -1,6 +1,6 @@
 - name: proxmox vm setup
-  hosts: all
   become: yes
+  hosts: all
   tasks:
 
   - name: disable eth0 dhcp
@@ -10,4 +10,15 @@
       backrefs: true
       regexp: '^(iface eth0 inet dhcp)$'
       line: '#\g<1>'
-  -
+
+  - name: install some proxmox packages
+    apt:
+      update_cache: true
+      force_apt_get: true
+      allow-unauthenticated: true
+      pkg:
+      - qemu-guest-agent
+
+  - name: install some proxmox packages
+    apt:
+      upgrade: full

@@ -102,7 +102,7 @@ version = 2
         [plugins."io.containerd.grpc.v1.cri".containerd.default_runtime.options]
 
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
-{% if 'nvidia_gpu' in hostvars[inventory_hostname] %}
+{% if 'nvidia_gpu' in hostvars[inventory_hostname] and hostvars[inventory_hostname]['nvidia_gpu'] == 'true' %}
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
           runtime_type = "io.containerd.runc.v2"
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
