@@ -29,7 +29,6 @@ for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm stop
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm destroy
 
-
 # using ceph LVM
 qm create 8888 --name debian-10-openstack-amd64 --net0 virtio,bridge=vmbr0
 qm importdisk 8888 debian-10-openstack-amd64.qcow2 ceph-lvm
@@ -49,7 +48,7 @@ qm set 6${x}${y} --name kube6${x}${y} --ipconfig0 ip=$(host kube6${x}${y}.home |
 qm set 6${x}${y} --sshkeys rsa.pub
 qm set 6${x}${y} --cores 40
 qm set 6${x}${y} --memory 65536  # 64G
-qm resize 6${x}${y} scsi0 +8G  #20G total
+qm resize 6${x}${y} scsi0 +18G  # 21.47G
 done
 done
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm start
