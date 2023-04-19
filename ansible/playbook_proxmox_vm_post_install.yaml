@@ -11,6 +11,12 @@
       regexp: '^(iface eth0 inet dhcp)$'
       line: '#\g<1>'
 
+  - name: Add the backports repository
+    apt_repository:
+      state: present
+      repo: 'deb https://deb.debian.org/debian buster-backports main contrib non-free'
+      filename: /etc/apt/sources.list.d/backports.list
+
   - name: install some proxmox packages
     apt:
       update_cache: true
@@ -18,6 +24,15 @@
       allow-unauthenticated: true
       pkg:
       - qemu-guest-agent
+
+  - name: upgrade to 5.10 kernel
+    apt:
+      default_release: buster-backports
+      update_cache: true
+      allow-unauthenticated: true
+      name:
+      - linux-image-5.10.0-0.deb10.16-cloud-amd64-unsigned
+      - linux-headers-5.10.0-0.deb10.16-cloud-amd64
 
   - name: install some proxmox packages
     apt:
