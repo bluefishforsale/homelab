@@ -1,5 +1,19 @@
 # Homelab
 
+1. create the vms using `readme_proxmox.md` instrucitons
+
+2. proceed with 3. when uptime returns w.o password on all VMs
+   - ansible -i inventory.ini k8s  -b -a 'uptime'
+
+3. proceed with step 4. only when post-install and reboot completes
+  - ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml playbook_base_packages_host_settings.yaml playbook_base_unattended_upgrade.yaml ; ansible -i inventory.ini k8s  -b -a reboot
+
+4. proceed with step 5. when ansible playbooks all apply whithout any error
+  - ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+
+5. proceed to kube networking, ceph, then pods only when Kube clsuter is deployed correctly
+  - https://github.com/bluefishforsale/homelab-kube/blob/master/Readme-proxmox.md
+
 
 ## notes about LACP 802.3ad transmit hash etc.
 The US-16-XG 10G needs to have the port-channels hash transmit modes changed via ssh
