@@ -1,4 +1,6 @@
 # Homelab
+## start in the ansible/ directory for all this
+0. todo: write instructions for creating ceph-lvm and cephfs
 
 1. create the vms using `readme_proxmox.md` instrucitons
 

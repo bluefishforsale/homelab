@@ -4,12 +4,3 @@ user:
     Last: Skiens
     groups: [sudo]
     github: bluefishforsale
-  - name: cilium
-    First: cilium
-    Last: user
-    groups: [sudo, cilium]
-  - name: ubuntu
-    First: ubuntu
-    Last: ubuntu
-    groups: [sudo, docker]
-    github: bluefishforsale
