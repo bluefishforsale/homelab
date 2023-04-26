@@ -3,20 +3,17 @@
 ### TL;DR
 
 Run all kube playbooks in order and setup the cluster from scratch
-```
-for FILE in playbook*kube*.yaml ; do ansible-playbook -i inventory.yaml $FILE ; done
-```
+- `for FILE in playbook*kube*.yaml ; do ansible-playbook -i inventory.yaml $FILE ; done`
 
 # examples:
 ### Become Root ask pass
-ansible-playbook -i inventory.yaml playbook.yaml -K
+- `ansible-playbook -i inventory.yaml playbook.yaml -K`
 
 ### Check playbook do not run
-ansible-playbook -i inventory.yaml playbook.yaml --check
+- `ansible-playbook -i inventory.yaml playbook.yaml --check`
 
 ### Single host from inventory
-ansible-playbook -i inventory.yaml -l onehost playbook.yaml
-
+- `ansible-playbook -i inventory.yaml -l onehost playbook.yaml`
 
 ## The playbooks
 
