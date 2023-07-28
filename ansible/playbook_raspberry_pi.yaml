@@ -1,0 +1,50 @@
+- name: raspberry pi setup
+  ignore_errors: true
+  become: yes
+  hosts: all
+  tasks:
+
+
+  - name: disable swap at boot
+    ansible.builtin.lineinfile:
+      path: /boot/cmdline.txt
+      state: present
+      backrefs: true
+      regexp: '^(.*) fastboot noswap$'
+      line: '\1 fastboot noswap'
+
+  - name: apt-get update
+    ansible.builtin.apt:
+      update_cache: true
+      pkg: busybox-syslogd
+      state: present
+
+  - name: apt-get update
+    ansible.builtin.apt:
+      pkg: busybox-syslogd
+      state: absent
+      purge: true
+    with_items:
+    - wolfram-engine
+    - triggerhappy
+    - anacron
+    - logrotate
+    - dphys-swapfile
+    - xserver-common
+    - lightdm
+
+
+  - name: disable services
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: stopped
+      enabled: false
+      daemon_reload: true
+    with_items:
+      - bootlogs
+      - console-setup
+      - x11-common
+
+  - name: apt-get update
+    ansible.builtin.apt:
+      autoremove: true
