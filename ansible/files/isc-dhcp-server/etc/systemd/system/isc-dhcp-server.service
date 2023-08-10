@@ -3,9 +3,11 @@ Description = DHCP server
 [Service]
 Type=simple
 Restart=always
+StartLimitIntervalSec=300
 StartLimitInterval=30
-StartLimitBurst=30
-TimeoutSec=5min
+StartLimitBurst=3
+RestartSec=30
+TimeoutSec=2min
 KillMode=process
 ExecStart=/usr/sbin/dhcpd -q -d --no-pid -cf /etc/dhcp/dhcpd.conf eth0
 
