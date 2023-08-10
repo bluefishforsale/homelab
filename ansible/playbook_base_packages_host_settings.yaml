@@ -23,7 +23,7 @@
       pkg:
         [
         bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-        iptraf-ng, iputils-ping, jq, linux-tools-common, fail2ban,
+        iptraf-ng, iputils-ping, jq, fail2ban,
         "linux-tools-{{kernel_version.stdout}}", "linux-cloud-tools-{{kernel_version.stdout}}",
         libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
