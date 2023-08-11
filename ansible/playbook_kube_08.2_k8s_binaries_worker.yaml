@@ -252,7 +252,7 @@
             owner: root
           with_items:
             - kubelet
-            # - kube-proxy
+            - kube-proxy
 
         - name: copy ntpdate cron
           copy:
@@ -271,4 +271,4 @@
             daemon_reload: true
           with_items:
             - kubelet
-            # - kube-proxy
+            - kube-proxy

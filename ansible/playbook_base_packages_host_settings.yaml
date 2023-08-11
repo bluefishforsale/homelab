@@ -20,14 +20,14 @@
 
   - name: Install a suite of common tools
     apt:
-      pkg:
-        [
-        bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+      pkg: "{{ item }}"
+    with_items:
+      [
+        bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
         iptraf-ng, iputils-ping, jq, fail2ban,
-        "linux-tools-{{kernel_version.stdout}}", "linux-cloud-tools-{{kernel_version.stdout}}",
-        libaa-bin, lvm2, make, net-tools, netcat, nmap, ntpdate, pciutils,
+        libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
-        ]
+      ]
 
   - name: Glances has issues installing on some platforms
     ignore_errors: true
@@ -205,33 +205,33 @@
       mode: 0644
       content: GOVERNOR="powersave"
 
-  # - name: Write cpu-performance script
-  #   copy:
-  #     force: yes
-  #     dest: "/etc/systemd/system/cpu-performance.sh"
-  #     mode: 0755
-  #     content: |
-  #       for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
-  #           echo "performance" > "${CPU}" 2>/dev/null
-  #       done
+  - name: Write cpu-performance script
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/cpu-performance.sh"
+      mode: 0755
+      content: |
+        for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
+            echo "performance" > "${CPU}" 2>/dev/null
+        done
 
-  # - name: Write cpu-performance service
-  #   copy:
-  #     force: yes
-  #     dest: "/etc/systemd/system/cpu-performance.service"
-  #     content: |
-  #       [Unit]
-  #       Description=Setup foo
-  #       #After=network.target
+  - name: Write cpu-performance service
+    copy:
+      force: yes
+      dest: "/etc/systemd/system/cpu-performance.service"
+      content: |
+        [Unit]
+        Description=Setup foo
+        #After=network.target
 
-  #       [Service]
-  #       Type=oneshot
-  #       ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
-  #       RemainAfterExit=true
-  #       StandardOutput=journal
+        [Service]
+        Type=oneshot
+        ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
+        RemainAfterExit=true
+        StandardOutput=journal
 
-  #       [Install]
-  #       WantedBy=multi-user.target
+        [Install]
+        WantedBy=multi-user.target
 
   - name: TEMP disable services
     systemd:

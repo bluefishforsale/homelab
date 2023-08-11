@@ -6,12 +6,8 @@ Requires=containerd.service
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \
-  --authorization-mode=Webhook \
   --config={{pki_dir}}/kubelet-config.yaml \
-  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \
-  --container-runtime=remote \
   --kubeconfig={{pki_dir}}/{{inventory_hostname}}.kubeconfig  \
-  --register-node=true \
   --v=2
 Restart=on-failure
 RestartSec=5
