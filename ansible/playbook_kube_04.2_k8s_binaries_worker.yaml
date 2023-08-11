@@ -271,4 +271,4 @@
             daemon_reload: true
           with_items:
             - kubelet
-            - kube-proxy
+            # - kube-proxy

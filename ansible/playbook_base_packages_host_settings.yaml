@@ -141,6 +141,8 @@
         kern.maxfilesperproc = 524288
         # no swapping
         vm.swappiness = 0
+        # rp_filter non container
+        net.ipv4.conf.eth*.rp_filter=0
         # ciliumn rp_filter
         # https://github.com/cilium/cilium/issues/10645
         net.ipv4.conf.lxc*.rp_filter = 0
@@ -297,6 +299,7 @@
           for host in ocean.home $(printf "node%03d " $(seq 1 6) | xargs -n1 | grep -vi $(hostname)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
           wait
           shutdown -h now
+
     - name: enable and restart services
       systemd:
         name: apcupsd
