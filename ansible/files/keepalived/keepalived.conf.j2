@@ -1,15 +1,22 @@
-vrrp_script haproxy-check {
-    script "/usr/bin/killall -0 haproxy"
-    interval 2
-    weight 20
+global_defs {
+    script_user root
+    enable_script_security
+    max_auto_priority 99
 }
 
-vrrp_instance haproxy-vip {
+vrrp_script haproxy-check {
+    script "/usr/bin/systemctl -q is-active haproxy"
+    interval 2
+    weight {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
+}
+
+vrrp_instance apiserver {
+    nopreempt
     state BACKUP
+    advert_int 2
     interface {{ iface.stdout }}
     priority {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
-    virtual_router_id {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
-    advert_int 3
+    virtual_router_id 100
     unicast_src_ip {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
     unicast_peer {
 {% for value in HOST_IP.values() if HOST_IP[inventory_hostname] not in value %}
@@ -20,6 +27,6 @@ vrrp_instance haproxy-vip {
         {{APISERVER_IP}}
     }
     track_script {
-        haproxy-check weight 20
+        haproxy-check
     }
 }
