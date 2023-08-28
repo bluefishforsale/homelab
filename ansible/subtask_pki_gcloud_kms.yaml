@@ -1,0 +1,22 @@
+- name: Test gcloud auth
+  ansible.builtin.command: gcloud beta auth application-default print-access-token
+  ignore_errors: true
+  register: gcloud_auth_status
+
+- name: Get info on a CryptoKey
+  google.cloud.gcp_kms_crypto_key_info:
+    key_ring: "{{ homelab_keyring }}"
+    project: "{{ homelab_project_name }}"
+    auth_kind: "serviceaccount"
+    service_account_file: "{{ homelab_sa_admin_credentials_file }}"
+  when: gcloud_auth_status.rc != 0
+
+- name: Create a crypto key
+  google.cloud.gcp_kms_crypto_key:
+    name: "{{ homelab_cryptokey_name }}"
+    key_ring: "{{ homelab_keyring }}"
+    project: "{{ homelab_project_name }}"
+    auth_kind: "serviceaccount"
+    service_account_file: "{{homelab_sa_admin_credentials_file}}"
+    state: "present"
+  when: gcloud_auth_status.rc != 0

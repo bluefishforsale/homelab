@@ -1,0 +1,14 @@
+- name: PKI tools and GCP init for kms
+  hosts: local
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    - name: "Install pip requests library"
+      ansible.builtin.pip:
+        name: "{{ item }}"
+        state: present
+      with_items: "{{ pip_package_requirements }}"
+
+    - name: "Install tools"
+      ansible.builtin.include_tasks: subtask_pki_tools_macos.yaml

@@ -1,0 +1,26 @@
+- name: PKI tools and GCP init for kms
+  hosts: local
+  collections:
+    - google.cloud
+  vars_files:
+    - vars_kube.yaml
+  vars:
+    pip_package_requirements:
+      - "requests"
+      - "google-auth"
+      - "google-auth-httplib2"
+      - "google-auth-oauthlib"
+      - "google-cloud"
+
+  tasks:
+    - name: Install pip requests library
+      ansible.builtin.pip:
+        name: "{{ item }}"
+        state: present
+      with_items: "{{ pip_package_requirements }}"
+
+    - name: GCloud Auth or Init
+      ansible.builtin.include_tasks: subtask_gcloud.yaml
+
+    - name: GCloud KMS fetch or create
+      ansible.builtin.include_tasks: subtask_pki_gcloud_kms.yaml

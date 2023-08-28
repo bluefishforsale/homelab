@@ -1,0 +1,9 @@
+- name: Install sops
+  community.general.homebrew:
+    name: sops
+    state: latest
+
+- name: Install cfssl
+  community.general.homebrew:
+    name: cfssl
+    state: latest

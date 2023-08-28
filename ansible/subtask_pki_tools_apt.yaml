@@ -1,0 +1,11 @@
+- name: Install sops
+  ansible.builtin.:
+    creates: /usr/local/bin/sops
+    name: sops
+    state: present
+
+- name: Install cfssl
+  ansible.builtin.apt:
+    creates: /usr/bin/cfssl
+    name: golang-cfssl
+

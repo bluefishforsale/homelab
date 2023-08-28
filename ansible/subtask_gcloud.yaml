@@ -1,0 +1,74 @@
+- name: Check if google-cloud-sdk is installed with Homebrew
+  ansible.builtin.command: brew list google-cloud-sdk
+  register: gcloud_check
+  ignore_errors: true
+
+- name: Install GCloud SDK
+  community.general.homebrew:
+    name: google-cloud-sdk
+    state: latest
+  when: gcloud_check.rc != 0
+
+- name: Install gcloud components beta
+  ansible.builtin.command: gcloud components install beta --quiet
+  environment:
+    CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+- name: Update gcloud components
+  ansible.builtin.command: gcloud components update --quiet
+  environment:
+    CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+- name: Check if the file exists
+  ansible.builtin.stat:
+    path: "{{ homelab_credentials_file }}"
+  register: gcp_creds_stat
+
+# Ensure directory exists for credentials
+- name: Ensure credentials directory exists
+  when: not gcp_creds_stat.stat.exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/config/gcloud/"
+    state: directory
+    mode: '0755'
+
+- name: Binding email to account
+  ansible.builtin.command: gcloud config set account {{ homelab_gcp_account }}
+  ignore_errors: true
+
+- name: Gcloud print-access-token (test of access)
+  ansible.builtin.command: gcloud beta auth application-default print-access-token
+  ignore_errors: true
+  register: gcloud_auth_status
+
+# Authenticate gcloud with service account
+- name: Authenticate gcloud with service account
+  when: gcloud_auth_status.rc != 0
+  ansible.builtin.command: gcloud auth application-default login --quiet
+  environment:
+    CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+- name: Create a GCP service account
+  google.cloud.gcp_iam_service_account:
+    name: "{{ homelab_service_account_name }}"
+    display_name: "{{ homelab_service_account_name.split('@')[0] }}"
+    project: "{{ homelab_project_name }}"
+    auth_kind: "serviceaccount"
+    service_account_file: "{{ homelab_sa_admin_credentials_file }}"
+    state: "present"
+  register: sa_result
+
+- name: Generate service account key
+  google.cloud.gcp_iam_service_account_key:
+    service_account: "{{ sa_result.name }}"
+    private_key_type: TYPE_GOOGLE_CREDENTIALS_FILE
+    state: "present"
+    auth_kind: "serviceaccount"
+    service_account_file: "{{ homelab_sa_admin_credentials_file }}"
+  register: sa_key_result
+
+- name: Write the service account key to a file
+  copy:
+    content: "{{ sa_key_result.privateKeyData | b64decode }}"
+    dest: "{{ homelab_sa_admin_credentials_file }}"
+    mode: '0600'
