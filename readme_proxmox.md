@@ -24,8 +24,12 @@ File /etc/apt/sources.list.d/ceph.list
 ## create the OSDs
 https://pve.proxmox.com/wiki/Deploy_Hyper-Converged_Ceph_Cluster
 
+ceph auth get client.bootstrap-osd > /etc/pve/priv/ceph.client.bootstrap-osd.keyring
+id=0
 for disk in a b c d e f g h ; do
-    pveceph osd create /dev/sd${disk} -db_dev /dev/nvme0n1 -db_dev_size 110
+    # pveceph osd create /dev/sd${disk} -db_dev /dev/nvme0n1 -db_dev_size 110
+    ceph-volume lvm create --bluestore --osd-id $id --data /dev/sd${disk} --block.db /dev/nvme0n1 --block.db-size 110
+    let "id=id+1"
 done
 ## data pool and pve storage
 pveceph pool create data -application rbd
@@ -38,10 +42,10 @@ pveceph fs create --pg_num 32 --add-storage
 # destroy all ceph and reset disks
 pveceph mds destroy node006
 pveceph fs destroy cephfs
-for osd in `seq 0 7` ; do ceph osd down $osd ; ceph osd out $osd ; pveceph osd destroy $osd ; done
+for osd in `seq 0 7` ; do for step in stop down out purge destroy ; do ceph osd $step osd.$osd --force  ; done ; done
 vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
 for disk in a b c d e f g h ; do wipefs -a /dev/sd${disk} ; done
-wipefs -a /dev/nvme0n
+wipefs -a /dev/nvme0n1
 pveceph mgr destroy node006
 pveceph mon destroy node006
 pveceph stop
