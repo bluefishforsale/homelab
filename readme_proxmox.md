@@ -100,6 +100,8 @@ pveceph fs create --pg_num 32 --add-storage
 ```
 pveceph mds destroy $HOSTNAME
 pveceph fs destroy cephfs
+pvesm remove rbd ceph-lvm -pool data
+for pool in data cephfs_data cephfs_metadata  ; do  pveceph pool destroy $pool ; done
 # here's the list of OSD IDs - change to what range is on this metal
 for osd in `seq 0 7` ; do for step in stop down out purge destroy ; do ceph osd $step osd.$osd --force  ; done ; done
 vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
@@ -112,6 +114,33 @@ pveceph purge
 rm /etc/pve/ceph.conf
 find /var/lib/ceph/ -mindepth 2 -delete
 ```
+
+### if on a single node
+- change the crush map domain to OSD
+```
+ceph osd getcrushmap -o current.crush
+crushtool -d current.crush -o current.txt
+vi  current.txt
+```
+
+change the host -> osd in the replicated_rule
+```
+# rules
+rule replicated_rule {
+        id 0
+        type replicated
+        step take default
+        step chooseleaf firstn 0 type osd
+        step emit
+}
+```
+crushtool -c current.txt -o new.crush
+ceph osd setcrushmap -i new.crush
+```
+
+#### put the new map in
+```
+
 
 
 
