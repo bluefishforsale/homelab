@@ -1,31 +1,53 @@
-# new proxmox 7.2
+# Do all tis beofre loading the web ui
+    - it will ask to install ceph
+    - best to have the right apt repos in place first
+## non-subscriptions repos
+https://pve.proxmox.com/wiki/Package_Repositories
 /etc/apt/sources.list
-add:
-    deb http://download.proxmox.com/debian/pve bullseye pve-no-subscription
-/etc/apt/sources.list.d/pve-enterprise.list
-    comment out the line in that file
+    deb http://ftp.debian.org/debian bookworm main contrib
+    deb http://ftp.debian.org/debian bookworm-updates main contrib
 
-# https://pve.proxmox.com/wiki/Deploy_Hyper-Converged_Ceph_Cluster
-pveceph install
-pveceph init --network 192.168.1.0/24
-pveceph mon create
-pveceph mgr create
+    # Proxmox VE pve-no-subscription repository provided by proxmox.com,
+    # NOT recommended for production use
+    deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription
+
+    # security updates
+    deb http://security.debian.org/debian-security bookworm-security main contrib
+
+File /etc/apt/sources.list.d/pve-enterprise.list
+comment out this line
+    deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise
+
+File /etc/apt/sources.list.d/ceph.list
+    deb https://enterprise.proxmox.com/debian/ceph-quincy bookworm enterprise
+
+## create the OSDs
+https://pve.proxmox.com/wiki/Deploy_Hyper-Converged_Ceph_Cluster
+
 for disk in a b c d e f g h ; do
     pveceph osd create /dev/sd${disk} -db_dev /dev/nvme0n1 -db_dev_size 110
 done
-# data pool and pve storage
+## data pool and pve storage
 pveceph pool create data -application rbd
 pvesm add rbd ceph-lvm -pool data
-# cephfs
+## cephfs
 pveceph mds create
-pveceph fs create --pg_num 256 --add-storage
+pveceph fs create --pg_num 32 --add-storage
 
 
-# destroy osds remove vgs wipe disks
+# destroy all ceph and reset disks
+pveceph mds destroy node006
+pveceph fs destroy cephfs
 for osd in `seq 0 7` ; do ceph osd down $osd ; ceph osd out $osd ; pveceph osd destroy $osd ; done
 vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
 for disk in a b c d e f g h ; do wipefs -a /dev/sd${disk} ; done
-efs -a /dev/nvme0n
+wipefs -a /dev/nvme0n
+pveceph mgr destroy node006
+pveceph mon destroy node006
+pveceph stop
+pveceph purge
+rm /etc/pve/ceph.conf
+find /var/lib/ceph/ -mindepth 2 -delete
 
 
 
