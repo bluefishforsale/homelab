@@ -1,8 +1,35 @@
-# stop and destroy
-for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |\
- while read id ; do qm stop $id ; qm destroy $id ; done
+# new proxmox 7.2
+/etc/apt/sources.list
+add:
+    deb http://download.proxmox.com/debian/pve bullseye pve-no-subscription
+/etc/apt/sources.list.d/pve-enterprise.list
+    comment out the line in that file
 
-# using ceph LVM for VM disk images
+# https://pve.proxmox.com/wiki/Deploy_Hyper-Converged_Ceph_Cluster
+pveceph install
+pveceph init --network 192.168.1.0/24
+pveceph mon create
+pveceph mgr create
+for disk in a b c d e f g h ; do
+    pveceph osd create /dev/sd${disk} -db_dev /dev/nvme0n1 -db_dev_size 110
+done
+# data pool and pve storage
+pveceph pool create data -application rbd
+pvesm add rbd ceph-lvm -pool data
+# cephfs
+pveceph mds create
+pveceph fs create --pg_num 256 --add-storage
+
+
+# destroy osds remove vgs wipe disks
+for osd in `seq 0 7` ; do ceph osd down $osd ; ceph osd out $osd ; pveceph osd destroy $osd ; done
+vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
+for disk in a b c d e f g h ; do wipefs -a /dev/sd${disk} ; done
+efs -a /dev/nvme0n
+
+
+
+# Make VM temaplate
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 wget -O  rsa.key https://github.com/bluefishforsale.keys
 
@@ -46,7 +73,12 @@ fi
 done
 done
 
+# start VMS
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm start
+
+# stop and destroy
+for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |\
+ while read id ; do qm stop $id ; qm destroy $id ; done
 
 
 
