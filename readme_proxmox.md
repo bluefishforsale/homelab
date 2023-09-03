@@ -141,6 +141,13 @@ pveceph fs create --pg_num 32 --add-storage
 ```
 
 
+##### Removing the no-subscription warning from the UI
+https://johnscs.com/remove-proxmox51-subscription-notice/
+```
+cd /usr/share/javascript/proxmox-widget-toolkit
+cp proxmoxlib.js proxmoxlib.js.bak
+```
+
 
 
 

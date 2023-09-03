@@ -3,32 +3,26 @@
   vars_files:
     - vars_kube.yaml
 
-
   tasks:
+  - name: Generate Kubernetes Control Plane CA TLS Certs
+    block:
 
-    - name: Generate Kubernetes Control Plane CA TLS Certs
-      block:
-
-      - name: Certificate Authority
-        delegate_to: localhost
-        ansible.builtin.shell: |
+    - name: Certificate Authority
+      ansible.builtin.shell: |
+        cmd:
           set -o pipefail
           cfssl gencert -initca ca-csr.json | cfssljson -bare ca
         chdir: "{{ cfssl }}"
-        args:
-          creates: "{{ cfssl }}/ca.pem"
-
+      args:
+        creates: "{{ cfssl }}/ca.pem"
 
     - name: Admin Client Certificate
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
-        chdir: "{{ cfssl }}"
       args:
         creates: "{{ cfssl }}/admin.pem"
 
     - name: Controller Manager Client Certificate
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
         chdir: "{{ cfssl }}"
@@ -36,7 +30,6 @@
         creates: "{{ cfssl }}/kube-controller-manager.pem"
 
     - name: Kube Proxy Client Certificate
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
         chdir: "{{ cfssl }}"
@@ -44,7 +37,7 @@
         creates: "{{ cfssl }}/kube-proxy.pem"
 
     - name: Kube Aggregation Layer Certificate
-      delegate_to: localhost
+
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-aggregator-csr.json | cfssljson -bare kube-aggregator
         chdir: "{{ cfssl }}"
@@ -52,7 +45,6 @@
         creates: "{{ cfssl }}/kube-aggregator.pem"
 
     - name: Scheduler Client Certificate
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
         chdir: "{{ cfssl }}"
@@ -78,7 +70,6 @@
 
     # kube apiserver has many names, some services will also be listed in the SAN
     - name: API Server Certificate
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: >-
           cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json
@@ -89,7 +80,6 @@
         creates: "{{ cfssl }}/kubernetes.pem"
 
     - name: Service Account Key Pair
-      delegate_to: localhost
       ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
         chdir: "{{ cfssl }}"
@@ -108,7 +98,6 @@
 
     # Node Client Certs
     - name: Client Certs
-      delegate_to: localhost
-      ansible.builtin.include: subtask_kube_node_certs.yaml file={{item}}
+      ansible.builtin.include_tasks: subtask_kube_node_certs.yaml file={{item}}
       with_inventory_hostnames:
       - k8s
