@@ -2,7 +2,7 @@
 cfssl: files/cfssl
 pki_dir: /var/lib/kubernetes
 
-#GCP
+# GCP
 homelab_gcp_account: "terracnsoaur@gmail.com"
 homelab_project_name: "homelab-390805"
 homelab_credentials_file: "{{ ansible_env.HOME }}/.config/gcloud/application_default_credentials.json"

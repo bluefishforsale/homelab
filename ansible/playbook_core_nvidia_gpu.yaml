@@ -13,86 +13,86 @@
       - nvidia-modprobe
 
   tasks:
-  - name: Driver and Patch
-    become: yes
-    when: nvidia_gpu is defined
+    - name: Driver and Patch
+      become: true
+      when: nvidia_gpu is defined
 
-    block:
-    - name: stop  services using driver
-      ansible.builtin.systemd:
-        state: stopped
-        daemon_reload: true
-        name: "{{item}}"
-      ignore_errors: true
-      with_items:
-        - containerd
-        - kubelet
+      block:
+      - name: Stop services using driver
+        ansible.builtin.systemd:
+          state: stopped
+          daemon_reload: true
+          name: "{{item}}"
+        ignore_errors: true
+        with_items:
+          - containerd
+          - kubelet
 
-    - name: print debug
-      debug:
-        msg: "Installing {{nvidia_version}} driver"
+      - name: print debug
+        ansible.builtin.debug:
+          msg: "Installing {{nvidia_version}} driver"
 
-    - name: blacklist the nuevo driver
-      copy:
-        dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
-        content: |
-          blacklist nouveau
-          options nouveau modeset=0
-        force: yes
-        mode: 0644
-        group: root
-        owner: root
+      - name: blacklist the nuevo driver
+        ansible.builtin.copy:
+          dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
+          content: |
+            blacklist nouveau
+            options nouveau modeset=0
+          force: yes
+          mode: 0644
+          group: root
+          owner: root
 
-    - name: set kernel version
-      register: kernel_version
-      shell:
-        cmd: uname -r
+      - name: set kernel version
+        register: kernel_version
+        ansible.builtin.shell:
+          cmd: uname -r
 
-    - name: apt install kernel headers
-      apt:
-        update_cache: true
-        pkg: "linux-headers-{{kernel_version.stdout}}"
+      - name: apt install kernel headers
+        ansible.builtin.apt:
+          update_cache: true
+          pkg: "linux-headers-{{kernel_version.stdout}}"
 
-    - name: add nvidia apt gpg key
-      apt_key:
-        url: "{{item}}"
-        state: present
-      with_items:
-      - https://nvidia.github.io/libnvidia-container/gpgkey
+      - name: add nvidia apt gpg key
+        ansible.builtin.apt_key:
+          url: "{{item}}"
+          state: present
+        with_items:
+        - https://nvidia.github.io/libnvidia-container/gpgkey
 
-    - name: nvidia-container-toolkit apt repo
-      get_url:
-        url: "https://nvidia.github.io/libnvidia-container/{{distribution}}/libnvidia-container.list"
-        dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      - name: nvidia-container-toolkit apt repo
+        ansible.builtin.get_url:
+          url: "https://nvidia.github.io/libnvidia-container/{{distribution}}/libnvidia-container.list"
+          dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
-    - name: apt install nvidia packages
-      apt:
-        update_cache: true
-        force_apt_get: true
-        allow-unauthenticated: true
-        pkg: "{{nvidia_apt_packages}}"
+      - name: apt install nvidia packages
+        ansible.builtin.apt:
+          update_cache: true
+          force_apt_get: true
+          allow-unauthenticated: true
+          pkg: "{{nvidia_apt_packages}}"
 
-    - name: run nvidi-smi test
-      ignore_errors: true
-      shell:
-        cmd: nvidia-smi
+      - name: run nvidi-smi test
+        ignore_errors: true
+        ansible.builtin.shell:
+          cmd: nvidia-smi
 
-    - name: Write Containerd config
-      copy:
-        force: yes
-        content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
-        dest: /etc/containerd/config.toml
+      - name: Write Containerd config
+        ansible.builtin.copy:
+          force: yes
+          content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
+          dest: /etc/containerd/config.toml
 
-    - name: update init ramfs
-      shell:
-        cmd: update-initramfs -u
+      - name: update init ramfs
+        ansible.builtin.shell:
+          cmd: update-initramfs -u
 
-    - name: Re-start related services
-      ansible.builtin.systemd:
-        state: restarted
-        daemon_reload: true
-        name: "{{item}}"
-      ignore_errors: true
-      with_items:
-        - containerd
-        - kubelet
+      - name: Re-start related services
+        ansible.builtin.systemd:
+          state: restarted
+          daemon_reload: true
+          name: "{{item}}"
+        ignore_errors: true
+        with_items:
+          - containerd
+          - kubelet

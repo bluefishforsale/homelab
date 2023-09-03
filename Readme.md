@@ -33,20 +33,14 @@ https://dl.ubnt.com/guides/edgemax/EdgeSwitch_CLI_Command_Reference_UG.pdf
 https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_configuration/
 
 ## comands needed to be run on the unifi switch to enable the layer 3-4 load-balance
+### do this for all switches with agg ports
 ```
-    ssh terrac@192.168.1.223
+    ssh terrac@192.168.1.$IP
     telnet localhost
     enable
     configure
-    show port-channel 3/1
-    show port-channel 3/2
-    show port-channel 3/3
-    show port-channel 3/4
-    port-channel load-balance 6 all
-    show port-channel 3/1
-    show port-channel 3/2
-    show port-channel 3/3
-    show port-channel 3/4
+    show port-channel all
+    port-channel load-balance 6 (slot/port  or all)
     exit
     write memory
 ```

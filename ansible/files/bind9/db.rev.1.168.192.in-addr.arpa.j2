@@ -9,13 +9,13 @@ $TTL 86400 ; 1 day
       3600        ; minimum (1 hour)
 )
 
+; internal DNS
 @           IN          NS          dns01.home.
-1           IN          PTR         gw.home.
 2           IN          PTR         dns01.home.
 3           IN          PTR         dns02.home.
 
 
-; Dell iDrac impi OOB starts at .10 and is last digit of IP/name
+; Dell iDracs impi OOB starts at .10 and is last digit of IP/name
 14          IN         PTR        node004-idrac.home.
 15          IN         PTR        node005-idrac.home.
 16          IN         PTR        node006-idrac.home.
@@ -55,11 +55,11 @@ $TTL 86400 ; 1 day
 144		IN		PTR		ocean-eth0.home.
 
 ; networking
-141   IN    PTR         uap-ac-pro-home-1.home.
-142   IN    PTR         uap-ac-pro-home-2.home.
-166   IN    PTR         uap-ac-pro-garage-1.home.
 1     IN    PTR         usg-3p.home.
 240   IN    PTR         us-8-150w-poe.home.
 241   IN    PTR         us-48-ac-pro.home.
 242   IN    PTR         us-16-xg-10g.home.
+243   IN    PTR         uap-ac-pro-home-1.home.
+244   IN    PTR         uap-ac-pro-home-2.home.
+245   IN    PTR         uap-ac-pro-garage-1.home.
 
