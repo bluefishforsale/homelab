@@ -1,16 +1,9 @@
+# HARD YOLO without any package versioning... YMMV
+# the time of writing this was tested on debian12 bookwork cloud-init EFI image
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
   vars_files:
     - vars_kube.yaml
-  vars:
-    distribution: ubuntu22.04
-    nvidia_version: "515"
-    nvidia_apt_packages:
-      - "nvidia-utils-{{nvidia_version}}-server"
-      - "nvidia-driver-{{nvidia_version}}-server"
-      - nvidia-container-runtime
-      - nvidia-container-toolkit
-      - nvidia-modprobe
 
   tasks:
     - name: Driver and Patch
@@ -18,21 +11,16 @@
       when: nvidia_gpu is defined
 
       block:
-      - name: Stop services using driver
+      - name: Stop containerd / kubelet
         ansible.builtin.systemd:
           state: stopped
-          daemon_reload: true
-          name: "{{item}}"
+          name: "{{ item }}"
         ignore_errors: true
         with_items:
           - containerd
           - kubelet
 
-      - name: print debug
-        ansible.builtin.debug:
-          msg: "Installing {{nvidia_version}} driver"
-
-      - name: blacklist the nuevo driver
+      - name: Blacklist the nuevo driver
         ansible.builtin.copy:
           dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
           content: |
@@ -43,56 +31,79 @@
           group: root
           owner: root
 
-      - name: set kernel version
+      - name: Remove the nuevo module
+        ansible.builtin.command: rmmod nuevo
+        ignore_errors: true
+
+      - name: Nvidia GPG key
+        ansible.builtin.get_url:
+          url: https://nvidia.github.io/nvidia-container-runtime/gpgkey
+          dest: /usr/share/keyrings/nvidia-container-runtime.gpg
+
+      - name: Debian non-free repo
+        ansible.builtin.apt_repository:
+          filename: deb-nonfree.list
+          repo: deb http://deb.debian.org/debian/ bookworm main non-free-firmware contrib non-free
+          state: present
+
+      - name: Nvidia container runtime repo
+        # use copy here becuase multi-line was getting concat by apt_repo
+        ansible.builtin.copy:
+          dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
+          content: |
+            deb https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /
+            deb https://nvidia.github.io/libnvidia-container/stable/debian10/$(ARCH) /
+
+      - name: Set kernel version
         register: kernel_version
         ansible.builtin.shell:
           cmd: uname -r
 
-      - name: apt install kernel headers
+      - name: Apt install packages
         ansible.builtin.apt:
           update_cache: true
-          pkg: "linux-headers-{{kernel_version.stdout}}"
-
-      - name: add nvidia apt gpg key
-        ansible.builtin.apt_key:
-          url: "{{item}}"
-          state: present
+          pkg: "{{ item }}"
         with_items:
-        - https://nvidia.github.io/libnvidia-container/gpgkey
+        - "linux-headers-{{kernel_version.stdout}}"
+        - dkms
+        - nvidia-driver
+        - firmware-misc-nonfree
+        - nvidia-container-runtime
 
-      - name: nvidia-container-toolkit apt repo
-        ansible.builtin.get_url:
-          url: "https://nvidia.github.io/libnvidia-container/{{distribution}}/libnvidia-container.list"
-          dest: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      - name: Clone the Git Repository
+        git:
+          repo: https://github.com/keylase/nvidia-patch.git
+          dest: "{{ ansible_env.HOME }}/nvidia-patch"
 
-      - name: apt install nvidia packages
-        ansible.builtin.apt:
-          update_cache: true
-          force_apt_get: true
-          allow-unauthenticated: true
-          pkg: "{{nvidia_apt_packages}}"
 
-      - name: run nvidi-smi test
+      - name: Install keylase patch
+        register: kernel_version
+        ansible.builtin.shell:
+          cmd: sh -c ./patch.sh
+          chdir: "{{ ansible_env.HOME }}/nvidia-patch"
+
+      - name: Test the host nvidia-smi
         ignore_errors: true
         ansible.builtin.shell:
           cmd: nvidia-smi
 
       - name: Write Containerd config
-        ansible.builtin.copy:
-          force: yes
-          content: '{{ lookup("template", "files/containerd/default.toml.j2") }}'
-          dest: /etc/containerd/config.toml
+        ansible.builtin.shell:
+          cmd: containerd config default > /etc/containerd/config.toml
 
-      - name: update init ramfs
+      - name: Containerd Runtime change to nvidia-container-runtime
+        ansible.builtin.lineinfile:
+          path: /etc/containerd/config.toml
+          state: present
+          backrefs: true
+          regexp: '(\ +)runtime = "runc"'
+          line: '\g<1>runtime = "nvidia-container-runtime"'
+
+      - name: Update init ramfs
         ansible.builtin.shell:
           cmd: update-initramfs -u
 
-      - name: Re-start related services
-        ansible.builtin.systemd:
-          state: restarted
-          daemon_reload: true
-          name: "{{item}}"
-        ignore_errors: true
-        with_items:
-          - containerd
-          - kubelet
+      - name: Reboot target to really get changes
+        reboot:
+          reboot_timeout: 300
+
