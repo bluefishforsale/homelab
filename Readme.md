@@ -43,4 +43,19 @@ https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_conf
     port-channel load-balance 6 (slot/port  or all)
     exit
     write memory
+
 ```
+
+
+
+
+
+# AP inform controller
+ssh ubnt@<AP-IP>
+You will be prompted for a username and password. The default username is usually "ubnt," and the default password is also "ubnt."
+
+Once you're connected, run the "Set-Inform" command with the appropriate controller URL:
+
+plaintext
+Copy code
+set-inform http://<controller-IP>:8080/inform

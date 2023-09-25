@@ -189,7 +189,6 @@ for y in 1 2 3 ; do
 qm clone 9999 6${x}${y}
 qm set 6${x}${y} --name kube6${x}${y} --ipconfig0 ip=$(host kube6${x}${y}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
 qm set 6${x}${y} --sshkeys rsa.key
-# qm set 6${x}${y} --efidisk0 ceph-lvm:6${x}${y}-disk,efitype=4m
 qm resize 6${x}${y} scsi0 +18G  # 21.47G
 if [ $x = 0 ] ; then
     qm set 6${x}${y} --cores 4
@@ -219,3 +218,62 @@ for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |
 
 
 
+### Make OPNsense VM
+```
+qm create 1000 --name OPNsense-23.7-vga-amd64 --net0 virtio,bridge=vmbr0
+qm importdisk 1000 	OPNsense-23.7-vga-amd64.img ceph-lvm
+qm set 1000 --ide2 ceph-lvm:cloudinit
+qm set 1000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-1000-disk-0
+qm set 1000 --boot order='scsi0'
+qm set 1000 --serial0 socket --vga serial0
+qm set 1000 --sshkeys rsa.key
+qm set 1000 --ipconfig0 ip=192.168.1.4/24,gw=192.168.1.1 --nameserver=192.168.1.2
+qm set 1000 --hotplug network,disk
+qm set 1000 --bios ovmf
+qm set 1000 --machine q35
+qm set 1000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 1000 --cores 4
+qm set 1000 --memory 4096
+qm set 1000 --agent enabled=1
+qm resize 1000 scsi0 +6G
+```
+
+### Pihole VM
+```
+qm create 3000 --name pihole --net0 virtio,bridge=vmbr0
+qm importdisk 3000 	debian-12-generic-amd64.qcow2 ceph-lvm
+qm set 3000 --ide2 ceph-lvm:cloudinit
+qm set 3000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-3000-disk-0
+qm set 3000 --boot order='scsi0'
+qm set 3000 --serial0 socket --vga serial0
+qm set 3000 --sshkeys rsa.key
+qm set 3000 --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1 --nameserver=192.168.1.2
+qm set 3000 --hotplug network,disk
+qm set 3000 --bios ovmf
+qm set 3000 --machine q35
+qm set 3000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 3000 --cores 2
+qm set 3000 --memory 2048
+qm set 3000 --agent enabled=1
+qm resize 3000 scsi0 +6G
+```
+
+### dns01 VM
+```
+qm create 2000 --name dns01 --net0 virtio,bridge=vmbr0
+qm importdisk 2000 	debian-12-generic-amd64.qcow2 ceph-lvm
+qm set 2000 --ide2 ceph-lvm:cloudinit
+qm set 2000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-2000-disk-0
+qm set 2000 --boot order='scsi0'
+qm set 2000 --serial0 socket --vga serial0
+qm set 2000 --sshkeys rsa.key
+qm set 2000 --ipconfig0 ip=192.168.1.3/24,gw=192.168.1.1 --nameserver=1.1.1.1
+qm set 2000 --hotplug network,disk
+qm set 2000 --bios ovmf
+qm set 2000 --machine q35
+qm set 2000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 2000 --cores 2
+qm set 2000 --memory 2048
+qm set 2000 --agent enabled=1
+qm resize 2000 scsi0 +6G
+```
