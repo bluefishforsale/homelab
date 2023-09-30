@@ -220,19 +220,20 @@ for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |
 
 ### Make OPNsense VM
 ```
-qm create 1000 --name OPNsense-23.7-vga-amd64 --net0 virtio,bridge=vmbr0
-qm importdisk 1000 	OPNsense-23.7-vga-amd64.img ceph-lvm
+qm create 1000 --name OPNsense --net0 virtio,bridge=vmbr2  --net1 virtio,bridge=vmbr3
+qm set 1000 --ipconfig0 ip=192.168.1.10/24,gw=192.168.1.1 --nameserver=192.168.1.2
+qm importdisk 1000 debian-12-generic-amd64.qcow2 ceph-lvm
 qm set 1000 --ide2 ceph-lvm:cloudinit
 qm set 1000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-1000-disk-0
-qm set 1000 --boot order='scsi0'
+qm set 1000 --sata0 local:iso/OPNsense-23.7-serial-amd64.img
+qm set 1000 --boot order='sata0;scsi0'
 qm set 1000 --serial0 socket --vga serial0
 qm set 1000 --sshkeys rsa.key
-qm set 1000 --ipconfig0 ip=192.168.1.4/24,gw=192.168.1.1 --nameserver=192.168.1.2
 qm set 1000 --hotplug network,disk
 qm set 1000 --bios ovmf
 qm set 1000 --machine q35
 qm set 1000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-qm set 1000 --cores 4
+qm set 1000 --cores 2
 qm set 1000 --memory 4096
 qm set 1000 --agent enabled=1
 qm resize 1000 scsi0 +6G
@@ -241,7 +242,7 @@ qm resize 1000 scsi0 +6G
 ### Pihole VM
 ```
 qm create 3000 --name pihole --net0 virtio,bridge=vmbr0
-qm importdisk 3000 	debian-12-generic-amd64.qcow2 ceph-lvm
+qm importdisk 3000 debian-12-generic-amd64.qcow2 ceph-lvm
 qm set 3000 --ide2 ceph-lvm:cloudinit
 qm set 3000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-3000-disk-0
 qm set 3000 --boot order='scsi0'
@@ -261,7 +262,7 @@ qm resize 3000 scsi0 +6G
 ### dns01 VM
 ```
 qm create 2000 --name dns01 --net0 virtio,bridge=vmbr0
-qm importdisk 2000 	debian-12-generic-amd64.qcow2 ceph-lvm
+qm importdisk 2000 debian-12-generic-amd64.qcow2 ceph-lvm
 qm set 2000 --ide2 ceph-lvm:cloudinit
 qm set 2000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-2000-disk-0
 qm set 2000 --boot order='scsi0'
