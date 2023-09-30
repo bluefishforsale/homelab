@@ -173,7 +173,7 @@
 
         - name: Write Containerd config
           ansible.builtin.shell:
-            cmd: containerd config default > /etc/containerd/config.toml
+            cmd: cat -n /etc/containerd/config.toml | grep 201
 
         - name: Containerd Runtime change to nvidia-container-runtime
           when: nvidia_gpu is defined
@@ -181,7 +181,7 @@
             path: /etc/containerd/config.toml
             state: present
             backrefs: true
-            regexp: '(runtime = "runc")'
+            regexp: '(\ +)runtime = "runc"'
             line: '\g<1>runtime = "nvidia-container-runtime"'
 
         - name: Write systemd Startup
