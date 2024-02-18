@@ -8,46 +8,57 @@
     block:
 
     - name: Certificate Authority
-      ansible.builtin.shell: |
-        cmd:
+      ansible.builtin.shell:
+        cmd: |
           set -o pipefail
+          cd "{{ cfssl }}"
           cfssl gencert -initca ca-csr.json | cfssljson -bare ca
-        chdir: "{{ cfssl }}"
       args:
         creates: "{{ cfssl }}/ca.pem"
 
     - name: Admin Client Certificate
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
       args:
         creates: "{{ cfssl }}/admin.pem"
 
     - name: Controller Manager Client Certificate
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
-        chdir: "{{ cfssl }}"
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
       args:
         creates: "{{ cfssl }}/kube-controller-manager.pem"
 
     - name: Kube Proxy Client Certificate
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
-        chdir: "{{ cfssl }}"
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
       args:
         creates: "{{ cfssl }}/kube-proxy.pem"
 
     - name: Kube Aggregation Layer Certificate
 
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-aggregator-csr.json | cfssljson -bare kube-aggregator
-        chdir: "{{ cfssl }}"
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-aggregator-csr.json | cfssljson -bare kube-aggregator
       args:
         creates: "{{ cfssl }}/kube-aggregator.pem"
 
     - name: Scheduler Client Certificate
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
-        chdir: "{{ cfssl }}"
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
       args:
         creates: "{{ cfssl }}/kube-scheduler.pem"
 
@@ -71,18 +82,18 @@
     # kube apiserver has many names, some services will also be listed in the SAN
     - name: API Server Certificate
       ansible.builtin.shell:
-        cmd: >-
-          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json
-          -hostname=apiserver,{{HOST_IP['apiserver']}},127.0.0.1,{{ '.'.join(SERVICE_CLUSTER_IP_RANGE.split('.')[:3]) }}.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}},"metrics-server.kube-system.svc"
-          -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
-        chdir: "{{ cfssl }}"
+        cmd: |
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=apiserver,{{HOST_IP['apiserver']}},127.0.0.1,{{ '.'.join(SERVICE_CLUSTER_IP_RANGE.split('.')[:3]) }}.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}},"metrics-server.kube-system.svc" -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
       args:
         creates: "{{ cfssl }}/kubernetes.pem"
 
     - name: Service Account Key Pair
       ansible.builtin.shell:
-        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
-        chdir: "{{ cfssl }}"
+        cmd: |
+          set -o pipefail
+          cd "{{ cfssl }}"
+          cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
       args:
         creates: "{{ cfssl }}/service-account.pem"
 
