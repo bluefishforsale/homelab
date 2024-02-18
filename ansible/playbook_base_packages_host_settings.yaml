@@ -19,11 +19,12 @@
     apt: update_cache=yes
 
   - name: Install a suite of common tools
-    apt:
-      pkg: "{{ item }}"
+    shell:
+      cmd: "apt-get install -y {{ item }} ; sleep 3"
     with_items:
       [
-        bmon, cpufrequtils, curl, dnsutils, dstat, fping, golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+        dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
+        golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
         iptraf-ng, iputils-ping, jq, fail2ban,
         libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
@@ -332,6 +333,7 @@
         [Journal]
         Storage=none
         Compress=yes
+        LineMax=100K
         #Seal=yes
         #SplitMode=uid
         #SyncIntervalSec=5m
@@ -357,7 +359,6 @@
         #MaxLevelKMsg=noticsort | unique | @she
         #MaxLevelConsole=info
         #MaxLevelWall=emerg
-        LineMax=100K
         #ReadKMsg=yes
         #Audit=no
 

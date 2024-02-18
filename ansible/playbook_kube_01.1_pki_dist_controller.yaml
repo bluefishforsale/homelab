@@ -1,8 +1,9 @@
 - name: Kube 04.2 Dist PKI Contollers
   hosts: k8s_controller
   become: yes
-  vars:
-    k8s_dir: /var/lib/kubernetes
+  vars_files:
+    - vars_kube.yaml
+
   tasks:
   - name: Distribute the Certs made in previous steps
     block:

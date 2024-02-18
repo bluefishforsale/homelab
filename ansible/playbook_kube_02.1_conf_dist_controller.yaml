@@ -1,10 +1,9 @@
 - name: Kube 05.2 Dist Kubeconfigs Controllers
   hosts: k8s_controller
   become: yes
-  vars:
-    k8s_dir: /var/lib/kubernetes
   vars_files:
     - vars_kube.yaml
+
   tasks:
   - name: Distribute the files made in previous steps
     block:

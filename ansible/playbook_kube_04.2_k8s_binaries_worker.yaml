@@ -4,23 +4,8 @@
   vars_files:
     - vars_kube.yaml
   vars:
-    dirs:
-      cni:
-        conf: /etc/cni/net.d
-        bin: /opt/cni/bin
-      kubernetes:
-        conf: /etc/kubernetes/config
-        static: /etc/kubernetes/manifests
-        data: /var/lib/kubernetes
-        lock: /var/run/kubernetes
-      system:
-        bin: /usr/local/bin
-      kube-proxy:
-        data: /var/lib/kube-proxy
-    binaries:
-      - kube-proxy
-      - kubelet
-      - kubectl
+
+
 
   tasks:
 
@@ -35,7 +20,7 @@
         path: "{{item.value}}"
         state: directory
         mode: 0755
-      with_dict: "{{dirs.values()}}"
+      with_dict: "{{worker_dirs.values()}}"
 
 
 ############ CRI binaries
@@ -55,7 +40,7 @@
             keep_newer: yes
 
         - name: command because no mv available
-          command: mv "{{tmpdir_1.path}}/crictl" "{{dirs['system']['bin']}}/crictl"
+          command: mv "{{tmpdir_1.path}}/crictl" "{{worker_dirs['system']['bin']}}/crictl"
 
         - name: Cleanup
           file:
@@ -66,7 +51,7 @@
         - name: Installing runc
           get_url:
             url: https://github.com/opencontainers/runc/releases/download/v{{RUNC_VERSION}}/runc.amd64
-            dest: "{{dirs['system']['bin']}}/runc"
+            dest: "{{worker_dirs['system']['bin']}}/runc"
             mode: 0755
 
 ############ CNI-PLUGINS
@@ -74,7 +59,7 @@
           unarchive:
             remote_src: yes
             src: https://github.com/containernetworking/plugins/releases/download/v{{CNI_PLUGIN_VERSION}}/cni-plugins-linux-amd64-v{{CNI_PLUGIN_VERSION}}.tgz
-            dest: "{{dirs['cni']['bin']}}"
+            dest: "{{worker_dirs['cni']['bin']}}"
             keep_newer: yes
 
         - name: CNI Config Files
@@ -155,15 +140,15 @@
           register: cont_files
 
         - name: mv files to bindir
-          command: mv "{{item.path}}" "{{dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
+          command: mv "{{item.path}}" "{{worker_dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
           with_items:  "{{cont_files.files}}"
 
         - name: chown files
-          command: chown root:root "{{dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
+          command: chown root:root "{{worker_dirs['system']['bin']}}/{{item.path|basename}}-{{CONTAINERD_VERSION}}"
           with_items:  "{{cont_files.files}}"
 
         - name: ln files to bindir
-          command: ln -sf "{{dirs['system']['bin']}}//{{item.path|basename}}-{{CONTAINERD_VERSION}}" "{{dirs['system']['bin']}}//{{item.path|basename}}"
+          command: ln -sf "{{worker_dirs['system']['bin']}}//{{item.path|basename}}-{{CONTAINERD_VERSION}}" "{{worker_dirs['system']['bin']}}//{{item.path|basename}}"
           with_items:  "{{cont_files.files}}"
 
         - name: rm tempdir
@@ -173,7 +158,7 @@
 
         - name: Write Containerd config
           ansible.builtin.shell:
-            cmd: cat -n /etc/containerd/config.toml | grep 201
+            cmd: containerd config default > /etc/containerd/config.toml
 
         - name: Containerd Runtime change to nvidia-container-runtime
           when: nvidia_gpu is defined
@@ -227,9 +212,9 @@
         - name: "installing kubernetes {{version}}"
           get_url:
             url: "{{KUBE_URL}}/{{ item }}"
-            dest: "{{dirs['system']['bin']}}/{{ item }}"
+            dest: "{{worker_dirs['system']['bin']}}/{{ item }}"
             mode: 0755
-          with_items: "{{binaries}}"
+          with_items: "{{worker_binaries}}"
 
         - name: register gpu var
           set_fact:
@@ -277,4 +262,4 @@
             daemon_reload: true
           with_items:
             - kubelet
-            # - kube-proxy ## kube-proxy replaced with cilium
+            - kube-proxy ## kube-proxy replaced with cilium

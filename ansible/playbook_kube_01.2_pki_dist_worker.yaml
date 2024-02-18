@@ -3,6 +3,7 @@
   become: yes
   vars_files:
     - vars_kube.yaml
+
   tasks:
   - name: Distribute the Certs made in previous steps
     block:

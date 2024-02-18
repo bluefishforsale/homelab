@@ -45,11 +45,6 @@ https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_conf
     write memory
 
 ```
-
-
-
-
-
 # AP inform controller
 ssh ubnt@<AP-IP>
 You will be prompted for a username and password. The default username is usually "ubnt," and the default password is also "ubnt."

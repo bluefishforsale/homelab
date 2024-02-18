@@ -3,26 +3,19 @@
   become: yes
   vars_files:
     - vars_kube.yaml
+
   vars:
-    confpath: "/etc/etcd"
-    binpath: "/usr/local/bin"
-    datapath: "/var/lib/etcd"
-    org: etcd-io
-    repo: etcd
-    version: "v{{ETCD_VERSION}}"
-    filename: "{{repo}}-{{version}}-linux-amd64.tar.gz"
-    project_url: https://github.com/{{org}}/{{repo}}/releases/download/{{version}}/{{filename}}
 
   tasks:
     - name: Directories
       block:
 
-      - name: MKdir "{{confpath}}"
+      - name: MKdir "{{etcd_confpath}}"
         file:
-          path: "{{confpath}}"
+          path: "{{etcd_confpath}}"
           state: directory
           mode: 0755
-        with_items: [ "{{confpath}}", "{{datapath}}" ]
+        with_items: [ "{{etcd_confpath}}", "{{etcd_datapath}}" ]
 
       - name: create tempdir
         tempfile:
@@ -34,20 +27,20 @@
         copy:
           force: yes
           src: "files/cfssl/{{item}}"
-          dest: "{{confpath}}/{{item}}"
+          dest: "{{etcd_confpath}}/{{item}}"
           mode: 0755
         with_items:
           - ca.pem
           - kubernetes-key.pem
           - kubernetes.pem
 
-    - name: Download {{repo}} {{version}}
+    - name: Download {{etcd_repo}} {{etcd_version}}
       block:
 
-        - name: "installing {{ repo }} {{version}}"
+        - name: "installing {{ etcd_repo }} {{etcd_version}}"
           unarchive:
             remote_src: yes
-            src: "{{project_url}}"
+            src: "{{etcd_project_url}}"
             dest: "{{tempfolder_1.path}}"
             keep_newer: yes
             extra_opts:
@@ -61,15 +54,15 @@
           register: etcd_files
 
         - name: mv files to bindir
-          command: mv "{{item.path}}" "{{binpath}}/{{item.path|basename}}-{{version}}"
+          command: mv "{{item.path}}" "{{etcd_binpath}}/{{item.path|basename}}-{{etcd_version}}"
           with_items:  "{{etcd_files.files}}"
 
         - name: chown files
-          command: chown root:root "{{binpath}}/{{item.path|basename}}-{{version}}"
+          command: chown root:root "{{etcd_binpath}}/{{item.path|basename}}-{{etcd_version}}"
           with_items:  "{{etcd_files.files}}"
 
         - name: ln files to bindir
-          command: ln -sf "{{binpath}}/{{item.path|basename}}-{{version}}" "{{binpath}}/{{item.path|basename}}"
+          command: ln -sf "{{etcd_binpath}}/{{item.path|basename}}-{{etcd_version}}" "{{etcd_binpath}}/{{item.path|basename}}"
           with_items:  "{{etcd_files.files}}"
 
         - name: rm tempdir
@@ -77,7 +70,7 @@
             state: absent
             name: "{{tempfolder_1.path}}"
 
-    - name: Make the EtcD systemd File
+    - name: Make EtcD systemd service
       block:
         - name: Get IP for a subset of hosts, store in HOST_IP
           set_fact:
@@ -92,7 +85,7 @@
             index_var: index
 
         # Create the config file from template
-        - name: systemd Unit file
+        - name: systemd Unit file copy to target
           copy:
             force: yes
             dest: "/etc/systemd/system/etcd.service"
@@ -101,7 +94,7 @@
             group: root
             owner: root
 
-        - name: enable and restart etcd
+        - name: enable and restart etcd service
           systemd:
             name: etcd
             state: restarted

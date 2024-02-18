@@ -217,7 +217,6 @@ for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |
 ```
 
 
-
 ### Make OPNsense VM
 ```
 qm create 1000 --name OPNsense --net0 virtio,bridge=vmbr2  --net1 virtio,bridge=vmbr3
@@ -236,7 +235,7 @@ qm set 1000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size
 qm set 1000 --cores 2
 qm set 1000 --memory 4096
 qm set 1000 --agent enabled=1
-qm resize 1000 scsi0 +6G
+qm resize 1000 scsi0 +16G
 ```
 
 ### Pihole VM
@@ -256,7 +255,7 @@ qm set 3000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size
 qm set 3000 --cores 2
 qm set 3000 --memory 2048
 qm set 3000 --agent enabled=1
-qm resize 3000 scsi0 +6G
+qm resize 3000 scsi0 +18G
 ```
 
 ### dns01 VM
@@ -268,7 +267,7 @@ qm set 2000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-2000-disk-0
 qm set 2000 --boot order='scsi0'
 qm set 2000 --serial0 socket --vga serial0
 qm set 2000 --sshkeys rsa.key
-qm set 2000 --ipconfig0 ip=192.168.1.3/24,gw=192.168.1.1 --nameserver=1.1.1.1
+qm set 2000 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1 --nameserver=1.1.1.1
 qm set 2000 --hotplug network,disk
 qm set 2000 --bios ovmf
 qm set 2000 --machine q35
@@ -276,5 +275,5 @@ qm set 2000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size
 qm set 2000 --cores 2
 qm set 2000 --memory 2048
 qm set 2000 --agent enabled=1
-qm resize 2000 scsi0 +6G
+qm resize 2000 scsi0 +18G
 ```

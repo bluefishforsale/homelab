@@ -87,17 +87,17 @@
         ansible.builtin.shell:
           cmd: nvidia-smi
 
-      - name: Write Containerd config
-        ansible.builtin.shell:
-          cmd: containerd config default > /etc/containerd/config.toml
+      # - name: Write Containerd config
+      #   ansible.builtin.shell:
+      #     cmd: containerd config default > /etc/containerd/config.toml
 
-      - name: Containerd Runtime change to nvidia-container-runtime
-        ansible.builtin.lineinfile:
-          path: /etc/containerd/config.toml
-          state: present
-          backrefs: true
-          regexp: '(\ +)runtime = "runc"'
-          line: '\g<1>runtime = "nvidia-container-runtime"'
+      # - name: Containerd Runtime change to nvidia-container-runtime
+      #   ansible.builtin.lineinfile:
+      #     path: /etc/containerd/config.toml
+      #     state: present
+      #     backrefs: true
+      #     regexp: '(\ +)runtime = "runc"'
+      #     line: '\g<1>runtime = "nvidia-container-runtime"'
 
       - name: Update init ramfs
         ansible.builtin.shell:
@@ -105,5 +105,5 @@
 
       - name: Reboot target to really get changes
         reboot:
-          reboot_timeout: 300
+          reboot_timeout: 600  #10 mins is more than enough for a VM but might not be enough for real bare metal.
 

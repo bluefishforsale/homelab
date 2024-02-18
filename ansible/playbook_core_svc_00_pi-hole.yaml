@@ -1,26 +1,53 @@
 ---
-- name: pi-hole
-  hosts: dns
-
+- name: Install Pi-hole on Debian 12
+  hosts: pi-hole
+  become: yes
   tasks:
-  - name: pihole and config
-    become: yes
-    block:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
 
+    - name: Install prerequisites
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - procps
+        - lsb-release
 
-    - name: configs
-      copy:
-        force: yes
-        src: pihole/{{ item  }}
-        dest: /opt/docker/{{ item  }}
-        mode: 0644
-      with_items:
-        - /etc/systemd/system/pihole.service
-        - /opt/docker/pihole.compose
+    - name: Add Pi-hole repository
+      apt_repository:
+        repo: deb https://packages.pi-hole.net/debian {{ ansible_distribution_release }} main
+        state: present
+        filename: pihole
 
-    - name: Enable and Start service
-      systemd:
-        enabled: yes
+    - name: Install Pi-hole
+      apt:
+        name: pi-hole
+        state: present
+
+    - name: Configure Pi-hole
+      command: pihole -r
+      environment:
+        AUTO_INSTALL: 1
+
+    - name: Restart DNS and Web services
+      service:
+        name: "{{ item }}"
         state: restarted
-        name: pihole.service
-        daemon_reload: true
+        enabled: yes
+      loop:
+        - pihole-FTL
+        - lighttpd
+
+    - name: Enable Pi-hole at startup
+      systemd:
+        name: pihole-FTL
+        enabled: yes
+
+    - name: Set Pi-hole admin password
+      command: pihole -a -p "{{ your_admin_password }}"
+      environment:
+        PIHOLE_SKIP_OS_CHECK: 1
+      no_log: true
