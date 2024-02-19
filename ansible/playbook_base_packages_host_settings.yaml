@@ -2,6 +2,7 @@
   ignore_errors: true
   become: yes
   hosts: all
+  strategy: free
   vars_files:
     - vars_kube.yaml
   vars:
@@ -20,12 +21,12 @@
 
   - name: Install a suite of common tools
     shell:
-      cmd: "apt-get install -y {{ item }} ; sleep 3"
+      cmd: "apt-get install -y {{ item }} ; sleep 2"
     with_items:
       [
         dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
         golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-        iptraf-ng, iputils-ping, jq, fail2ban,
+        iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
         libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
         pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
       ]

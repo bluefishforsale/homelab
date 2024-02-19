@@ -1,5 +1,6 @@
 - name: Kube 08 Containerd, Kubelet, CNI
   hosts: k8s
+  strategy: free
   become: yes
   vars_files:
     - vars_kube.yaml

@@ -1,5 +1,6 @@
 - name: Kube 08 Kubernetes apiserver, controller-manager, scheduler
   hosts: k8s_controller
+  strategy: free
   become: yes
   vars_files:
     - vars_kube.yaml

@@ -1,5 +1,6 @@
 - name: Kube 06 Dist Encryption Config
   hosts: k8s_controller
+  strategy: free
   become: yes
   vars_files:
     - vars_kube.yaml
@@ -9,7 +10,7 @@
       copy:
         force: yes
         dest: "{{k8s_dir}}/{{item}}"
-        content: 'files/kube_encryption_conf/{{item}}.j2}}'
+        content: '{{ lookup("template", "files/kube_encryption_conf/{{item}}.j2") }}'
         mode: 0644
         group: root
         owner: root
