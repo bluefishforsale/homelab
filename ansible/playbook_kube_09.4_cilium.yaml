@@ -12,24 +12,24 @@
     cilium_org: cilium
     cilium_repo: cilium-cli
     cilium_version: "v0.16.4"
-    cilium_filename: "{{cilium_org}}-linux-amd64.tar.gz"
-    cilium_project_url: https://github.com/{{cilium_org}}/{{cilium_repo}}/releases/download/{{cilium_version}}/{{cilium_filename}}
+    cilium_filename: "{{ cilium_org }}-linux-amd64.tar.gz"
+    cilium_project_url: https://github.com/{{ cilium_org }}/{{ cilium_repo }}/releases/download/{{ cilium_version }}/{{ cilium_filename }}
 
   tasks:
-  - name: create tempdir
+  - name: Create tempdir
     ansible.builtin.tempfile:
       state: directory
       suffix: _dwnld
     register: tempfolder_1
 
-  - name: installing {{ cilium_repo }} {{cilium_version}}
+  - name: Installing {{ cilium_repo }} {{ cilium_version }}
     ansible.builtin.unarchive:
       remote_src: true
       src: "{{ cilium_project_url }}"
       dest: "{{ tempfolder_1.path }}"
       keep_newer: true
 
-  - name: mv files to bindir
+  - name: Mv files to bindir
     ansible.builtin.find:
       paths: "{{ tempfolder_1.path }}"
       patterns: "cilium*"
