@@ -3,9 +3,10 @@
 
 # ignore keys and cert requests
 *.csr
-*.pem
+kube601-key.pem
 
 # ansible tmp output
+output.txt
 
 # packer build files
 packer/mini.iso.1
