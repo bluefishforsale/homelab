@@ -19,7 +19,7 @@
         name: "{{item}}"
         group: "{{item}}"
         system: true
-        shell: /usr/bin/false
+        ansible.builtin.shell: /usr/bin/false
       with_items:
       - haproxy
       - keepalived
@@ -53,11 +53,20 @@
             - haproxy
             - keepalived
 
-        - name: install
-          ansible.builtin.apt:
-            name: [ haproxy, keepalived, psmisc ]
-            state: present
-            update_cache: yes
+        - name: kill any running apt-get process
+          ansible.builtin.shell: killall apt-get
+          ignore_errors: true
+
+        - name: Wait for /var/lib/dpkg/lock-frontend to be released
+          ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
+        - name: Install packages
+          apt: name={{ item }} state=latest
+          register: apt_status
+          until: apt_status is success
+          delay: 6
+          retries: 30
+          with_items: [ haproxy, keepalived, psmisc ]
 
         - name: write configs haproxy
           ansible.builtin.copy:

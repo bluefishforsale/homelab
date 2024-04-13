@@ -16,7 +16,7 @@
           [ bind9, bind9utils, dnsutils]
 
     - name: rndc-key-write
-      shell:
+      ansible.builtin.shell:
         creates: /etc/bind/rndc.key
         cmd: rndc-confgen -a -b 512
 
@@ -67,16 +67,16 @@
         - db.rev.1.168.192.in-addr.arpa
 
     - name: Config Check
-      shell: named-checkconf
+      ansible.builtin.shell: named-checkconf
 
     - name: Check home zone
-      shell: named-checkzone  home /var/lib/bind/home.zone
+      ansible.builtin.shell: named-checkzone  home /var/lib/bind/home.zone
 
     - name: Check reverse mapping zone
-      shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
+      ansible.builtin.shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
 
     - name: remove the jnl files before restart
-      shell: find /var/lib/bind -type f -name "*.jnl" -delete
+      ansible.builtin.shell: find /var/lib/bind -type f -name "*.jnl" -delete
 
     - name: Enable and Start service
       systemd:

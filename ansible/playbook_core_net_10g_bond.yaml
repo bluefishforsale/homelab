@@ -3,12 +3,12 @@
 
   tasks:
   - name: register interfaces carrier
-    shell: |
+    ansible.builtin.shell: |
       grep -l 1 /sys/class/net/e*/carrier | xargs -n1 dirname | xargs -n1 basename
     register: carrier_up
 
   - name: register interfaces speeds
-    shell: |
+    ansible.builtin.shell: |
       grep -v -- -1 /sys/class/net/e*/speed | sed -e 's/\// /g'
     register: iface_speed
 
@@ -25,7 +25,7 @@
   #     state: absent
 
   # - name: netplan apply
-  #   shell: >
+  #   ansible.builtin.shell: >
   #     netplan apply
 
   - name: 10g tc qdisc boot oneshot service

@@ -7,10 +7,21 @@
     github: bluefishforsale
 
   tasks:
+
+    - name: kill any running apt-get process
+      ansible.builtin.shell: killall apt-get
+      ignore_errors: true
+
+    - name: Wait for /var/lib/dpkg/lock-frontend to be released
+      ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
     - name: install zsh first
-      become: true
-      ansible.builtin.apt:
-        pkg: [ zsh, git, cron ]
+      apt: name={{ item }} state=latest
+      register: apt_status
+      until: apt_status is success
+      delay: 6
+      retries: 30
+      with_items: [ zsh, git, cron ]
 
     - name: Crontab to fetch ssh keys from github user
       become: true
@@ -47,7 +58,7 @@
         become: true
         ansible.builtin.user:
           name: "{{ ansible_user }}"
-          shell: /bin/zsh
+          ansible.builtin.shell: /bin/zsh
 
       - name: install powerlevel10k
         ansible.builtin.git:
@@ -136,7 +147,7 @@
     #   - name: Root Change user shell to zsh
     #     ansible.builtin.user:
     #       name: root
-    #       shell: /bin/zsh
+    #       ansible.builtin.shell: /bin/zsh
 
     #   - name: Root install powerlevel10k
     #     ansible.builtin.git:

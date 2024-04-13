@@ -13,23 +13,38 @@
   #####################################################
   - name: set kernel version
     register: kernel_version
-    shell:
+    ansible.builtin.shell:
       cmd: uname -r
 
-  - name: apt-get update
-    apt: update_cache=yes
+  - name: update cache once
+    ansible.builtin.apt:
+      update_cache: true
+
+  - name: update cache once
+    ansible.builtin.shell:
+      cmd: sleep 5
+
+  - name: kill any running apt-get process
+    ansible.builtin.shell: killall apt-get
+    ignore_errors: true
+
+  - name: Wait for /var/lib/dpkg/lock-frontend to be released
+    ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
 
   - name: Install a suite of common tools
-    shell:
-      cmd: "apt-get install -y {{ item }} ; sleep 2"
+    apt: name={{ item }} state=latest
+    register: apt_status
+    until: apt_status is success
+    delay: 6
+    retries: 30
     with_items:
-      [
-        dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
-        golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-        iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
-        libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
-        pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
-      ]
+       [
+          dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
+          golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+          iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
+          libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
+          pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
+        ]
 
   - name: Glances has issues installing on some platforms
     ignore_errors: true
@@ -37,7 +52,7 @@
       pkg: glances
 
   - name: old_paths
-    shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
+    ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
     register: old_paths
 
   - name: add go to the environment PATH
@@ -63,7 +78,12 @@
       mode: 0644
 
   - name: set time and date from NTP upstream
-    shell: /usr/sbin/ntpdate time.nist.gov
+    ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
+
+  - name: make /etc/rsyslog.d/
+    ansible.builtin.file:
+      path: /etc/rsyslog.d/
+      state: directory
 
   - name: rsyslog drop IPVS no route messages
     copy:
@@ -150,7 +170,7 @@
         net.ipv4.conf.lxc*.rp_filter = 0
 
   - name: sysctl reload
-    shell: sysctl --system
+    ansible.builtin.shell: sysctl --system
 
   - name: Write io-scheduler script
     copy:

@@ -3,7 +3,7 @@
   tasks:
 
   - name: register interfaces carrier
-    shell: |
+    ansible.builtin.shell: |
       grep -l 1 /sys/class/net/e*/carrier | xargs -n1 dirname | xargs -n1 basename
     register: carrier_up
 
@@ -17,7 +17,7 @@
       msg: "{{interfaces}}"
 
   - name: register interfaces speeds
-    shell: |
+    ansible.builtin.shell: |
       grep -v -- -1 /sys/class/net/e*/speed | sed -e 's/\// /g' | xargs -n1 | egrep '(eth|speed)' | sed -e 's/speed://g' | xargs -n2
     register: iface_speed
 

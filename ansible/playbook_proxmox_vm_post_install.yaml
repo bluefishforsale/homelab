@@ -17,13 +17,21 @@
   #     repo: 'deb https://deb.debian.org/debian buster-backports main contrib non-free'
   #     filename: /etc/apt/sources.list.d/backports.list
 
-  - name: install some proxmox packages
-    apt:
-      update_cache: true
-      force_apt_get: true
-      allow-unauthenticated: true
-      pkg:
-      - qemu-guest-agent
+    - name: kill any running apt-get process
+      ansible.builtin.shell: killall apt-get
+      ignore_errors: true
+
+    - name: Wait for /var/lib/dpkg/lock-frontend to be released
+      ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
+    - name: install some proxmox packages
+      ansible.builtin.shell: name={{ item }} state=latest
+      register: apt_status
+      until: apt_status is success
+      delay: 6
+      retries: 30
+      with_items: [ qemu-guest-agent]
+
 
   # - name: upgrade to 5.10 kernel
   #   apt:

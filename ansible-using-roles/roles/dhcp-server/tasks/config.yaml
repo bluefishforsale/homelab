@@ -2,7 +2,7 @@
     block:
 
     - name: RNDC-key-check
-      shell: cat /etc/bind/rndc.key
+      ansible.builtin.shell: cat /etc/bind/rndc.key
       register: rndc_keyfile
 
     - name: RNDC-key-copy

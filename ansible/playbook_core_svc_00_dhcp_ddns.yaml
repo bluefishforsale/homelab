@@ -15,7 +15,7 @@
           [ isc-dhcp-server ]
 
     - name: rndc-key-check
-      shell: cat /etc/bind/rndc.key
+      ansible.builtin.shell: cat /etc/bind/rndc.key
       register: rndc_keyfile
 
     - name: Failed rndc check
@@ -36,7 +36,7 @@
 
     - name: rndc-key-copy
       when: rndc_keyfile.stdout | length > 0
-      shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
+      ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
 
     - name: Config files
       copy:
@@ -54,7 +54,7 @@
 
     - name: remove LSB init
       ignore_errors: True
-      shell: rm /etc/init.d/isc-dhcp-server
+      ansible.builtin.shell: rm /etc/init.d/isc-dhcp-server
 
 
     - name: Enable and Start service

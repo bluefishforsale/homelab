@@ -85,7 +85,7 @@
           replace: '#\1'
 
       - name: swapp-off command for current boot
-        shell: swapoff -a
+        ansible.builtin.shell: swapoff -a
 
       - name: Container Modules
         copy:
@@ -96,7 +96,7 @@
             br_netfilter
 
       - name: Live Modprobe
-        shell:
+        ansible.builtin.shell:
           cmd: modprobe "{{item}}"
         with_items: [overlay, br_netfilter]
 
@@ -109,7 +109,7 @@
             net.bridge.bridge-nf-call-ip6tables = 1
 
       - name: sysctl reload
-        shell: sysctl --system
+        ansible.builtin.shell: sysctl --system
 
 ################# Containerd
     - name: "Containerd"
@@ -206,9 +206,20 @@
     - name: Kubelet and Kube-proxy
       block:
 
+        - name: kill any running apt-get process
+          ansible.builtin.shell: killall apt-get
+          ignore_errors: true
+
+        - name: Wait for /var/lib/dpkg/lock-frontend to be released
+          ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
         - name: Worker Apt Packages
-          apt:
-            pkg: [ socat, conntrack, ipset, nfs-common]
+          ansible.builtin.shell: name={{ item }} state=latest
+          register: apt_status
+          until: apt_status is success
+          delay: 6
+          retries: 30
+          with_items: [ socat, conntrack, ipset, nfs-common]
 
         - name: "installing kubernetes {{version}}"
           get_url:
@@ -263,4 +274,4 @@
             daemon_reload: true
           with_items:
             - kubelet
-            - kube-proxy ## kube-proxy replaced with cilium
+            # - kube-proxy ## kube-proxy replaced with cilium

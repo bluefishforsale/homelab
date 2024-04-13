@@ -3,7 +3,7 @@
 
       # Make variables for the Kubernetes configfile
       - name: Get IP for a subset of hosts, store in PEERS_IP
-        shell:
+        ansible.builtin.shell:
           cmd: ip route | awk '(/default/){print $5}'
         register: iface
 

@@ -19,6 +19,15 @@ etcd_version: "v{{ETCD_VERSION}}"
 etcd_filename: "{{etcd_repo}}-{{etcd_version}}-linux-amd64.tar.gz"
 etcd_project_url: https://github.com/{{etcd_org}}/{{etcd_repo}}/releases/download/{{etcd_version}}/{{etcd_filename}}
 
+# cilium
+cilium_binpath: "/usr/local/bin"
+cilium_datapath: "/var/lib/cilium"
+cilium_org: cilium
+cilium_repo: cilium-cli
+cilium_version: "v0.16.4"
+cilium_filename: "{{cilium_org}}-linux-amd64.tar.gz"
+cilium_project_url: https://github.com/{{cilium_org}}/{{cilium_repo}}/releases/download/{{cilium_version}}/{{cilium_filename}}
+
 # k8s control plane
 controller_confpath: "/etc/kubernetes/config"
 controller_instpath: "/usr/local/bin"
@@ -73,7 +82,6 @@ KUBE_CLUSER_NAME: "k8s"
 KUBECONFIG: "kubeconfig"
 KUBE_VERSION: "v1.27.4"
 
-
 # Kube networking
 kubeconfig: "files/kubeconf"
 k8s_dir: /var/lib/kubernetes
@@ -82,6 +90,15 @@ KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kuberne
 APISERVER: "apiserver"
 SYSLOG: "192.168.1.65"
 APISERVER_IP: ""
-CLUSTER_CIDR: "10.244.0.0/16"
+CLUSTER_CIDR: "10.0.0.0/16"
+# due to the way the PodCIDR for the kubelet is configured, this must not be larger than /24 right not
+# the last octet of the IP address as the 3rd octet of the kubernetes pod cidr eg kube601 = 192.168.1.65 = podCIDR 10.0.65.0
+# and since the DNS and IP mappings are for sequential IP addresses this limits us to /24 for each node podCIDR
+# cilium companion to this :https://github.com/bluefishforsale/homelab-kube/blob/master/charts/cilium/values.yaml#L1688-L1689
+# kubelet compantion to this : https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L18
 POD_NETMASK: "24"
-SERVICE_CLUSTER_IP_RANGE: "10.32.0.0/24"
+SERVICE_CLUSTER_IP_RANGE: "10.0.0.0/24"
+# this maps to an IP address in the kubelet config and coreDNS pod
+# https://github.com/bluefishforsale/homelab-argocd/blob/master/charts/coredns/values.yaml#L70
+# https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L13-L14
+CLUSTER_DNS:  "10.0.0.10"

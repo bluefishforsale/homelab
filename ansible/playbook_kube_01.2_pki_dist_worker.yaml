@@ -26,6 +26,8 @@
         group: root
         owner: root
       with_items:
+        - admin.pem
+        - admin-key.pem
         - ca.pem
         - "{{inventory_hostname}}-key.pem"
         - "{{inventory_hostname}}.pem"

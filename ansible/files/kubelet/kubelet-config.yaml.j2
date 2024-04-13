@@ -11,7 +11,7 @@ authentication:
     clientCAFile: "{{pki_dir}}/ca.pem"
 clusterDomain: "cluster.local"
 clusterDNS:
-  - "10.32.0.10"
+  - "{{ CLUSTER_DNS }}"
 registerNode: true
 containerRuntimeEndpoint: unix:///var/run/containerd/containerd.sock
 cgroupDriver: "systemd"

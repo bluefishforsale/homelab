@@ -20,7 +20,7 @@
 
     - name: Certificate Authority
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
         chdir: "{{ cfssl }}"
       args:
@@ -29,7 +29,7 @@
 
     - name: The Admin Client Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
         chdir: "{{ cfssl }}"
       args:
@@ -37,7 +37,7 @@
 
     - name: Controller Manager Client Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
         chdir: "{{ cfssl }}"
       args:
@@ -45,7 +45,7 @@
 
     - name: Kube Proxy Client Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
         chdir: "{{ cfssl }}"
       args:
@@ -53,7 +53,7 @@
 
     - name: Kube Aggregation Layer Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-aggregator-csr.json | cfssljson -bare kube-aggregator
         chdir: "{{ cfssl }}"
       args:
@@ -61,7 +61,7 @@
 
     - name: Scheduler Client Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
         chdir: "{{ cfssl }}"
       args:
@@ -87,7 +87,7 @@
     # kube apiserver has many names, some services will also be listed in the SAN
     - name: API Server Certificate
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: >-
           cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json
           -hostname=apiserver,{{HOST_IP['apiserver']}},127.0.0.1,{{ '.'.join(SERVICE_CLUSTER_IP_RANGE.split('.')[:3]) }}.1,{{KUBERNETES_HOSTNAMES}},{{PEERS_MAP}},"metrics-server.kube-system.svc"
@@ -98,7 +98,7 @@
 
     - name: Service Account Key Pair
       delegate_to: localhost
-      shell:
+      ansible.builtin.shell:
         cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
         chdir: "{{ cfssl }}"
       args:

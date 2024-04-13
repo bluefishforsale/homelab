@@ -3,10 +3,22 @@
   hosts: all
   tasks:
 
+
+
+    - name: kill any running apt-get process
+      ansible.builtin.shell: killall apt-get
+      ignore_errors: true
+
+    - name: Wait for /var/lib/dpkg/lock-frontend to be released
+      ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
     - name: install unattended-upgrade package
-      apt:
-        pkg: unattended-upgrades
-        state: present
+      apt: name={{ item }} state=latest
+      register: apt_status
+      until: apt_status is success
+      delay: 6
+      retries: 30
+      with_items: [ unattended-upgrades ]
 
     - name: unattended upgrade
       command: unattended-upgrade

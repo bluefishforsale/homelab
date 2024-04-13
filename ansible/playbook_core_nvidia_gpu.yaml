@@ -1,5 +1,4 @@
-# HARD YOLO without any package versioning... YMMV
-# the time of writing this was tested on debian12 bookwork cloud-init EFI image
+---
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
   vars_files:
@@ -31,6 +30,38 @@
           group: root
           owner: root
 
+
+      # - name: Debian non-free repo
+      #   ansible.builtin.apt_repository:
+      #     filename: deb-nonfree.list
+      #     repo: deb http://deb.debian.org/debian/ bookworm main non-free-firmware contrib non-free
+      #     state: present
+
+      - name: kill any running apt-get process
+        ansible.builtin.shell: killall apt-get
+        ignore_errors: true
+
+      - name: Wait for /var/lib/dpkg/lock-frontend to be released
+        ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
+      - name: Apt install packages
+        apt: name={{ item }} state=latest
+        register: apt_status
+        until: apt_status is success
+        delay: 6
+        retries: 30
+        with_items: [ software-properties-common ]
+
+      - name: Add contrib and non-free repositories
+        ansible.builtin.command:
+          cmd: "apt-add-repository -yn contrib non-free"
+        register: debian_repo
+        changed_when: "'Added' in repo_add.stdout"
+      - name: Update apt cache after adding repositories
+        ansible.builtin.apt:
+          update_cache: yes
+        when: product_repo.changed or debian_repo.changed
+
       - name: Remove the nuevo module
         ansible.builtin.command: rmmod nuevo
         ignore_errors: true
@@ -39,12 +70,6 @@
         ansible.builtin.get_url:
           url: https://nvidia.github.io/nvidia-container-runtime/gpgkey
           dest: /usr/share/keyrings/nvidia-container-runtime.gpg
-
-      - name: Debian non-free repo
-        ansible.builtin.apt_repository:
-          filename: deb-nonfree.list
-          repo: deb http://deb.debian.org/debian/ bookworm main non-free-firmware contrib non-free
-          state: present
 
       - name: Nvidia container runtime repo
         # use copy here becuase multi-line was getting concat by apt_repo
@@ -60,27 +85,44 @@
           cmd: uname -r
 
       - name: Apt install packages
-        ansible.builtin.apt:
-          update_cache: true
-          pkg: "{{ item }}"
-        with_items:
-        - "linux-headers-{{kernel_version.stdout}}"
-        - dkms
-        - nvidia-driver
-        - firmware-misc-nonfree
-        - nvidia-container-runtime
+        apt: name={{ item }} state=latest
+        register: apt_status
+        until: apt_status is success
+        delay: 6
+        retries: 30
+        with_items: [ "linux-headers-{{kernel_version.stdout}}", dkms]
+
+      # - name: Nvidia GPG key
+      #   ansible.builtin.get_url:
+      #     url: https://nvidia.github.io/nvidia-container-runtime/gpgkey
+      #     dest: /usr/share/keyrings/nvidia-container-runtime.gpg
+
+      # - name: Nvidia container runtime repo
+      #   # use copy here becuase multi-line was getting concat by apt_repo
+      #   ansible.builtin.copy:
+      #     dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
+      #     content: |
+      #       deb https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /
+      #       deb https://nvidia.github.io/libnvidia-container/stable/debian10/$(ARCH) /
+
+      - name: Apt install packages
+        apt: name={{ item }} state=latest
+        register: apt_status
+        until: apt_status is success
+        delay: 6
+        retries: 30
+        with_items [ nvidia-driver,  nvidia-container-runtime ]
 
       - name: Clone the Git Repository
         git:
           repo: https://github.com/keylase/nvidia-patch.git
           dest: "{{ ansible_env.HOME }}/nvidia-patch"
 
-
-      - name: Install keylase patch
-        register: kernel_version
-        ansible.builtin.shell:
-          cmd: sh -c ./patch.sh
-          chdir: "{{ ansible_env.HOME }}/nvidia-patch"
+      # - name: Install keylase patch
+      #   register: kernel_version
+      #   ansible.builtin.shell:
+      #     cmd: sh -c ./patch.sh
+      #     chdir: "{{ ansible_env.HOME }}/nvidia-patch"
 
       - name: Test the host nvidia-smi
         ignore_errors: true

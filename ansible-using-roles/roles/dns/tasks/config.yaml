@@ -7,7 +7,7 @@
 
       # this is used to validate dhcp records
       - name: rndc-key-write
-        shell:
+        ansible.builtin.shell:
           creates: /etc/bind/rndc.key
           cmd: rndc-confgen -a -b 512
 

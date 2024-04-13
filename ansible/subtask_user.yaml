@@ -8,7 +8,7 @@
 
   - name: check for user
     changed_when: false
-    shell: id "{{ user.name }}"
+    ansible.builtin.shell: id "{{ user.name }}"
     register: user_exists
 
   - name: Add required base users
@@ -16,7 +16,7 @@
     user:
       name: "{{ user.name }}"
       comment: "{{ user.First user.Last}}"
-      shell: /bin/zsh
+      ansible.builtin.shell: /bin/zsh
       group: "{{ user.name }}"
       groups: "{{ user.groups }}"
       append: yes

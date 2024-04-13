@@ -13,5 +13,5 @@
 
   - name: Create the system:kube-apiserver-to-kubelet ClusterRole / ClusterRoleBinding
     ignore_errors: true
-    shell:
+    ansible.builtin.shell:
       cmd: kubectl apply --kubeconfig "{{pki_dir}}/admin.kubeconfig" -f "{{pki_dir}}/kube-apiserver-to-kubelet.yaml"

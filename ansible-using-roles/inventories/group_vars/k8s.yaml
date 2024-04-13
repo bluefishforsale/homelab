@@ -20,6 +20,6 @@ KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kuberne
 APISERVER: "apiserver"
 SYSLOG: "192.168.1.65"
 APISERVER_IP: ""
-CLUSTER_CIDR: "10.244.0.0/16"
+CLUSTER_CIDR: "10.0.0.0/16"
 POD_NETMASK: "24"
 SERVICE_CLUSTER_IP_RANGE: "10.32.0.0/24"

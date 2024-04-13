@@ -13,7 +13,7 @@
   - name: Change user shell to zsh
     ansible.builtin.user:
       name: "{{ login_user.stdout }}"
-      shell: /bin/zsh
+      ansible.builtin.shell: /bin/zsh
 
   - name: Mkdir conf & glances
     ansible.builtin.file:
