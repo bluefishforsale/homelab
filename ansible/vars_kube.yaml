@@ -19,14 +19,6 @@ etcd_version: "v{{ETCD_VERSION}}"
 etcd_filename: "{{etcd_repo}}-{{etcd_version}}-linux-amd64.tar.gz"
 etcd_project_url: https://github.com/{{etcd_org}}/{{etcd_repo}}/releases/download/{{etcd_version}}/{{etcd_filename}}
 
-# cilium
-cilium_binpath: "/usr/local/bin"
-cilium_datapath: "/var/lib/cilium"
-cilium_org: cilium
-cilium_repo: cilium-cli
-cilium_version: "v0.16.4"
-cilium_filename: "{{cilium_org}}-linux-amd64.tar.gz"
-cilium_project_url: https://github.com/{{cilium_org}}/{{cilium_repo}}/releases/download/{{cilium_version}}/{{cilium_filename}}
 
 # k8s control plane
 controller_confpath: "/etc/kubernetes/config"

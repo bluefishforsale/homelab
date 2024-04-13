@@ -1,6 +1,6 @@
 - name: Kube 04.2 Dist PKI Workers
   hosts: k8s
-  strategy: free
+  strategy: linear
   become: yes
   vars_files:
     - vars_kube.yaml

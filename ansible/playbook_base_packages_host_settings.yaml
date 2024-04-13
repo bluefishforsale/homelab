@@ -2,7 +2,7 @@
   ignore_errors: true
   become: yes
   hosts: all
-  strategy: free
+  strategy: linear
   vars_files:
     - vars_kube.yaml
   vars:
@@ -40,23 +40,18 @@
     with_items:
        [
           dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
-          golang, gpg, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+          golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
           iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
           libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
           pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
         ]
-
-  - name: Glances has issues installing on some platforms
-    ignore_errors: true
-    apt:
-      pkg: glances
 
   - name: old_paths
     ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
     register: old_paths
 
   - name: add go to the environment PATH
-    lineinfile:
+    ansible.builtin.lineinfile:
       path: /etc/environment
       state: present
       backrefs: yes
@@ -69,7 +64,7 @@
       name: America/Los_Angeles
 
   - name: copy ntpdate cron
-    copy:
+    ansible.builtin.copy:
       force: yes
       src: files/crons/ntpdate
       dest: /etc/cron.d/ntpdate
@@ -77,23 +72,23 @@
       group: root
       mode: 0644
 
-  - name: set time and date from NTP upstream
+  - name: Set time and date from NTP upstream
     ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
 
-  - name: make /etc/rsyslog.d/
+  - name: Make /etc/rsyslog.d/
     ansible.builtin.file:
       path: /etc/rsyslog.d/
       state: directory
 
   - name: rsyslog drop IPVS no route messages
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
       content: |
         :msg, regex, ".*IPVS.*no destination available" ~
 
-  - name: rsyslog remote server
-    copy:
+  - name: Rsyslog remote server
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/rsyslog.d/99-remote-syslog.conf"
       content: |
@@ -102,8 +97,8 @@
         action(type="mmutf8fix" replacementChar="?")
         action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
-  - name: systemd-udev MAC link
-    copy:
+  - name: Systemd-udev MAC link
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/network/99-default.link"
       content: |
@@ -111,8 +106,8 @@
         NamePolicy=kernel database onboard slot path
         MACAddressPolicy=persistent
 
-  - name: increase file limits
-    copy:
+  - name: Increase file limits
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/security/limits.conf"
       mode: 0644
@@ -120,7 +115,7 @@
         # put stuff here
 
   - name: Sysctl Tunings
-    copy:
+    ansible.builtin.copy:
       dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
       content: |
         # allow binding to interfaces not yet up (haproxy/keepalived)
@@ -169,11 +164,11 @@
         # https://github.com/cilium/cilium/issues/10645
         net.ipv4.conf.lxc*.rp_filter = 0
 
-  - name: sysctl reload
+  - name: Sysctl reload
     ansible.builtin.shell: sysctl --system
 
   - name: Write io-scheduler script
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/system/io-scheduler.sh"
       mode: 0755
@@ -189,7 +184,7 @@
         done
 
   - name: Write io-scheduler service
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/system/io-scheduler.service"
       content: |
@@ -207,7 +202,7 @@
         WantedBy=multi-user.target
 
   - name: Write blockdev readahead service
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/system/blockdev-setra.service"
       content: |
@@ -223,14 +218,14 @@
         WantedBy=multi-user.target
 
   - name: Write cpufrequtils GOVERNOR
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: /etc/default/cpufrequtils
       mode: 0644
       content: GOVERNOR="powersave"
 
   - name: Write cpu-performance script
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/system/cpu-performance.sh"
       mode: 0755
@@ -240,7 +235,7 @@
         done
 
   - name: Write cpu-performance service
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/system/cpu-performance.service"
       content: |
@@ -258,7 +253,7 @@
         WantedBy=multi-user.target
 
   - name: TEMP disable services
-    systemd:
+    ansible.builtin.systemd:
       name: "{{item}}"
       state: stopped
       enabled: false
@@ -266,8 +261,8 @@
     with_items:
     - cpu-performance
 
-  - name: enable and restart performance services
-    systemd:
+  - name: Enable and restart performance services
+    ansible.builtin.systemd:
       name: "{{item}}"
       state: restarted
       enabled: true
@@ -285,15 +280,15 @@
     block:
 
     - name: print debug
-      debug:
+      ansible.builtin.debug:
         msg: "APC UPSd software and config"
 
     - name: Install a suite of common tools
-      apt:
+      ansible.builtin.apt:
         pkg: [apcupsd]
 
     - name: APCUPSd config
-      copy:
+      ansible.builtin.copy:
         force: yes
         dest: "/etc/apcupsd/apcupsd.conf"
         content: |
@@ -305,14 +300,14 @@
           POLLTIME 60
 
     - name: UPSd /etc/default
-      copy:
+      ansible.builtin.copy:
         force: yes
         dest: "/etc/default/apcupsd"
         content: |
           ISCONFIGURED=yes
 
     - name: min time left script
-      copy:
+      ansible.builtin.copy:
         force: yes
         mode: 0755
         dest: "/etc/apcupsd/runlimit"
@@ -324,14 +319,14 @@
           shutdown -h now
 
     - name: enable and restart services
-      systemd:
+      ansible.builtin.systemd:
         name: apcupsd
         state: restarted
         enabled: true
         daemon_reload: true
 
   - name: Write journald config
-    copy:
+    ansible.builtin.copy:
       force: yes
       dest: "/etc/systemd/journald.conf"
       content: |
@@ -384,7 +379,7 @@
         #Audit=no
 
   - name: enable and restart systemd-journald
-    systemd:
+    ansible.builtin.systemd:
       name: systemd-journald.service
       state: restarted
       enabled: true

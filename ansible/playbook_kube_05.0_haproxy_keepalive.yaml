@@ -1,14 +1,14 @@
 - name: Kube 07 Haproxy keepalived
   hosts: k8s_controller
-  strategy: free
-  become: yes
+  strategy: linear
+  become: true
   vars_files:
     - vars_kube.yaml
 
   tasks:
     - name: HAproxy and Keepalived group
       ansible.builtin.group:
-        name: "{{item}}"
+        name: "{{ item }}"
       with_items:
       - haproxy
       - keepalived
@@ -16,10 +16,10 @@
 
     - name: HAproxy and Keepalived users
       ansible.builtin.user:
-        name: "{{item}}"
-        group: "{{item}}"
+        name: "{{ item }}"
+        group: "{{ item }}"
         system: true
-        ansible.builtin.shell: /usr/bin/false
+        shell: /usr/bin/false
       with_items:
       - haproxy
       - keepalived
@@ -40,20 +40,20 @@
         HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
       loop: "{{ groups['k8s_controller'] }}"
 
-    - name: haproxy + keepalive
+    - name: Haproxy + keepalive
       block:
         - name: config
           ansible.builtin.file:
-            path: "/etc/{{item}}"
+            path: "/etc/{{ item }}"
             state: directory
-            mode: 0755
+            mode: "0755"
             owner: haproxy
             group: haproxy
           with_items:
             - haproxy
             - keepalived
 
-        - name: kill any running apt-get process
+        - name: Kill any running apt-get process
           ansible.builtin.shell: killall apt-get
           ignore_errors: true
 
@@ -61,37 +61,37 @@
           ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
 
         - name: Install packages
-          apt: name={{ item }} state=latest
+          ansible.builtin.apt: name={{ item }} state=latest
           register: apt_status
           until: apt_status is success
           delay: 6
           retries: 30
           with_items: [ haproxy, keepalived, psmisc ]
 
-        - name: write configs haproxy
+        - name: Write configs haproxy
           ansible.builtin.copy:
-            force: yes
+            force: true
             dest: "/etc/haproxy/haproxy.cfg"
             content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
-            mode: 0644
+            mode: "0644"
             owner: haproxy
             group: haproxy
 
-        - name: write configs keepalived
+        - name: Write configs keepalived
           ansible.builtin.copy:
             force: true
             dest: "/etc/keepalived/keepalived.conf"
             content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
-            mode: 0644
+            mode: "0644"
             owner: haproxy
             group: haproxy
 
-        - name: write haproxy / keepalived systemd services
+        - name: Write haproxy / keepalived systemd services
           ansible.builtin.copy:
             force: true
-            dest: "/etc/systemd/system/{{item}}.service"
-            content: '{{ lookup("template", "files/{{item}}/{{item}}.service.j2") }}'
-            mode: 0644
+            dest: "/etc/systemd/system/{{ item }}.service"
+            content: '{{ lookup("template", "files/{{ item }}/{{ item }}.service.j2") }}'
+            mode: "0644"
             owner: root
             group: root
           with_items:
@@ -106,14 +106,14 @@
             comment: INPUT-VRRP
 
         - name: reset failed
-          ansible.builtin.shell: systemctl reset-failed "{{item}}"
+          ansible.builtin.shell: systemctl reset-failed "{{ item }}"
           with_items:
             - keepalived.service
             - haproxy.service
 
         - name: enable and start
           ansible.builtin.systemd:
-            name: "{{item}}"
+            name: "{{ item }}"
             state: restarted
             enabled: true
             daemon_reload: true

@@ -1,6 +1,6 @@
 - name: Kube 05.2 Dist Kubeconfigs Workers
   hosts: k8s
-  strategy: free
+  strategy: linear
   become: yes
   vars_files:
     - vars_kube.yaml
