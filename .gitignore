@@ -1,5 +1,12 @@
-packer/mini.iso.1
-packer/http/preseed.cfg.bak
-ansible/output.*
+# macOS files
+.DS_Store
+
+# ignore keys and cert requests
 *.csr
 *.pem
+
+# ansible tmp output
+
+# packer build files
+packer/mini.iso.1
+packer/http/preseed.cfg.bak
