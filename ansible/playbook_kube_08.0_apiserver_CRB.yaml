@@ -6,8 +6,8 @@
     - vars_kube.yaml
   tasks:
   - name: "Copy over kube-apiserver-to-kubelet.yaml"
-    copy:
-      force: yes
+    ansible.builtin.copy:
+      force: true
       dest: "{{pki_dir}}/kube-apiserver-to-kubelet.yaml"
       src: "files/kubelet/kube-apiserver-to-kubelet.yaml"
 
