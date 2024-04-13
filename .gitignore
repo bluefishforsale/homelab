@@ -1,3 +1,5 @@
 packer/mini.iso.1
 packer/http/preseed.cfg.bak
 ansible/output.*
+**/*.csr
+**/*.pem
