@@ -17,20 +17,52 @@
   #     repo: 'deb https://deb.debian.org/debian buster-backports main contrib non-free'
   #     filename: /etc/apt/sources.list.d/backports.list
 
-    - name: kill any running apt-get process
-      ansible.builtin.shell: killall apt-get
-      ignore_errors: true
+  ############  fix dpkg if things went sideways #####################
+  - name: Killall fuser
+    command: "killall fuser ; killall dpkg"
+    ignore_errors: true
 
-    - name: Wait for /var/lib/dpkg/lock-frontend to be released
-      ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+  - name: Fuser TERM
+    command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+    ignore_errors: true
+    register: fuser_term
 
-    - name: install some proxmox packages
-      ansible.builtin.shell: name={{ item }} state=latest
-      register: apt_status
-      until: apt_status is success
-      delay: 6
-      retries: 30
-      with_items: [ qemu-guest-agent]
+  - name: Debug Fuser TERM
+    debug:
+      msg: "fuser TERM: {{ fuser_term.stdout }}"
+    ignore_errors: true
+    when: fuser_term.rc != 0
+
+  - name: Fuser KILL
+    command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+    when: fuser_term.rc != 0
+    ignore_errors: true
+    register: fuser_kill
+
+  - name: Debug Fuser KILL
+    debug:
+      msg: "fuser kill: {{ fuser_kill.stdout }}"
+    when: fuser_kill.rc != 0
+
+  - name: Dpkg repair
+    ansible.builtin.command: dpkg --configure --pending
+    register: dpkg_repair
+
+  - name: Debug Dpkg repair
+    debug:
+      msg: "dpkg repair: {{ dpkg_repair.stdout }}"
+    when: dpkg_repair.rc != 0
+
+  - name: Wait for /var/lib/dpkg/lock-frontend to be released
+    ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+
+  - name: install some proxmox packages
+    ansible.builtin.shell: name={{ item }} state=latest
+    register: apt_status
+    until: apt_status is success
+    delay: 6
+    retries: 30
+    with_items: [ qemu-guest-agent]
 
 
   # - name: upgrade to 5.10 kernel

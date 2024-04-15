@@ -1,7 +1,6 @@
 - name: root and system level
-  ignore_errors: true
   become: yes
-  hosts: all
+  hosts: k8s
   strategy: linear
   vars_files:
     - vars_kube.yaml
@@ -16,17 +15,46 @@
     ansible.builtin.shell:
       cmd: uname -r
 
+  ############  fix dpkg if things went sideways #####################
+  - name: Killall fuser
+    command: "killall fuser ; killall dpkg"
+    ignore_errors: true
+
+  - name: Fuser TERM
+    command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+    ignore_errors: true
+    register: fuser_term
+
+  - name: Debug Fuser TERM
+    debug:
+      msg: "fuser TERM: {{ fuser_term.stdout }}"
+    ignore_errors: true
+    when: fuser_term.rc != 0
+
+  - name: Fuser KILL
+    command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+    when: fuser_term.rc != 0
+    ignore_errors: true
+    register: fuser_kill
+
+  - name: Debug Fuser KILL
+    debug:
+      msg: "fuser kill: {{ fuser_kill.stdout }}"
+    when: fuser_kill.rc != 0
+
+  - name: Dpkg repair
+    ansible.builtin.command: dpkg --configure --pending
+    register: dpkg_repair
+
+  - name: Debug Dpkg repair
+    debug:
+      msg: "dpkg repair: {{ dpkg_repair.stdout }}"
+    when: dpkg_repair.rc != 0
+
+  ############  apt install #####################
   - name: update cache once
     ansible.builtin.apt:
       update_cache: true
-
-  - name: update cache once
-    ansible.builtin.shell:
-      cmd: sleep 5
-
-  - name: kill any running apt-get process
-    ansible.builtin.shell: killall apt-get
-    ignore_errors: true
 
   - name: Wait for /var/lib/dpkg/lock-frontend to be released
     ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;

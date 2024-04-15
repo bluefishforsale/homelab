@@ -1,6 +1,7 @@
 - name: unattended upgrade
-  become: yes
+  become: true
   hosts: all
+
   tasks:
   - name: kill any running apt-get process
     ansible.builtin.shell: killall apt-get
