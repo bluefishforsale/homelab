@@ -1,7 +1,5 @@
 # Ansible VM setup playbooks
 
-
-
 ## The playbooks
 
 ### Users
