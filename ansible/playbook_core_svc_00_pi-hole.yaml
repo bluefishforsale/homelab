@@ -2,6 +2,7 @@
 - name: Install Pi-hole on Debian 12
   hosts: pi-hole
   become: true
+
   tasks:
     - name: Update APT cache
       apt:
@@ -41,6 +42,9 @@
         - pihole-FTL
         - lighttpd
 
+    - name: Update Pi-Hole
+      ansible.builtin.command: pihole -u
+
     - name: Enable Pi-hole at startup
       ansible.builtin.systemd:
         name: pihole-FTL
@@ -51,3 +55,4 @@
       environment:
         PIHOLE_SKIP_OS_CHECK: 1
       no_log: true
+
