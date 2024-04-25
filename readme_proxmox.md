@@ -82,7 +82,6 @@ EOF
 apt-get update
 ```
 
-
 ### install ceph
 
 ```bash
@@ -240,12 +239,16 @@ done
 
 ## start VMS
 
+```bash
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm start
+```
 
 ## stop and destroy all VMs
 
+```bash
 for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |\
  while read id ; do qm stop $id ; qm destroy $id ; done
+```
 
 ### Make OPNsense VM
 
@@ -269,7 +272,6 @@ qm set 1000 --agent enabled=1
 qm resize 1000 scsi0 +16G
 ```
 
-
 ### Pihole VM
 
 ```bash
@@ -289,6 +291,9 @@ qm set 3000 --cores 2
 qm set 3000 --memory 2048
 qm set 3000 --agent enabled=1
 qm resize 3000 scsi0 +18G
+qm set 3000 --onboot qm set 3000 --onboot 11
+
+
 ```
 
 ### dns01 VM
@@ -310,6 +315,7 @@ qm set 2000 --cores 2
 qm set 2000 --memory 2048
 qm set 2000 --agent enabled=1
 qm resize 2000 scsi0 +18G
+qm set 2000 --onboot 1
 ```
 
 # Totally screwed? Need to start over?
