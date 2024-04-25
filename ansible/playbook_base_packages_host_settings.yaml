@@ -1,11 +1,19 @@
 - name: root and system level
-  become: yes
+  become: true
   hosts: all
   strategy: linear
   vars_files:
     - vars_kube.yaml
   vars:
     go_paths: '/usr/local/go/bin'
+    packages: [
+      dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
+      golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+      iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
+      libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
+      pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
+    ]
+
   tasks:
     - name: debian hosts
       when: ansible_facts['os_family'] == "Debian"
@@ -66,16 +74,10 @@
         apt: name={{ item }} state=latest
         register: apt_status
         until: apt_status is success
-        delay: 6
+        delay: 2
         retries: 30
-        with_items:
-          [
-              dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
-              golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
-              iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
-              libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
-              pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
-            ]
+        with_items: "{{packages}}"
+
 
       - name: old_paths
         ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
@@ -85,7 +87,7 @@
         ansible.builtin.lineinfile:
           path: /etc/environment
           state: present
-          backrefs: yes
+          backrefs: true
           regexp: '^PATH=.*'
           line: 'PATH={{ old_paths.stdout }}:{{ go_paths }}'
 
@@ -96,7 +98,7 @@
 
       - name: copy ntpdate cron
         ansible.builtin.copy:
-          force: yes
+          force: true
           src: files/crons/ntpdate
           dest: /etc/cron.d/ntpdate
           owner: root
@@ -113,14 +115,14 @@
 
       - name: rsyslog drop IPVS no route messages
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
           content: |
             :msg, regex, ".*IPVS.*no destination available" ~
 
       - name: Rsyslog remote server
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/rsyslog.d/99-remote-syslog.conf"
           content: |
             module(load="omprog")
@@ -130,7 +132,7 @@
 
       - name: Systemd-udev MAC link
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/network/99-default.link"
           content: |
             [Link]
@@ -139,9 +141,9 @@
 
       - name: Increase file limits
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/security/limits.conf"
-          mode: 0644
+          mode: "0644"
           content: |
             # put stuff here
 
@@ -200,7 +202,7 @@
 
       - name: Write io-scheduler script
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/system/io-scheduler.sh"
           mode: 0755
           content: |
@@ -216,7 +218,7 @@
 
       - name: Write io-scheduler service
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/system/io-scheduler.service"
           content: |
             [Unit]
@@ -234,7 +236,7 @@
 
       - name: Write blockdev readahead service
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/system/blockdev-setra.service"
           content: |
             [Unit]
@@ -250,16 +252,16 @@
 
       - name: Write cpufrequtils GOVERNOR
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: /etc/default/cpufrequtils
-          mode: 0644
+          mode: "0644"
           content: GOVERNOR="powersave"
 
       - name: Write cpu-performance script
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/system/cpu-performance.sh"
-          mode: 0755
+          mode: "0755"
           content: |
             for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
                 echo "performance" > "${CPU}" 2>/dev/null
@@ -267,7 +269,7 @@
 
       - name: Write cpu-performance service
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/system/cpu-performance.service"
           content: |
             [Unit]
@@ -320,7 +322,7 @@
 
         - name: APCUPSd config
           ansible.builtin.copy:
-            force: yes
+            force: true
             dest: "/etc/apcupsd/apcupsd.conf"
             content: |
               UPSNAME smartups1500
@@ -332,15 +334,15 @@
 
         - name: UPSd /etc/default
           ansible.builtin.copy:
-            force: yes
+            force: true
             dest: "/etc/default/apcupsd"
             content: |
-              ISCONFIGURED=yes
+              ISCONFIGURED=true
 
         - name: min time left script
           ansible.builtin.copy:
-            force: yes
-            mode: 0755
+            force: true
+            mode: "0755"
             dest: "/etc/apcupsd/runlimit"
             content: |
               #!/bin/bash
@@ -358,7 +360,7 @@
 
       - name: Write journald config
         ansible.builtin.copy:
-          force: yes
+          force: true
           dest: "/etc/systemd/journald.conf"
           content: |
             #  This file is part of systemd.
@@ -379,9 +381,9 @@
 
             [Journal]
             Storage=none
-            Compress=yes
+            Compress=true
             LineMax=100K
-            #Seal=yes
+            #Seal=true
             #SplitMode=uid
             #SyncIntervalSec=5m
             #RateLimitIntervalSec=30s
@@ -396,17 +398,17 @@
             #RuntimeMaxFiles=100
             #MaxRetentionSec=
             #MaxFileSec=1month
-            #ForwardToSyslog=yes
+            #ForwardToSyslog=true
             #ForwardToKMsg=no
             #ForwardToConsole=no
-            #ForwardToWall=yes
+            #ForwardToWall=true
             #TTYPath=/dev/console
             #MaxLevelStore=debug
             #MaxLevelSyslog=debug
             #MaxLevelKMsg=noticsort | unique | @she
             #MaxLevelConsole=info
             #MaxLevelWall=emerg
-            #ReadKMsg=yes
+            #ReadKMsg=true
             #Audit=no
 
       - name: enable and restart systemd-journald
