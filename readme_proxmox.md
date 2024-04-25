@@ -1,8 +1,17 @@
 # Install proxmox and setup ceph
 
+- this document is hard coded for a specific setup
+- machine has 8 HDD, and 1 NVME on /dev/sd{a..h}
+- boot disk is /dev/sdi
+- ssh-keys stored in github and loaded during VM creation
+- software setup done via ansible
+
 ## networking interfaces to bond
 
-https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysadmin_network_bond
+- https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysadmin_network_bond
+- network: 192.168.1.0/2
+- gateway: 191.168.1.1
+- dual 10GbE as eno1 eno2 named interfaces
 
 ```bash
 ip address add 192.168.1.106/24 dev eno1
