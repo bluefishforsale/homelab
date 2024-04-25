@@ -4,12 +4,49 @@
   become: true
 
   tasks:
-    - name: Update APT cache
-      apt:
+    ############  fix dpkg if things went sideways #####################
+    - name: Killall fuser
+      ansible.builtin.command: "killall fuser ; killall dpkg"
+      ignore_errors: true
+
+    - name: Fuser TERM
+      ansible.builtin.command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+      ignore_errors: true
+      register: fuser_term
+
+    - name: Debug Fuser TERM
+      ansible.builtin.debug:
+        msg: "fuser TERM: {{ fuser_term.stdout }}"
+      ignore_errors: true
+      when: fuser_term.rc != 0
+
+    - name: Fuser KILL
+      ansible.builtin.command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+      when: fuser_term.rc != 0
+      ignore_errors: true
+      register: fuser_kill
+
+    - name: Debug Fuser KILL
+      ansible.builtin.debug:
+        msg: "fuser kill: {{ fuser_kill.stdout }}"
+      when: fuser_kill.rc != 0
+
+    - name: Dpkg repair
+      ansible.builtin.command: dpkg --configure --pending
+      register: dpkg_repair
+
+    - name: Debug Dpkg repair
+      ansible.builtin.debug:
+        msg: "dpkg repair: {{ dpkg_repair.stdout }}"
+      when: dpkg_repair.rc != 0
+
+    ############  apt install #####################
+    - name: update cache once
+      ansible.builtin.apt:
         update_cache: true
 
     - name: Install prerequisites
-      apt:
+      ansible.builtin.apt:
         name: "{{ item }}"
         state: present
       loop:
