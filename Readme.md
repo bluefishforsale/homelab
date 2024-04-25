@@ -37,7 +37,7 @@
 
 ### notes about LACP 802.3ad transmit hash etc
 
-    - The US-16-XG 10G needs to have the port-channels hash transmit modes changed via ssh
+  - The US-16-XG 10G needs to have the port-channels hash transmit modes changed via ssh
 
 ### Bonding interfaces
 

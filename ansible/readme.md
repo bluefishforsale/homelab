@@ -4,23 +4,28 @@
 
 ## The playbooks
 
-### Base Packages and Settings
-
-Uses apt to install a bunch of useful CLI tools.
-Sets up NTP date and timezone to UTC.
-Has a task for adding path items to /etc/environment
-
-### Unattended Upgrades
-
-Does a full package update and upgrade.
-
 ### Users
 
 - sets up ssh keys from github,
 - ZSH, oh-mh-zsh, poewrlevel9k, tmux, ultimate vim config.
 
 ```bash
+ansible-playbook -i inventory.ini -l dns playbook_base_users.yaml
 ```
+
+### Base Packages and Settings
+
+Uses apt to install a bunch of useful CLI tools.
+Sets up NTP date and timezone to UTC.
+Has a task for adding path items to /etc/environment
+
+```bash
+ansible-playbook -i inventory.ini -l dns playbook_base_packages_host_settings.yaml
+```
+
+### Unattended Upgrades
+
+Does a full package update and upgrade.
 
 ### DNS & DHCP
 
@@ -31,7 +36,6 @@ Does a full package update and upgrade.
 ```bash
 ansible-playbook -i inventory.ini -l dns playbook_core_svc_00_dns.yaml playbook_core_svc_00_dhcp_ddns.yaml
 ```
-
 
 ### Kubernetes PKI
 
