@@ -1,6 +1,10 @@
+# master keys github ID
+github: bluefishforsale
+
+# dict of users to add
 user:
   - name: terrac
-    First: Terrac
-    Last: Skiens
+    first: Terrac
+    last: Skiens
     groups: [sudo]
     github: bluefishforsale
