@@ -1,10 +1,10 @@
 # Install proxmox and setup ceph
 
-### networking interfaces to bond
+## networking interfaces to bond
 
 https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysadmin_network_bond
 
-```
+```bash
 ip address add 192.168.1.106/24 dev eno1
 ip route add default via 192.168.1.1via
 
@@ -45,7 +45,7 @@ ping 1.1.1.1
 
 ### first get GPG key
 
-```
+```bash
 wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
 ```
 
@@ -55,7 +55,7 @@ wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/
 - bookworm (debian 12)
 - security updates
 
-```
+```bash
 cat << EOF > /etc/apt/sources.list
 deb http://ftp.debian.org/debian bookworm main contrib
 deb http://ftp.debian.org/debian bookworm-updates main contrib
@@ -66,7 +66,7 @@ EOF
 
 ### ceph reef  repo
 
-```
+```bash
 cat << EOF > /etc/apt/sources.list.d/ceph.list
 deb http://download.proxmox.com/debian/ceph-reef bookworm no-subscription
 EOF
@@ -74,7 +74,7 @@ EOF
 
 ### comment out the enterprise repo
 
-```
+```bash
 cat << EOF > /etc/apt/sources.list.d/pve-enterprise.list
 # deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise
 EOF
@@ -85,12 +85,12 @@ apt-get update
 
 ### install ceph
 
-```
-    pveceph install --version reef --repository no-subscription
-    pveceph init --network 192.168.1.0/24
-    pveceph mon create
-    pveceph mgr create
-    ceph -s
+```bash
+pveceph install --version reef --repository no-subscription
+pveceph init --network 192.168.1.0/24
+pveceph mon create
+pveceph mgr create
+ceph -s
 ```
 
 ### update crush map domain from  host to osd
@@ -98,7 +98,7 @@ apt-get update
 - if on a single node
 - change the crush map domain from host to OSD
 
-```
+```bash
 ceph osd getcrushmap -o current.crush
 crushtool -d current.crush -o current.txt
 vi  current.txt
@@ -110,7 +110,7 @@ vi  current.txt
 
 #### what the rules should look like
 
-```
+```bash
 rule replicated_rule {
         id 0
         type replicated
@@ -121,16 +121,19 @@ rule replicated_rule {
 ```
 
 ### put the new map in
-    crushtool -c current.txt -o new.crush
-    ceph osd setcrushmap -i new.crush
 
+```bash
+crushtool -c current.txt -o new.crush
+ceph osd setcrushmap -i new.crush
+```
 
 ## create the OSDs
+
 https://pve.proxmox.com/wiki/Deploy_Hyper-Converged_Ceph_Cluster
 
 ##### write the ceph-client keyring for the OSDS
 
-```
+```bash
 ceph auth get client.bootstrap-osd > /etc/pve/priv/ceph.client.bootstrap-osd.keyring
 ```
 
@@ -139,70 +142,72 @@ ceph auth get client.bootstrap-osd > /etc/pve/priv/ceph.client.bootstrap-osd.key
 - create ceph OSD lvm PV, VG, and LV  LVMs
 - creates and starts ceph OSD services and mounts the disks
 
-```
+```bash
 ceph-volume lvm batch --report $(printf "/dev/sd%s " $(for x in a b c d e f g h ; do echo $x ; done) ) --db-devices /dev/nvme0n1 --yes
 ceph-volume lvm batch $(printf "/dev/sd%s " $(for x in a b c d e f g h ; do echo $x ; done) ) --db-devices /dev/nvme0n1 --yes
 ```
 
 ### data pool and rbd storage
 
-```
-    pveceph pool create data -application rbd
-    pvesm add rbd ceph-lvm -pool data
+```bash
+pveceph pool create data -application rbd
+pvesm add rbd ceph-lvm -pool data
 ```
 
 ### cephfs
 
-```
-    pveceph mds create
-    pveceph fs create --pg_num 32 --add-storage
+```bash
+pveceph mds create
+pveceph fs create --pg_num 32 --add-storage
 ```
 
 
 ### Removing the no-subscription warning from the UI
-https://johnscs.com/remove-proxmox51-subscription-notice/
-
-```
-    cd /usr/share/javascript/proxmox-widget-toolkit
-    cp proxmoxlib.js proxmoxlib.js.bak
-```
-
 
 - https://johnscs.com/remove-proxmox51-subscription-notice/
 
+```bash
+cd /usr/share/javascript/proxmox-widget-toolkit
+cp proxmoxlib.js proxmoxlib.js.bak
 ```
-    sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
+
+- https://johnscs.com/remove-proxmox51-subscription-notice/
+
+```bash
+sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
 ```
 
 
 
 ### Making VMs
+
 #### Getting the debian base img
 
-  - adding the SSH keys at the start
+- adding the SSH keys at the start
 
-```
-    wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
-    wget -O  rsa.key https://github.com/bluefishforsale.keys
+```bash
+wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
+wget -O  rsa.key https://github.com/bluefishforsale.keys
 ```
 
 ### Make VM temaplate
-```
-    qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
-    qm importdisk 9999 	debian-12-generic-amd64.qcow2 ceph-lvm
-    qm set 9999 --ide2 ceph-lvm:cloudinit
-    qm set 9999 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-9999-disk-0
-    qm set 9999 --boot order='scsi0'
-    qm set 9999 --serial0 socket --vga serial0
-    qm set 9999 --sshkeys rsa.key
-    qm set 9999 --hotplug network,disk
-    qm set 9999 --bios ovmf
-    qm set 9999 --machine q35
-    qm set 9999 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-    qm set 9999 --cores 2
-    qm set 9999 --memory 4096
-    qm set 9999 --agent enabled=1
-    qm template 9999
+
+```bash
+qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
+qm importdisk 9999 	debian-12-generic-amd64.qcow2 ceph-lvm
+qm set 9999 --ide2 ceph-lvm:cloudinit
+qm set 9999 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-9999-disk-0
+qm set 9999 --boot order='scsi0'
+qm set 9999 --serial0 socket --vga serial0
+qm set 9999 --sshkeys rsa.key
+qm set 9999 --hotplug network,disk
+qm set 9999 --bios ovmf
+qm set 9999 --machine q35
+qm set 9999 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 9999 --cores 2
+qm set 9999 --memory 4096
+qm set 9999 --agent enabled=1
+qm template 9999
 ```
 
 ## make six VMs from the template
@@ -211,7 +216,7 @@ https://johnscs.com/remove-proxmox51-subscription-notice/
 - one of them (kube603) has GPU PCI-e passthrough
 - this requires DNS entries be in place for each VM to look up the IP
 
-```
+```bash
 for x in 0 1 ; do
 for y in 1 2 3 ; do
 qm clone 9999 6${x}${y}
@@ -244,6 +249,7 @@ for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |
 
 ### Make OPNsense VM
 
+```bash
 qm create 1000 --name OPNsense --net0 virtio,bridge=vmbr2  --net1 virtio,bridge=vmbr3
 qm set 1000 --ipconfig0 ip=192.168.1.10/24,gw=192.168.1.1 --nameserver=192.168.1.2
 qm importdisk 1000 debian-12-generic-amd64.qcow2 ceph-lvm
@@ -261,10 +267,12 @@ qm set 1000 --cores 2
 qm set 1000 --memory 4096
 qm set 1000 --agent enabled=1
 qm resize 1000 scsi0 +16G
+```
 
 
 ### Pihole VM
 
+```bash
 qm create 3000 --name pihole --net0 virtio,bridge=vmbr0
 qm importdisk 3000 debian-12-generic-amd64.qcow2 ceph-lvm
 qm set 3000 --ide2 ceph-lvm:cloudinit
@@ -281,10 +289,11 @@ qm set 3000 --cores 2
 qm set 3000 --memory 2048
 qm set 3000 --agent enabled=1
 qm resize 3000 scsi0 +18G
-
+```
 
 ### dns01 VM
 
+```bash
 qm create 2000 --name dns01 --net0 virtio,bridge=vmbr0
 qm importdisk 2000 debian-12-generic-amd64.qcow2 ceph-lvm
 qm set 2000 --ide2 ceph-lvm:cloudinit
@@ -301,29 +310,27 @@ qm set 2000 --cores 2
 qm set 2000 --memory 2048
 qm set 2000 --agent enabled=1
 qm resize 2000 scsi0 +18G
-
-
-
+```
 
 # Totally screwed? Need to start over?
   -  we got you
 
 ## Destroy all ceph and reset disks
-```
-    pveceph mds destroy $HOSTNAME
-    pveceph fs destroy cephfs
-    pvesm remove rbd ceph-lvm -pool data
-    for pool in data cephfs_data cephfs_metadata  ; do  pveceph pool destroy $pool ; done
-    # here's the list of OSD IDs - change to what range is on this metal
-    for osd in `seq 0 7` ; do for step in stop down out purge destroy ; do ceph osd $step $osd --force  ; done ; done
-    lvdisplay | grep ceph | grep Name  | awk '{print $3}' | xargs lvremove --yes
-    vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
-    for disk in a b c d e f g h ; do wipefs -a /dev/sd${disk} ; done
-    wipefs -a /dev/nvme0n1
-    pveceph mgr destroy node006
-    pveceph mon destroy node006
-    pveceph stop
-    pveceph purge
-    rm /etc/pve/ceph.conf
-    find /var/lib/ceph/ -mindepth 2 -delete
+```bash
+pveceph mds destroy $HOSTNAME
+pveceph fs destroy cephfs
+pvesm remove rbd ceph-lvm -pool data
+for pool in data cephfs_data cephfs_metadata  ; do  pveceph pool destroy $pool ; done
+# here's the list of OSD IDs - change to what range is on this metal
+for osd in `seq 0 7` ; do for step in stop down out purge destroy ; do ceph osd $step $osd --force  ; done ; done
+lvdisplay | grep ceph | grep Name  | awk '{print $3}' | xargs lvremove --yes
+vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}'  | xargs vgremove -y
+for disk in a b c d e f g h ; do wipefs -a /dev/sd${disk} ; done
+wipefs -a /dev/nvme0n1
+pveceph mgr destroy node006
+pveceph mon destroy node006
+pveceph stop
+pveceph purge
+rm /etc/pve/ceph.conf
+find /var/lib/ceph/ -mindepth 2 -delete
 ```
