@@ -1,10 +1,13 @@
 # Install proxmox and setup ceph
 
 - this document is hard coded for a specific setup
-- machine has 8 HDD, and 1 NVME on /dev/sd{a..h}
-- boot disk is /dev/sdi
-- ssh-keys stored in github and loaded during VM creation
-- software setup done via ansible
+- read through, and change things to fit your setup
+- machine has 8 HDD, and 1 NVME on `/dev/sd{a..h}` and `/dev/nvme0n1`
+- boot disk is `/dev/sdi`
+- ssh-keys stored in `github` and loaded during VM creation using github username
+- software setup explained in [ansible readme](ansible//readme.md)
+- if you changed things, consult the ansible inventory and make your changes consistent
+- [ansible inventory](ansible/inventory.ini)
 
 ## networking interfaces to bond
 
