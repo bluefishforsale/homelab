@@ -48,6 +48,29 @@ ping 192.168.1.1
 ping 1.1.1.1
 ```
 
+### GPU passthrough IOMMU
+
+```bash
+sed  /etc/default/grub  -i -e  's/GRUB_CMDLINE_LINUX_DEFAULT="quiet"/GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on"/g'
+update-grub
+
+cat << EOF >> /etc/modules
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+echo "options vfio_iommu_type1 allow_unsafe_interrupts=1" > /etc/modprobe.d/iommu_unsafe_interrupts.conf
+echo "options kvm ignore_msrs=1" > /etc/modprobe.d/kvm.conf
+echo "blacklist radeon" >> /etc/modprobe.d/blacklist.conf
+echo "blacklist nouveau" >> /etc/modprobe.d/blacklist.conf
+echo "blacklist nvidia" >> /etc/modprobe.d/blacklist.conf
+
+# add the PCI ID to the modprobe vfio config
+echo "options vfio-pci ids=$(lspci | grep NVIDIA | awk '{print $1}' | xargs | sed -e 's/ /,/g') disable_vga=1"> /etc/modprobe.d/vfio.conf
+```
+
 ## Do all this before loading the web UI for the first time
 
 - because it will ask to install ceph
