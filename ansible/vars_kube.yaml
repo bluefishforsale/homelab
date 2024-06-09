@@ -82,14 +82,16 @@ KUBERNETES_HOSTNAMES: "kubernetes.internal,kubernetes,kubernetes.default,kuberne
 APISERVER: "apiserver"
 SYSLOG: "192.168.1.65"
 APISERVER_IP: ""
-CLUSTER_CIDR: "10.0.0.0/16"
-# due to the way the PodCIDR for the kubelet is configured, this must not be larger than /24 right not
-# the last octet of the IP address as the 3rd octet of the kubernetes pod cidr eg kube601 = 192.168.1.65 = podCIDR 10.0.65.0
-# and since the DNS and IP mappings are for sequential IP addresses this limits us to /24 for each node podCIDR
-# cilium companion to this :https://github.com/bluefishforsale/homelab-kube/blob/master/charts/cilium/values.yaml#L1688-L1689
+# due to the way the PodCIDR for the kubelet is configured, this must not be larger than /24 right now
+# the last octet of the locan LAN IP address as the 3rd octet of the kubernetes pod cidr
+# eg kube601 = 192.168.1.65 = podCIDR 10.0.65.0
 # kubelet compantion to this : https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L18
+CLUSTER_CIDR: "10.0.0.0/16"
 POD_NETMASK: "24"
-SERVICE_CLUSTER_IP_RANGE: "10.0.250.0/20"
+# service IP range is from
+#   Min:   10.0.0.1
+#   Max:   10.0.15.254
+SERVICE_CLUSTER_IP_RANGE: "10.0.0.0/20"
 # this maps to an IP address in the kubelet config and coreDNS pod
 # https://github.com/bluefishforsale/homelab-argocd/blob/master/charts/coredns/values.yaml#L70
 # https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L13-L14
