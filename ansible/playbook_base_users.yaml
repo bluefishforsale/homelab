@@ -77,7 +77,7 @@
 
       - name: Shell, Theme, and config for logged in user
         block:
-        - name: Install oh-my-zsh
+        - name: Download oh-my-zsh
           ansible.builtin.get_url:
             url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
             dest: /tmp/oh-my-zsh-installer.sh

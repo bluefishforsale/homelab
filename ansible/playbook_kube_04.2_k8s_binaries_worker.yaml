@@ -297,4 +297,4 @@
         daemon_reload: true
       with_items:
         - kubelet
-        # - kube-proxy ## kube-proxy replaced with cilium
+        - kube-proxy ## comment out if kube-proxy replaced with cilium

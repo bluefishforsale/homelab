@@ -3,13 +3,13 @@
   hosts: all
   tasks:
 
-  - name: disable eth0 dhcp
-    ansible.builtin.lineinfile:
-      path: /etc/network/interfaces
-      state: present
-      backrefs: true
-      regexp: '^(iface eth0 inet dhcp)$'
-      line: '#\g<1>'
+  # - name: disable eth0 dhcp
+  #   ansible.builtin.lineinfile:
+  #     path: /etc/network/interfaces
+  #     state: present
+  #     backrefs: true
+  #     regexp: '^(iface eth0 inet dhcp)$'
+  #     line: '#\g<1>'
 
   # - name: Add the backports repository
   #   apt_repository:

@@ -54,16 +54,16 @@
         - procps
         - lsb-release
 
-    - name: Add Pi-hole repository
-      ansible.builtin.apt_repository:
-        repo: deb https://packages.pi-hole.net/debian {{ ansible_distribution_release }} main
-        state: present
-        filename: pihole
+    - name: Git clone Pi-hole
+      ansible.builtin.git:
+        repo: https://github.com/pi-hole/pi-hole.git
+        dest: /opt/pi-hole
+        accept_hostkey: true
+        force: true
+        depth: 1
 
     - name: Install Pi-hole
-      ansible.builtin.apt:
-        name: pi-hole
-        state: present
+      ansible.builtin.command: /opt/pi-hole/automated\ install/basic-install.sh --reconfigure --unattended
 
     - name: Configure Pi-hole
       ansible.builtin.command: pihole -r

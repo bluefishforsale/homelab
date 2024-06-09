@@ -89,7 +89,7 @@ CLUSTER_CIDR: "10.0.0.0/16"
 # cilium companion to this :https://github.com/bluefishforsale/homelab-kube/blob/master/charts/cilium/values.yaml#L1688-L1689
 # kubelet compantion to this : https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L18
 POD_NETMASK: "24"
-SERVICE_CLUSTER_IP_RANGE: "10.0.0.0/24"
+SERVICE_CLUSTER_IP_RANGE: "10.0.250.0/20"
 # this maps to an IP address in the kubelet config and coreDNS pod
 # https://github.com/bluefishforsale/homelab-argocd/blob/master/charts/coredns/values.yaml#L70
 # https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L13-L14

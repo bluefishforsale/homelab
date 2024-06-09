@@ -8,7 +8,7 @@
     go_paths: '/usr/local/go/bin'
     packages: [
       dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
-      golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2,
+      golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2, ipset,
       iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
       libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
       pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
@@ -78,7 +78,6 @@
         retries: 30
         with_items: "{{packages}}"
 
-
       - name: old_paths
         ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
         register: old_paths
@@ -96,7 +95,7 @@
           hwclock: local
           name: America/Los_Angeles
 
-      - name: copy ntpdate cron
+      - name: copy ntpdate cmon
         ansible.builtin.copy:
           force: true
           src: files/crons/ntpdate
@@ -363,42 +362,33 @@
           force: true
           dest: "/etc/systemd/journald.conf"
           content: |
-            #  This file is part of systemd.
-            #
-            #  systemd is free software; you can redistribute it and/or modify it under the
-            #  terms of the GNU Lesser General Public License as published by the Free
-            #  Software Foundation; either version 2.1 of the License, or (at your option)
-            #  any later version.
-            #
-            # Entries in this file show the compile time defaults. Local configuration
-            # should be created by either modifying this file, or by creating "drop-ins" in
-            # the journald.conf.d/ subdirectory. The latter is generally recommended.
-            # Defaults can be restored by simply deleting this file and all drop-ins.
-            #
-            # Use 'systemd-analyze cat-config systemd/journald.conf' to display the full config.
-            #
-            # See journald.conf(5) for details.
+            # This file is part of systemd.
+            # the goal of this config is to avoid writing the journald contents to disk
+            # we collect up to 10k lines per unit in memory
+            # then we limit overall size in ram by memory size constraints
+            # do yo really think anyone is going to read-back in journald more then 10k lines?
+
 
             [Journal]
             Storage=none
-            Compress=true
-            LineMax=100K
+            Compress=false
+            LineMax=10K
+            #RuntimeMaxUse=100M
+            SystemMaxUse=10M
+            SystemMaxFileSize=5M
+            ForwardToSyslog=false
             #Seal=true
             #SplitMode=uid
             #SyncIntervalSec=5m
             #RateLimitIntervalSec=30s
             #RateLimitBurst=10000
-            #SystemMaxUse=
             #SystemKeepFree=
-            #SystemMaxFileSize=
             #SystemMaxFiles=100
-            #RuntimeMaxUse=
             #RuntimeKeepFree=
             #RuntimeMaxFileSize=
             #RuntimeMaxFiles=100
             #MaxRetentionSec=
             #MaxFileSec=1month
-            #ForwardToSyslog=true
             #ForwardToKMsg=no
             #ForwardToConsole=no
             #ForwardToWall=true
