@@ -1,0 +1,38 @@
+- name: kubernetes Network Tuning
+  hosts: all
+  become: true
+
+  tasks:
+  - name: register interfaces carrier
+    ansible.builtin.shell: |
+      grep -l 1 /sys/class/net/e*/carrier | xargs -n1 dirname | xargs -n1 basename
+    register: carrier_up
+
+  - name: register interfaces speeds
+    ansible.builtin.shell: |
+      grep -v -- -1 /sys/class/net/e*/speed | sed -e 's/\// /g'
+    register: iface_speed
+
+  - name: tc qdisc boot oneshot service
+    copy:
+      dest: /etc/systemd/system/net_qdisc.service
+      content: |
+        [Unit]
+        After=network.target
+
+        [Install]
+        WantedBy=multi-user.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=true
+        ExecStart=/sbin/tc qdisc del dev eth0 root
+        ExecStart=/sbin/tc qdisc add dev eth0 root handle 1: htb default 12
+        ExecStart=/sbin/tc class add dev eth0 parent 1:1 classid 1:12 htb rate 10gbit
+
+  - name: Enable and Start service
+    systemd:
+      enabled: yes
+      state: restarted
+      name: net_qdisc.service
+      daemon_reload: true

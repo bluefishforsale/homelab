@@ -26,35 +26,35 @@
         ansible.builtin.shell:
           cmd: uname -r
 
-      ############  fix dpkg if things went sideways #####################
-      - name: Killall fuser
-        ansible.builtin.command: "killall fuser ; killall dpkg"
-        ignore_errors: true
+      # ############  fix dpkg if things went sideways #####################
+      # - name: Killall fuser
+      #   ansible.builtin.command: "killall fuser ; killall dpkg"
+      #   ignore_errors: true
 
-      - name: Fuser TERM
-        ansible.builtin.command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-        ignore_errors: true
-        register: fuser_term
+      # - name: Fuser TERM
+      #   ansible.builtin.command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+      #   ignore_errors: true
+      #   register: fuser_term
 
-      - name: Debug Fuser TERM
-        ansible.builtin.debug:
-          msg: "fuser TERM: {{ fuser_term.stdout }}"
-        ignore_errors: true
-        when: fuser_term.rc != 0
+      # - name: Debug Fuser TERM
+      #   ansible.builtin.debug:
+      #     msg: "fuser TERM: {{ fuser_term.stdout }}"
+      #   ignore_errors: true
+      #   when: fuser_term.rc != 0
 
-      - name: Fuser KILL
-        ansible.builtin.command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-        when: fuser_term.rc != 0
-        ignore_errors: true
-        register: fuser_kill
+      # - name: Fuser KILL
+      #   ansible.builtin.command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
+      #   when: fuser_term.rc != 0
+      #   ignore_errors: true
+      #   register: fuser_kill
 
-      - name: Debug Fuser KILL
-        ansible.builtin.debug:
-          msg: "fuser kill: {{ fuser_kill.stdout }}"
-        when: fuser_kill.rc != 0
+      # - name: Debug Fuser KILL
+      #   ansible.builtin.debug:
+      #     msg: "fuser kill: {{ fuser_kill.stdout }}"
+      #   when: fuser_kill.rc != 0
 
       - name: Dpkg repair
-        ansible.builtin.command: dpkg --configure --pending
+        ansible.builtin.command: dpkg --configure -a --force-confdef --force-confold
         register: dpkg_repair
 
       - name: Debug Dpkg repair
@@ -75,7 +75,7 @@
         register: apt_status
         until: apt_status is success
         delay: 2
-        retries: 30
+        retries: 90
         with_items: "{{packages}}"
 
       - name: old_paths
@@ -146,6 +146,45 @@
           content: |
             # put stuff here
 
+    ################# Sysctl, modules, swap
+
+      - name: Swap off in /etc/fstab
+        ansible.builtin.replace:
+          path: /etc/fstab
+          regexp: '^(\/swap.*)$'
+          replace: '#\1'
+
+      - name: Swapp-off command for current boot
+        ansible.builtin.shell: swapoff -a
+
+      - name: Container Modules
+        ansible.builtin.copy:
+          force: true
+          dest: "/etc/modules-load.d/99-containerd.conf"
+          content: |
+            overlay
+            br_netfilter
+
+      - name: Live Modprobe
+        ansible.builtin.shell:
+          cmd: modprobe "{{ item }}"
+        with_items: [overlay, br_netfilter]
+
+      - name: Write Sysctl Startup Params
+        ansible.builtin.copy:
+          dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
+          content: |
+            net.bridge.bridge-nf-call-iptables  = 1
+            net.bridge.bridge-nf-call-ip6tables = 1
+            net.ipv4.ip_forward                 = 1
+            # ciliumn rp_filter
+            # https://github.com/cilium/cilium/issues/10645
+            # rp_filter non container
+            net.ipv4.conf.*.rp_filter = 0
+            net.ipv4.conf.all.rp_filter = 0
+            net.ipv4.conf.default.rp_filter = 0
+            net.ipv4.conf.cilium_geneve.rp_filter = 0
+
       - name: Sysctl Tunings
         ansible.builtin.copy:
           dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
@@ -190,11 +229,7 @@
             kern.maxfilesperproc = 524288
             # no swapping
             vm.swappiness = 0
-            # rp_filter non container
-            net.ipv4.conf.eth*.rp_filter=0
-            # ciliumn rp_filter
-            # https://github.com/cilium/cilium/issues/10645
-            net.ipv4.conf.lxc*.rp_filter = 0
+
 
       - name: Sysctl reload
         ansible.builtin.shell: sysctl --system
@@ -370,7 +405,8 @@
 
 
             [Journal]
-            Storage=none
+            # Storage=persistent
+            Storage=volatile
             Compress=false
             LineMax=10K
             #RuntimeMaxUse=100M

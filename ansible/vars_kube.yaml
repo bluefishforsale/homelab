@@ -88,11 +88,10 @@ APISERVER_IP: ""
 # kubelet compantion to this : https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L18
 CLUSTER_CIDR: "10.0.0.0/16"
 POD_NETMASK: "24"
-# service IP range is from
-#   Min:   10.0.0.1
-#   Max:   10.0.15.254
-SERVICE_CLUSTER_IP_RANGE: "10.0.0.0/20"
+# make sure that service range does not overlap cluster range
+# changing this also means re-generating and distriburing all the PKI certs
+SERVICE_CLUSTER_IP_RANGE: "10.244.0.0/16"
 # this maps to an IP address in the kubelet config and coreDNS pod
 # https://github.com/bluefishforsale/homelab-argocd/blob/master/charts/coredns/values.yaml#L70
 # https://github.com/bluefishforsale/homelab/blob/master/ansible/files/kubelet/kubelet-config.yaml.j2#L13-L14
-CLUSTER_DNS:  "10.0.0.10"
+CLUSTER_DNS:  "10.244.0.10"

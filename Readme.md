@@ -29,7 +29,12 @@
 3. proceed with step 4. only when post-install and reboot completes
 
     ```bash
-    ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml playbook_base_packages_host_settings.yaml playbook_base_unattended_upgrade.yaml playbook_base_users.yaml playbook_base_users.yaml
+    ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml
+    ansible-playbook -i inventory.ini -l k8s playbook_base_unattended_upgrade.yaml
+    ansible-playbook -i inventory.ini -l k8s playbook_base_packages_host_settings.yaml
+    ansible-playbook -i inventory.ini -l k8s playbook_core_net_qdisc.yaml
+    ansible-playbook -i inventory.ini -l k8s playbook_base_users.yaml
+    ansible -i inventory.ini k8s  -b -a 'reboot'
     ```
 
 4. proceed with step 5. when ansible playbooks all apply whithout any error

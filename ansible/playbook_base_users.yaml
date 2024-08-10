@@ -85,7 +85,7 @@
             mode: "0755"
 
         - name: Install oh-my-zsh
-          ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh
+          ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
           args:
             creates: ~/.oh-my-zsh
 
@@ -130,6 +130,9 @@
             path: ~/.zshrc
             state: present
             line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
+
+        - name: Set shell zsh
+          ansible.builtin.shell: sudo chsh -s /usr/bin/zsh $LOGNAME
 
         - name: Ultimate vim
           ansible.builtin.git:
@@ -183,7 +186,7 @@
           mode: "0755"
 
       - name: Root install oh-my-zsh
-        ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh
+        ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
         args:
           creates: /root/.oh-my-zsh
 
@@ -219,6 +222,9 @@
           path: /root/.zshrc
           state: present
           line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
+
+      - name: Root Set shell zsh
+        ansible.builtin.shell: chsh -s /usr/bin/zsh $LOGNAME
 
       - name: Root ultimate vim
         ansible.builtin.shell:

@@ -69,43 +69,6 @@
       with_items:
         - 99-loopback.conf
 
-################# Sysctl, modules, swap
-  - name: Sysctl, modules, swap
-    block:
-
-    - name: Swap off in /etc/fstab
-      ansible.builtin.replace:
-        path: /etc/fstab
-        regexp: '^(\/swap.*)$'
-        replace: '#\1'
-
-    - name: Swapp-off command for current boot
-      ansible.builtin.shell: swapoff -a
-
-    - name: Container Modules
-      ansible.builtin.copy:
-        force: true
-        dest: "/etc/modules-load.d/99-containerd.conf"
-        content: |
-          overlay
-          br_netfilter
-
-    - name: Live Modprobe
-      ansible.builtin.shell:
-        cmd: modprobe "{{ item }}"
-      with_items: [overlay, br_netfilter]
-
-    - name: Write Sysctl Startup Params
-      ansible.builtin.copy:
-        dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
-        content: |
-          net.bridge.bridge-nf-call-iptables  = 1
-          net.ipv4.ip_forward                 = 1
-          net.bridge.bridge-nf-call-ip6tables = 1
-
-    - name: Sysctl reload
-      ansible.builtin.shell: sysctl --system
-
 ################# Containerd
   - name: "Containerd"
     block:
@@ -242,16 +205,16 @@
       until: apt_status is success
       delay: 6
       retries: 30
-      with_items: [ socat, conntrack, ipset, nfs-common]
+      with_items: [socat,conntrack,ipset,nfs-common]
 
-    - name: "installing kubernetes {{ version }}"
+    - name: "Installing kubernetes {{version}}"
       ansible.builtin.get_url:
-        url: "{{ KUBE_URL }}/{{ item }}"
-        dest: "{{ worker_dirs['system']['bin'] }}/{{ item }}"
+        url: "{{ KUBE_URL }}/{{item}}"
+        dest: "{{ worker_dirs['system']['bin'] }}/{{item}}"
         mode: "0755"
       with_items: "{{worker_binaries}}"
 
-    - name: register gpu var
+    - name: Register gpu var
       ansible.builtin.set_fact:
         nvidia_gpu: "{{ nvidia_gpu }}"
 
@@ -268,7 +231,7 @@
         kube-proxy: /var/lib/kube-proxy/
         }
 
-    - name: systemd service
+    - name: Systemd service
       ansible.builtin.copy:
         force: true
         dest: "/etc/systemd/system/{{item}}.service"
@@ -278,9 +241,9 @@
         owner: root
       with_items:
         - kubelet
-        - kube-proxy
+        # - kube-proxy
 
-    - name: copy ntpdate cron
+    - name: Copy ntpdate cron
       ansible.builtin.copy:
         force: true
         src: files/crons/ntpdate
@@ -289,7 +252,7 @@
         group: root
         mode: "0644"
 
-    - name: systemd enable and restart kubelet and proxy
+    - name: Systemd enable and restart kubelet and proxy
       ansible.builtin.systemd:
         name: "{{ item }}"
         state: restarted
@@ -297,4 +260,4 @@
         daemon_reload: true
       with_items:
         - kubelet
-        - kube-proxy ## comment out if kube-proxy replaced with cilium
+        # - kube-proxy ## comment out if kube-proxy replaced with cilium
