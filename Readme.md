@@ -34,14 +34,14 @@ This is a critical step before provisioning the VMs.
 - Ceph storage (Ceph-LVM and CephFS) is properly configured
 - TODO: integrate this into the DHCP setup w/ PXE and Preseed
 
-### Setup Proxmox host(s)
+### 1. Setup Proxmox host(s)
 
 - [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md)
 
-### 1. Create the VMs
-Start by creating the necessary VMs as described in the [Proxmox Readme#making-vms](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md#making-vms) file. This is done using the following Ansible playbook:
+### 2. Create the VMs
 
-### 2. Continue to ansible setup for hosts
+- Creating the necessary VMs as described in [Proxmox Readme#making-vms](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md#making-vms)
+
+### 3. Set up the hosts for roles usign Ansible playbooks
 
 - [Ansible setup Readme](https://github.com/bluefishforsale/homelab/blob/master/ansible/readme.md)
-
