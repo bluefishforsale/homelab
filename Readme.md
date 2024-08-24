@@ -1,106 +1,37 @@
-# Bluefishforsale Homelab
+# Bluefishforsale Homelab Automation
 
-- Creates a proxmox VE cluster
-- VM for bind and DHCPd
-    -  192.168.1.2/32
-- VM for Pi-Hole
-    -  192.168.1.9/32
-- 6 kubernetes EFI VMs
-- kubernetes cluster with the following network
-    - cluster cidr: 10.0.0.0/16
-    - nodes cidr: 10.0.${node_number}.0/16
-    - serives cidr: 10.0.250.0/20
-    - api_server: 192.168.1.99/32
-    - uses kube-proxy
+This repository contains Ansible playbooks to automate the setup and management of a homelab environment, which includes a Proxmox VE cluster, various VMs, and a Kubernetes cluster. The playbooks are organized into different phases to ensure a step-by-step configuration of the entire infrastructure.
 
+## Overview
 
-## Start in the ansible/ directory for all this
+### Infrastructure Components
+1. **Proxmox VE Cluster**: 
+   - Manages the virtualization of multiple VMs, including those used for DNS, DHCP, and Kubernetes.
 
-0. todo: write instructions for creating ceph-lvm and cephfs
+2. **DNS and DHCP VM**:
+   - **IP**: 192.168.1.2/32
+   - Hosts BIND and DHCPd services.
 
-1. create the vms using [readme_proxmox](readme_proxmox) instrucitons
+3. **Pi-Hole VM**:
+   - **IP**: 192.168.1.9/32
+   - Provides network-wide ad blocking and DNS filtering.
 
-2. proceed with 3. when uptime returns w.o password on all VMs
+4. **Kubernetes VMs**:
+   - Six EFI VMs are provisioned to form a Kubernetes cluster.
+   - **Network Configuration**:
+     - **Cluster CIDR**: 10.0.0.0/16
+     - **Nodes CIDR**: 10.0.${node_number}.0/16
+     - **Services CIDR**: 10.0.250.0/20
+     - **API Server**: 192.168.1.99/32
+   - Utilizes `kube-proxy` for networking.
 
-    ```bash
-    ansible -i inventory.ini k8s  -b -a 'uptime'
-    ```
+## Getting Started with Ansible Playbooks
 
-3. proceed with step 4. only when post-install and reboot completes
+### 0. Pre-requisites
+Before starting, ensure that Ceph storage (Ceph-LVM and CephFS) is properly configured. This is a critical step before provisioning the VMs.
 
-    ```bash
-    ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml
-    ansible-playbook -i inventory.ini -l k8s playbook_base_unattended_upgrade.yaml
-    ansible-playbook -i inventory.ini -l k8s playbook_base_packages_host_settings.yaml
-    ansible-playbook -i inventory.ini -l k8s playbook_core_net_qdisc.yaml
-    ansible-playbook -i inventory.ini -l k8s playbook_base_users.yaml
-    ansible -i inventory.ini k8s  -b -a 'reboot'
-    ```
+### 1. Create the VMs
+Start by creating the necessary VMs as described in the `readme_proxmox.md` file. This is done using the following Ansible playbook:
 
-4. proceedewith step 5. when all prior ansible playbooks all apply whithout any error
-
-    ```bash
-    # safelty step through each phase and check for errors, fix plays if there are any
-    ls -1 playbook_kube_00.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_01.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_04.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_05.* | xargs -n1 -I% ansible-playbook -i inventory.ini  e
-    ls -1 playbook_kube_07.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_08.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_09.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ls -1 playbook_kube_10.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-
-    # only use this if you are SURE all playbooks have no errors already
-    ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
-    ```
-
-5. proceed to kube networking, ceph, then pods only when Kube clsuter is deployed correctly
-
-    ```bash
-    https://github.com/bluefishforsale/homelab-kube/blob/master/Readme-proxmox.md
-    ```
-
-### notes about LACP 802.3ad transmit hash etc
-
-  - The US-16-XG 10G needs to have the port-channels hash transmit modes changed via ssh
-
-### Bonding interfaces
-
-  - https://www.kernel.org/doc/Documentation/networking/bonding.txt
-  - https://www.ibm.com/docs/en/aix/7.1?topic=configuration-ieee-8023ad-link-aggregation-troubleshooting
-
-### Unifi CLI reference
-
-  - https://dl.ubnt.com/guides/edgemax/EdgeSwitch_CLI_Command_Reference_UG.pdf
-
-### And this reddit post helped
-
-  - https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_configuration/
-
-## comands needed to be run on the unifi switch to enable the layer 3-4 load-balance
-
-### Do this for unifi switches with aggregation ports
-
-    ```bash
-    ssh terrac@192.168.1.$IP
-    telnet localhost
-    enable
-    configure
-    show port-channel all
-    port-channel load-balance 6 (slot/port  or all)
-    exit
-    write memory
-    ```
-
-## AP inform controller
-
-    ```bash
-    ssh ubnt@<AP-IP>
-    ```
-You will be prompted for a username and password. The default username is usually "ubnt," and the default password is also "ubnt."
-
-Once you're connected, run the "Set-Inform" command with the appropriate controller URL:
-
-plaintext
-Copy code
-set-inform http://<controller-IP>:8080/inform
+```bash
+ansible-playbook -i inventory.ini playbook_proxmox_create_kube_vm.yaml
