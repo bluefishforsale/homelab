@@ -1,8 +1,0 @@
-  - name: Packages
-    block:
-
-      - name: isc-dhcp-server
-        ansible.builtin.apt:
-          update_cache: true
-          pkg:
-            [ isc-dhcp-server]

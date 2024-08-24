@@ -117,14 +117,15 @@
       ansible.builtin.shell:
         cmd: containerd config default > /etc/containerd/config.toml
 
-    - name: Containerd Runtime change to nvidia-container-runtime
-      when: nvidia_gpu is defined
-      ansible.builtin.lineinfile:
-        path: /etc/containerd/config.toml
-        state: present
-        backrefs: true
-        regexp: '(\ +)runtime = "runc"'
-        line: '\g<1>runtime = "nvidia-container-runtime"'
+    - name: Copy the update_config.py script to the target machine
+      ansible.builtin.copy:
+        src: files/containerd/udpate_config.py
+        dest: /tmp/update_config.py
+        mode: '0755'
+
+    - name: Ensure systemd_cgroup and runtime settings in containerd config
+      ansible.builtin.command: >
+        python3 /tmp/update_config.py /etc/containerd/config.toml {{ nvidia_gpu | default(false) | ternary(1, 0) }}
 
     - name: Write systemd Startup
       ansible.builtin.copy:
@@ -163,40 +164,8 @@
     block:
 
   ############  fix dpkg if things went sideways #####################
-    - name: Killall fuser
-      command: "killall fuser ; killall dpkg"
-      ignore_errors: true
-
-    - name: Fuser TERM
-      command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-      ignore_errors: true
-      register: fuser_term
-
-    - name: Debug Fuser TERM
-      debug:
-        msg: "fuser TERM: {{ fuser_term.stdout }}"
-      ignore_errors: true
-      when: fuser_term.rc != 0
-
-    - name: Fuser KILL
-      command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-      when: fuser_term.rc != 0
-      ignore_errors: true
-      register: fuser_kill
-
-    - name: Debug Fuser KILL
-      debug:
-        msg: "fuser kill: {{ fuser_kill.stdout }}"
-      when: fuser_kill.rc != 0
-
-    - name: Dpkg repair
-      ansible.builtin.command: dpkg --configure --pending
-      register: dpkg_repair
-
-    - name: Debug Dpkg repair
-      debug:
-        msg: "dpkg repair: {{ dpkg_repair.stdout }}"
-      when: dpkg_repair.rc != 0
+    - name: Handle dpkg locks and repair
+      include_tasks: subtask_fix_dpkg_lock.yaml
 
   ############  fix dpkg if things went sideways #####################
     - name: Worker Apt Packages
@@ -241,7 +210,7 @@
         owner: root
       with_items:
         - kubelet
-        # - kube-proxy
+        - kube-proxy
 
     - name: Copy ntpdate cron
       ansible.builtin.copy:

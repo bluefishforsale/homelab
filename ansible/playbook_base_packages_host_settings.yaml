@@ -6,335 +6,344 @@
     - vars_kube.yaml
   vars:
     go_paths: '/usr/local/go/bin'
-    packages: [
-      dialog, apt-utils, bmon, cpufrequtils, curl, dnsutils, dstat, fping,
-      golang, gpg, glances, git, gcc, htop, iotop, iperf3, ipmitool, iproute2, ipset,
-      iptraf-ng, iputils-ping, jq, fail2ban, logrotate,
-      libaa-bin, lvm2, make, net-tools, nmap, ntpdate, pciutils,
-      pv, rsyslog, strace, sysstat, tmux, unzip, vim, wget, zsh, zsh
-    ]
+    packages: 
+      - dialog
+      - apt-utils
+      - bmon
+      - cpufrequtils
+      - curl
+      - dnsutils
+      - dstat
+      - fping
+      - golang
+      - gpg
+      - glances
+      - git
+      - gcc
+      - htop
+      - iotop
+      - iperf3
+      - ipmitool
+      - iproute2
+      - ipset
+      - iptraf-ng
+      - iputils-ping
+      - jq
+      - fail2ban
+      - logrotate
+      - libaa-bin
+      - lvm2
+      - make
+      - net-tools
+      - nmap
+      - ntpdate
+      - pciutils
+      - pv
+      - rsyslog
+      - strace
+      - sysstat
+      - tmux
+      - unzip
+      - vim
+      - wget
+      - zsh
 
   tasks:
-    - name: debian hosts
-      when: ansible_facts['os_family'] == "Debian"
-      block:
-      ############ HIGHLY OPINIONATED #####################
-      # We hate snap for system services and applications #
-      #####################################################
-      - name: set kernel version
-        register: kernel_version
-        ansible.builtin.shell:
-          cmd: uname -r
+    - name: Handle dpkg locks and repair
+      include_tasks: subtask_fix_dpkg_lock.yaml
 
-      # ############  fix dpkg if things went sideways #####################
-      # - name: Killall fuser
-      #   ansible.builtin.command: "killall fuser ; killall dpkg"
-      #   ignore_errors: true
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
 
-      # - name: Fuser TERM
-      #   ansible.builtin.command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-      #   ignore_errors: true
-      #   register: fuser_term
+    - name: Install a suite of common tools
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: no
+      register: apt_status
+      until: apt_status is succeeded
+      delay: 5
+      retries: 5
+      with_items: "{{ packages }}"
+      ignore_errors: true
 
-      # - name: Debug Fuser TERM
-      #   ansible.builtin.debug:
-      #     msg: "fuser TERM: {{ fuser_term.stdout }}"
-      #   ignore_errors: true
-      #   when: fuser_term.rc != 0
+    - name: Ensure dpkg is not in a broken state
+      ansible.builtin.shell: dpkg --configure -a
+      when: apt_status is failed
+      ignore_errors: true
 
-      # - name: Fuser KILL
-      #   ansible.builtin.command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-      #   when: fuser_term.rc != 0
-      #   ignore_errors: true
-      #   register: fuser_kill
+    - name: Retry package installation if previous attempt failed
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: no
+      when: apt_status is failed
+      with_items: "{{ packages }}"
+      ignore_errors: true
 
-      # - name: Debug Fuser KILL
-      #   ansible.builtin.debug:
-      #     msg: "fuser kill: {{ fuser_kill.stdout }}"
-      #   when: fuser_kill.rc != 0
+    - name: Set kernel version
+      register: kernel_version
+      ansible.builtin.shell:
+        cmd: uname -r
 
-      - name: Dpkg repair
-        ansible.builtin.command: dpkg --configure -a --force-confdef --force-confold
-        register: dpkg_repair
+    - name: Fetch existing PATHs from /etc/environment
+      ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
+      register: old_paths
 
-      - name: Debug Dpkg repair
-        ansible.builtin.debug:
-          msg: "dpkg repair: {{ dpkg_repair.stdout }}"
-        when: dpkg_repair.rc != 0
+    - name: Add Go to the environment PATH
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        state: present
+        backrefs: true
+        regexp: '^PATH=.*'
+        line: 'PATH={{ old_paths.stdout }}:{{ go_paths }}'
 
-      ############  apt install #####################
-      - name: update cache once
-        ansible.builtin.apt:
-          update_cache: true
+    - name: Set the Host TZ and hwclock to UTC
+      community.general.timezone:
+        hwclock: local
+        name: America/Los_Angeles
 
-      - name: Wait for /var/lib/dpkg/lock-frontend to be released
-        ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+    - name: Copy ntpdate cron job
+      ansible.builtin.copy:
+        force: true
+        src: files/crons/ntpdate
+        dest: /etc/cron.d/ntpdate
+        owner: root
+        group: root
+        mode: 0644
 
-      - name: Install a suite of common tools
-        apt: name={{ item }} state=latest
-        register: apt_status
-        until: apt_status is success
-        delay: 2
-        retries: 90
-        with_items: "{{packages}}"
+    - name: Set time and date from NTP upstream
+      ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
 
-      - name: old_paths
-        ansible.builtin.shell: awk -F \= '{print $2}' /etc/environment | sed -e 's/\:/\n/g' | sort -u | sed -e 's/\"//g' | xargs | sed -e 's/\ /:/g'
-        register: old_paths
+    - name: Create /etc/rsyslog.d/ directory
+      ansible.builtin.file:
+        path: /etc/rsyslog.d/
+        state: directory
 
-      - name: add go to the environment PATH
-        ansible.builtin.lineinfile:
-          path: /etc/environment
-          state: present
-          backrefs: true
-          regexp: '^PATH=.*'
-          line: 'PATH={{ old_paths.stdout }}:{{ go_paths }}'
+    - name: Rsyslog drop IPVS no route messages
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
+        content: |
+          :msg, regex, ".*IPVS.*no destination available" ~
 
-      - name: Set the Host TZ and hwclock to UTC
-        community.general.timezone:
-          hwclock: local
-          name: America/Los_Angeles
+    - name: Rsyslog remote server configuration
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/rsyslog.d/99-remote-syslog.conf"
+        content: |
+          module(load="omprog")
+          module(load="mmutf8fix")
+          action(type="mmutf8fix" replacementChar="?")
+          action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
 
-      - name: copy ntpdate cmon
-        ansible.builtin.copy:
-          force: true
-          src: files/crons/ntpdate
-          dest: /etc/cron.d/ntpdate
-          owner: root
-          group: root
-          mode: 0644
+    - name: Configure systemd-udev MAC link
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/network/99-default.link"
+        content: |
+          [Link]
+          NamePolicy=kernel database onboard slot path
+          MACAddressPolicy=persistent
 
-      - name: Set time and date from NTP upstream
-        ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
-
-      - name: Make /etc/rsyslog.d/
-        ansible.builtin.file:
-          path: /etc/rsyslog.d/
-          state: directory
-
-      - name: rsyslog drop IPVS no route messages
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
-          content: |
-            :msg, regex, ".*IPVS.*no destination available" ~
-
-      - name: Rsyslog remote server
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/rsyslog.d/99-remote-syslog.conf"
-          content: |
-            module(load="omprog")
-            module(load="mmutf8fix")
-            action(type="mmutf8fix" replacementChar="?")
-            action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
-
-      - name: Systemd-udev MAC link
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/network/99-default.link"
-          content: |
-            [Link]
-            NamePolicy=kernel database onboard slot path
-            MACAddressPolicy=persistent
-
-      - name: Increase file limits
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/security/limits.conf"
-          mode: "0644"
-          content: |
-            # put stuff here
+    - name: Increase file limits
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/security/limits.conf"
+        mode: "0644"
+        content: |
+          # put stuff here
 
     ################# Sysctl, modules, swap
 
-      - name: Swap off in /etc/fstab
-        ansible.builtin.replace:
-          path: /etc/fstab
-          regexp: '^(\/swap.*)$'
-          replace: '#\1'
+    - name: Disable swap in /etc/fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^(\/swap.*)$'
+        replace: '#\1'
 
-      - name: Swapp-off command for current boot
-        ansible.builtin.shell: swapoff -a
+    - name: Disable swap for current boot
+      ansible.builtin.shell: swapoff -a
 
-      - name: Container Modules
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/modules-load.d/99-containerd.conf"
-          content: |
-            overlay
-            br_netfilter
+    - name: Load container modules
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/modules-load.d/99-containerd.conf"
+        content: |
+          overlay
+          br_netfilter
 
-      - name: Live Modprobe
-        ansible.builtin.shell:
-          cmd: modprobe "{{ item }}"
-        with_items: [overlay, br_netfilter]
+    - name: Live modprobe of container modules
+      ansible.builtin.shell:
+        cmd: modprobe "{{ item }}"
+      with_items: [overlay, br_netfilter]
 
-      - name: Write Sysctl Startup Params
-        ansible.builtin.copy:
-          dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
-          content: |
-            net.bridge.bridge-nf-call-iptables  = 1
-            net.bridge.bridge-nf-call-ip6tables = 1
-            net.ipv4.ip_forward                 = 1
-            # ciliumn rp_filter
-            # https://github.com/cilium/cilium/issues/10645
-            # rp_filter non container
-            net.ipv4.conf.*.rp_filter = 0
-            net.ipv4.conf.all.rp_filter = 0
-            net.ipv4.conf.default.rp_filter = 0
-            net.ipv4.conf.cilium_geneve.rp_filter = 0
+    - name: Write sysctl startup parameters
+      ansible.builtin.copy:
+        dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+          # cilium rp_filter
+          # https://github.com/cilium/cilium/issues/10645
+          # rp_filter non container
+          net.ipv4.conf.*.rp_filter = 0
+          net.ipv4.conf.all.rp_filter = 0
+          net.ipv4.conf.default.rp_filter = 0
+          net.ipv4.conf.cilium_geneve.rp_filter = 0
 
-      - name: Sysctl Tunings
-        ansible.builtin.copy:
-          dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
-          content: |
-            # allow binding to interfaces not yet up (haproxy/keepalived)
-            net.ipv4.ip_nonlocal_bind = 1
-            # don't cache ss-thresh from previous connection
-            net.ipv4.tcp_no_metrics_save = 1
-            # Enable Forward Acknowledgment, which operates with Selective Acknowledgment (SACK) to reduce congestion.
-            net.ipv4.tcp_fack = 1
-            # recommended default congestion control is htcp
-            net.ipv4.tcp_congestion_control = htcp
-            # The maximum number of packets queued in received state
-            net.core.netdev_max_backlog = 30000
-            # Enable selective acknowledgment, which improves performance by selectively acknowledging packets received out of order.
-            net.ipv4.tcp_sack = 1
-            # Enable calculation of RTT in a more accurate way (see RFC 1323) than the retransmission timeout.
-            net.ipv4.tcp_timestamps = 1
-            # If you are using Jumbo Frames, also set this
-            net.ipv4.tcp_mtu_probing = 1
-            # Avoid falling back to slow start after a connection goes idle.
-            net.ipv4.tcp_slow_start_after_idle = 0
-            # recommended to enable 'fair queueing'
-            net.core.default_qdisc = fq
-            # increase TCP max buffer sizes 512MB
-            net.core.rmem_max = 512000000
-            net.core.wmem_max = 512000000
-            # Support windows larger than 64KB.
-            net.ipv4.tcp_window_scaling = 1
-            # jumbo frames needs probing
-            net.ipv4.tcp_mtu_probing = 1
-            # increase Linux autotuning TCP buffer limit
-            net.ipv4.tcp_rmem = 4096 87380 512000000
-            net.ipv4.tcp_wmem = 4096 65536 512000000
-            # file watches increase
-            fs.inotify.max_queued_events = 1310720
-            fs.inotify.max_user_instances = 20480
-            fs.inotify.max_user_watches = 655360
-            user.max_inotify_instances = 20480
-            user.max_inotify_watches = 655360
-            kern.maxfiles = 16777216
-            kern.maxfilesperproc = 524288
-            # no swapping
-            vm.swappiness = 0
+    - name: Apply custom sysctl tunings
+      ansible.builtin.copy:
+        dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
+        content: |
+          # allow binding to interfaces not yet up (haproxy/keepalived)
+          net.ipv4.ip_nonlocal_bind = 1
+          # don't cache ss-thresh from previous connection
+          net.ipv4.tcp_no_metrics_save = 1
+          # Enable Forward Acknowledgment, which operates with Selective Acknowledgment (SACK) to reduce congestion.
+          net.ipv4.tcp_fack = 1
+          # recommended default congestion control is htcp
+          net.ipv4.tcp_congestion_control = htcp
+          # The maximum number of packets queued in received state
+          net.core.netdev_max_backlog = 30000
+          # Enable selective acknowledgment, which improves performance by selectively acknowledging packets received out of order.
+          net.ipv4.tcp_sack = 1
+          # Enable calculation of RTT in a more accurate way (see RFC 1323) than the retransmission timeout.
+          net.ipv4.tcp_timestamps = 1
+          # If you are using Jumbo Frames, also set this
+          net.ipv4.tcp_mtu_probing = 1
+          # Avoid falling back to slow start after a connection goes idle.
+          net.ipv4.tcp_slow_start_after_idle = 0
+          # recommended to enable 'fair queueing'
+          net.core.default_qdisc = fq
+          # increase TCP max buffer sizes 512MB
+          net.core.rmem_max = 512000000
+          net.core.wmem_max = 512000000
+          # Support windows larger than 64KB.
+          net.ipv4.tcp_window_scaling = 1
+          # jumbo frames needs probing
+          net.ipv4.tcp_mtu_probing = 1
+          # increase Linux autotuning TCP buffer limit
+          net.ipv4.tcp_rmem = 4096 87380 512000000
+          net.ipv4.tcp_wmem = 4096 65536 512000000
+          # file watches increase
+          fs.inotify.max_queued_events = 1310720
+          fs.inotify.max_user_instances = 20480
+          fs.inotify.max_user_watches = 655360
+          user.max_inotify_instances = 20480
+          user.max_inotify_watches = 655360
+          kern.maxfiles = 16777216
+          kern.maxfilesperproc = 524288
+          # no swapping
+          vm.swappiness = 0
 
+    - name: Reload sysctl settings
+      ansible.builtin.shell: sysctl --system
 
-      - name: Sysctl reload
-        ansible.builtin.shell: sysctl --system
+    - name: Write IO scheduler script
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/io-scheduler.sh"
+        mode: 0755
+        content: |
+          for SCH in /sys/block/*/queue/scheduler ; do
+              echo "deadline" > "${SCH}" 2>/dev/null
+          done
+          for DEPTH in /sys/block/*/queue/nr_requests ; do
+              echo "1024" > "${DEPTH}" 2>/dev/null
+          done
+          for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
+              echo "4096" > "${RAHEAD}" 2>/dev/null
+          done
 
-      - name: Write io-scheduler script
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/system/io-scheduler.sh"
-          mode: 0755
-          content: |
-            for SCH in /sys/block/*/queue/scheduler ; do
-                echo "deadline" > "${SCH}" 2>/dev/null
-            done
-            for DEPTH in /sys/block/*/queue/nr_requests ; do
-                echo "1024" > "${DEPTH}" 2>/dev/null
-            done
-            for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
-                echo "4096" > "${RAHEAD}" 2>/dev/null
-            done
+    - name: Write IO scheduler service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/io-scheduler.service"
+        content: |
+          [Unit]
+          Description=Setup IO Scheduler
+          #After=network.target
 
-      - name: Write io-scheduler service
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/system/io-scheduler.service"
-          content: |
-            [Unit]
-            Description=Setup foo
-            #After=network.target
+          [Service]
+          Type=oneshot
+          ExecStart=sh -c /etc/systemd/system/io-scheduler.sh
+          RemainAfterExit=true
+          StandardOutput=journal
 
-            [Service]
-            Type=oneshot
-            ExecStart=sh -c /etc/systemd/system/io-scheduler.sh
-            RemainAfterExit=true
-            StandardOutput=journal
+          [Install]
+          WantedBy=multi-user.target
 
-            [Install]
-            WantedBy=multi-user.target
+    - name: Write blockdev readahead service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/blockdev-setra.service"
+        content: |
+          [Unit]
+          Description=Set readahead for the hard drive device
+          After=local-fs.target
 
-      - name: Write blockdev readahead service
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/system/blockdev-setra.service"
-          content: |
-            [Unit]
-            Description=Set readahead for the hard drive device
-            After=local-fs.target
+          [Service]
+          Type=oneshot
+          ExecStart=bash -c '/sbin/blockdev --setra 8192 /dev/sd*'
 
-            [Service]
-            Type=oneshot
-            ExecStart=bash -c '/sbin/blockdev --setra 8192 /dev/sd*'
+          [Install]
+          WantedBy=multi-user.target
 
-            [Install]
-            WantedBy=multi-user.target
+    - name: Write cpufrequtils GOVERNOR
+      ansible.builtin.copy:
+        force: true
+        dest: /etc/default/cpufrequtils
+        mode: "0644"
+        content: GOVERNOR="powersave"
 
-      - name: Write cpufrequtils GOVERNOR
-        ansible.builtin.copy:
-          force: true
-          dest: /etc/default/cpufrequtils
-          mode: "0644"
-          content: GOVERNOR="powersave"
+    - name: Write CPU performance script
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/cpu-performance.sh"
+        mode: "0755"
+        content: |
+          for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
+              echo "performance" > "${CPU}" 2>/dev/null
+          done
 
-      - name: Write cpu-performance script
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/system/cpu-performance.sh"
-          mode: "0755"
-          content: |
-            for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
-                echo "performance" > "${CPU}" 2>/dev/null
-            done
+    - name: Write CPU performance service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/cpu-performance.service"
+        content: |
+          [Unit]
+          Description=Setup CPU Performance
+          #After=network.target
 
-      - name: Write cpu-performance service
-        ansible.builtin.copy:
-          force: true
-          dest: "/etc/systemd/system/cpu-performance.service"
-          content: |
-            [Unit]
-            Description=Setup foo
-            #After=network.target
+          [Service]
+          Type=oneshot
+          ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
+          RemainAfterExit=true
+          StandardOutput=journal
 
-            [Service]
-            Type=oneshot
-            ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
-            RemainAfterExit=true
-            StandardOutput=journal
+          [Install]
+          WantedBy=multi-user.target
 
-            [Install]
-            WantedBy=multi-user.target
-
-      - name: TEMP disable services
-        ansible.builtin.systemd:
-          name: "{{item}}"
-          state: stopped
-          enabled: false
-          daemon_reload: true
-        with_items:
+    - name: Temporarily disable services
+      ansible.builtin.systemd:
+        name: "{{item}}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      with_items:
         - cpu-performance
 
-      - name: Enable and restart performance services
-        ansible.builtin.systemd:
-          name: "{{item}}"
-          state: restarted
-          enabled: true
-          daemon_reload: true
-        with_items:
+    - name: Enable and restart performance services
+      ansible.builtin.systemd:
+        name: "{{item}}"
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      with_items:
         - blockdev-setra
         - io-scheduler
         - rsyslog
@@ -342,104 +351,103 @@
         - cpufrequtils
         - fail2ban
 
-      - name: UPS battery backups
-        when: apcupsd is defined
-        block:
+    - name: UPS battery backups
+      when: apcupsd is defined
+      block:
 
-        - name: print debug
-          ansible.builtin.debug:
-            msg: "APC UPSd software and config"
+      - name: Print debug
+        ansible.builtin.debug:
+          msg: "APC UPSd software and config"
 
-        - name: Install a suite of common tools
-          ansible.builtin.apt:
-            pkg: [apcupsd]
+      - name: Install APC UPS tools
+        ansible.builtin.apt:
+          pkg: [apcupsd]
 
-        - name: APCUPSd config
-          ansible.builtin.copy:
-            force: true
-            dest: "/etc/apcupsd/apcupsd.conf"
-            content: |
-              UPSNAME smartups1500
-              UPSCABLE usb
-              UPSTYPE usb
-              MINUTES 7
-              DEVICE
-              POLLTIME 60
-
-        - name: UPSd /etc/default
-          ansible.builtin.copy:
-            force: true
-            dest: "/etc/default/apcupsd"
-            content: |
-              ISCONFIGURED=true
-
-        - name: min time left script
-          ansible.builtin.copy:
-            force: true
-            mode: "0755"
-            dest: "/etc/apcupsd/runlimit"
-            content: |
-              #!/bin/bash
-              # http://www.apcupsd.org/manual/manual.html#configure-options
-              for host in ocean.home $(printf "node%03d " $(seq 1 6) | xargs -n1 | grep -vi $(hostname)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
-              wait
-              shutdown -h now
-
-        - name: enable and restart services
-          ansible.builtin.systemd:
-            name: apcupsd
-            state: restarted
-            enabled: true
-            daemon_reload: true
-
-      - name: Write journald config
+      - name: APCUPSd config
         ansible.builtin.copy:
           force: true
-          dest: "/etc/systemd/journald.conf"
+          dest: "/etc/apcupsd/apcupsd.conf"
           content: |
-            # This file is part of systemd.
-            # the goal of this config is to avoid writing the journald contents to disk
-            # we collect up to 10k lines per unit in memory
-            # then we limit overall size in ram by memory size constraints
-            # do yo really think anyone is going to read-back in journald more then 10k lines?
+            UPSNAME smartups1500
+            UPSCABLE usb
+            UPSTYPE usb
+            MINUTES 7
+            DEVICE
+            POLLTIME 60
 
+      - name: UPSd /etc/default config
+        ansible.builtin.copy:
+          force: true
+          dest: "/etc/default/apcupsd"
+          content: |
+            ISCONFIGURED=true
 
-            [Journal]
-            # Storage=persistent
-            Storage=volatile
-            Compress=false
-            LineMax=10K
-            #RuntimeMaxUse=100M
-            SystemMaxUse=10M
-            SystemMaxFileSize=5M
-            ForwardToSyslog=false
-            #Seal=true
-            #SplitMode=uid
-            #SyncIntervalSec=5m
-            #RateLimitIntervalSec=30s
-            #RateLimitBurst=10000
-            #SystemKeepFree=
-            #SystemMaxFiles=100
-            #RuntimeKeepFree=
-            #RuntimeMaxFileSize=
-            #RuntimeMaxFiles=100
-            #MaxRetentionSec=
-            #MaxFileSec=1month
-            #ForwardToKMsg=no
-            #ForwardToConsole=no
-            #ForwardToWall=true
-            #TTYPath=/dev/console
-            #MaxLevelStore=debug
-            #MaxLevelSyslog=debug
-            #MaxLevelKMsg=noticsort | unique | @she
-            #MaxLevelConsole=info
-            #MaxLevelWall=emerg
-            #ReadKMsg=true
-            #Audit=no
+      - name: Min time left script
+        ansible.builtin.copy:
+          force: true
+          mode: "0755"
+          dest: "/etc/apcupsd/runlimit"
+          content: |
+            #!/bin/bash
+            # http://www.apcupsd.org/manual/manual.html#configure-options
+            for host in ocean.home $(printf "node%03d " $(seq 1 6) | xargs -n1 | grep -vi $(hostname)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
+            wait
+            shutdown -h now
 
-      - name: enable and restart systemd-journald
+      - name: Enable and restart APC UPS services
         ansible.builtin.systemd:
-          name: systemd-journald.service
+          name: apcupsd
           state: restarted
           enabled: true
           daemon_reload: true
+
+    - name: Write journald config
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/journald.conf"
+        content: |
+          # This file is part of systemd.
+          # The goal of this config is to avoid writing the journald contents to disk
+          # we collect up to 10k lines per unit in memory
+          # then we limit overall size in ram by memory size constraints
+          # do you really think anyone is going to read-back in journald more than 10k lines?
+
+          [Journal]
+          # Storage=persistent
+          Storage=volatile
+          Compress=false
+          LineMax=10K
+          #RuntimeMaxUse=100M
+          SystemMaxUse=10M
+          SystemMaxFileSize=5M
+          ForwardToSyslog=false
+          #Seal=true
+          #SplitMode=uid
+          #SyncIntervalSec=5m
+          #RateLimitIntervalSec=30s
+          #RateLimitBurst=10000
+          #SystemKeepFree=
+          #SystemMaxFiles=100
+          #RuntimeKeepFree=
+          #RuntimeMaxFileSize=
+          #RuntimeMaxFiles=100
+          #MaxRetentionSec=
+          #MaxFileSec=1month
+          #ForwardToKMsg=no
+          #ForwardToConsole=no
+          #ForwardToWall=true
+          #TTYPath=/dev/console
+          #MaxLevelStore=debug
+          #MaxLevelSyslog=debug
+          #MaxLevelKMsg=notice
+          #MaxLevelConsole=info
+          #MaxLevelWall=emerg
+          #ReadKMsg=true
+          #Audit=no
+
+    - name: Enable and restart systemd-journald
+      ansible.builtin.systemd:
+        name: systemd-journald.service
+        state: restarted
+        enabled: true
+        daemon_reload: true

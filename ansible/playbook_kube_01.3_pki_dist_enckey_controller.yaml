@@ -1,4 +1,4 @@
-- name: Kube 06 Dist Encryption Config
+- name: Dist Encryption Config to kube controllers
   hosts: k8s_controller
   strategy: linear
   become: yes

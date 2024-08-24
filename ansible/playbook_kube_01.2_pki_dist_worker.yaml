@@ -1,4 +1,4 @@
-- name: Kube 04.2 Dist PKI Workers
+- name: Dist certs to kube workers
   hosts: k8s
   strategy: linear
   become: yes

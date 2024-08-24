@@ -1,0 +1,48 @@
+---
+# Task to handle dpkg locks and repair any pending dpkg configurations
+
+- name: Ensure dpkg is not locked before proceeding
+  block:
+    - name: Check if dpkg or apt is running
+      shell: pgrep -x "dpkg|apt"
+      register: dpkg_apt_running
+      failed_when: dpkg_apt_running.rc == 0
+      retries: 10
+      delay: 5
+      until: dpkg_apt_running.rc != 0
+      ignore_errors: true
+
+    - name: Attempt to gracefully stop any ongoing dpkg or apt operations
+      shell: killall dpkg apt
+      when: dpkg_apt_running.rc == 0
+      ignore_errors: true
+
+    - name: Wait for dpkg or apt lock files to be released
+      shell: >
+        while fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock"; sleep 5;
+        done
+      register: dpkg_lock_check
+      retries: 10
+      delay: 5
+      until: dpkg_lock_check.rc == 0
+      ignore_errors: true
+
+    - name: Forcefully kill any remaining dpkg or apt processes (as last resort)
+      shell: killall -9 dpkg apt
+      when: dpkg_lock_check.rc != 0
+      ignore_errors: true
+
+    - name: Repair any broken dpkg installations
+      ansible.builtin.command: dpkg --configure --pending
+      register: dpkg_repair
+
+    - name: Debug dpkg repair output
+      debug:
+        msg: "dpkg repair: {{ dpkg_repair.stdout }}"
+      when: dpkg_repair.rc != 0
+
+  rescue:
+    - name: Log failure to handle dpkg locks gracefully
+      debug:
+        msg: "Failed to handle dpkg locks after multiple attempts"

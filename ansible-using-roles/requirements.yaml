@@ -1,6 +1,0 @@
-# Install roles from the Ansible Galaxy
-- src: ansible.posix
-
-# # Install a role from GitHub
-# - name: opendaylight
-#   src: https://github.com/dfarrell07/ansible-opendaylight

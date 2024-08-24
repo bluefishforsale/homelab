@@ -37,9 +37,20 @@
     ansible -i inventory.ini k8s  -b -a 'reboot'
     ```
 
-4. proceed with step 5. when ansible playbooks all apply whithout any error
+4. proceedewith step 5. when all prior ansible playbooks all apply whithout any error
 
     ```bash
+    # safelty step through each phase and check for errors, fix plays if there are any
+    ls -1 playbook_kube_00.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_01.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_04.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_05.* | xargs -n1 -I% ansible-playbook -i inventory.ini  e
+    ls -1 playbook_kube_07.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_08.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_09.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+    ls -1 playbook_kube_10.* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+
+    # only use this if you are SURE all playbooks have no errors already
     ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
     ```
 

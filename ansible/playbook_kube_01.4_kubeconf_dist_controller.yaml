@@ -1,4 +1,4 @@
-- name: Kube 05.2 Dist Kubeconfigs Controllers
+- name: Dist Kubeconfigs to kube controllers
   hosts: k8s_controller
   strategy: linear
   become: yes
@@ -11,7 +11,7 @@
 
     - name: Ensure we have a directory to place files
       file:
-        path: "{{ k8s_dir }}"
+        path: "{{ controller_confpath }}"
         mode: 0755
         owner: root
         group: root
@@ -20,7 +20,7 @@
     - name: Copy admin controller and scheduler configs
       copy:
         force: yes
-        dest: "{{ k8s_dir }}/{{ item }}"
+        dest: "{{ controller_confpath }}/{{ item }}"
         src: "files/kubeconf/{{item}}"
         mode: 0644
         group: root
