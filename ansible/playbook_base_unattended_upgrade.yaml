@@ -1,22 +1,33 @@
-- name: unattended upgrade
+---
+- name: Unattended Upgrade with Dedicated Cron File
   become: true
   hosts: all
 
   tasks:
-  - name: kill any running apt-get process
-    ansible.builtin.shell: killall apt-get
-    ignore_errors: true
+  - name: Handle dpkg locks and repair
+    include_tasks: subtask_fix_dpkg_lock.yaml
 
   - name: Wait for /var/lib/dpkg/lock-frontend to be released
     ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
 
-  - name: install unattended-upgrade package
-    apt: name={{ item }} state=latest
+  - name: Install unattended-upgrades package
+    apt:
+      name: unattended-upgrades
+      state: latest
     register: apt_status
     until: apt_status is success
     delay: 6
     retries: 30
-    with_items: [ unattended-upgrades ]
 
-  - name: unattended upgrade
-    command: unattended-upgrade
+  - name: Run unattended upgrades immediately
+    command: unattended-upgrades
+
+  # - name: Create cron file for unattended-upgrades
+  #   copy:
+  #     dest: /etc/cron.d/unattended-upgrades
+  #     content: |
+  #       # Cron job for unattended-upgrades
+  #       0 3 * * * root /usr/bin/unattended-upgrades
+  #     owner: root
+  #     group: root
+  #     mode: '0644'

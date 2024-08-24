@@ -32,3 +32,6 @@ ls -1 playbook_kube_10.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
 # Run all playbooks in one go if you're confident there are no errors
 ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini %
 ```
+
+### 5. Networking, Ceph, and Pod Deployment
+[Readme-proxmox.md](https://github.com/bluefishforsale/homelab-kube/blob/master/Readme.md)

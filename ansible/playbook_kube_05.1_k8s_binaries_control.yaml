@@ -1,6 +1,6 @@
 - name: Setup Kubernetes control plane binaries
   hosts: k8s_controller
-  strategy: linear
+  strategy: free
   become: true
   vars_files:
     - vars_kube.yaml

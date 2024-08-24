@@ -1,6 +1,6 @@
-- name: Kube 08 node kubectl admin
+- name: Kubectl admin
   hosts: k8s
-  strategy: linear
+  strategy: free
   vars_files:
     - vars_kube.yaml
 

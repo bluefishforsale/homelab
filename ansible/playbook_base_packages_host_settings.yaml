@@ -1,7 +1,8 @@
+---
 - name: root and system level
   become: true
   hosts: all
-  strategy: linear
+  strategy: free
   vars_files:
     - vars_kube.yaml
   vars:
@@ -52,10 +53,59 @@
     - name: Handle dpkg locks and repair
       include_tasks: subtask_fix_dpkg_lock.yaml
 
+    - name: Reinstall libkrb5support0:amd64
+      apt:
+        name: libkrb5support0:amd64
+        state: present
+        force: yes
+      ignore_errors: yes
+
+    - name: Attempt to configure all pending packages
+      command: dpkg --configure --pending
+      register: dpkg_configure_result
+      ignore_errors: yes
+
+    - name: Debug dpkg configure result
+      debug:
+        msg: "{{ dpkg_configure_result.stderr }}"
+      when: dpkg_configure_result.rc != 0
+
+    - name: Attempt to reinstall libkrb5support0:amd64 and related packages
+      apt:
+        name:
+          - libkrb5support0:amd64
+          - libgssapi-krb5-2:amd64
+          - libk5crypto3:amd64
+          - libcurl4:amd64
+          - libkrb5-3:amd64
+          - curl
+          - bind9-dnsutils
+          - bind9-libs:amd64
+          - libcurl3-gnutls:amd64
+          - dnsutils
+          - git
+          - bind9-host
+        state: present
+        force: yes
+      ignore_errors: yes
+
+    - name: Final attempt to configure all packages
+      command: dpkg --configure --pending
+      ignore_errors: yes
+
+    - name: Debug final dpkg configure result
+      debug:
+        msg: "{{ dpkg_configure_result.stderr }}"
+      when: dpkg_configure_result.rc != 0
+
     - name: Update apt cache if not done in the last 24 hours
       ansible.builtin.apt:
         update_cache: yes
         cache_valid_time: 86400  # 24 hours
+
+    - name: Calculate the number of package retries
+      set_fact:
+        total_retries: "{{ packages | length * 5 }}"
 
     - name: Install a suite of common tools
       apt:
@@ -65,7 +115,7 @@
       register: apt_status
       until: apt_status is succeeded
       delay: 5
-      retries: 5
+      retries: "{{ total_retries }}"
       with_items: "{{ packages }}"
       ignore_errors: true
 
@@ -445,9 +495,30 @@
           #ReadKMsg=true
           #Audit=no
 
-    - name: Enable and restart systemd-journald
+    - name: Enable systemd-journald
       ansible.builtin.systemd:
         name: systemd-journald.service
-        state: restarted
         enabled: true
-        daemon_reload: true
+
+    - name: Restart systemd-journald with a timeout
+      ansible.builtin.command: >
+        systemctl restart systemd-journald.service
+      args:
+        warn: false
+        timeout: 30
+      register: restart_journald_result
+      retries: 3
+      delay: 10
+      until: restart_journald_result.rc == 0
+      ignore_errors: yes
+
+    - name: Verify systemd-journald status
+      ansible.builtin.systemd:
+        name: systemd-journald.service
+        state: started
+      register: journald_status
+      retries: 3
+      delay: 5
+      until: journald_status.status == 'started'
+      ignore_errors: yes
+

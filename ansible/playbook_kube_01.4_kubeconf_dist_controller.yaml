@@ -1,6 +1,6 @@
 - name: Dist Kubeconfigs to kube controllers
   hosts: k8s_controller
-  strategy: linear
+  strategy: free
   become: yes
   vars_files:
     - vars_kube.yaml

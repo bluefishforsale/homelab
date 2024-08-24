@@ -1,6 +1,6 @@
-- name: Kube 09 cilium
+- name: Cilium
   hosts: k8s
-  strategy: linear
+  strategy: free
   become: true
 
   vars_files:

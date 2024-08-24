@@ -1,6 +1,6 @@
-- name: Kube 07 etcd
+- name: Etcd
   hosts: etcd
-  strategy: linear
+  strategy: free
   become: true
   vars_files:
     - vars_kube.yaml

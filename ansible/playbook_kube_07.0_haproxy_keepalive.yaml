@@ -1,6 +1,6 @@
-- name: Kube 07 Haproxy keepalived
+- name: Haproxy keepalived
   hosts: k8s_controller
-  strategy: linear
+  strategy: free
   become: true
   vars_files:
     - vars_kube.yaml

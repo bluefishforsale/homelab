@@ -28,10 +28,16 @@ This repository contains Ansible playbooks to automate the setup and management 
 ## Getting Started with Ansible Playbooks
 
 ### 0. Pre-requisites
-Before starting, ensure that Ceph storage (Ceph-LVM and CephFS) is properly configured. This is a critical step before provisioning the VMs.
+
+This is a critical step before provisioning the VMs.
+- [Proxmox host ready to run VMs](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md)
+- Ensure that Ceph storage (Ceph-LVM and CephFS) is properly configured
+- TODO: integrate this into the DHCP setup w/ PXE and Preseed
 
 ### 1. Create the VMs
-Start by creating the necessary VMs as described in the `readme_proxmox.md` file. This is done using the following Ansible playbook:
+Start by creating the necessary VMs as described in the [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md) file. This is done using the following Ansible playbook:
 
+WIP: ansible playbook to create the VMs 
 ```bash
 ansible-playbook -i inventory.ini playbook_proxmox_create_kube_vm.yaml
+```

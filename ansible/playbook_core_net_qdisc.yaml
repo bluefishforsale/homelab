@@ -1,23 +1,25 @@
-- name: kubernetes Network Tuning
+- name: Kubernetes Network Tuning
   hosts: all
   become: true
 
   tasks:
-  - name: register interfaces carrier
+  - name: Register primary network interface
     ansible.builtin.shell: |
-      grep -l 1 /sys/class/net/e*/carrier | xargs -n1 dirname | xargs -n1 basename
-    register: carrier_up
+      ip route | grep default | awk '{print $5}'
+    register: primary_interface
 
-  - name: register interfaces speeds
+  - name: Check if a non-default qdisc exists
     ansible.builtin.shell: |
-      grep -v -- -1 /sys/class/net/e*/speed | sed -e 's/\// /g'
-    register: iface_speed
+      /sbin/tc qdisc show dev {{ primary_interface.stdout.strip() }} | grep -q "htb"
+    register: qdisc_exists
+    failed_when: false
 
   - name: tc qdisc boot oneshot service
     copy:
       dest: /etc/systemd/system/net_qdisc.service
       content: |
         [Unit]
+        Description=Configure network qdisc for 10Gb interface
         After=network.target
 
         [Install]
@@ -26,9 +28,17 @@
         [Service]
         Type=oneshot
         RemainAfterExit=true
-        ExecStart=/sbin/tc qdisc del dev eth0 root
-        ExecStart=/sbin/tc qdisc add dev eth0 root handle 1: htb default 12
-        ExecStart=/sbin/tc class add dev eth0 parent 1:1 classid 1:12 htb rate 10gbit
+        ExecStartPre=/bin/echo "Starting qdisc configuration on {{ primary_interface.stdout.strip() }}"
+        ExecStartPre=/usr/bin/logger "Executing tc commands for qdisc configuration"
+        {% if qdisc_exists.rc == 0 %}
+        ExecStart=/sbin/tc qdisc del dev {{ primary_interface.stdout.strip() }} root
+        {% endif %}
+        ExecStart=/sbin/tc qdisc add dev {{ primary_interface.stdout.strip() }} root handle 1: htb default 12
+        ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1: classid 1:1 htb rate 10gbit burst 15k
+        ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1:1 classid 1:12 htb rate 9gbit ceil 10gbit burst 15k
+        ExecStartPost=/bin/echo "Finished qdisc configuration on {{ primary_interface.stdout.strip() }}"
+        ExecStartPost=/usr/bin/logger "Completed tc commands for qdisc configuration"
+    when: primary_interface.stdout.strip() != ""
 
   - name: Enable and Start service
     systemd:

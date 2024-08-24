@@ -17,10 +17,6 @@
     nameserver: "192.168.1.2"
     disk_resize: "+18G"
     gpu_pci: "42:00"
-    number_of_sets: 2
-    vms_per_set: 3
-    ip_suffix: "{{ item.x }}{{ item.y }}"
-    base_ip: "192.168.1"
 
   tasks:
 
@@ -36,116 +32,112 @@
       dest: /tmp/rsa.key
       mode: '0644'
 
-  - name: Create the base VM
+  - name: Check if the base VM exists
+    ansible.builtin.shell: |
+      qm status {{ vm_base_id }}
+    register: base_vm_status
+    ignore_errors: true
+    changed_when: false
+
+  - name: Create the base VM if it doesn't exist
     ansible.builtin.shell: >
       qm create {{ vm_base_id }} --name {{ vm_template_name }} --net0 virtio,bridge={{ vmbridge }}
-    args:
-      warn: false
+    when: base_vm_status.rc == 2
 
   - name: Import QCOW2 disk to VM
     ansible.builtin.shell: >
       qm importdisk {{ vm_base_id }} /tmp/debian-12-generic-amd64.qcow2 {{ storage_pool }}
-    args:
-      warn: false
+    when: base_vm_status.rc == 2
 
   - name: Configure the base VM
     block:
       - name: Set VM options
         ansible.builtin.shell: >
           qm set {{ vm_base_id }} --ide2 {{ storage_pool }}:cloudinit
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
       - name: Attach and configure disks and interfaces
         ansible.builtin.shell: >
           qm set {{ vm_base_id }} --scsihw virtio-scsi-pci --scsi0 {{ storage_pool }}:vm-{{ vm_base_id }}-disk-0
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
       - name: Configure boot order and serial console
         ansible.builtin.shell: >
           qm set {{ vm_base_id }} --boot order='scsi0' --serial0 socket --vga serial0
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
       - name: Set SSH keys and other VM parameters
         ansible.builtin.shell: >
           qm set {{ vm_base_id }} --sshkeys /tmp/rsa.key --hotplug network,disk --bios ovmf --machine q35 --efidisk0 {{ storage_pool }}:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
       - name: Set CPU cores, memory, and agent
         ansible.builtin.shell: >
           qm set {{ vm_base_id }} --cores 2 --memory 4096 --agent enabled=1
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
       - name: Convert VM to template
         ansible.builtin.shell: >
           qm template {{ vm_base_id }}
-        args:
-          warn: false
+        when: base_vm_status.rc == 2
 
-  - name: Clone and configure VMs
-    with_sequence: start=0 end={{ number_of_sets - 1 }}
-    loop_control:
-      loop_var: x
-    block:
-      - name: Create VM clones and set configurations
-        with_sequence: start=1 end={{ vms_per_set }}
-        loop_control:
-          loop_var: y
-        block:
+  - name: Initialize VM status dictionary
+    set_fact:
+      vm_status_dict: {}
 
-          - name: Clone VM from template
-            ansible.builtin.shell: >
-              qm clone {{ vm_base_id }} 6{{ x }}{{ y }}
-            args:
-              warn: false
+  - name: Check status of each cloned VM
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: |
+      qm status {{ item }}
+    register: vm_status_check
+    ignore_errors: true
+    changed_when: false
 
-          - name: Set basic configuration for cloned VM
-            ansible.builtin.shell: >
-              qm set 6{{ x }}{{ y }} --name kube6{{ x }}{{ y }} --ipconfig0 ip=$(host kube6{{ x }}{{ y }}.home | awk '{{print $NF}}')/24,gw={{ gateway }} --nameserver={{ nameserver }} --onboot 1
-            args:
-              warn: false
+  - name: Store VM status in dictionary
+    set_fact:
+      vm_status_dict: "{{ vm_status_dict | combine({ item: vm_status_check.results[loop.index0].rc }) }}"
+    loop: "{{ vmids }}"
 
-          - name: Set SSH keys for cloned VM
-            ansible.builtin.shell: >
-              qm set 6{{ x }}{{ y }} --sshkeys /tmp/rsa.key
-            args:
-              warn: false
-
-          - name: Resize VM disk
-            ansible.builtin.shell: >
-              qm resize 6{{ x }}{{ y }} scsi0 {{ disk_resize }}
-            args:
-              warn: false
-
-          - name: Configure cores and memory for VM
-            when: x == 0
-            ansible.builtin.shell: >
-              qm set 6{{ x }}{{ y }} --cores {{ cores_small }} --memory {{ memory_small }}
-            args:
-              warn: false
-
-          - name: Configure cores, memory, and GPU passthrough for VM
-            when: x != 0
-            block:
-              - name: Set cores and memory for large VMs
-                ansible.builtin.shell: >
-                  qm set 6{{ x }}{{ y }} --cores {{ cores_large }} --memory {{ memory_large }}
-                args:
-                  warn: false
-
-              - name: Set GPU passthrough for VM 6{{ x }}{{ y }}
-                when: y == 3
-                ansible.builtin.shell: >
-                  qm set 6{{ x }}{{ y }} --hostpci0={{ gpu_pci }},pcie=1
-                args:
-                  warn: false
-
-  - name: Start all VMs
+  - name: Clone VM from template if not already created
+    loop: "{{ vmids }}"
     ansible.builtin.shell: >
-      for x in $(seq 0 {{ number_of_sets - 1 }}); do for y in $(seq 1 {{ vms_per_set }}); do qm start 6$x$y; done; done
-    args:
-      warn: false
+      qm clone {{ vm_base_id }} {{ item }}
+    when: vm_status_dict[item] == 2
+
+  - name: Set basic configuration for cloned VM
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: >
+      qm set {{ item }} --name kube{{ item }} --ipconfig0 ip=$(host kube{{ item }}.home | awk '{{print $NF}}')/24,gw={{ gateway }} --nameserver={{ nameserver }} --onboot 1
+    when: vm_status_dict[item] == 2
+
+  - name: Set SSH keys for cloned VM
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: >
+      qm set {{ item }} --sshkeys /tmp/rsa.key
+    when: vm_status_dict[item] == 2
+
+  - name: Resize VM disk
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: >
+      qm resize {{ item }} scsi0 {{ disk_resize }}
+    when: vm_status_dict[item] == 2
+
+  - name: Configure cores and memory for VM
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: |
+      qm set {{ item }} --cores {{ item|int is divisibleby(10) | ternary(cores_small, cores_large) }} --memory {{ item|int is divisibleby(10) | ternary(memory_small, memory_large) }}
+    when: vm_status_dict[item] == 2
+
+  - name: Configure GPU passthrough for specific VM
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: >
+      qm set {{ item }} --hostpci0={{ gpu_pci }},pcie=1
+    when: item == '613' and vm_status_dict[item] == 2
+
+  - name: Start all VMs except template and already running VMs
+    loop: "{{ vmids }}"
+    ansible.builtin.shell: >
+      qm start {{ item }}
+    when: 
+      - vm_status_dict[item] == 0
+      - "'status: stopped' in vm_status_dict[item]"

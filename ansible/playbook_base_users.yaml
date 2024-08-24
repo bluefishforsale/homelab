@@ -1,257 +1,119 @@
----
-- name: Install zsh and tools for ansible_user
+- name: Install and configure zsh and tools for users
   hosts: all
+  become: true
   vars_files:
     - vars_users.yaml
 
-
   tasks:
-    - name: Apt install software for users as root
-      become: true
-      block:
+    - name: Handle dpkg locks and repair
+      include_tasks: subtask_fix_dpkg_lock.yaml
+      ignore_errors: yes
 
-      ############  fix dpkg if things went sideways #####################
-      - name: Killall fuser
-        ansible.builtin.command: "killall fuser ; killall dpkg"
-        ignore_errors: true
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
 
-      - name: Fuser TERM
-        ansible.builtin.command: fuser -vki -TERM /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-        ignore_errors: true
-        register: fuser_term
+    - name: Install common packages
+      apt:
+        name: "{{ item }}"
+        state: latest
+      with_items:
+        - zsh
+        - git
+        - cron
+      ignore_errors: yes
 
-      - name: Debug Fuser TERM
-        ansible.builtin.debug:
-          msg: "fuser TERM: {{ fuser_term.stdout }}"
-        ignore_errors: true
-        when: fuser_term.rc != 0
+    # Define user details explicitly with correct home directories
+    - name: Set user details
+      set_fact:
+        users:
+          - { user_name: "debian", user_home: "/home/debian" }
+          - { user_name: "root", user_home: "/root" }
 
-      - name: Fuser KILL
-        ansible.builtin.command: fuser -vki -KILL /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend
-        when: fuser_term.rc != 0
-        ignore_errors: true
-        register: fuser_kill
+    - name: Download oh-my-zsh installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+        dest: /tmp/oh-my-zsh-installer.sh
+        mode: "0755"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Debug Fuser KILL
-        ansible.builtin.debug:
-          msg: "fuser kill: {{ fuser_kill.stdout }}"
-        when: fuser_kill.rc != 0
+    - name: Install oh-my-zsh
+      ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
+      args:
+        creates: "{{ user.user_home }}/.oh-my-zsh"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Dpkg repair
-        ansible.builtin.command: dpkg --configure --pending
-        register: dpkg_repair
+    - name: Ensure .zshrc is created
+      ansible.builtin.copy:
+        src: "{{ user.user_home }}/.oh-my-zsh/templates/zshrc.zsh-template"
+        dest: "{{ user.user_home }}/.zshrc"
+        remote_src: yes
+        force: no  # Only create if not exists
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Debug Dpkg repair
-        ansible.builtin.debug:
-          msg: "dpkg repair: {{ dpkg_repair.stdout }}"
-        when: dpkg_repair.rc != 0
+    - name: Set ZSH directory in .zshrc
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        regexp: '^ZSH='
+        line: 'ZSH="{{ user.user_home }}/.oh-my-zsh"'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      ############  apt install #####################
-      - name: Update cache once
-        ansible.builtin.apt:
-          update_cache: true
+    - name: Set powerlevel10k theme in .zshrc
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        state: present
+        regexp: '^ZSH_THEME='
+        line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Wait for /var/lib/dpkg/lock-frontend to be released
-        ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+    - name: Disable powerlevel10k configuration wizard
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        state: present
+        line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Install zsh first
-        apt: name={{ item }} state=latest
-        register: apt_status
-        until: apt_status is success
-        delay: 2
-        retries: 30
-        with_items: [ zsh, git, cron ]
+    - name: Change user shell to zsh
+      ansible.builtin.shell: chsh -s /usr/bin/zsh {{ user.user_name }}
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-    - name: Config and stuff for default login user
-      block:
-      - name: Crontab to fetch ssh keys from github user
-        become: true
-        ansible.builtin.cron:
-          name: ssh-import-id-gh bluefishforsale
-          weekday: "*"
-          minute: "*/15"
-          hour: "*"
-          user: "{{ ansible_user }}"
-          job: ssh-import-id-gh bluefishforsale
-          cron_file: ssh-import-id-gh-bluefishforsale-"{{ ansible_user }}"
+    - name: Copy p10k config file
+      ansible.builtin.copy:
+        src: files/shell/p10k.zsh
+        dest: "{{ user.user_home }}/.p10k.zsh"
+        mode: "0755"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
 
-      - name: Shell, Theme, and config for logged in user
-        block:
-        - name: Download oh-my-zsh
-          ansible.builtin.get_url:
-            url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
-            dest: /tmp/oh-my-zsh-installer.sh
-            force: true
-            mode: "0755"
-
-        - name: Install oh-my-zsh
-          ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
-          args:
-            creates: ~/.oh-my-zsh
-
-        - name: Copy aliases into custom zsh dir
-          ansible.builtin.copy:
-            force: true
-            src: files/shell/aliases.sh
-            dest: ~/.oh-my-zsh/custom/
-            mode: "0755"
-
-        - name: Change user shell to zsh
-          become: true
-          ansible.builtin.user:
-            name: "{{ ansible_user }}"
-            shell: /bin/zsh
-
-        - name: Install powerlevel10k
-          ansible.builtin.git:
-            repo: https://github.com/romkatv/powerlevel10k
-            dest: ~/.oh-my-zsh/themes/powerlevel10k
-            accept_hostkey: true
-            force: true
-            depth: 1
-
-        - name: Set p10k THEME in .zshrc
-          ansible.builtin.lineinfile:
-            path: ~/.zshrc
-            state: present
-            backrefs: true
-            regexp: '^ZSH_THEME='
-            line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-
-        - name: P10k config file
-          ansible.builtin.copy:
-            force: true
-            src: files/shell/p10k.zsh
-            dest: ~/.p10k.zsh"
-            mode: "0755"
-
-        - name: P10k DISABLE_CONFIGURATION_WIZARD
-          ansible.builtin.lineinfile:
-            path: ~/.zshrc
-            state: present
-            line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
-
-        - name: Set shell zsh
-          ansible.builtin.shell: sudo chsh -s /usr/bin/zsh $LOGNAME
-
-        - name: Ultimate vim
-          ansible.builtin.git:
-            repo: https://github.com/amix/vimrc.git
-            depth: 1
-            dest: "{{ ansible_env.HOME }}/.vimrc"
-
-        - name: Tmux conf
-          ansible.builtin.copy:
-            force: true
-            src: files/shell/tmux.conf
-            dest: "{{ ansible_env.HOME }}/.tmux.conf"
-
-        - name: Mkdir conf & glances
-          ansible.builtin.file:
-            path: "{{ item }}"
-            state: directory
-          with_items:
-          - "{{ ansible_env.HOME }}/.config"
-          - "{{ ansible_env.HOME }}/.config/glances"
-
-        - name: Glances conf
-          ansible.builtin.copy:
-            force: true
-            src: files/shell/glances.conf
-            dest: "{{ ansible_env.HOME }}/.config/glances/glances.conf"
-
-    ################ config and setup for Root user ###################
-    - name: Stuff done for root
-      become: true
-
-      block:
-      - name: Add github keys to user
-        ansible.builtin.authorized_key:
-          user: root
-          state: present
-          key: "https://github.com/{{github}}.keys"
-
-      - name: Passwordless sudo for 'sudo' group
-        ansible.builtin.lineinfile:
-          path: /etc/sudoers
-          state: present
-          regexp: '^%sudo'
-          line: '%sudo ALL=(ALL) NOPASSWD: ALL'
-
-      - name: get oh-my-zsh
-        ansible.builtin.get_url:
-          url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
-          dest: /tmp/oh-my-zsh-installer.sh
-          force: true
-          mode: "0755"
-
-      - name: Root install oh-my-zsh
-        ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
-        args:
-          creates: /root/.oh-my-zsh
-
-      - name: Root Change user shell to zsh
-        ansible.builtin.user:
-          name: root
-          shell: /bin/zsh
-
-      - name: Root install powerlevel10k
-        ansible.builtin.git:
-          repo: https://github.com/romkatv/powerlevel10k
-          dest: /root/.oh-my-zsh/themes/powerlevel10k
-          accept_hostkey: true
-          force: true
-          depth: 1
-
-      - name: Root Set p10k THEME in .zshrc
-        ansible.builtin.lineinfile:
-          path: /root/.zshrc
-          state: present
-          backrefs: true
-          regexp: '^ZSH_THEME='
-          line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
-
-      - name: Root p10k config file
-        ansible.builtin.copy:
-          force: true
-          src: files/shell/p10k.zsh
-          dest: /root/.p10k.zsh
-
-      - name: Root P10k DISABLE_CONFIGURATION_WIZARD
-        ansible.builtin.lineinfile:
-          path: /root/.zshrc
-          state: present
-          line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
-
-      - name: Root Set shell zsh
-        ansible.builtin.shell: chsh -s /usr/bin/zsh $LOGNAME
-
-      - name: Root ultimate vim
-        ansible.builtin.shell:
-          cmd: git clone --depth=1 https://github.com/amix/vimrc.git ~/.vim_runtime
-        args:
-          creates: /root/.vim_runtime
-
-      - name: Root tmux conf
-        ansible.builtin.copy:
-          force: true
-          src: files/shell/tmux.conf
-          dest: /root/.tmux.conf
-
-      - name: Root mkdir conf & glances
-        ansible.builtin.file:
-          path: "{{item}}"
-          state: directory
-        with_items:
-        - /root/.config
-        - /root/.config/glances
-
-      - name: Root Glances conf
-        ansible.builtin.copy:
-          force: true
-          src: files/shell/glances.conf
-          dest: ~/.config/glances/glances.conf
-
-      - name: add users
-        ansible.builtin.include_tasks: subtask_user.yaml
-        loop: "{{ user }}"
+    - name: Copy tmux config
+      ansible.builtin.copy:
+        src: files/shell/tmux.conf
+        dest: "{{ user.user_home }}/.tmux.conf"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
