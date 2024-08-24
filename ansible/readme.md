@@ -1,74 +1,34 @@
-# Ansible VM setup playbooks
 
-## The playbooks
-
-### Users
-
-- sets up ssh keys from github,
-- ZSH, oh-mh-zsh, poewrlevel9k, tmux, ultimate vim config.
-
+### 2. Verify VM Availability
 ```bash
-ansible-playbook -i inventory.ini -l dns,pihole playbook_base_users.yaml
+ansible -i inventory.ini k8s -b -a 'uptime'
 ```
 
-### Base Packages and Settings
-
-Uses apt to install a bunch of useful CLI tools.
-Sets up NTP date and timezone to UTC.
-Has a task for adding path items to /etc/environment
-
+### 3. Post-installation and Initial Setup
 ```bash
-ansible-playbook -i inventory.ini -l dns,pihole playbook_base_packages_host_settings.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml
+ansible-playbook -i inventory.ini -l k8s,proxmox playbook_base_unattended_upgrade.yaml
+ansible-playbook -i inventory.ini -l k8s,proxmox playbook_base_packages_host_settings.yaml
+ansible-playbook -i inventory.ini -l k8s,proxmox playbook_core_net_qdisc.yaml
+ansible-playbook -i inventory.ini -l k8s,proxmox playbook_base_users.yaml
+ansible -i inventory.ini k8s -b -a 'reboot'
 ```
 
-### Unattended Upgrades
-
-Does a full package update and upgrade.
-
-### DNS & DHCP
-
-- Use these to setup bind9 and isc-dhcp-server
-- Config files in `files/isc-dhcp-server` and `files/bind9`
-- One playbook per service, run within the ansible dir
-
+### 4. Sequential Deployment of Kubernetes Components
 ```bash
-ansible-playbook -i inventory.ini -l dns playbook_core_svc_00_dns.yaml playbook_core_svc_00_dhcp_ddns.yaml
-ansible-playbook -i inventory.ini -l pihole playbook_core_svc_00_pi-hole.yaml
+# Run each phase sequentially, checking for errors after each
+ls -1 playbook_kube_00.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_01.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_04.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_05.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_07.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_08.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_09.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+ls -1 playbook_kube_10.* | xargs -n1 -I% ansible-playbook -i inventory.ini %
 ```
 
-### Kubernetes PKI
-
-- Installs the CF SSL tool using brew (yes OSX only)
-- One playbook for generating all the Certs.
-- Two playbooks for copying them to nodes. Controller and Worker.
-
-### Kubernetes Configs
-
-- One playbook for generating all the Configs.
-- Two playbooks for copying them to nodes. Controller and Worker.
-
-### Kubernetes nodes
-
-- Run all kube playbooks in order and setup the cluster from scratch
-
+#### A. Kubernetes Components as one command
 ```bash
-ls -1 playbook*kube*.yaml | xargs -n1 -I% ansible-playbook -i inventory.yaml %
-```
-
-## Examples
-
-- Become Root ask pass
-
-```bash
-ansible-playbook -i inventory.yaml playbook.yaml -K
-```
-
-### Check playbook do not run
-
-ansible-playbook -i inventory.yaml playbook.yaml --check
-
-### Single host from inventory
-
-```bash
-ansible-playbook -i inventory.yaml -l onehost playbook.yaml
+# Run all playbooks in one go if you're confident there are no errors
+ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini %
 ```
