@@ -1,4 +1,4 @@
-# Bluefishforsale Homelab Automation
+# Homelab Automation
 
 This repository contains Ansible playbooks to automate the setup and management of a homelab environment, which includes a Proxmox VE cluster, various VMs, and a Kubernetes cluster. The playbooks are organized into different phases to ensure a step-by-step configuration of the entire infrastructure.
 
@@ -30,12 +30,16 @@ This repository contains Ansible playbooks to automate the setup and management 
 ### 0. Pre-requisites
 
 This is a critical step before provisioning the VMs.
-- [Proxmox host ready to run VMs](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md)
-- Ensure that Ceph storage (Ceph-LVM and CephFS) is properly configured
+- Proxmox host(s) setup and ready to run VMs
+- Ceph storage (Ceph-LVM and CephFS) is properly configured
 - TODO: integrate this into the DHCP setup w/ PXE and Preseed
 
+### Setup Proxmox host(s)
+
+- [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md)
+
 ### 1. Create the VMs
-Start by creating the necessary VMs as described in the [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md) file. This is done using the following Ansible playbook:
+Start by creating the necessary VMs as described in the [Proxmox Readme#making-vms](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md#making-vms) file. This is done using the following Ansible playbook:
 
 ### 2. Continue to ansible setup for hosts
 
