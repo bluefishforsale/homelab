@@ -64,17 +64,6 @@
     retries: 30
     with_items: [ qemu-guest-agent]
 
-  - name: upgrade to 5.10 kernel
-    apt:
-      default_release: buster-backports
-      update_cache: true
-      allow-unauthenticated: true
-      name:
-      - linux-image-6.1.0-23-cloud-amd64
-      - linux-headers-6.1.0-23-cloud-amd64
-
-
-
   - name: install some proxmox packages
     apt:
       upgrade: full
