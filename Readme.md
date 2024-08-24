@@ -37,7 +37,7 @@ This is a critical step before provisioning the VMs.
 ### 1. Create the VMs
 Start by creating the necessary VMs as described in the [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md) file. This is done using the following Ansible playbook:
 
-WIP: ansible playbook to create the VMs 
-```bash
-ansible-playbook -i inventory.ini playbook_proxmox_create_kube_vm.yaml
-```
+### 2. Continue to ansible setup for hosts
+
+- [Ansible setup Readme](https://github.com/bluefishforsale/homelab/blob/master/ansible/readme.md)
+
