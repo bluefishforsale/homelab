@@ -1,0 +1,151 @@
+---
+- name: Automate VM creation and cloning on Proxmox VE
+  hosts: proxmox
+  become: yes
+  vars:
+    vm_base_id: 9999
+    vm_template_name: debian-12-generic-amd64
+    qcow2_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+    ssh_key_url: "https://github.com/bluefishforsale.keys"
+    storage_pool: "ceph-lvm"
+    vmbridge: "vmbr0"
+    cores_small: 4
+    memory_small: 8192  # 8G
+    cores_large: 9
+    memory_large: 57344  # 56G
+    gateway: "192.168.1.1"
+    nameserver: "192.168.1.2"
+    disk_resize: "+18G"
+    gpu_pci: "42:00"
+    number_of_sets: 2
+    vms_per_set: 3
+    ip_suffix: "{{ item.x }}{{ item.y }}"
+    base_ip: "192.168.1"
+
+  tasks:
+
+  - name: Download Debian 12 QCOW2 image
+    ansible.builtin.get_url:
+      url: "{{ qcow2_url }}"
+      dest: /tmp/debian-12-generic-amd64.qcow2
+      mode: '0644'
+
+  - name: Download SSH public key
+    ansible.builtin.get_url:
+      url: "{{ ssh_key_url }}"
+      dest: /tmp/rsa.key
+      mode: '0644'
+
+  - name: Create the base VM
+    ansible.builtin.shell: >
+      qm create {{ vm_base_id }} --name {{ vm_template_name }} --net0 virtio,bridge={{ vmbridge }}
+    args:
+      warn: false
+
+  - name: Import QCOW2 disk to VM
+    ansible.builtin.shell: >
+      qm importdisk {{ vm_base_id }} /tmp/debian-12-generic-amd64.qcow2 {{ storage_pool }}
+    args:
+      warn: false
+
+  - name: Configure the base VM
+    block:
+      - name: Set VM options
+        ansible.builtin.shell: >
+          qm set {{ vm_base_id }} --ide2 {{ storage_pool }}:cloudinit
+        args:
+          warn: false
+
+      - name: Attach and configure disks and interfaces
+        ansible.builtin.shell: >
+          qm set {{ vm_base_id }} --scsihw virtio-scsi-pci --scsi0 {{ storage_pool }}:vm-{{ vm_base_id }}-disk-0
+        args:
+          warn: false
+
+      - name: Configure boot order and serial console
+        ansible.builtin.shell: >
+          qm set {{ vm_base_id }} --boot order='scsi0' --serial0 socket --vga serial0
+        args:
+          warn: false
+
+      - name: Set SSH keys and other VM parameters
+        ansible.builtin.shell: >
+          qm set {{ vm_base_id }} --sshkeys /tmp/rsa.key --hotplug network,disk --bios ovmf --machine q35 --efidisk0 {{ storage_pool }}:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+        args:
+          warn: false
+
+      - name: Set CPU cores, memory, and agent
+        ansible.builtin.shell: >
+          qm set {{ vm_base_id }} --cores 2 --memory 4096 --agent enabled=1
+        args:
+          warn: false
+
+      - name: Convert VM to template
+        ansible.builtin.shell: >
+          qm template {{ vm_base_id }}
+        args:
+          warn: false
+
+  - name: Clone and configure VMs
+    with_sequence: start=0 end={{ number_of_sets - 1 }}
+    loop_control:
+      loop_var: x
+    block:
+      - name: Create VM clones and set configurations
+        with_sequence: start=1 end={{ vms_per_set }}
+        loop_control:
+          loop_var: y
+        block:
+
+          - name: Clone VM from template
+            ansible.builtin.shell: >
+              qm clone {{ vm_base_id }} 6{{ x }}{{ y }}
+            args:
+              warn: false
+
+          - name: Set basic configuration for cloned VM
+            ansible.builtin.shell: >
+              qm set 6{{ x }}{{ y }} --name kube6{{ x }}{{ y }} --ipconfig0 ip=$(host kube6{{ x }}{{ y }}.home | awk '{{print $NF}}')/24,gw={{ gateway }} --nameserver={{ nameserver }} --onboot 1
+            args:
+              warn: false
+
+          - name: Set SSH keys for cloned VM
+            ansible.builtin.shell: >
+              qm set 6{{ x }}{{ y }} --sshkeys /tmp/rsa.key
+            args:
+              warn: false
+
+          - name: Resize VM disk
+            ansible.builtin.shell: >
+              qm resize 6{{ x }}{{ y }} scsi0 {{ disk_resize }}
+            args:
+              warn: false
+
+          - name: Configure cores and memory for VM
+            when: x == 0
+            ansible.builtin.shell: >
+              qm set 6{{ x }}{{ y }} --cores {{ cores_small }} --memory {{ memory_small }}
+            args:
+              warn: false
+
+          - name: Configure cores, memory, and GPU passthrough for VM
+            when: x != 0
+            block:
+              - name: Set cores and memory for large VMs
+                ansible.builtin.shell: >
+                  qm set 6{{ x }}{{ y }} --cores {{ cores_large }} --memory {{ memory_large }}
+                args:
+                  warn: false
+
+              - name: Set GPU passthrough for VM 6{{ x }}{{ y }}
+                when: y == 3
+                ansible.builtin.shell: >
+                  qm set 6{{ x }}{{ y }} --hostpci0={{ gpu_pci }},pcie=1
+                args:
+                  warn: false
+
+  - name: Start all VMs
+    ansible.builtin.shell: >
+      for x in $(seq 0 {{ number_of_sets - 1 }}); do for y in $(seq 1 {{ vms_per_set }}); do qm start 6$x$y; done; done
+    args:
+      warn: false

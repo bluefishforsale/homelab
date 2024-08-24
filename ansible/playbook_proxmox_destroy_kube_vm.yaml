@@ -1,0 +1,21 @@
+---
+- name: Destroy specific VMs on Proxmox
+  hosts: proxmox
+  become: yes
+  tasks:
+
+    - name: Stop and destroy specific VMs
+      ansible.builtin.shell: |
+        for x in $(seq 0 1); do
+          for y in $(seq 1 3); do
+            echo "6$x$y"
+          done
+        done | while read id; do
+          qm stop $id
+          qm destroy $id
+        done
+      register: destroy_output
+
+    - name: Print the output of the destruction process
+      ansible.builtin.debug:
+        var: destroy_output.stdout

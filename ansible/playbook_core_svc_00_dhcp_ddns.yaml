@@ -2,6 +2,9 @@
   hosts: dns
 
   tasks:
+  - name: Handle dpkg locks and repair
+    include_tasks: subtask_fix_dpkg_lock.yaml
+
   - name: packages and config
     become: True
     block:

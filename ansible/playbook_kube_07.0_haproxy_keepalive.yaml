@@ -53,12 +53,9 @@
             - haproxy
             - keepalived
 
-        - name: Kill any running apt-get process
-          ansible.builtin.shell: killall apt-get
-          ignore_errors: true
-
-        - name: Wait for /var/lib/dpkg/lock-frontend to be released
-          ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+      ############  fix dpkg if things went sideways #####################
+        - name: Handle dpkg locks and repair
+          include_tasks: subtask_fix_dpkg_lock.yaml
 
         - name: Install packages
           ansible.builtin.apt: name={{ item }} state=latest

@@ -30,9 +30,8 @@
           group: root
           owner: root
 
-      - name: Kill any running apt-get process
-        ansible.builtin.shell: killall apt-get
-        ignore_errors: true
+      - name: Handle dpkg locks and repair
+        include_tasks: subtask_fix_dpkg_lock.yaml
 
       - name: Wait for /var/lib/dpkg/lock-frontend to be released
         ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;

@@ -7,6 +7,9 @@
     become: yes
     block:
 
+    - name: Handle dpkg locks and repair
+      include_tasks: subtask_fix_dpkg_lock.yaml
+
     - name: apt-get update
       apt: update_cache=yes
 
