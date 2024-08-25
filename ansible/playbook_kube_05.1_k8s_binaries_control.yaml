@@ -92,17 +92,13 @@
       - kube-apiserver
       - kube-controller-manager
 
-  - name: Wait for 60 seconds before validating API server response
-    pause:
-      seconds: 60
-
-  - name: Validate API server response
+  - name: Validate Local API server response
     uri:
-      url: "https://{{ APISERVER_IP }}:6443/healthz"
+      url: "https://{{ ansible_default_ipv4.address }}:6443/healthz"
       method: GET
       status_code: 200
       validate_certs: no
     register: apiserver_health
     until: apiserver_health.status == 200
-    retries: 5
+    retries: 6
     delay: 10
