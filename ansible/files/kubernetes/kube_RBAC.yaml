@@ -22,70 +22,70 @@ subjects:
     apiGroup: rbac.authorization.k8s.io
 
 
-# ClusterRole and ClusterRoleBinding for Cilium node config management
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cilium
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - nodes
-  - services
-  - endpoints
-  - namespaces
-  - configmaps
-  - events
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - "networking.k8s.io"
-  resources:
-  - networkpolicies
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - "cilium.io"
-  resources:
-  - ciliumnetworkpolicies
-  - ciliumnodeconfigs
-  - ciliumendpoints
-  - ciliumidentities
-  - ciliumnodes
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: cilium
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cilium
-subjects:
-- kind: ServiceAccount
-  name: cilium
-  namespace: kube-system
+# # ClusterRole and ClusterRoleBinding for Cilium node config management
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: cilium
+# rules:
+# - apiGroups:
+#   - ""
+#   resources:
+#   - pods
+#   - nodes
+#   - services
+#   - endpoints
+#   - namespaces
+#   - configmaps
+#   - events
+#   - secrets
+#   verbs:
+#   - get
+#   - list
+#   - watch
+#   - create
+#   - update
+#   - patch
+#   - delete
+# - apiGroups:
+#   - "networking.k8s.io"
+#   resources:
+#   - networkpolicies
+#   verbs:
+#   - get
+#   - list
+#   - watch
+#   - create
+#   - update
+#   - patch
+#   - delete
+# - apiGroups:
+#   - "cilium.io"
+#   resources:
+#   - ciliumnetworkpolicies
+#   - ciliumnodeconfigs
+#   - ciliumendpoints
+#   - ciliumidentities
+#   - ciliumnodes
+#   verbs:
+#   - get
+#   - list
+#   - watch
+#   - create
+#   - update
+#   - patch
+#   - delete
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: cilium
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: cilium
+# subjects:
+# - kind: ServiceAccount
+#   name: cilium
+#   namespace: kube-system
