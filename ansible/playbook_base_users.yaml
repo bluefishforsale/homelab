@@ -1,8 +1,6 @@
 - name: Install and configure zsh and tools for users
   hosts: all
   become: true
-  vars_files:
-    - vars_users.yaml
 
   tasks:
     - name: Handle dpkg locks and repair
@@ -17,7 +15,7 @@
     - name: Install common packages
       apt:
         name: "{{ item }}"
-        state: latest
+        state: present
       with_items:
         - zsh
         - git
@@ -31,6 +29,24 @@
           - { user_name: "debian", user_home: "/home/debian" }
           - { user_name: "root", user_home: "/root" }
 
+    - name: Download default .zshrc from Oh My Zsh repository
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/templates/zshrc.zsh-template
+        dest: "{{ user.user_home }}/.zshrc"
+        owner: "{{ user.user_name }}"
+        group: "{{ user.user_name }}"
+        mode: '0644'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Change user shell to zsh
+      ansible.builtin.shell: chsh -s /usr/bin/zsh {{ user.user_name }}
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
     - name: Download oh-my-zsh installer
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
@@ -41,21 +57,18 @@
         loop_var: user
       ignore_errors: yes
 
-    - name: Install oh-my-zsh
-      ansible.builtin.shell: /tmp/oh-my-zsh-installer.sh --unattended
-      args:
-        creates: "{{ user.user_home }}/.oh-my-zsh"
+    - name: Recursively remove the .oh-my-zsh directory from the user's home
+      ansible.builtin.shell: rm -rf "{{ user.user_home }}/.oh-my-zsh"
       loop: "{{ users }}"
       loop_control:
         loop_var: user
       ignore_errors: yes
 
-    - name: Ensure .zshrc is created
-      ansible.builtin.copy:
-        src: "{{ user.user_home }}/.oh-my-zsh/templates/zshrc.zsh-template"
-        dest: "{{ user.user_home }}/.zshrc"
-        remote_src: yes
-        force: no  # Only create if not exists
+    - name: Install oh-my-zsh
+      ansible.builtin.shell: ZSH="" /tmp/oh-my-zsh-installer.sh --unattended
+      args:
+        creates: "{{ user.user_home }}/.oh-my-zsh"
+      become_user: "{{ user.user_name }}"
       loop: "{{ users }}"
       loop_control:
         loop_var: user
@@ -69,6 +82,18 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      ignore_errors: yes
+
+    - name: Install Powerlevel10k theme for Oh My Zsh
+      ansible.builtin.git:
+        repo: "https://github.com/romkatv/powerlevel10k.git"
+        dest: "{{ user.user_home }}/.oh-my-zsh/custom/themes/powerlevel10k"
+        depth: 1
+        update: yes
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      become_user: "{{ user.user_name }}"
       ignore_errors: yes
 
     - name: Set powerlevel10k theme in .zshrc
@@ -92,12 +117,6 @@
         loop_var: user
       ignore_errors: yes
 
-    - name: Change user shell to zsh
-      ansible.builtin.shell: chsh -s /usr/bin/zsh {{ user.user_name }}
-      loop: "{{ users }}"
-      loop_control:
-        loop_var: user
-      ignore_errors: yes
 
     - name: Copy p10k config file
       ansible.builtin.copy:
