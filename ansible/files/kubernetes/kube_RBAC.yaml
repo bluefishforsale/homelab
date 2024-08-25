@@ -6,6 +6,18 @@ rules:
   - apiGroups: ["*"]
     resources: ["*"]
     verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["extension-apiserver-authentication"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources:
+      - pods/log
+      - nodes/proxy
+    verbs:
+      - get
+      - list
+      - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -21,71 +33,31 @@ subjects:
     name: system:kube-controller-manager
     apiGroup: rbac.authorization.k8s.io
 
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubernetes-log-access
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods/log
+      - nodes/proxy
+    verbs:
+      - get
+      - list
+      - watch
 
-# # ClusterRole and ClusterRoleBinding for Cilium node config management
-# ---
-# apiVersion: rbac.authorization.k8s.io/v1
-# kind: ClusterRole
-# metadata:
-#   name: cilium
-# rules:
-# - apiGroups:
-#   - ""
-#   resources:
-#   - pods
-#   - nodes
-#   - services
-#   - endpoints
-#   - namespaces
-#   - configmaps
-#   - events
-#   - secrets
-#   verbs:
-#   - get
-#   - list
-#   - watch
-#   - create
-#   - update
-#   - patch
-#   - delete
-# - apiGroups:
-#   - "networking.k8s.io"
-#   resources:
-#   - networkpolicies
-#   verbs:
-#   - get
-#   - list
-#   - watch
-#   - create
-#   - update
-#   - patch
-#   - delete
-# - apiGroups:
-#   - "cilium.io"
-#   resources:
-#   - ciliumnetworkpolicies
-#   - ciliumnodeconfigs
-#   - ciliumendpoints
-#   - ciliumidentities
-#   - ciliumnodes
-#   verbs:
-#   - get
-#   - list
-#   - watch
-#   - create
-#   - update
-#   - patch
-#   - delete
-# ---
-# apiVersion: rbac.authorization.k8s.io/v1
-# kind: ClusterRoleBinding
-# metadata:
-#   name: cilium
-# roleRef:
-#   apiGroup: rbac.authorization.k8s.io
-#   kind: ClusterRole
-#   name: cilium
-# subjects:
-# - kind: ServiceAccount
-#   name: cilium
-#   namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-log-access-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubernetes-log-access
+subjects:
+  - kind: User
+    name: kubernetes
+    apiGroup: rbac.authorization.k8s.io
