@@ -117,3 +117,14 @@
           with_items:
             - keepalived.service
             - haproxy.service
+
+        - name: Validate VRRP API server response
+          uri:
+            url: "https://{{ APISERVER }}:443/healthz"
+            method: GET
+            status_code: 200
+            validate_certs: no
+          register: apiserver_health
+          until: apiserver_health.status == 200
+          retries: 6
+          delay: 10
