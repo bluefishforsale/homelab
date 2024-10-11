@@ -1,0 +1,67 @@
+- name: Generate Kubernetes join token on the first master node
+  hosts: k8s
+  become: yes
+  any_errors_fatal: true
+  tasks:
+    - name: Generate a new Kubernetes join token and print the join command
+      shell: kubeadm token create --print-join-command
+      run_once: true
+      register: kubeadm_token_output
+      delegate_to: "{{ groups['k8s_controller'][0] }}"
+      when: not ansible_check_mode
+
+    - name: Display generated join command
+      debug:
+        msg: "{{ kubeadm_token_output.stdout }}"
+      when: not ansible_check_mode
+
+    - name: Extract token, discovery token hash, and certificate key from join command
+      set_fact:
+        kubeadm_join_command: "{{ kubeadm_token_output.stdout }}"
+        join_token: "{{ (kubeadm_token_output.stdout | regex_search('kubeadm join\\s.*--token\\s(\\S+)', '\\1')).first }}"
+        ca_cert_hash: "{{ kubeadm_token_output.stdout | regex_search('--discovery-token-ca-cert-hash\\s(sha256:\\S+)', '\\1') }}"
+        certificate_key: "{{ kubeadm_token_output.stdout | regex_search('--certificate-key\\s(\\S+)', '\\1') }}"
+      when: kubeadm_token_output.stdout is defined and not ansible_check_mode
+
+    # masters
+    - name: Join additional master nodes
+      shell: |
+        kubeadm join {{ vip }}:6443 --token {{ join_token }} \
+                     --discovery-token-ca-cert-hash sha256:{{ ca_cert_hash }} \
+                     --control-plane --certificate-key {{ certificate_key }} \
+                     --apiserver-advertise-address "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+
+    # workers
+    - name: Join worker node to the Kubernetes cluster
+      shell: |
+        kubeadm join {{ vip }}:6443 --token {{ join_token }} \
+        --discovery-token-ca-cert-hash {{ca_cert_hash }}
+      register: kubeadm_join_output
+      when: inventory_hostname in groups['k8s_worker'] and not ansible_check_mode
+
+    - name: Display join output
+      debug:
+        var: kubeadm_join_output.stdout
+      run_once: true
+      when: kubeadm_join_output.stdout is defined and not ansible_check_mode
+
+    # allow kubectl for debian user
+    - name: Create .kube directory for debian user
+      file:
+        path: /home/{{ ansible_user }}/.kube
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      when: not ansible_check_mode
+
+    - name: Copy admin.conf to debian user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: not ansible_check_mode

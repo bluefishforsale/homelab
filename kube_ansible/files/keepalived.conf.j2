@@ -1,0 +1,31 @@
+vrrp_script chk_haproxy {
+  script "killall -0 haproxy"
+  interval 2
+  weight 2
+}
+
+vrrp_instance haproxy-vip {
+    state BACKUP
+    interface {{ hostvars[inventory_hostname]['ansible_default_ipv4']['interface'] }}
+    virtual_router_id 100
+    priority {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'].split('.')[-1] }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        {{ vip }}
+    }
+    unicast_src_ip {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
+    unicast_peer {
+{% for host in groups['k8s_controller'] %}
+{% if hostvars[host]['ansible_default_ipv4']['address'] != hostvars[inventory_hostname]['ansible_default_ipv4']['address'] %}
+        {{ hostvars[host]['ansible_default_ipv4']['address'] }}
+{% endif %}
+{% endfor %}
+    }
+    track_script {
+        chk_haproxy
+    }
+}

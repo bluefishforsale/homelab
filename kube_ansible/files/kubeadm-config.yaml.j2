@@ -1,0 +1,47 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: stable-{{ kubernetes_version | regex_replace('^([0-9]+\\.[0-9]+).*', '\\1') }}
+controlPlaneEndpoint: "{{ vip }}:6443"
+startupGracePeriod: 240s
+failureThreshold: 30
+backoffLimit: 30
+networking:
+  podSubnet: "{{ pod_network_cidr }}"
+kubeletConfiguration:
+  baseConfig:
+    cniBinDir: "/opt/cni/bin"
+apiServer:
+  extraArgs:
+    advertise-address: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    authorization-mode: "Node,RBAC"
+    bind-address: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    secure-port: "6443"
+  certSANs:
+    - "localhost"
+    - "127.0.0.1"
+{% for host in groups['k8s_controller'] %}
+    - "{{ hostvars[host]['ansible_default_ipv4']['address'] }}"
+{% endfor %}
+{% for domain in domain_suffixes %}
+{% for host in groups['k8s_controller'] %}
+    - "{{ hostvars[host]['inventory_hostname'] }}{{ domain }}"
+{% endfor %}
+    - "kubernetes{{ domain }}"
+    - "apiserver{{ domain }}"
+{% endfor %}
+  timeoutForControlPlane: 8m0s  # Extend the timeout for control plane components
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+    extraArgs:
+      quota-backend-bytes: "8589934592"
+      heartbeat-interval: "500"
+      election-timeout: "5000"
+      snapshot-count: "100000"
+      max-snapshots: "5"
+      max-wals: "5"
+    extraEnvs:
+      - name: ETCD_HEARTBEAT_INTERVAL
+        value: "500" # Increase to make etcd more tolerant
+      - name: ETCD_ELECTION_TIMEOUT
+        value: "2500" # Increase election timeout
