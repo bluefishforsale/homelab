@@ -1,0 +1,174 @@
+---
+- name: root and system level
+  become: true
+  hosts: baremetal
+  strategy: free
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
+
+
+    - name: Write IO scheduler script
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/io-scheduler.sh"
+        mode: 0755
+        content: |
+          for SCH in /sys/block/*/queue/scheduler ; do
+              echo "deadline" > "${SCH}" 2>/dev/null
+          done
+          for DEPTH in /sys/block/*/queue/nr_requests ; do
+              echo "1024" > "${DEPTH}" 2>/dev/null
+          done
+          for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
+              echo "4096" > "${RAHEAD}" 2>/dev/null
+          done
+
+    - name: Write IO scheduler service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/io-scheduler.service"
+        content: |
+          [Unit]
+          Description=Setup IO Scheduler
+          #After=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=sh -c /etc/systemd/system/io-scheduler.sh
+          RemainAfterExit=true
+          StandardOutput=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Write blockdev readahead service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/blockdev-setra.service"
+        content: |
+          [Unit]
+          Description=Set readahead for the hard drive device
+          After=local-fs.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=bash -c '/sbin/blockdev --setra 8192 /dev/sd*'
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Write cpufrequtils GOVERNOR
+      ansible.builtin.copy:
+        force: true
+        dest: /etc/default/cpufrequtils
+        mode: "0644"
+        content: GOVERNOR="powersave"
+
+    - name: Write CPU performance script
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/cpu-performance.sh"
+        mode: "0755"
+        content: |
+          for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do
+              echo "performance" > "${CPU}" 2>/dev/null
+          done
+
+    - name: Write CPU performance service
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/cpu-performance.service"
+        content: |
+          [Unit]
+          Description=Setup CPU Performance
+          #After=network.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=sh -c /etc/systemd/system/cpu-performance.sh
+          RemainAfterExit=true
+          StandardOutput=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Temporarily disable services
+      ansible.builtin.systemd:
+        name: "{{item}}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      with_items:
+        - cpu-performance
+
+    - name: Enable and restart performance services
+      ansible.builtin.systemd:
+        name: "{{item}}"
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      with_items:
+        - blockdev-setra
+        - io-scheduler
+        - rsyslog
+        - logrotate
+        - cpufrequtils
+        - fail2ban
+
+    - name: UPS battery backups
+      when: apcupsd is defined
+      block:
+
+      - name: Print debug
+        ansible.builtin.debug:
+          msg: "APC UPSd software and config"
+
+      - name: Install APC UPS tools
+        ansible.builtin.apt:
+          pkg: [apcupsd]
+
+      - name: APCUPSd config
+        ansible.builtin.copy:
+          force: true
+          dest: "/etc/apcupsd/apcupsd.conf"
+          content: |
+            UPSNAME smartups1500
+            UPSCABLE usb
+            UPSTYPE usb
+            MINUTES 7
+            DEVICE
+            POLLTIME 60
+
+      - name: UPSd /etc/default config
+        ansible.builtin.copy:
+          force: true
+          dest: "/etc/default/apcupsd"
+          content: |
+            ISCONFIGURED=true
+
+      - name: Min time left script
+        ansible.builtin.copy:
+          force: true
+          mode: "0755"
+          dest: "/etc/apcupsd/runlimit"
+          content: |
+            #!/bin/bash
+            # http://www.apcupsd.org/manual/manual.html#configure-options
+            for host in ocean.home $(printf "node%03d " $(seq 1 6) | xargs -n1 | grep -vi $(hostname)) ; do ssh -l ubuntu ${host} 'sudo hostname' & done
+            wait
+            shutdown -h now
+
+      - name: Enable and restart APC UPS services
+        ansible.builtin.systemd:
+          name: apcupsd
+          state: restarted
+          enabled: true
+          daemon_reload: true
+
+

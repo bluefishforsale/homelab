@@ -29,6 +29,48 @@
           - { user_name: "debian", user_home: "/home/debian" }
           - { user_name: "root", user_home: "/root" }
 
+    - name: Ensure the user exists
+      ansible.builtin.user:
+        name: "{{ user.user_name }}"
+        state: present
+        create_home: yes
+        shell: /bin/bash
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Add user to sudoers with no password
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ user.user_name }} ALL=.*"
+        line: "{{ user.user_name }} ALL=(ALL) NOPASSWD:ALL"
+        validate: "visudo -cf %s"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Create .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ user.user_name }}/.ssh"
+        state: directory
+        owner: "{{ user.user_name }}"
+        mode: '0700'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Download SSH key from GitHub
+      ansible.builtin.get_url:
+        url: https://github.com/bluefishforsale.keys
+        dest: "{{ user.user_home }}/.ssh/authorized_keys"
+        mode: '0600'
+        owner: "{{ user.user_name }}"
+        timeout: 30
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
     - name: Download default .zshrc from Oh My Zsh repository
       ansible.builtin.get_url:
         url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/templates/zshrc.zsh-template
@@ -116,7 +158,6 @@
       loop_control:
         loop_var: user
       ignore_errors: yes
-
 
     - name: Copy p10k config file
       ansible.builtin.copy:

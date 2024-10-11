@@ -1,125 +1,156 @@
----
 - name: Nvidia Driver, encoding patch, and Containerd config
   hosts: all
+  vars:
+    nvidia_driver_version: latest
+    nvidia_container_toolkit_version: latest
+    reboot_required: false
   vars_files:
     - vars_kube.yaml
 
   tasks:
+    - block:
     - name: Driver and Patch
       become: true
-      when: nvidia_gpu is defined
+      when: nvidia_gpu | default(False) | bool
 
-      block:
-      - name: Stop containerd / kubelet
-        ansible.builtin.systemd:
-          state: stopped
-          name: "{{ item }}"
-        ignore_errors: true
-        with_items:
-          - containerd
-          - kubelet
+    - name: Ensure 'contrib' and 'non-free' repositories are enabled
+      ansible.builtin.apt_repository:
+        repo: "deb http://deb.debian.org/debian {{ ansible_lsb.codename }} main contrib non-free non-free-firmware"
+        state: present
+        filename: "debian_contrib_non_free"
+      register: contrib_non_free_repo
 
-      - name: Blacklist the nouveau driver
-        ansible.builtin.copy:
-          dest: /etc/modprobe.d/blacklist-nvidia-nouveau.conf
-          content: |
-            blacklist nouveau
-            options nouveau modeset=0
-          force: yes
-          mode: 0644
-          group: root
-          owner: root
+    - name: Update apt cache if repository changes occurred
+      ansible.builtin.apt:
+        update_cache: yes
+      when: contrib_non_free_repo.changed
 
-      - name: Handle dpkg locks and repair
-        include_tasks: subtask_fix_dpkg_lock.yaml
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - dkms
+          - linux-headers-{{ ansible_kernel }}
+          - pciutils
+          - curl
+        state: present
+        update_cache: yes
 
-      - name: Wait for /var/lib/dpkg/lock-frontend to be released
-        ansible.builtin.shell: while lsof /var/lib/dpkg/lock-frontend ; do sleep 10; done;
+    - name: Check for existing NVIDIA GPUs
+      ansible.builtin.shell: |
+        lspci | grep -i 'nvidia'
+      register: nvidia_gpu_check
+      changed_when: false
 
-      - name: Add contrib and non-free repositories
-        ansible.builtin.command:
-          cmd: "apt-add-repository -yn contrib non-free"
-        register: repo_add
-        changed_when: "'Added' in repo_add.stdout"
+    - name: Fail if no NVIDIA GPU is detected
+      ansible.builtin.fail:
+        msg: "No NVIDIA GPU detected on this host."
+      when: nvidia_gpu_check.stdout == ""
 
-      - name: Add NVIDIA container runtime repository
-        ansible.builtin.copy:
-          dest: /etc/apt/sources.list.d/nvidia-container-runtime.list
-          content: |
-            deb https://nvidia.github.io/libnvidia-container/stable/deb/{{ ansible_architecture }} /
-            deb https://nvidia.github.io/libnvidia-container/stable/debian10/{{ ansible_architecture }} /
-        register: nvidia_repo
-        notify: update apt cache
+    - name: Blacklist Nouveau driver
+      ansible.builtin.copy:
+        dest: /etc/modprobe.d/blacklist-nouveau.conf
+        content: |
+          blacklist nouveau
+          options nouveau modeset=0
+      notify: update-initramfs
+      register: blacklist_nouveau
 
-      - name: Update apt cache after adding repositories
-        ansible.builtin.apt:
-          update_cache: yes
-        when: repo_add.changed or nvidia_repo.changed
+    - name: Remove Nouveau drivers if loaded
+      ansible.builtin.shell: |
+        lsmod | grep -i nouveau && rmmod nouveau || true
+      register: remove_nouveau
+      changed_when: remove_nouveau.stdout != ""
 
-      - name: Remove the nouveau module
-        ansible.builtin.command: rmmod nouveau
-        ignore_errors: true
+    - name: Install NVIDIA driver
+      ansible.builtin.apt:
+        name: "nvidia-driver"
+        state: "{{ nvidia_driver_version }}"
+      register: nvidia_driver_install
+      notify: set_reboot_required
 
-      - name: Nvidia GPG key
-        ansible.builtin.get_url:
-          url: https://nvidia.github.io/nvidia-container-runtime/gpgkey
-          dest: /usr/share/keyrings/nvidia-container-runtime.gpg
+    - name: Add NVIDIA Container Toolkit repository GPG key
+      ansible.builtin.apt_key:
+        url: https://nvidia.github.io/libnvidia-container/gpgkey
+        state: present
 
-      - name: Set kernel version
-        ansible.builtin.shell:
-          cmd: uname -r
-        register: kernel_version
+    - name: Add NVIDIA Container Toolkit repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://nvidia.github.io/libnvidia-container/debian{{ ansible_distribution_major_version }} {{ ansible_lsb.codename }} main"
+        state: present
+        filename: "nvidia_container_toolkit"
+      register: nvidia_container_repo
 
-      - name: Install kernel headers and DKMS
-        apt:
-          name:
-            - "linux-headers-{{ kernel_version.stdout.strip() }}"
-            - dkms
-          state: latest
-        register: apt_status
-        until: apt_status is success
-        delay: 3
-        retries: 30
+    - name: Update apt cache if NVIDIA Container Toolkit repository changed
+      ansible.builtin.apt:
+        update_cache: yes
+      when: nvidia_container_repo.changed
 
-      - name: Apt install NVIDIA driver and runtime
-        apt:
-          name:
-            - nvidia-driver
-            - nvidia-container-runtime
-            - nvidia-container-toolkit
-          state: latest
-        register: apt_status
-        until: apt_status is success
-        delay: 6
-        retries: 30
+    - name: Install NVIDIA Container Toolkit
+      ansible.builtin.apt:
+        name: "nvidia-container-toolkit"
+        state: "{{ nvidia_container_toolkit_version }}"
+      register: nvidia_container_toolkit_install
+      notify: restart_containerd
 
-      - name: Install additional required packages
-        apt:
-          name:
-            - build-essential
-            - curl
-            - software-properties-common
-          state: latest
+    - name: Configure NVIDIA Container Runtime
+      ansible.builtin.shell: |
+        sudo nvidia-ctk runtime configure --runtime=docker
+      register: nvidia_container_runtime_configure
+      changed_when: nvidia_container_runtime_configure.rc == 0
+      notify: restart_containerd
 
-      - name: Test the host nvidia-smi
-        ansible.builtin.shell:
-          cmd: nvidia-smi
-        register: smi_output
-        failed_when: "'NVIDIA-SMI has failed' in smi_output.stdout"
+    - name: Restart containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+      when: nvidia_container_runtime_configure.changed or
+            'restart_containerd' in ansible_run_tags
 
-      - name: Update init ramfs
-        ansible.builtin.shell:
-          cmd: update-initramfs -u
+    - name: Reboot system if required
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by Ansible for NVIDIA driver installation."
+        connect_timeout: 300
+        reboot_timeout: 600
+        pre_reboot_delay: 5
+        post_reboot_delay: 30
+      when: reboot_required
+      become: yes
 
-      - name: Reboot target to apply changes
-        reboot:
-          reboot_timeout: 600
+    - name: Verify NVIDIA driver installation with nvidia-smi
+      ansible.builtin.command: nvidia-smi
+      register: nvidia_smi_output
+      retries: 5
+      delay: 10
+      until: nvidia_smi_output.rc == 0
+      changed_when: false
 
-      - name: Start containerd / kubelet
-        ansible.builtin.systemd:
-          state: started
-          name: "{{ item }}"
-        with_items:
-          - containerd
-          - kubelet
-        when: apt_status is success
+  handlers:
+    - name: update-initramfs
+      ansible.builtin.command: update-initramfs -u
+      listen: update-initramfs
+      notify: set_reboot_required
+
+    - name: set_reboot_required
+      ansible.builtin.set_fact:
+        reboot_required: true
+      listen: set_reboot_required
+
+    - name: restart_containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+      listen: restart_containerd
+
+
+    - name: Reboot target to apply changes
+      reboot:
+        reboot_timeout: 600
+
+    - name: Start containerd / kubelet
+      ansible.builtin.systemd:
+        state: restarted
+        name: "{{ item }}"
+      with_items:
+        - containerd
+        - kubelet

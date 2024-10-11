@@ -29,10 +29,12 @@ ansible -i inventory.ini k8s -b -a 'uptime'
 
 ### 4. Post-installation and Initial Setup
 ```bash
+ansible-playbook -i inventory.ini -l k8s playbook_base_packages.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_base_host_settings.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_base_users.yaml
+
 ansible-playbook -i inventory.ini -l proxmox playbook_core_net_qdisc.yaml
 ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml
-ansible-playbook -i inventory.ini -l k8s,proxmox playbook_base_packages_host_settings.yaml
-ansible-playbook -i inventory.ini -l k8s,proxmox playbook_base_users.yaml
 ansible -i inventory.ini k8s -b -a 'reboot'
 ```
 

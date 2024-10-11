@@ -6,12 +6,47 @@
     - vars_kube.yaml
 
   tasks:
+  ######### Look up and set cluster host IPs from DNS
   - name: Get IP for a subset of hosts, store in HOST_IP
     ansible.builtin.set_fact:
       HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
     loop: "{{ groups['k8s'] }}"
 
-######### Dirs for all the things at once
+  ######### Kernel modules needed to run containers
+  - name: Load container modules
+    ansible.builtin.copy:
+      force: true
+      dest: "/etc/modules-load.d/99-containerd.conf"
+      content: |
+        overlay
+        br_netfilter
+
+  - name: Live modprobe of container modules
+    ansible.builtin.shell:
+      cmd: modprobe "{{ item }}"
+    with_items: [overlay, br_netfilter]
+
+  ######### Sysctl needed for CNI
+  - name: Write sysctl startup parameters
+    ansible.builtin.copy:
+      dest: "/etc/sysctl.d/99-kubernetes-cri.conf"
+      content: |
+        net.bridge.bridge-nf-call-iptables  = 1
+        net.bridge.bridge-nf-call-ip6tables = 1
+        net.ipv4.ip_forward                 = 1
+        # cilium rp_filter
+        # https://github.com/cilium/cilium/issues/10645
+        # rp_filter non container
+        net.ipv4.conf.*.rp_filter = 0
+        net.ipv4.conf.all.rp_filter = 0
+        net.ipv4.conf.default.rp_filter = 0
+        net.ipv4.conf.cilium_geneve.rp_filter = 0
+
+  - name: Reload sysctl settings
+    ansible.builtin.shell: sysctl --system
+
+
+  ######### Dirs for all the things at once
   - name: Mkdir all
     ansible.builtin.file:
       path: "{{ item.value }}"
@@ -19,7 +54,7 @@
       mode: "0755"
     with_dict: "{{ worker_dirs.values() }}"
 
-############ CRI
+  ############ CRI
   - name: CRI binaries
     block:
     - name: create tempdir
@@ -43,14 +78,14 @@
         path: "{{ tmpdir_1.path }}"
         state: absent
 
-############ runc
+  ############ runc
     - name: Installing runc
       ansible.builtin.get_url:
         url: https://github.com/opencontainers/runc/releases/download/v{{ RUNC_VERSION }}/runc.amd64
         dest: "{{worker_dirs['system']['bin']}}/runc"
         mode: "0755"
 
-############ CNI-PLUGINS
+  ############ CNI-PLUGINS
     - name: Installing CNI-PLUGINS
       ansible.builtin.unarchive:
         remote_src: true
@@ -69,7 +104,7 @@
       with_items:
         - 99-loopback.conf
 
-################# Containerd
+  ################# Containerd
   - name: "Containerd"
     block:
     - name: Mkdir /etc/containerd
@@ -159,7 +194,7 @@
         enabled: true
         daemon_reload: true
 
-#################### Kubelet
+  #################### Kubelet
   - name: Kubelet and Kube-proxy
     block:
 
@@ -229,4 +264,4 @@
         daemon_reload: true
       with_items:
         - kubelet
-        # - kube-proxy ## comment out if kube-proxy replaced with cilium
+        - kube-proxy ## comment out if kube-proxy replaced by CNI

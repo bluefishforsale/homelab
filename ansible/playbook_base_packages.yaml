@@ -1,0 +1,86 @@
+---
+- name: root and system level
+  become: true
+  hosts: all
+  strategy: free
+  vars_files:
+    - vars_kube.yaml
+  vars:
+    go_paths: '/usr/local/go/bin'
+    packages: 
+      - dialog
+      - apt-utils
+      - bmon
+      - cpufrequtils
+      - curl
+      - dnsutils
+      - dstat
+      - fping
+      - golang
+      - gpg
+      - glances
+      - git
+      - gcc
+      - htop
+      - iotop
+      - iperf3
+      - ipmitool
+      - iproute2
+      - ipset
+      - iptraf-ng
+      - iputils-ping
+      - jq
+      - fail2ban
+      - logrotate
+      - libaa-bin
+      - lvm2
+      - make
+      - net-tools
+      - nmap
+      - ntpdate
+      - pciutils
+      - pv
+      - rsyslog
+      - strace
+      - sysstat
+      - tmux
+      - unzip
+      - vim
+      - wget
+      - zsh
+
+  tasks:
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
+
+    - name: Calculate the number of package retries
+      set_fact:
+        total_retries: "{{ packages | length * 5 }}"
+
+    - name: Install a suite of common tools
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: no
+      register: apt_status
+      until: apt_status is succeeded
+      delay: 5
+      retries: "{{ total_retries }}"
+      with_items: "{{ packages }}"
+      ignore_errors: true
+
+    - name: Ensure dpkg is not in a broken state
+      ansible.builtin.shell: dpkg --configure -a
+      when: apt_status is failed
+      ignore_errors: true
+
+    - name: Retry package installation if previous attempt failed
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: no
+      when: apt_status is failed
+      with_items: "{{ packages }}"
+      ignore_errors: true

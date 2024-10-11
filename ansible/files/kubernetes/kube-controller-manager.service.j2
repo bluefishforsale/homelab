@@ -20,6 +20,9 @@ ExecStart=/usr/local/bin/kube-controller-manager \
   --secure-port=10257 \
   --profiling=false
   --v=1 \
+  --allocate-node-cidrs=true \  # Enable node CIDR allocation for Pod IPs
+  --cluster-cidr={{ CLUSTER_CIDR }} \  # Define the Pod network CIDR range
+  --node-cidr-mask-size={{ POD_NETMASK }} \  # Optional: Subnet mask size for each node
 
 Restart=on-failure
 RestartSec=5

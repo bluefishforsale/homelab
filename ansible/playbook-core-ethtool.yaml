@@ -1,0 +1,45 @@
+---
+- name: Configure systemd service for ethtool settings
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Find the location of the ethtool binary
+      ansible.builtin.command: "which ethtool"
+      register: ethtool_path
+      changed_when: false
+
+    - name: Gather list of all network interfaces excluding unwanted types
+      ansible.builtin.shell: |
+        ip -o link show | awk -F': ' '{print $2}' | grep -Ev '^(lo|vmbr|tap|veth|bond)'
+      register: network_interfaces
+      changed_when: false
+
+    - name: Check speed for each interface and generate ethtool commands
+      ansible.builtin.shell: "{{ ethtool_path.stdout }} {{ item }} | grep -oP '(?<=Speed: )[0-9]+' || echo unknown"
+      loop: "{{ network_interfaces.stdout_lines }}"
+      register: interface_speeds
+      changed_when: false
+
+    - name: Set ethtool commands for interfaces with known speeds
+      ansible.builtin.set_fact:
+        ethtool_commands: "{{ ethtool_commands | default([]) + ['ExecStart=' + ethtool_path.stdout + ' -s ' + item.item + ' autoneg off speed ' + item.stdout + ' duplex full'] }}"
+      loop: "{{ interface_speeds.results }}"
+      when: item.stdout != "unknown"
+
+    - name: Create systemd service file for ethtool settings
+      ansible.builtin.template:
+        src: files/system/ethtool-settings.service.j2
+        dest: /etc/systemd/system/ethtool-settings.service
+        mode: '0644'
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start ethtool-settings service
+      ansible.builtin.systemd:
+        name: ethtool-settings.service
+        enabled: yes
+        state: started

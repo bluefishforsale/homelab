@@ -59,10 +59,18 @@
       ignore_errors: True
       ansible.builtin.shell: rm /etc/init.d/isc-dhcp-server
 
+    - name: Rsyslog ensure local7.* is logged to /var/log/dhcpd.log
+      ansible.builtin.lineinfile:
+        path: /etc/rsyslog.conf  # Replace with the actual path to the file you want to modify
+        line: 'local7.* /var/log/dhcpd.log'
+        state: present
 
-    - name: Enable and Start service
+    - name: Enable and Start services
       systemd:
         enabled: yes
         state: restarted
-        name: isc-dhcp-server.service
+        name: "{{ item }}"
         daemon_reload: true
+      with_items:
+      - isc-dhcp-server.service
+      - rsyslog

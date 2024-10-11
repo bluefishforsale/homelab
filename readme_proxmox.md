@@ -175,24 +175,35 @@ ceph auth get client.bootstrap-osd > /etc/pve/priv/ceph.client.bootstrap-osd.key
 
 - create ceph OSD lvm PV, VG, and LV  LVMs
 - creates and starts ceph OSD services and mounts the disks
+- erasure coded pool
 
 ```bash
 ceph-volume lvm batch --report $(printf "/dev/sd%s " $(for x in a b c d e f g h ; do echo $x ; done) ) --db-devices /dev/nvme0n1 --yes
 ceph-volume lvm batch $(printf "/dev/sd%s " $(for x in a b c d e f g h ; do echo $x ; done) ) --db-devices /dev/nvme0n1 --yes
-```
-
-### data pool and rbd storage
-
-```bash
-pveceph pool create data -application rbd
-pvesm add rbd ceph-lvm -pool data
+ceph osd erasure-code-profile set ec-profile-name k=4 m=2 crush-failure-domain=host
+ceph osd pool create ec-data-pool-name 64 64 erasure ec-profile-name
+ceph osd pool application enable ec-data-pool-name rbd
+ceph osd pool create replicated-data-pool-name 64
+ceph osd pool application enable replicated-data-pool-name rbd
+ceph osd pool create replicated-data-pool-name 64
+ceph osd pool application enable replicated-data-pool-name rbd
+ceph osd tier add ec-data-pool-name replicated-data-pool-name
+ceph osd tier cache-mode replicated-data-pool-name writeback
+ceph osd tier set-overlay ec-data-pool-name replicated-data-pool-name
+pvesm add rbd ceph-lvm -pool replicated-data-pool-name
 ```
 
 ### cephfs
 
 ```bash
-pveceph mds create
-pveceph fs create --pg_num 32 --add-storage
+ceph osd pool create cephfs_metadata_pool 32
+ceph osd pool application enable cephfs_metadata_pool cephfs
+ceph fs new cephfs cephfs_metadata_pool replicated-data-pool-name
+
+
+# decrease replication factor from 3->2
+ceph osd pool set cephfs_data size 2
+ceph osd pool set cephfs_metadata size 2
 ```
 
 
