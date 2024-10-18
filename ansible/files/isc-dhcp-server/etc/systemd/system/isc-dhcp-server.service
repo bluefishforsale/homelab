@@ -9,7 +9,10 @@ StartLimitBurst=3
 RestartSec=30
 TimeoutSec=2min
 KillMode=process
-ExecStart=/usr/sbin/dhcpd -q -d --no-pid -cf /etc/dhcp/dhcpd.conf eth0
+ExecStart=/usr/sbin/dhcpd -q -d -cf /etc/dhcp/dhcpd.conf eth0
+SyslogIdentifier=isc-dhcp-server
+StandardOutput=syslog
+StandardError=syslog
 
 [Install]
 WantedBy = multi-user.target
