@@ -26,6 +26,7 @@ ansible-playbook -i inventory.ini 07_configure_gpu_node.yaml
 
  
 # RESET
+ansible -i inventory.ini k8s  -b -a 'sudo pgrep kube* | xargs sudo kill -9'
 ansible -i inventory.ini k8s  -b -a 'sudo crictl stopp $(sudo crictl ps -a -q)'
 ansible -i inventory.ini k8s  -b -a 'sudo crictl rmp $(sudo crictl ps -a -q)'
 ansible -i inventory.ini k8s  -b -a 'sudo systemctl stop kubelet containerd'
