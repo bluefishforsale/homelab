@@ -99,14 +99,6 @@ deb http://security.debian.org/debian-security bookworm-security main contrib
 EOF
 ```
 
-### ceph reef  repo
-
-```bash
-cat << EOF > /etc/apt/sources.list.d/ceph.list
-deb http://download.proxmox.com/debian/ceph-reef bookworm no-subscription
-EOF
-```
-
 ### comment out the enterprise repo
 
 ```bash
@@ -116,6 +108,32 @@ EOF
 
 apt-get update
 ```
+
+
+### Removing the no-subscription warning from the UI
+
+- https://johnscs.com/remove-proxmox51-subscription-notice/
+
+```bash
+cd /usr/share/javascript/proxmox-widget-toolkit
+cp proxmoxlib.js proxmoxlib.js.bak
+```
+
+- https://johnscs.com/remove-proxmox51-subscription-notice/
+
+```bash
+sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
+```
+
+### ceph reef  repo
+
+```bash
+cat << EOF > /etc/apt/sources.list.d/ceph.list
+deb http://download.proxmox.com/debian/ceph-reef bookworm no-subscription
+EOF
+```
+
+
 
 ### install ceph
 
@@ -207,163 +225,6 @@ ceph osd pool set cephfs_metadata size 2
 ```
 
 
-### Removing the no-subscription warning from the UI
-
-- https://johnscs.com/remove-proxmox51-subscription-notice/
-
-```bash
-cd /usr/share/javascript/proxmox-widget-toolkit
-cp proxmoxlib.js proxmoxlib.js.bak
-```
-
-- https://johnscs.com/remove-proxmox51-subscription-notice/
-
-```bash
-sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
-```
-
-
-
-### Making VMs
-
-#### Getting the debian base img
-
-- adding the SSH keys at the start
-
-```bash
-wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
-wget -O  rsa.key https://github.com/bluefishforsale.keys
-```
-
-### Make VM temaplate
-
-```bash
-qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
-qm importdisk 9999 	debian-12-generic-amd64.qcow2 ceph-lvm
-qm set 9999 --ide2 ceph-lvm:cloudinit
-qm set 9999 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-9999-disk-0
-qm set 9999 --boot order='scsi0'
-qm set 9999 --serial0 socket --vga serial0
-qm set 9999 --sshkeys rsa.key
-qm set 9999 --hotplug network,disk
-qm set 9999 --bios ovmf
-qm set 9999 --machine q35
-qm set 9999 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-qm set 9999 --cores 2
-qm set 9999 --memory 4096
-qm set 9999 --agent enabled=1
-qm template 9999
-```
-
-## make six VMs from the template
-
-- using cloud-init to set IP and onboot info
-- one of them (kube603) has GPU PCI-e passthrough
-- this requires DNS entries be in place for each VM to look up the IP
-
-```bash
-for x in 0 1 ; do
-for y in 1 2 3 ; do
-qm clone 9999 6${x}${y}
-qm set 6${x}${y} --name kube6${x}${y} --ipconfig0 ip=$(host kube6${x}${y}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
-qm set 6${x}${y} --sshkeys rsa.key
-qm resize 6${x}${y} scsi0 +18G  # 21.47G
-if [ $x = 0 ] ; then
-    qm set 6${x}${y} --cores 4
-    qm set 6${x}${y} --memory 8192  # 8G
-else
-    qm set 6${x}${y} --cores 9
-    qm set 6${x}${y} --memory 57344  # 56G
-    if [ $y = 3 ] ; then
-        # this sets up this VM specificallt for nvidia pci-e GPU passthrough at PCI-e address 42:00.*
-        qm set 6${x}${y} --hostpci0=42:00,pcie=1
-    fi
-fi
-done
-done
-```
-
-## start VMS
-
-```bash
-for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done | xargs -n1 qm start
-```
-
-## stop and destroy all VMs
-
-```bash
-for x in $(seq  0 1) ; do for y in $(seq 1 3) ; do  echo "6$x$y" ; done ; done |\
- while read id ; do qm stop $id ; qm destroy $id ; done
-```
-
-### Make OPNsense VM
-
-```bash
-qm create 1000 --name OPNsense --net0 virtio,bridge=vmbr2  --net1 virtio,bridge=vmbr3
-qm set 1000 --ipconfig0 ip=192.168.1.10/24,gw=192.168.1.1 --nameserver=192.168.1.2
-qm importdisk 1000 debian-12-generic-amd64.qcow2 ceph-lvm
-qm set 1000 --ide2 ceph-lvm:cloudinit
-qm set 1000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-1000-disk-0
-qm set 1000 --sata0 local:iso/OPNsense-23.7-serial-amd64.img
-qm set 1000 --boot order='sata0;scsi0'
-qm set 1000 --serial0 socket --vga serial0
-qm set 1000 --sshkeys rsa.key
-qm set 1000 --hotplug network,disk
-qm set 1000 --bios ovmf
-qm set 1000 --machine q35
-qm set 1000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-qm set 1000 --cores 2
-qm set 1000 --memory 4096
-qm set 1000 --agent enabled=1
-qm resize 1000 scsi0 +16G
-```
-
-### Pihole VM
-
-```bash
-qm create 3000 --name pihole --net0 virtio,bridge=vmbr0
-qm importdisk 3000 debian-12-generic-amd64.qcow2 ceph-lvm
-qm set 3000 --ide2 ceph-lvm:cloudinit
-qm set 3000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-3000-disk-0
-qm set 3000 --boot order='scsi0'
-qm set 3000 --serial0 socket --vga serial0
-qm set 3000 --sshkeys rsa.key
-qm set 3000 --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1 --nameserver=192.168.1.2
-qm set 3000 --hotplug network,disk
-qm set 3000 --bios ovmf
-qm set 3000 --machine q35
-qm set 3000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-qm set 3000 --cores 2
-qm set 3000 --memory 2048
-qm set 3000 --agent enabled=1
-qm resize 3000 scsi0 +18G
-qm set 3000 --onboot qm set 3000 --onboot 11
-
-
-```
-
-### dns01 VM
-
-```bash
-qm create 2000 --name dns01 --net0 virtio,bridge=vmbr0
-qm importdisk 2000 debian-12-generic-amd64.qcow2 ceph-lvm
-qm set 2000 --ide2 ceph-lvm:cloudinit
-qm set 2000 --scsihw virtio-scsi-pci --scsi0 ceph-lvm:vm-2000-disk-0
-qm set 2000 --boot order='scsi0'
-qm set 2000 --serial0 socket --vga serial0
-qm set 2000 --sshkeys rsa.key
-qm set 2000 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1 --nameserver=1.1.1.1
-qm set 2000 --hotplug network,disk
-qm set 2000 --bios ovmf
-qm set 2000 --machine q35
-qm set 2000 --efidisk0 ceph-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
-qm set 2000 --cores 2
-qm set 2000 --memory 2048
-qm set 2000 --agent enabled=1
-qm resize 2000 scsi0 +18G
-qm set 2000 --onboot 1
-```
-
 # Totally screwed? Need to start over?
   -  we got you
 
@@ -386,3 +247,90 @@ pveceph purge
 rm /etc/pve/ceph.conf
 find /var/lib/ceph/ -mindepth 2 -delete
 ```
+
+
+### Make VM temaplate
+
+```bash
+qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
+qm importdisk 9999 	debian-12-generic-amd64.qcow2 vm-boot-lvm-thin
+qm set 9999 --ide2 vm-boot-lvm-thin:cloudinit
+qm set 9999 --scsihw virtio-scsi-pci --scsi0 vm-boot-lvm-thin:vm-9999-disk-0
+qm set 9999 --boot order='scsi0'
+qm set 9999 --serial0 socket --vga serial0
+qm set 9999 --sshkeys rsa.key
+qm set 9999 --hotplug network,disk
+qm set 9999 --bios ovmf
+qm set 9999 --machine q35
+qm set 9999 --efidisk0 vm-boot-lvm-thin:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 9999 --cores 2
+qm set 9999 --memory 4096
+qm set 9999 --agent enabled=1
+qm template 9999
+```
+
+
+### dns01 VM
+
+```bash
+qm clone 9999 2000
+qm set 2000 --name dns01 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1 --nameserver=1.1.1.1 --onboot 1
+qm set 2000 --cores 1
+qm set 2000 --memory 1024
+qm resize 2000 scsi0 +8G
+qm start 2000
+```
+
+### Pihole VM
+
+```bash
+qm clone 9999 3000
+qm set 3000 --name pihole --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 3000 --cores 1
+qm set 3000 --memory 1024
+qm resize 3000 scsi0 +8G
+qm start 3000
+```
+
+## make six kube VMs from the template
+
+- using cloud-init to set IP and onboot info
+- one of them (kube013) has GPU PCI-e passthrough
+- this requires DNS entries be in place for each VM to look up the IP
+
+```bash
+x=5
+for y in 0 1 ; do
+    for z in 1 2 3 ; do
+        n="${x}${y}${z}"
+        qm clone 9999 ${n}
+        qm set ${n} --name kube${n} --ipconfig0 ip=$(host kube${n}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+        qm set ${n} --sshkeys rsa.key
+        qm resize ${n} scsi0 +8G  # 10G
+        if [ $x = 0 ] ; then
+            qm set ${n} --cores 4
+            qm set ${n} --memory 2048  # 8G
+        else
+            qm set ${n} --cores 8
+            qm set ${n} --memory 8192  # 56G
+            if [ $y = 3 ] ; then
+                # this sets up this VM specifically for nvidia GPU passthrough at PCI-e address 42:00.*
+                qm set ${n} --hostpci0=42:00,pcie=1
+            fi
+        fi
+    done
+done
+```
+
+## start kube VMS
+
+```bash
+for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do  qm start "$x$y$z" ; done ; done ; done
+```
+
+## stop and destroy all kube VMS
+
+```bash
+for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do qm stop "$x$y$z" ; qm destroy "$x$y$z" ; done ; done ; done
+```
+
