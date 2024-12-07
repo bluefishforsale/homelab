@@ -64,6 +64,7 @@
         path: /etc/rsyslog.conf  # Replace with the actual path to the file you want to modify
         line: 'local7.* /var/log/dhcpd.log'
         state: present
+      ignore_errors: yes
 
     - name: Enable and Start services
       systemd:

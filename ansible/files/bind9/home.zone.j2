@@ -12,7 +12,7 @@ $TTL 86400 ; 1 day
 @                 IN          NS    dns01.home.
 
 gw                IN          A     192.168.1.1
-dns01             IN          A     192.168.1.143
+dns01             IN          A     192.168.1.2
 dns02             IN          A     192.168.1.5
 pihole            IN          A     192.168.1.9
 unifi             IN          A     192.168.1.10
@@ -38,6 +38,17 @@ node005-idrac    IN        A     192.168.1.15
 node006-idrac    IN        A     192.168.1.16
 
 ; proxmox vms
+; node005
+kube500         IN      A       192.168.1.51
+kube501         IN      A       192.168.1.51
+kube502         IN      A       192.168.1.52
+kube503         IN      A       192.168.1.53
+kube504         IN      A       192.168.1.54
+kube511         IN      A       192.168.1.55
+kube512         IN      A       192.168.1.56
+kube513         IN      A       192.168.1.57
+kube514         IN      A       192.168.1.58
+kube515         IN      A       192.168.1.59
 ; node006
 kube600         IN      A       192.168.1.61
 kube601         IN      A       192.168.1.61

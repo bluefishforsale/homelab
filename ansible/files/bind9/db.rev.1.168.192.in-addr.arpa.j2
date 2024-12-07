@@ -11,7 +11,7 @@ $TTL 86400 ; 1 day
 
 ; internal DNS
 @           IN          NS          dns01.home.
-143           IN          PTR         dns01.home.
+2           IN          PTR         dns01.home.
 3           IN          PTR         dns02.home.
 10          IN          PTR         unifi.home.
 
@@ -30,16 +30,23 @@ $TTL 86400 ; 1 day
 ;;    Addresses in network	- 35
 
 
+50		IN		PTR		kube500.home.
+51		IN		PTR		kube501.home.
+52		IN		PTR		kube502.home.
+53		IN		PTR		kube503.home.
+54		IN		PTR		kube504.home.
+55		IN		PTR		kube511.home.
+56		IN		PTR		kube512.home.
+57		IN		PTR		kube513.home.
+58		IN		PTR		kube514.home.
+59		IN		PTR		kube515.home.
+
 60		IN		PTR		kube600.home.
 61		IN		PTR		kube601.home.
 62		IN		PTR		kube602.home.
 63		IN		PTR		kube603.home.
-64		IN		PTR		kube604.home.
-65		IN		PTR		kube611.home.
-66		IN		PTR		kube612.home.
-67		IN		PTR		kube613.home.
-68		IN		PTR		kube614.home.
-69		IN		PTR		kube615.home.
+
+; 64 - 95 MetalLB
 
 99          IN          PTR         apiserver.home.
 
@@ -53,6 +60,8 @@ $TTL 86400 ; 1 day
 
 143		IN		PTR		ocean.home.
 144		IN		PTR		ocean-eth0.home.
+
+; DHCP range 192.168.1.150 - 192.168.1.239
 
 ; networking
 1     IN    PTR         usg-3p.home.

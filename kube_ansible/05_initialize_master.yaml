@@ -65,7 +65,7 @@
         curl -sI --cert /etc/kubernetes/pki/apiserver-kubelet-client.crt
              --key /etc/kubernetes/pki/apiserver-kubelet-client.key
              --cacert /etc/kubernetes/pki/ca.crt
-             https://192.168.1.61:6443/healthz
+             https://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}:6443/healthz
       register: health_check
       retries: 100
       delay: 1
