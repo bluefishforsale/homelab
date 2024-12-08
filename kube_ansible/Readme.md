@@ -24,9 +24,7 @@ ansible-playbook -i inventory.ini 05_initialize_master.yaml
 ansible-playbook -i inventory.ini 06_join_other_nodes.yaml
 ansible-playbook -i inventory.ini 07_configure_gpu_node.yaml
 
- 
 # RESET
-ansible -i inventory.ini k8s  -b -a 'sudo pgrep kube* | xargs sudo kill -9'
 ansible -i inventory.ini k8s  -b -a 'sudo crictl stopp $(sudo crictl ps -a -q)'
 ansible -i inventory.ini k8s  -b -a 'sudo crictl rmp $(sudo crictl ps -a -q)'
 ansible -i inventory.ini k8s  -b -a 'sudo systemctl stop kubelet containerd'
@@ -34,6 +32,8 @@ ansible -i inventory.ini k8s  -b -a 'sudo ip link delete flannel.1'
 ansible -i inventory.ini k8s  -b -a 'sudo rm -rf /etc/cni/net.d /var/lib/cni /var/lib/etcd /var/lib/kubelet /etc/kubernetes /var/lib/containerd'
 ansible -i inventory.ini k8s  -b -a 'sudo kubeadm reset --force'
 ansible -i inventory.ini k8s  -b -a 'sudo ipvsadm --clear'
+ansible -i inventory.ini k8s  -b -a 'sudo pgrep container* | xargs sudo kill -9'
+ansible -i inventory.ini k8s  -b -a 'sudo pgrep kube* | xargs sudo kill -9'
 
 # watching things
 watch sudo crictl ps -a
