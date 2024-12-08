@@ -318,6 +318,7 @@ for y in 0 1 ; do
                 qm set ${n} --hostpci0=42:00,pcie=1
             fi
         fi
+        qm start "$x$y$z"
     done
 done
 ```
