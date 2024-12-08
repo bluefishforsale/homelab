@@ -1,4 +1,4 @@
-- name: All controller dir and kubeadm loop
+- name: Initialize the master via Kubeadm
   hosts: k8s_controller
   become: yes
   any_errors_fatal: true
@@ -10,7 +10,7 @@
         owner: root
         group: root
         mode: '0755'
-      when: not ansible_check_mode      
+      when: not ansible_check_mode
 
     - name: Copy kubeadm configuration template to /etc/kubernetes/kubeadm-config.yaml
       template:
