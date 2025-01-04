@@ -48,6 +48,11 @@
         mode: '0755'
       when: not ansible_check_mode
 
+    - name: Remove containerd configuration file
+      file:
+        path: /etc/containerd/config.toml
+        state: absent
+
     - name: Generate default containerd configuration file
       shell: "containerd config default > /etc/containerd/config.toml"
       args:
