@@ -49,7 +49,7 @@
       when: not ansible_check_mode
 
     - name: Generate default containerd configuration file
-      command: "containerd config default > /etc/containerd/config.toml"
+      shell: "containerd config default > /etc/containerd/config.toml"
       args:
         creates: /etc/containerd/config.toml
       when: not ansible_check_mode
@@ -60,6 +60,13 @@
         path: /etc/containerd/config.toml
         regexp: '^(\s*bin_dir\s*=\s*).*'
         replace: '\1"/opt/cni/bin"'
+      when: not ansible_check_mode
+
+    - name: Ensure SystemdCgroup is set to true
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '(\s*SystemdCgroup\s*=\s*)false'
+        replace: '\1true'
       when: not ansible_check_mode
 
     - name: Ensure crictl config directory exists
