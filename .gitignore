@@ -1,13 +1,12 @@
 # macOS files
 .DS_Store
 
+# ignore qemu-local
+qemu-output/
+
 # ignore keys and cert requests
 *.csr
 *.pem
 
-# ansible tmp output
-output.txt
-
-# packer build files
-packer/mini.iso.1
-packer/http/preseed.cfg.bak
+# large files from upstreams
+*.iso
