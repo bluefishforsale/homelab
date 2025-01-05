@@ -60,6 +60,13 @@
       when: not ansible_check_mode
 
     ### start config updates
+    - name: Update CRI pause image
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '(\s*sandbox_image\s*=s*).*'
+        replace: '\1"{{ sandbox_image }}"'
+      when: not ansible_check_mode
+
     - name: Update CNI plugin directory to /opt/cni/bin
       replace:
         path: /etc/containerd/config.toml
