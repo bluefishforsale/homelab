@@ -48,3 +48,10 @@ watch  sudo curl -s --cacert /etc/kubernetes/pki/ca.crt --cert /etc/kubernetes/p
 watch curl -s http://127.0.0.1:2381/health
 
 sudo ss -plant | grep 6443 | grep LIST
+
+# get member list
+kubectl exec -n kube-system -it etcd-kube501 -- etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  member list

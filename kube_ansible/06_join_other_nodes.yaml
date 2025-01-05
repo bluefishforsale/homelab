@@ -84,17 +84,18 @@
       when:  inventory_hostname in groups['k8s_worker'] and not ansible_check_mode
 
     # this feels wrong, keep looking for the right way to set node apiserver IP address correctly
-    - name: Update kube-apiserver bind address
-      replace:
-        path: /etc/kubernetes/manifests/kube-apiserver.yaml
-        regexp: '(\s*-\s*--bind-address=).*'
-        replace: '\1{{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}'
-      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
 
     - name: Ensure kube-apiserver advertises the correct address
       replace:
         path: /etc/kubernetes/manifests/kube-apiserver.yaml
-        regexp: '(\s*-\s*--advertise-address=).*'
+        regexp: '(\s*-\s*--advertise-address)=.*'
+        replace: '\1={{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}'
+      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Update kube-apiserver bind address
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '(\s*-\s*--bind-address)=.*'
         replace: '\1={{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}'
       when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
 
