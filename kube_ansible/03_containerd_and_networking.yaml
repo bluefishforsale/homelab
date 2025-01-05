@@ -21,14 +21,6 @@
         group: root
         mode: '0755'
     
-    - name: Deploy CNI configuration file
-      template:
-        src: files/10-containerd-net.conflist.j2
-        dest: /etc/cni/net.d/10-containerd-net.conflist
-        owner: root
-        group: root
-        mode: '0644'
-
     - name: Install containerd
       apt:
         name: containerd
