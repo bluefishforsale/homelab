@@ -23,6 +23,7 @@ ansible-playbook -i inventory.ini 04_configure_ha_proxy_keepalived.yaml
 ansible-playbook -i inventory.ini 05_initialize_master.yaml
 ansible-playbook -i inventory.ini 06_join_other_nodes.yaml
 ansible-playbook -i inventory.ini 07_configure_gpu_node.yaml
+ansible-playbook -i inventory.ini 20_metrics_server_certs_secrets.yaml
 
 # RESET
 ansible -i inventory.ini k8s -b -m shell a 'sudo crictl stopp $(sudo crictl ps -a -q)'
