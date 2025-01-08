@@ -12,6 +12,7 @@
 1. HA for all critical components (dns, dhcp, LB)
 1. Resiliancy and Redundancy to achieve higher reliability
 1. DR plan for all services config and data, recover / restore within x mins
+1. local LLM RAG
 
 # Architecture
 ## Github stores the Ansible playbooks
@@ -45,32 +46,33 @@
 1. Rundeck / Ansible is responsible for all IAC
 
 # Todo list 
-
-
+1. DNS prometheus exporter & dashboard
+1. DHCP prometheus exporter & dashboard
+1. convert all ocean services to ansible in git
+1. docker container for audible downaload and convert
+1. Gitlab ansible playbook on control-plane metal
+1. Runbook on contol-plane metal deplyoed by gitlab
+1. List ideas for runbook tasks
+1. Ansible automate VM creation
+1. pihole .local domain passthrough or shut down pi-hole or ansible configure pi-hole on disk to allow this
 1. kubernetes ingress for services
-1. pihole .local domain passthrough
 1. kubernetes gpu support
 1. kubernetes argoCD
+1. alertmanager and alerts for critical components
 1. update all charts and have ArgoCD automate their installation
 1. kubernetes secrets and letsencrypt certs automation - certmanager?
 1. kubernetes cilium
 1. iBGP internally
 1. vault for secrets - use it to bootstrap kubernetes?
-1. alertmanager and alerts for critical components
 1. local container repo
 1. rewrite playbooks so they are idempotent (produces the same result when applied multiple times as it does when applied once)
 1. LLM on kubernetes
 1. proxmox automated installation w/ PXE, TFTP, DHCP
-1. git ansible ocean services
 1. proxmox ocean -> node006
-1. ansible automate VM creation
 1. proxmox move ocean to VM node006
 1. proxmox import existing ZFS pool
-1. install proxmox on raspberry pi 5
-1. pi5 as control-plane node
-1. move dns, dhcp to pi5
-1. vm for pxe install on pi5
-1. playbook for installing gitlab
-1. GitLab on pi5 for automating the run of ansible playbooks
+1. proxmox raspberry pi 5
+1. kubernetes VM worker on pi-5
+1. kubernetes ARM pod affinity
+1. NextCloud ansible playbook
 1. renumber IP network change subnet from /24 to /16
-1. playbook to install nextcloud
