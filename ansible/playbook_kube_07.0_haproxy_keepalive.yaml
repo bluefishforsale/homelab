@@ -1,0 +1,130 @@
+- name: Haproxy keepalived
+  hosts: k8s_controller
+  strategy: free
+  become: true
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    - name: HAproxy and Keepalived group
+      ansible.builtin.group:
+        name: "{{ item }}"
+      with_items:
+      - haproxy
+      - keepalived
+      - keepalived_script
+
+    - name: HAproxy and Keepalived users
+      ansible.builtin.user:
+        name: "{{ item }}"
+        group: "{{ item }}"
+        system: true
+        shell: /usr/bin/false
+      with_items:
+      - haproxy
+      - keepalived
+      - keepalived_script
+
+    # Make variables for the Kubernetes configfile
+    - name: Get IP for a subset of hosts, store in PEERS_IP
+      ansible.builtin.shell:
+        cmd: ip route | awk '(/default/){print $5}'
+      register: iface
+
+    - name: Get IP for all hosts, store in HOST_IP
+      ansible.builtin.set_fact:
+        APISERVER_IP: "{{ lookup('community.general.dig', APISERVER) }}"
+
+    - name: Get IP for a subset of hosts, store in HOST_IP
+      ansible.builtin.set_fact:
+        HOST_IP: "{{ HOST_IP | combine({ item: lookup('community.general.dig', item) }) }}"
+      loop: "{{ groups['k8s_controller'] }}"
+
+    - name: Haproxy + keepalive
+      block:
+        - name: config
+          ansible.builtin.file:
+            path: "/etc/{{ item }}"
+            state: directory
+            mode: "0755"
+            owner: haproxy
+            group: haproxy
+          with_items:
+            - haproxy
+            - keepalived
+
+      ############  fix dpkg if things went sideways #####################
+        - name: Handle dpkg locks and repair
+          include_tasks: subtask_fix_dpkg_lock.yaml
+
+        - name: Install packages
+          ansible.builtin.apt: name={{ item }} state=latest
+          register: apt_status
+          until: apt_status is success
+          delay: 6
+          retries: 30
+          with_items: [ haproxy, keepalived, psmisc ]
+
+        - name: Write configs haproxy
+          ansible.builtin.copy:
+            force: true
+            dest: "/etc/haproxy/haproxy.cfg"
+            content: '{{ lookup("template", "files/haproxy/haproxy.cfg.j2") }}'
+            mode: "0644"
+            owner: haproxy
+            group: haproxy
+
+        - name: Write configs keepalived
+          ansible.builtin.copy:
+            force: true
+            dest: "/etc/keepalived/keepalived.conf"
+            content: '{{ lookup("template", "files/keepalived/keepalived.conf.j2") }}'
+            mode: "0644"
+            owner: haproxy
+            group: haproxy
+
+        - name: Write haproxy / keepalived systemd services
+          ansible.builtin.copy:
+            force: true
+            dest: "/etc/systemd/system/{{ item }}.service"
+            content: '{{ lookup("template", "files/{{ item }}/{{ item }}.service.j2") }}'
+            mode: "0644"
+            owner: root
+            group: root
+          with_items:
+          - keepalived
+          - haproxy
+
+        - name: iptables allow vrrp
+          ansible.builtin.iptables:
+            chain: INPUT
+            protocol: vrrp
+            jump: ACCEPT
+            comment: INPUT-VRRP
+
+        - name: reset failed
+          ansible.builtin.shell: systemctl reset-failed "{{ item }}"
+          with_items:
+            - keepalived.service
+            - haproxy.service
+
+        - name: enable and start
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: restarted
+            enabled: true
+            daemon_reload: true
+          with_items:
+            - keepalived.service
+            - haproxy.service
+
+        - name: Validate VRRP API server response
+          uri:
+            url: "https://{{ APISERVER }}:443/healthz"
+            method: GET
+            status_code: 200
+            validate_certs: no
+          register: apiserver_health
+          until: apiserver_health.status == 200
+          retries: 6
+          delay: 10

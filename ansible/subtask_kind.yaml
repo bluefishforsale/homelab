@@ -1,6 +1,6 @@
 ---
 - name: kind installed and in $PATH
-  shell: which kind
+  ansible.builtin.shell: which kind
   register: kind_installed
 
 - name: KIND clusters
@@ -15,13 +15,13 @@
   - name: KIND clusters create and stop
     block:
       - name: has the KIND cluster been created yet
-        shell: kind get clusters
+        ansible.builtin.shell: kind get clusters
         register: kind_clusters
       - name: create KIND {{ item }}
         when:  item not in kind_clusters.stdout
         command: kind create cluster --name "{{ item }}" --config kind_cluster_template.yaml
       - name: is the docker container running?
-        shell: docker ps -q --no-trunc -fname='^{{ item }}'-control-plane$
+        ansible.builtin.shell: docker ps -q --no-trunc -fname='^{{ item }}'-control-plane$
         register: docker_containers
       - name: stop the KIND {{ item }}
         when:  docker_containers.stdout | length > 0

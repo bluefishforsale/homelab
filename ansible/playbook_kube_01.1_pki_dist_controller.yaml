@@ -1,8 +1,10 @@
-- name: Kube 04.2 Dist PKI Contollers
+- name: Dist certs to kube contollers
   hosts: k8s_controller
+  strategy: free
   become: yes
-  vars:
-    k8s_dir: /var/lib/kubernetes
+  vars_files:
+    - vars_kube.yaml
+
   tasks:
   - name: Distribute the Certs made in previous steps
     block:
@@ -24,6 +26,8 @@
         group: root
         owner: root
       with_items:
+        - admin.pem
+        - admin-key.pem
         - ca.pem
         - ca-key.pem
         - kubernetes-key.pem

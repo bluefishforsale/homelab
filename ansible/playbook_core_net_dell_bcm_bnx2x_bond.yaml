@@ -52,5 +52,5 @@
     #     state: absent
 
     # - name: netplan apply
-    #   shell: >
+    #   ansible.builtin.shell: >
     #     netplan apply

@@ -1,0 +1,158 @@
+---
+- name: root and system level
+  become: true
+  hosts: all
+  strategy: free
+  vars_files:
+    - vars_kube.yaml
+  
+  tasks:
+
+    ########### Date and Time
+    - name: Set the Host TZ and hwclock to UTC
+      community.general.timezone:
+        hwclock: local
+        name: America/Los_Angeles
+
+    - name: Copy ntpdate cron job
+      ansible.builtin.copy:
+        force: true
+        src: files/crons/ntpdate
+        dest: /etc/cron.d/ntpdate
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Set time and date from NTP upstream
+      ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
+
+    ########### Syslog
+    - name: Create /etc/rsyslog.d/ directory
+      ansible.builtin.file:
+        path: /etc/rsyslog.d/
+        state: directory
+
+    - name: Rsyslog drop IPVS no route messages
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
+        content: |
+          :msg, regex, ".*IPVS.*no destination available" ~
+
+    - name: Rsyslog remote server configuration
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/rsyslog.d/99-remote-syslog.conf"
+        content: |
+          # This file is managed by ansible
+          
+          module(load="omprog")
+          module(load="mmutf8fix")
+          action(type="mmutf8fix" replacementChar="?")
+          action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
+
+
+    ########### Sysctl, modules, swap
+    - name: Disable swap in /etc/fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^(\/swap.*)$'
+        replace: '#\1'
+
+    - name: Disable swap for current boot
+      ansible.builtin.shell: swapoff -a
+
+    - name: Apply custom sysctl tunings
+      ansible.builtin.copy:
+        dest: "/etc/sysctl.d/99-z-final-custom-kubecluster-sysctl-tune.conf"
+        content: |
+          # This file is managed by ansible
+
+          # allow binding to interfaces not yet up (haproxy/keepalived)
+          net.ipv4.ip_nonlocal_bind = 1
+          # don't cache ss-thresh from previous connection
+          net.ipv4.tcp_no_metrics_save = 1
+          # Enable Forward Acknowledgment, which operates with Selective Acknowledgment (SACK) to reduce congestion.
+          net.ipv4.tcp_fack = 1
+          # recommended default congestion control is htcp
+          net.ipv4.tcp_congestion_control = htcp
+          # The maximum number of packets queued in received state
+          net.core.netdev_max_backlog = 30000
+          # Enable selective acknowledgment, which improves performance by selectively acknowledging packets received out of order.
+          net.ipv4.tcp_sack = 1
+          # Enable calculation of RTT in a more accurate way (see RFC 1323) than the retransmission timeout.
+          net.ipv4.tcp_timestamps = 1
+          # If you are using Jumbo Frames, also set this
+          net.ipv4.tcp_mtu_probing = 1
+          # Avoid falling back to slow start after a connection goes idle.
+          net.ipv4.tcp_slow_start_after_idle = 0
+          # recommended to enable 'fair queueing'
+          net.core.default_qdisc = fq
+          # increase TCP max buffer sizes 512MB
+          net.core.rmem_max = 512000000
+          net.core.wmem_max = 512000000
+          # Support windows larger than 64KB.
+          net.ipv4.tcp_window_scaling = 1
+          # jumbo frames needs probing
+          net.ipv4.tcp_mtu_probing = 1
+          # increase Linux autotuning TCP buffer limit
+          net.ipv4.tcp_rmem = 4096 87380 512000000
+          net.ipv4.tcp_wmem = 4096 65536 512000000
+          # file watches increase
+          fs.inotify.max_queued_events = 1310720
+          fs.inotify.max_user_instances = 20480
+          fs.inotify.max_user_watches = 655360
+          user.max_inotify_instances = 20480
+          user.max_inotify_watches = 655360
+          kern.maxfiles = 16777216
+          kern.maxfilesperproc = 524288
+          # no swapping
+          vm.swappiness = 0
+
+    - name: Reload sysctl settings
+      ansible.builtin.shell: sysctl --system
+
+    ########### systemd-journald
+    - name: Write journald config
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/journald.conf"
+        content: |
+          # This file is managed by ansible
+
+          [Journal]
+          Storage=volatile
+          Compress=false
+          LineMax=10K
+          SystemMaxUse=10M
+          SystemMaxFileSize=5M
+          ForwardToSyslog=false
+
+    - name: Restart systemd-journald
+      ansible.builtin.systemd:
+        daemon_reload: yes
+        state: restarted
+        enabled: true
+        name: systemd-journald.service
+
+    ########### interfaces are consistently named and have persistent MAC addresses
+    - name: Configure systemd-udev MAC link
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/network/99-default.link"
+        content: |
+          # This file is managed by ansible
+
+          [Link]
+          NamePolicy=kernel database onboard slot path
+          MACAddressPolicy=persistent
+
+    - name: Restart systemd-udevd service
+      ansible.builtin.service:
+        name: systemd-udevd
+        state: restarted
+
+    - name: Restart systemd-networkd service
+      ansible.builtin.service:
+        name: systemd-networkd
+        state: restarted

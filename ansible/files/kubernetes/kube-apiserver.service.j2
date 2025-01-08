@@ -4,6 +4,7 @@ Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-apiserver \
+  --advertise-address={{APISERVER_IP}} \
   --allow-privileged=true \
   --apiserver-count=3 \
   --audit-log-maxage=30 \
@@ -11,6 +12,8 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --audit-log-maxsize=100 \
   --audit-log-path=/var/log/audit.log \
   --authorization-mode=Node,RBAC \
+  --bind-address=0.0.0.0 \
+  --cert-dir="{{pki_dir}}" \
   --client-ca-file={{pki_dir}}/ca.pem \
   --enable-admission-plugins=NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \
   --enable-aggregator-routing \
@@ -20,17 +23,18 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --etcd-keyfile={{pki_dir}}/kubernetes-key.pem \
   --etcd-servers={{ETCD_SERVER_URLS}} \
   --event-ttl=1h \
-  --cert-dir="{{pki_dir}}" \
   --kubelet-certificate-authority={{pki_dir}}/ca.pem \
   --kubelet-client-certificate={{pki_dir}}/kubernetes.pem \
   --kubelet-client-key={{pki_dir}}/kubernetes-key.pem \
-  --requestheader-client-ca-file={{pki_dir}}/ca.pem \
+  --max-mutating-requests-inflight 1000 \
+  --max-requests-inflight 2000 \
+  --proxy-client-cert-file={{pki_dir}}/kube-aggregator.pem \
+  --proxy-client-key-file={{pki_dir}}/kube-aggregator-key.pem \
   --requestheader-allowed-names=apiserver,aggregator \
+  --requestheader-client-ca-file={{pki_dir}}/ca.pem \
   --requestheader-extra-headers-prefix=X-Remote-Extra- \
   --requestheader-group-headers=X-Remote-Group \
   --requestheader-username-headers=X-Remote-User \
-  --proxy-client-cert-file={{pki_dir}}/kube-aggregator.pem \
-  --proxy-client-key-file={{pki_dir}}/kube-aggregator-key.pem \
   --runtime-config='api/all=true' \
   --service-account-issuer=https://{{APISERVER}} \
   --service-account-key-file={{pki_dir}}/service-account.pem \
@@ -41,7 +45,7 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --storage-media-type=application/json \
   --tls-cert-file={{pki_dir}}/kubernetes.pem \
   --tls-private-key-file={{pki_dir}}/kubernetes-key.pem \
-  --v=2
+  --v=1
 Restart=on-failure
 RestartSec=5
 

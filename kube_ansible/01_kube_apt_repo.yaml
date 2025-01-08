@@ -1,0 +1,40 @@
+- name: Install Kubernetes dependencies on Debian Bookworm
+  hosts: k8s
+  become: yes
+  any_errors_fatal: true
+  tasks:
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
+
+    - name: Install apt-transport-https, curl, and gnupg
+      apt:
+        name:
+          - apt-transport-https
+          - curl
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: Create the keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Set Kubernetes version for repository
+      set_fact:
+        kubernetes_version_short: "{{ kubernetes_version | regex_replace('^([0-9]+\\.[0-9]+).*', '\\1') }}"
+
+    - name: Download and add Kubernetes GPG key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_short }}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes apt repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_short }}/deb/ /"
+        state: present
+        filename: kubernetes

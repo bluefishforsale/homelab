@@ -1,8 +1,10 @@
-- name: Kube 04.2 Dist PKI Workers
+- name: Dist certs to kube workers
   hosts: k8s
+  strategy: free
   become: yes
   vars_files:
     - vars_kube.yaml
+
   tasks:
   - name: Distribute the Certs made in previous steps
     block:
@@ -24,6 +26,8 @@
         group: root
         owner: root
       with_items:
+        - admin.pem
+        - admin-key.pem
         - ca.pem
         - "{{inventory_hostname}}-key.pem"
         - "{{inventory_hostname}}.pem"

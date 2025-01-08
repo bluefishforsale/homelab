@@ -1,21 +1,28 @@
 - name: Create the user and ensure groups and sudo (done as root)
   become: yes
   become_user: root
+
   block:
   - name: change iterable item -> user so item can be used in this playbook
-    set_fact:
+    ansible.builtin.set_fact:
       user: '{{ item }}'
 
   - name: check for user
+    ansible.builtin.command: id "{{ user.name }}"
     changed_when: false
-    shell: id "{{ user.name }}"
+    ignore_errors: true
     register: user_exists
+
+  - name: Create group
+    ansible.builtin.group:
+      name: "{{ user.name }}"
+      state: present
 
   - name: Add required base users
     when: user_exists.rc != 0
-    user:
+    ansible.builtin.user:
       name: "{{ user.name }}"
-      comment: "{{ user.First user.Last}}"
+      comment: "{{ user.first }} {{ user.last}}"
       shell: /bin/zsh
       group: "{{ user.name }}"
       groups: "{{ user.groups }}"
@@ -25,7 +32,7 @@
       ssh_key_file: .ssh/id_rsa
 
   - name: Add github keys to "{{ user.name }}"
-    authorized_key:
+    ansible.builtin.authorized_key:
       user: "{{ user.name }}"
       state: present
       key: "https://github.com/{{ user.github }}.keys"

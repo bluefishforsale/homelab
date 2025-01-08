@@ -1,0 +1,27 @@
+- name: Install Kubernetes components
+  hosts: k8s
+  become: yes
+  any_errors_fatal: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install specific version of Kubernetes components
+      apt:
+        name:
+          - "kubelet={{ kubernetes_version }}"
+          - "kubeadm={{ kubernetes_version }}"
+          - "kubectl={{ kubernetes_version }}"
+        state: present
+        update_cache: yes
+      when: not ansible_check_mode
+
+    - name: Hold Kubernetes packages at the specified version
+      command: "echo '{{ item }} hold' | dpkg --set-selections"
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      when: not ansible_check_mode
+

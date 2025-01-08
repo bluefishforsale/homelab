@@ -1,0 +1,7 @@
+- name: RBAC setup
+  hosts: localhost
+  tasks:
+  - name: Create the system:kube-apiserver-to-kubelet ClusterRole / ClusterRoleBinding
+    ignore_errors: true
+    ansible.builtin.shell:
+      cmd: kubectl apply  -f files/kubernetes/kube_RBAC.yaml

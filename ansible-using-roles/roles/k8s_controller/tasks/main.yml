@@ -1,9 +1,0 @@
-# tasks file for common
----
-- name: k8s_controller
-  become: true
-  block:
-
-    - name: Tasks
-      ansible.builtin.include_tasks: "{{ item }}"
-      loop: "{{ query('fileglob', '{{playbook_dir}}/roles/k8s_controller/tasks/*.yaml') | reject('search', 'main') | list }}"

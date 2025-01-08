@@ -1,0 +1,31 @@
+- name: Fetch and Decrypt KMS Secret
+  hosts: localhost
+  vars:
+    gcloud_command: /usr/bin/gcloud
+    kms_keyring: "projects/{{ homelab_project_name }}/locations/{{ keyring_location }}/keyRings/{{ keyring_name }}"
+    kms_key: "{{ kms_key_name }}"
+    encrypted_secret_file: "/path/to/encrypted-secret.enc"
+    decrypted_secret_file: "/path/to/decrypted-secret.txt"
+  tasks:
+    
+    - name: Ensure Google Cloud SDK is installed
+      ansible.builtin.package:
+        name: google-cloud-sdk
+        state: present
+    
+    - name: Fetch and Decrypt KMS Secret
+      ansible.builtin.shell: >
+        {{ gcloud_command }} kms decrypt
+        --location={{ keyring_location }}
+        --keyring={{ keyring_name }}
+        --key={{ kms_key_name }}
+        --ciphertext-file={{ encrypted_secret_file }}
+        --plaintext-file={{ decrypted_secret_file }}
+      args:
+        creates: "{{ decrypted_secret_file }}"
+      environment:
+        GOOGLE_APPLICATION_CREDENTIALS: "{{ service_account_json }}"
+
+    - name: Display Decrypted Secret (Optional)
+      ansible.builtin.debug:
+        msg: "{{ lookup('file', decrypted_secret_file) }}"

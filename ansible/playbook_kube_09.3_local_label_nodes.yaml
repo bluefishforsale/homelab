@@ -1,0 +1,26 @@
+- name: Kube 20 Node Labels from Inventory
+  hosts: localhost
+  vars_files:
+    - vars_kube.yaml
+
+  tasks:
+    - name: commands
+      debug:
+        msg: >-
+          {% for label in (hostvars[item]['k8s_labels'].split(',')) %}{
+            kubectl label node --overwrite {{item}} {{label}}
+          }{% endfor %}
+      loop: "{{ groups['k8s'] }}"
+
+    - name: exec roles
+      ansible.builtin.shell:
+        cmd: kubectl label node --overwrite {{item}} kubernetes.io/role={{hostvars[item]['k8s_role']}}
+      loop: "{{ groups['k8s'] }}"
+
+    - name: exec labels
+      ansible.builtin.shell:
+        cmd: >-
+          {% for label in (hostvars[item]['k8s_labels'].split(',')) %}{
+            kubectl label node --overwrite {{item}} {{label}}
+          }{% endfor %}
+      loop: "{{ groups['k8s'] }}"

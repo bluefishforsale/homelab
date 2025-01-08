@@ -1,9 +1,12 @@
 - name: DCHP server
   hosts: dns
+  become: True
 
   tasks:
+  - name: Handle dpkg locks and repair
+    include_tasks: subtask_fix_dpkg_lock.yaml
+
   - name: packages and config
-    become: True
     block:
 
     - name: apt-get update
@@ -15,7 +18,7 @@
           [ isc-dhcp-server ]
 
     - name: rndc-key-check
-      shell: cat /etc/bind/rndc.key
+      ansible.builtin.shell: cat /etc/bind/rndc.key
       register: rndc_keyfile
 
     - name: Failed rndc check
@@ -36,7 +39,7 @@
 
     - name: rndc-key-copy
       when: rndc_keyfile.stdout | length > 0
-      shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
+      ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
 
     - name: Config files
       copy:
@@ -54,12 +57,21 @@
 
     - name: remove LSB init
       ignore_errors: True
-      shell: rm /etc/init.d/isc-dhcp-server
+      ansible.builtin.shell: rm /etc/init.d/isc-dhcp-server
 
+    - name: Rsyslog ensure local7.* is logged to /var/log/dhcpd.log
+      ansible.builtin.lineinfile:
+        path: /etc/rsyslog.conf  # Replace with the actual path to the file you want to modify
+        line: 'local7.* /var/log/dhcpd.log'
+        state: present
+      ignore_errors: yes
 
-    - name: Enable and Start service
+    - name: Enable and Start services
       systemd:
         enabled: yes
         state: restarted
-        name: isc-dhcp-server.service
+        name: "{{ item }}"
         daemon_reload: true
+      with_items:
+      - isc-dhcp-server.service
+      # - rsyslog

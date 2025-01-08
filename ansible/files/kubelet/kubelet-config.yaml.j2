@@ -11,11 +11,10 @@ authentication:
     clientCAFile: "{{pki_dir}}/ca.pem"
 clusterDomain: "cluster.local"
 clusterDNS:
-  - "10.32.0.10"
+  - "{{ CLUSTER_DNS }}"
 registerNode: true
 containerRuntimeEndpoint: unix:///var/run/containerd/containerd.sock
 cgroupDriver: "systemd"
-podCIDR: "{{'.'.join(CLUSTER_CIDR.split('.')[:2])}}.{{HOST_IP[inventory_hostname].split('.')[-1]}}.0/{{POD_NETMASK}}"
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: "5m"
 tlsCertFile: "{{pki_dir}}/{{inventory_hostname}}.pem"

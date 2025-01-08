@@ -1,0 +1,110 @@
+- name: Generate Kubernetes join token on the first master node
+  hosts: k8s
+  become: yes
+  any_errors_fatal: true
+  tasks:
+    # pre-join cleanup
+    - name: Reset kubeadm on the node
+      shell: kubeadm reset -f
+      when: inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+      ignore_errors: true
+
+    - name: Remove stale Kubernetes files
+      file:
+        path: "{{ item }}"
+        state: absent
+      when: inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+      with_items:
+        - /etc/kubernetes
+        - /var/lib/etcd
+
+    - name: Create directories
+      file:
+        state: directory
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: '0755'
+      when: inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+      with_items:
+      - "/etc/kubernetes"
+      - "/etc/kubernetes/pki"
+
+    - name: Distribute admin.conf to all controllers
+      copy:
+        src: "{{ lookup('env', 'HOME') }}/.kube/config"
+        dest: /etc/kubernetes/admin.conf
+        owner: root
+        group: root
+        mode: '0600'
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups['k8s_controller'] }}"
+      when: inventory_hostname != groups['k8s_controller'][0]
+
+    - name: Generate certificate key on the master node
+      shell: kubeadm init phase upload-certs --upload-certs
+      register: cert_key_output
+      run_once: true
+      delegate_to: "{{ groups['k8s_controller'][0] }}"
+      when: not ansible_check_mode
+
+    - name: Extract the certificate key
+      set_fact:
+        certificate_key: "{{ cert_key_output.stdout | regex_search('[a-f0-9]{64}') }}"
+      when: not ansible_check_mode
+
+    - name: Generate a new Kubernetes join token and print the join command
+      shell: kubeadm token create --print-join-command
+      register: kubeadm_token_output
+      run_once: true
+      delegate_to: "{{ groups['k8s_controller'][0] }}"
+      when: inventory_hostname in groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Display generated join command
+      debug:
+        msg: "{{ kubeadm_token_output.stdout }}"
+      when: inventory_hostname in groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Display certificate key
+      debug:
+        msg: "{{ certificate_key }}"
+      when: inventory_hostname in groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Join additional master nodes
+      shell: >
+        {{ kubeadm_token_output.stdout }}
+        --ignore-preflight-errors=Port-6443
+        --certificate-key {{ certificate_key }}
+        --apiserver-advertise-address={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
+        --control-plane
+      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Join worker nodes
+      shell: "{{ kubeadm_token_output.stdout }}"
+      when:  inventory_hostname in groups['k8s_worker'] and not ansible_check_mode
+
+    # this feels wrong, keep looking for the right way to set node apiserver IP address correctly
+
+    - name: Ensure kube-apiserver advertises the correct address
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '(\s*-\s*--advertise-address)=.*'
+        replace: '\1={{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}'
+      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+
+    - name: Update kube-apiserver bind address
+      replace:
+        path: /etc/kubernetes/manifests/kube-apiserver.yaml
+        regexp: '(\s*-\s*--bind-address)=.*'
+        replace: '\1={{ hostvars[inventory_hostname]["ansible_default_ipv4"]["address"] }}'
+      when: inventory_hostname in groups['k8s_controller'] and inventory_hostname != groups['k8s_controller'][0] and not ansible_check_mode
+
+    # allow kubectl for debian user
+    - name: Create .kube directory for debian user
+      file:
+        path: /home/{{ ansible_user }}/.kube
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      when: not ansible_check_mode

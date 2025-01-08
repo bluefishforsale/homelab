@@ -1,44 +1,69 @@
-# how to run these playbooks
+# Ansible setup for VMs
+Not Ready: ansible playbook to create the VMs 
+```bash
+ansible-playbook -i inventory.ini playbook_proxmox_create_kube_vm.yaml
+```
 
-### TL;DR
+### 1. DHCP & DNS
+Host groups where these plays are installed are in the playbooks themselves.
 
-Run all kube playbooks in order and setup the cluster from scratch
-- `for FILE in playbook*kube*.yaml ; do ansible-playbook -i inventory.yaml $FILE ; done`
+DHCP & DNS verify VM Availability
+```bash
+ansible -i inventory.ini dns -b -a 'uptime'
+```
+Run the playbooks
+```bash
+ansible-playbook -i inventory.ini -l playbook_core_svc_00_dhcp_ddns.yaml
+ansible-playbook -i inventory.ini -l playbook_core_svc_00_dns.yaml
+```
 
-# examples:
-### Become Root ask pass
-- `ansible-playbook -i inventory.yaml playbook.yaml -K`
+### 2. PiHole
+```bash
+ansible-playbook -i inventory.ini -l playbook_core_svc_00_pi-hole.yaml
+```
 
-### Check playbook do not run
-- `ansible-playbook -i inventory.yaml playbook.yaml --check`
+### 3. K8s verify VM Availability
+```bash
+ansible -i inventory.ini k8s -b -a 'uptime'
+```
 
-### Single host from inventory
-- `ansible-playbook -i inventory.yaml -l onehost playbook.yaml`
+### 4. Post-installation and Initial Setup
+```bash
+ansible-playbook -i inventory.ini -l k8s playbook_base_packages.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_base_host_settings.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_base_users.yaml
 
-## The playbooks
+ansible-playbook -i inventory.ini -l proxmox playbook_core_net_qdisc.yaml
+ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml
+ansible -i inventory.ini k8s -b -a 'reboot'
+```
 
-### Base Packages and Settings
-Uses apt to install a bunch of useful CLI tools.
-Sets up NTP date and timezone to UTC.
-Has a task for adding path items to /etc/environment
+### 5. Sequential Deployment of Kubernetes Components
+Run each phase sequentially, checking for errors after each
+```bash
+ansible-playbook -i inventory.ini playbook_kube_00.1_gen_pki.yaml
+ansible-playbook -i inventory.ini playbook_kube_00.2_gen_kubeconfigs.yaml
+ansible-playbook -i inventory.ini playbook_kube_01.1_pki_dist_controller.yaml
+ansible-playbook -i inventory.ini playbook_kube_01.2_pki_dist_worker.yaml
+ansible-playbook -i inventory.ini playbook_kube_01.3_pki_dist_enckey_controller.yaml
+ansible-playbook -i inventory.ini playbook_kube_01.4_kubeconf_dist_controller.yaml
+ansible-playbook -i inventory.ini playbook_kube_01.5_kubeconf_dist_worker.yaml
+ansible-playbook -i inventory.ini playbook_kube_04.0_etcd.yaml
+ansible-playbook -i inventory.ini playbook_kube_05.1_k8s_binaries_control.yaml
+ansible-playbook -i inventory.ini playbook_kube_05.2_k8s_binaries_worker.yaml
+ansible-playbook -i inventory.ini playbook_kube_07.0_haproxy_keepalive.yaml
+ansible-playbook -i inventory.ini playbook_kube_08.1_node_admin_kubeconf.yaml
+ansible-playbook -i inventory.ini playbook_kube_09.1_local_join_cluster.yaml
+ansible-playbook -i inventory.ini playbook_kube_09.2_RBAC.yaml
+ansible-playbook -i inventory.ini playbook_kube_09.3_local_label_nodes.yaml
+ansible-playbook -i inventory.ini playbook_kube_10.0_cilium.yaml
+```
 
-### Unattended Upgrades
-Does a full package update and upgrade.
+#### A. Kubernetes Components as one command
+This runs all kube playbooks sequentially, not stopping for errors
+```bash
+ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini %
+```
 
-### Users
-sets up ssh keys from github,
-ZSH, oh-mh-zsh, poewrlevel9k, tmux, ultimate vim config.
-
-### DNS & DHCP
-Use these to setup bind9 and isc-dhcp-server
-Config files in `files/isc-dhcp-server` and `files/bind9`
-One playbook per service. These need to be run with -K
-
-### Kubernetes PKI
-Installs the CF SSL tool using brew (yes OSX only)
-One playbook for generating all the Certs.
-Two playbooks for copying them to nodes. Controller and Worker.
-
-### Kubernetes Configs
-One playbook for generating all the Configs.
-Two playbooks for copying them to nodes. Controller and Worker.
+### 6. Networking, Ceph, and Pod Deployment
+[Readme-proxmox.md](https://github.com/bluefishforsale/homelab-kube/blob/master/Readme.md)

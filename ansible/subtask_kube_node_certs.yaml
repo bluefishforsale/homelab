@@ -6,7 +6,7 @@
 
 - name: Kubelet Client Certs
   delegate_to: localhost
-  shell:
+  ansible.builtin.shell:
     cmd: "cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{item}},{{HOST_IP[item]}} -profile=kubernetes {{item}}-csr.json | cfssljson -bare {{item}}"
     chdir: "{{ cfssl }}"
   args:

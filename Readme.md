@@ -1,61 +1,47 @@
-# Homelab
-## start in the ansible/ directory for all this
-0. todo: write instructions for creating ceph-lvm and cephfs
+# Homelab Automation
 
-1. create the vms using `readme_proxmox.md` instrucitons
+This repository contains Ansible playbooks to automate the setup and management of a homelab environment, which includes a Proxmox VE cluster, various VMs, and a Kubernetes cluster. The playbooks are organized into different phases to ensure a step-by-step configuration of the entire infrastructure.
 
-2. proceed with 3. when uptime returns w.o password on all VMs
-  - ansible -i inventory.ini k8s  -b -a 'uptime'
+## Overview
 
-3. proceed with step 4. only when post-install and reboot completes
-  - ansible-playbook -i inventory.ini -l k8s playbook_proxmox_vm_post_install.yaml playbook_base_packages_host_settings.yaml playbook_base_unattended_upgrade.yaml ; ansible -i inventory.ini k8s  -b -a reboot
+### Infrastructure Components
+1. **Proxmox VE Cluster**: 
+   - Manages the virtualization of multiple VMs, including those used for DNS, DHCP, and Kubernetes.
 
-4. proceed with step 5. when ansible playbooks all apply whithout any error
-  - ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini  %
+2. **DNS and DHCP VM**:
+   - **IP**: 192.168.1.2/32
+   - Hosts BIND and DHCPd services.
 
-5. proceed to kube networking, ceph, then pods only when Kube clsuter is deployed correctly
-  - https://github.com/bluefishforsale/homelab-kube/blob/master/Readme-proxmox.md
+3. **Pi-Hole VM**:
+   - **IP**: 192.168.1.9/32
+   - Provides network-wide ad blocking and DNS filtering.
 
-## notes about LACP 802.3ad transmit hash etc.
-The US-16-XG 10G needs to have the port-channels hash transmit modes changed via ssh
+4. **Kubernetes VMs**:
+   - Six EFI VMs are provisioned to form a Kubernetes cluster.
+   - **Network Configuration**:
+     - **Cluster CIDR**: 10.0.0.0/16
+     - **Nodes CIDR**: 10.0.${node_number}.0/16
+     - **Services CIDR**: 10.0.250.0/20
+     - **API Server**: 192.168.1.99/32
+   - Utilizes `kube-proxy` for networking.
 
-# Netplan reference
-https://netplan.io/reference/
+## Getting Started with Ansible Playbooks
 
-# A word on bonding modes
-https://www.kernel.org/doc/Documentation/networking/bonding.txt
-https://www.ibm.com/docs/en/aix/7.1?topic=configuration-ieee-8023ad-link-aggregation-troubleshooting
+### 0. Pre-requisites
 
-# Unifi CLI reference
-https://dl.ubnt.com/guides/edgemax/EdgeSwitch_CLI_Command_Reference_UG.pdf
+This is a critical step before provisioning the VMs.
+- Proxmox host(s) setup and ready to run VMs
+- Ceph storage (Ceph-LVM and CephFS) is properly configured
+- TODO: integrate this into the DHCP setup w/ PXE and Preseed
 
-# And this reddit post helped.
-https://www.reddit.com/r/Ubiquiti/comments/hrbe9k/unifi_switch_port_channel_configuration/
+### 1. Setup Proxmox host(s)
 
-## comands needed to be run on the unifi switch to enable the layer 3-4 load-balance
-### do this for all switches with agg ports
-```
-    ssh terrac@192.168.1.$IP
-    telnet localhost
-    enable
-    configure
-    show port-channel all
-    port-channel load-balance 6 (slot/port  or all)
-    exit
-    write memory
+- [Proxmox Readme](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md)
 
-```
+### 2. Create the VMs
 
+- Creating the necessary VMs as described in [Proxmox Readme#making-vms](https://github.com/bluefishforsale/homelab/blob/master/readme_proxmox.md#making-vms)
 
+### 3. Set up the hosts for roles usign Ansible playbooks
 
-
-
-# AP inform controller
-ssh ubnt@<AP-IP>
-You will be prompted for a username and password. The default username is usually "ubnt," and the default password is also "ubnt."
-
-Once you're connected, run the "Set-Inform" command with the appropriate controller URL:
-
-plaintext
-Copy code
-set-inform http://<controller-IP>:8080/inform
+- [Ansible VM Readme](https://github.com/bluefishforsale/homelab/blob/master/ansible/readme.md)
