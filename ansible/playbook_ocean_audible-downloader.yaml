@@ -1,0 +1,92 @@
+---
+- name: Configure systemd service for audible-download and compress
+  hosts: ocean
+  become: true
+  gather_facts: true
+  vars:
+    services:
+      - audible-download.timer
+      - audible-download.service
+
+  tasks:
+    - name: Install audible-cli via pip
+      ansible.builtin.pip:
+        name: audible-cli
+        state: present
+
+    - name: Check if directory exists
+      ansible.builtin.stat:
+        path: /data01/services/audible-downloader
+      register: dir_status
+
+    - name: Ensure directory exists with correct ownership and permissions
+      ansible.builtin.file:
+        path: /data01/services/audible-downloader
+        state: directory
+        owner: media
+        group: media
+        mode: '0755'
+      when: dir_status.stat.exists == False or
+            dir_status.stat.uid != 0 or
+            dir_status.stat.gid != 0 or
+            dir_status.stat.mode != '0755'
+
+    - name: Patched version of AAXtoMP3
+      ansible.builtin.copy:
+        src: "files/audible-downloader/AAXtoMP3"
+        dest: "/data01/services/audible-downloader/AAXtoMP3"
+        owner: media
+        group: media
+        mode: '0755'
+
+    - name: Copy additional scripts to remote machine
+      ansible.builtin.copy:
+        src: "files/audible-downloader/{{ item }}"
+        dest: "/data01/services/audible-downloader/{{ item }}"
+        owner: media
+        group: media
+        mode: '0755'
+      loop:
+        - compress.sh
+        - download.sh
+        - download_and_compress.sh
+
+    - name: Ensure audible-cli config directory exists
+      ansible.builtin.file:
+        path: /root/.audible
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Copy audible-cli config files
+      ansible.builtin.copy:
+        src: "files/audible-downloader/.audible/{{ item }}"
+        dest: "/root/.audible/{{ item }}"
+        owner: root
+        group: root
+        mode: '0660'
+      loop:
+        - audible.json
+        - config.toml
+
+    - name: Create systemd service and timer
+      ansible.builtin.template:
+        src: "files/audible-downloader/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop: "{{ services }}"
+      notify:
+        - Reload systemd daemon
+        - Restart smartmon-exporter services
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart smartmon-exporter services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ services }}"

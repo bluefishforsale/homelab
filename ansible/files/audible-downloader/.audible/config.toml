@@ -1,0 +1,14 @@
+title = "Audible Config File"
+
+[APP]
+primary_profile = "audible"
+
+[profile.audible]
+auth_file = "audible.json"
+country_code = "us"
+aax_fallback = true
+no_confirm = true
+chapter = true
+pdf = true
+cover = true
+all = true

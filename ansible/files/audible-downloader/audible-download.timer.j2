@@ -1,0 +1,12 @@
+[Unit]
+Description=Run audible-download.service every hour
+Requires=audible-download.service
+
+[Timer]
+Unit=audible-download.service
+OnCalendar=hourly
+AccuracySec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
