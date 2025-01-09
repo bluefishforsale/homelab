@@ -3,12 +3,11 @@ Description=Process audiobooks
 After=network.target
 
 [Service]
-Type=oneshot
+Type=forking
 StandardError=syslog
 StandardOutput=file:/tmp/audible-download-and-compress.log
 WorkingDirectory=/data01/services/audible-downloader
-ExecStart=/bin/bash /data01/services/audible-downloader/download_and_compress.sh
 ExecStartPre=/usr/bin/flock -n /var/lock/audible-downloader.lock -c "true"
-ExecStart=/usr/bin/flock -n /var/lock/audible-downloader.lock /bin/bash /data01/services/audible-downloader/download_and_compress.sh
+ExecStart=/usr/bin/flock -n /var/lock/audible-downloader.lock /bin/bash -c "/data01/services/audible-downloader/download_and_compress.sh &"
 StandardOutput=journal
 StandardError=journal

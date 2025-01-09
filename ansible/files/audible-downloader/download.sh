@@ -7,9 +7,13 @@ set -o pipefail
 
 TARGET='/data01/complete/audiobooks'
 
-test -d  "${TARGET}/aax" || mkdir  "${TARGET}/aax"
+# create download dir if does not exist
+echo "Checking download dir, create if not exist"
+test -d "${TARGET}/aax" || mkdir  "${TARGET}/aax"
 
+echo "Gathering all ISNs to download"
 ISNS=$(audible library  list | awk -F: '{print $1}')
 for ISN in $ISNS ; do
+    echo "Downloading $ISN"
     audible download -a "${ISN}" --annotation --aax-fallback --no-confirm --chapter --pdf --cover --output-dir "${TARGET}/aax"
 done

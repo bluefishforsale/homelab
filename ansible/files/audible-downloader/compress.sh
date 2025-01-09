@@ -9,19 +9,21 @@ BASEDIR='/data01/services/audible-downloader'
 TARGET='/data01/complete/audiobooks'
 
 cd "${BASEDIR}"
+echo "Exporting audible library"
 audible library export
-find . -type f -name '*.aax*' | sed 's|^\./||' |  while read file ; do
 
+find . -type f -name '*.aax*' | sed 's|^\./||' |  while read file ; do
+    echo "Compressing ${TARGET}/aax/${file}"
     #--no-clobber \
-${BASEDIR}/AAXtoMP3 \
-    -l 3 \
-    -A c424e208  \
-    -t "${TARGET}" \
-    -D '$artist - $title' \
-    -e:mp3 \
-    --chaptered \
-    --chapter-naming-scheme '$title - $(printf %0${#chaptercount}d $chapternum) $chapter' \
-    --use-audible-cli-data \
-    --audible-cli-library-file "${BASEDIR}/library.tsv" \
-    "${TARGET}/aax/${file}"
+    ${BASEDIR}/AAXtoMP3 \
+        -l 3 \
+        -A c424e208  \
+        -t "${TARGET}" \
+        -D '$artist - $title' \
+        -e:mp3 \
+        --chaptered \
+        --chapter-naming-scheme '$title - $(printf %0${#chaptercount}d $chapternum) $chapter' \
+        --use-audible-cli-data \
+        --audible-cli-library-file "${BASEDIR}/library.tsv" \
+        "${TARGET}/aax/${file}"
 done
