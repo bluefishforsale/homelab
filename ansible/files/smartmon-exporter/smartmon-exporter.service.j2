@@ -1,0 +1,15 @@
+[Unit]
+Description=Runs smartmon textfile exporter script and logs to file
+Wants=smartmon-textfile-exporter.timer
+After=zfs-mount.service zfs.target data01.mount
+Requires=zfs-mount.service zfs.target data01.mount
+
+[Service]
+Type=oneshot
+StandardError=syslog
+StandardOutput=file:/data01/services/node-exporter/text_files/smart_mon.prom
+ExecStart=/data01/services/smartmon-exporter/smartmon.sh
+TimeoutStartSec=2min
+
+[Install]
+WantedBy=multi-user.target

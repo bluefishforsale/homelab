@@ -1,0 +1,13 @@
+[Unit]
+Description=Cron task for running smartmon-exporter.service
+Requires=smartmon-exporter.service
+
+[Timer]
+Unit=smartmon-exporter.service
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=60s
+Persistent=true
+
+
+[Install]
+WantedBy=timers.target
