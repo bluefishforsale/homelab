@@ -113,7 +113,8 @@
         daemon_reload: true
 
 
-    # bind9 prometheus-exporter local installation
+    # bind9 exporter local installation
+    # https://github.com/prometheus-community/bind_exporter
     - name: Ensure Go is installed
       ansible.builtin.command: go version
       register: go_installed
