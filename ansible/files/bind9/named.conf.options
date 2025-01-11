@@ -7,6 +7,10 @@ acl localnet {
  };
 
  options {
+    statistics-channels {
+        inet 127.0.0.1 port 8053 allow { 127.0.0.1; };
+    };
+
   directory "/var/cache/bind";
 
   // If your ISP provided one or more IP addresses for stable
