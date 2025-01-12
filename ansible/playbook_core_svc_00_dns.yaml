@@ -3,6 +3,10 @@
   hosts: dns
 
   vars:
+    go_version: "1.23.4"
+    go_tarball_url: "https://go.dev/dl/go{{ go_version }}.linux-arm64.tar.gz"
+    go_install_dir: "/usr/local/go"
+    go_profile_path: "/etc/profile.d/go.sh"
     bind_exporter_repo: "github.com/prometheus-community/bind_exporter"
     bind_exporter_flags: "--web.listen-address=:9119 --bind.stats-url=http://localhost:8053/json/v1/server_stats"
 
@@ -113,29 +117,48 @@
         daemon_reload: true
 
 
+    # go required for bind-exporter
+    # install go from tarball
+    - name: Remove existing Go installation (if any)
+      ansible.builtin.file:
+        path: "{{ go_install_dir }}"
+        state: absent
+
+    - name: Download Go tarball
+      ansible.builtin.get_url:
+        url: "{{ go_tarball_url }}"
+        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+
+    - name: Extract Go tarball
+      ansible.builtin.unarchive:
+        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: "/usr/local"
+        remote_src: true
+
+    - name: Create symlink for Go binary
+      ansible.builtin.file:
+        src: "/usr/local/go/bin/go"
+        dest: "/usr/local/bin/go"
+        state: link
+
+    - name: Verify Go installation
+      ansible.builtin.command: go version
+      register: go_version_output
+
+    - name: Display Go version
+      ansible.builtin.debug:
+        msg: "{{ go_version_output.stdout }}"
+
     # bind9 exporter local installation
     # https://github.com/prometheus-community/bind_exporter
-    - name: Ensure Go is installed
-      ansible.builtin.command: go version
-      register: go_installed
-      failed_when: go_installed.rc != 0
-      ignore_errors: true
-
-    - name: Install Go if not present
-      ansible.builtin.shell: |
-        wget https://go.dev/dl/go1.20.7.linux-amd64.tar.gz
-        tar -C /usr/local -xzf go1.20.7.linux-amd64.tar.gz
-        export PATH=$PATH:/usr/local/go/bin
-      when: go_installed.rc != 0
-
     - name: Clone Bind Exporter repository
       ansible.builtin.shell: |
         export GOPATH=$HOME/go
-        export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
-        go get {{ bind_exporter_repo }}
+        export PATH=$PATH:/usr/local/go/bin:$GOPATH/biexport PATH=$PATH:/usr/local/go/bin:$GOPATH/binn
+        go install {{ bind_exporter_repo }}@latest
       environment:
         GOPATH: "{{ ansible_env.HOME }}/go"
-        PATH: "/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
 
     - name: Build from src Bind Exporter
       ansible.builtin.shell: |
@@ -143,17 +166,6 @@
         make
       environment:
         GOPATH: "{{ ansible_env.HOME }}/go"
-        PATH: "/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
-
-    - name: Run Bind Exporter
-      ansible.builtin.shell: |
-        cd $GOPATH/src/{{ bind_exporter_repo }}
-        ./bind_exporter {{ bind_exporter_flags }}
-      environment:
-        GOPATH: "{{ ansible_env.HOME }}/go"
-        PATH: "/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
-      async: 0
-      poll: 0
 
     - name: Create systemd service for Bind Exporter
       ansible.builtin.copy:

@@ -8,22 +8,23 @@ set -o pipefail
 BASEDIR='/data01/services/audible-downloader'
 TARGET='/data01/complete/audiobooks'
 
-cd "${BASEDIR}"
+cd "${TARGET}"
+test -d "${TARGET}/mp3" || mkdir  "${TARGET}/mp3"
 echo "Exporting audible library"
 audible library export
 
-find . -type f -name '*.aax*' | sed 's|^\./||' |  while read file ; do
+find ./aax -type f -name '*.aax*' | sed 's|^\./||' |   while read file ; do
     echo "Compressing ${TARGET}/aax/${file}"
     #--no-clobber \
     ${BASEDIR}/AAXtoMP3 \
         -l 3 \
         -A c424e208  \
-        -t "${TARGET}" \
+        -t "${TARGET}/mp3" \
         -D '$artist - $title' \
         -e:mp3 \
         --chaptered \
         --chapter-naming-scheme '$title - $(printf %0${#chaptercount}d $chapternum) $chapter' \
         --use-audible-cli-data \
         --audible-cli-library-file "${BASEDIR}/library.tsv" \
-        "${TARGET}/aax/${file}"
+        "${TARGET}/${file}"
 done
