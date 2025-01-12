@@ -44,4 +44,4 @@ This is a critical step before provisioning the VMs.
 
 ### 3. Set up the hosts for roles usign Ansible playbooks
 
-- [Ansible VM Readme](https://github.com/bluefishforsale/homelab/blob/master/ansible/readme.md)
+- [Ansible VM Readme](https://github.com/bluefishforsale/homelab/blob/master/homelab_playbooks/readme.md)
