@@ -4,6 +4,7 @@
 1. Everything secured with publicly signed certs (no self-signed anywhere)
 1. Git driven infrastructure as code
 1. Git driven build for services / containers
+1. Logg aggregation service
 1. Control plane for building infrastructure
 1. Isolated "clusters" and "environments" / dev-prod
 1. Versioned releases
@@ -46,9 +47,18 @@
 1. Rundeck / Ansible is responsible for all IAC
 
 # Todo list 
-1. DNS prometheus exporter & dashboard
+1. DNS prometheus exporter & dashboard 
+    - exporter and bind config checked in but untested
+    - dashboard imported to ocean by hand
+    - need to add dashboard to kube-prometheus-stack
 1. DHCP prometheus exporter & dashboard
 1. convert all ocean services to ansible in git
+1. rewrite playbooks so they are idempotent 
+1. proxmox move ocean to VM node006
+1. port ZFS pool to node006 proxmox
+1. proxmox automated installation w/ PXE, TFTP, DHCP
+1. proxmox ocean -> node006
+1. proxmox import existing ZFS pool
 1. docker container for audible downaload and convert
 1. Gitlab ansible playbook on control-plane metal
 1. Runbook on contol-plane metal deplyoed by gitlab
@@ -56,6 +66,7 @@
 1. Ansible automate VM creation
 1. pihole .local domain passthrough or shut down pi-hole or ansible configure pi-hole on disk to allow this
 1. kubernetes ingress for services
+1. Loki for all services, systems, and kubernetes logs
 1. kubernetes gpu support
 1. kubernetes argoCD
 1. alertmanager and alerts for critical components
@@ -65,12 +76,7 @@
 1. iBGP internally
 1. vault for secrets - use it to bootstrap kubernetes?
 1. local container repo
-1. rewrite playbooks so they are idempotent (produces the same result when applied multiple times as it does when applied once)
 1. LLM on kubernetes
-1. proxmox automated installation w/ PXE, TFTP, DHCP
-1. proxmox ocean -> node006
-1. proxmox move ocean to VM node006
-1. proxmox import existing ZFS pool
 1. proxmox raspberry pi 5
 1. kubernetes VM worker on pi-5
 1. kubernetes ARM pod affinity
