@@ -1,0 +1,49 @@
+[Unit]
+Description=tdarr_node
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+TimeoutStartSec=240s
+Environment=IMAGE="haveagitgat/tdarr_node"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/tdarr"
+Environment=DATADIR="/data01/complete"
+Environment=TRANSCODE="/transcode"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR TRANSCODE
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    --runtime nvidia \
+    --gpus='all,"capabilities=compute,utility,video"' \
+    -e NVIDIA_VISIBLE_DEVICES=all \
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
+    -e THREADS_WORKER_INIT_TIMEOUT=200000 \
+    -e TZ="America/Los_Angeles" \
+    -e PGID=1001 -e PUID=1001 \
+    -e "serverIP=192.168.1.143" \
+    -e "serverPort=8266" \
+    -e "nodePort=8267" \
+    -e "nodeID=ocean.home" \
+    -e "nodeIP=192.168.1.143" \
+    -p 8267:8267 \
+    -v ${LOCALDIR}/plugins/bluefishforsale_tdarr_plugins:/app/server/Tdarr/Plugins/Local \
+    -v ${DATADIR}:/media \
+    -v ${LOCALDIR}/server:/app/server \
+    -v ${LOCALDIR}/conf:/app/configs \
+    -v ${LOCALDIR}/logs:/app/logs \
+    -v ${TRANSCODE}:/temp \
+  ${IMAGE}:${VERSION}
+
+
+
+
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,36 @@
+[Unit]
+Description=bazarr
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=10s
+TimeoutStartSec=30s
+Environment=SERVICE="bazarr"
+Environment=IMAGE="linuxserver/bazarr"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/${SERVICE}"
+Environment=DATADIR="/data01/complete"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR
+
+TimeoutStartSec=0
+
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=/usr/bin/docker pull "${IMAGE}:${VERSION}"
+ExecStart=docker run --rm \
+   --name=%N \
+   --hostname=%H \
+   -e PUID=1001 \
+   -e PGID=1001 \
+   -p=6767:6767 \
+   -v ${DATADIR}:/media \
+   -v ${LOCALDIR}/config:/config \
+   -v ${DATADIR}/movies:/movies \
+   -v ${DATADIR}/tv:/tv \
+   ${IMAGE}:${VERSION}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

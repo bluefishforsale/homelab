@@ -1,0 +1,59 @@
+[Unit]
+Description=plex
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=10s
+RuntimeMaxSec=72h
+TimeoutStartSec=240s
+Environment=IMAGE="plexinc/pms-docker"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+Environment=DATADIR="/data01/complete"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    --device=/dev/nvidia-uvm:/dev/nvidia-uvm \
+    --device=/dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools \
+    --device=/dev/nvidia0:/dev/nvidia0 \
+    --device=/dev/nvidiactl:/dev/nvidiactl \
+    --runtime=nvidia \
+    --gpus=all,capabilities=video \
+    -e TZ="America/Los_Angeles" \
+    -e VERSION=${VERSION} \
+    -e PLEX_CLAIM="claim-MUrzf7bhg6xrQ5GEqtF7" \
+    -e ADVERTISE_IP="https://192.168.1.143:32400/" \
+    -e PLEX_UID=1001 -e PLEX_GID=1001 \
+    -e NVIDIA_VISIBLE_DEVICES=all \
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
+    -p 3005:3005/tcp \
+    -p 8324:8324/tcp \
+    -p 32400:32400/tcp \
+    -p 32469:32469/tcp \
+    -p 32410:32410/udp \
+    -p 32412:32412/udp \
+    -p 32413:32413/udp \
+    -p 32414:32414/udp \
+    -v /etc/letsencrypt/archive/home.terrac.com:/certs \
+    -v ${DATADIR}/tv:/tv \
+    -v ${DATADIR}:/data01 \
+    -v ${DATADIR}/music:/music \
+    -v ${DATADIR}/movies:/movies \
+    -v ${LOCALDIR}/config:/config \
+    -v ${LOCALDIR}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro \
+    -v /mnt/ramdisk:/transcode \
+  ${IMAGE}:${VERSION}
+
+
+
+
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+[Unit]
+Description=prowlarr
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+RuntimeMaxSec=1d
+TimeoutStartSec=240s
+Environment=IMAGE="linuxserver/prowlarr"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+Environment=DOWNLOADS="/data01/incoming"
+Environment=MOVIES="/data01/complete/movies"
+Environment=TV="/data01/complete/tv"
+PassEnvironment=IMAGE VERSION LOCALDIR DOWNLOADS MOVIES TV
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    -e TZ="America/Los_Angeles" \
+    -e PUID=1001 -e PGID=1001 \
+    -p 9696:9696 \
+    -v ${LOCALDIR}/config:/config \
+  ${IMAGE}:${VERSION}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

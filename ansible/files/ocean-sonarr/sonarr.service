@@ -1,0 +1,35 @@
+[Unit]
+Description=sonarr
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+RuntimeMaxSec=1d
+TimeoutStartSec=240s
+Environment=IMAGE="linuxserver/sonarr"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+Environment=DOWNLOADS="/data01/incoming/tv"
+Environment=COMPLETE="/data01/complete/tv"
+PassEnvironment=IMAGE VERSION LOCALDIR DOWNLOADS COMPLETE
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    --cpus=4 \
+    -e TZ="America/Los_Angeles" \
+    -e PUID=1001 -e PGID=1001 \
+    -v /etc/localtime:/etc/localtime:ro \
+    -p 8902:8902 \
+    -v ${LOCALDIR}:/config \
+    -v ${DOWNLOADS}:/downloads \
+    -v ${COMPLETE}:/tv \
+  ${IMAGE}:${VERSION}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

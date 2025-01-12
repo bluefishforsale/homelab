@@ -1,0 +1,47 @@
+[Unit]
+Description=nextcloud
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=10s
+RuntimeMaxSec=72h
+TimeoutStartSec=240s
+Environment=IMAGE="nextcloud/all-in-one"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+Environment=DATADIR="/data01/complete"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --init \
+    --sig-proxy=false \
+    --name=nextcloud-aio-mastercontainer \
+    --device=/dev/nvidia-uvm:/dev/nvidia-uvm \
+    --device=/dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools \
+    --device=/dev/nvidia0:/dev/nvidia0 \
+    --device=/dev/nvidiactl:/dev/nvidiactl \
+    --runtime=nvidia \
+    --gpus=all,capabilities=video \
+    -e TZ="America/Los_Angeles" \
+    -e VERSION=${VERSION} \
+    -e NVIDIA_VISIBLE_DEVICES=all \
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
+    -e NEXTCLOUD_DATADIR="${LOCALDIR}" \
+    -p 81:80 \
+    -p 8081:8080 \
+    -p 8444:8443 \
+    -p 3478:3488 \
+    -v /var/run/docker.sock:/var/run/docker.sock:ro \
+    -v nextcloud_aio_mastercontainer:/mnt/docker-aio-config \
+  ${IMAGE}:${VERSION}
+
+
+ExecStop=docker stop nextcloud-aio-mastercontainer
+ExecStop=docker rm -f nextcloud-aio-mastercontainer
+
+[Install]
+WantedBy=multi-user.target

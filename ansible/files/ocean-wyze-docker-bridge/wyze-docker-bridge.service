@@ -1,0 +1,44 @@
+[Unit]
+Description=node-exporter
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+TimeoutStartSec=60s
+Environment=IMAGE="mrlt8/wyze-bridge"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR HOATNAME
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    -e TZ=America/Los_Angeles \
+    -e WYZE_EMAIL="terracnosaur@gmail.com" \
+    -e WYZE_PASSWORD="ynPe0Is!jB61Zm3yFmNDSf8h&QhuQ" \
+    -e WB_AUTH=False \
+    -e API_ID=78a21440-d390-41b4-b388-d7a0475fda05 \
+    -e API_KEY=bpzcPAEr2uFdpF6cSMKiPIWmEEWH0a4QNwAwbXBRa917VAapsNZcJzrnrKBI \
+    -e WB_IP=192.168.1.143 \
+    -e MOTION_API=True \
+    -e MOTION_START=True \
+    -e RECORD_ALL=True \
+    -e RECORD_KEEP=72h \
+    -v ${LOCALDIR}:/tokens \
+    -v ${LOCALDIR}/record:/record \
+    -p 1935:1935 \
+    -p 5050:5000 \
+    -p 8554:8554 \
+    -p 8189:8189 \
+    -p 8888:8888 \
+    ${IMAGE}:${VERSION}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target
+
+#-p 8554:8554 -p 8888:8888 -p 5050:5000 -e WB_AUTH=True -e API_ID=50d788b5-537b-4032-bb59-81cf97a56e02 -e API_KEY=kRa3Vlsgna1QreL9BPSkFG6tCfK46TZPrmTGF19FcBZHvX5jtPPg4eHXYHwO -e WB_IP=192.168.1.143 mrlt8/wyze-bridge

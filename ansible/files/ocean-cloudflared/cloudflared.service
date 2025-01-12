@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloudflared Zero Access Tunnels
+After=network.target
+
+[Service]
+Restart=always
+RestartSec=10s
+TimeoutStartSec=5
+PrivateTmp=true
+Type=simple
+User=terrac
+Group=terrac
+PIDFile=/var/run/cloudflared.pid
+ExecStart=cloudflared tunnel run 1808d97e-fc1b-4244-8233-f076ff6f9e8a
+
+[Install]
+WantedBy=multi-user.target

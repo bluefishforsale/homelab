@@ -1,0 +1,10 @@
+[Unit]
+Description=Run certbot once weekly
+
+[Timer]
+OnCalendar=*-*-1,7,14,24 12:00:00
+RandomizedDelaySec=43200
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,32 @@
+[Unit]
+Description=nginx
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+RuntimeMaxSec=1d
+TimeoutStartSec=240s
+Environment=IMAGE="nginx"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+PassEnvironment=IMAGE VERSION LOCALDIR
+ExecStartPre=-docker rm -f %N
+ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    --cpus=2 \
+    -e TZ="America/Los_Angeles" \
+    -e PUID=1001 -e PGID=1001 \
+    -p 80:80 \
+    -p 443:443 \
+    -v ${LOCALDIR}/conf:/etc/nginx \
+    -v ${LOCALDIR}/logs:/var/logs/nginx \
+  ${IMAGE}:${VERSION}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target
