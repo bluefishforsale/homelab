@@ -1,3 +1,7 @@
+statistics-channels {
+    inet {{ ansible_default_ipv4.address }} port 8053 allow { localnet; };
+};
+
 acl localnet {
   //localhost
   127.0.0.1;
@@ -6,10 +10,8 @@ acl localnet {
   192.168.1.0/24;
  };
 
+
  options {
-    statistics-channels {
-        inet 127.0.0.1 port 8053 allow { 127.0.0.1; };
-    };
 
   directory "/var/cache/bind";
 

@@ -4,7 +4,9 @@
 
   vars:
     go_version: "1.23.4"
-    go_tarball_url: "https://go.dev/dl/go{{ go_version }}.linux-arm64.tar.gz"
+    go_arch: amd64
+    go_tarball: linux-{{ go_arch }}.tar.gz
+    go_tarball_url: "https://go.dev/dl/go{{ go_version }}.{{ go_tarball }}"
     go_install_dir: "/usr/local/go"
     go_profile_path: "/etc/profile.d/go.sh"
     bind_exporter_repo: "github.com/prometheus-community/bind_exporter"
@@ -15,30 +17,30 @@
     become: yes
     block:
 
-    - name: Handle dpkg locks and repair
-      include_tasks: subtask_fix_dpkg_lock.yaml
+    # - name: Handle dpkg locks and repair
+    #   include_tasks: subtask_fix_dpkg_lock.yaml
 
     - name: apt-get update
       apt: update_cache=yes
 
-    - name: bind and tools
+    - name: Install required apt packages
       apt:
         pkg:
-          [ bind9, bind9utils, dnsutils]
+          [ bind9, bind9utils, dnsutils, build-essential]
 
     - name: rndc-key-write
       ansible.builtin.shell:
         creates: /etc/bind/rndc.key
         cmd: rndc-confgen -a -b 512
 
-    - name: configs
-      copy:
+    - name: Configure BIND9 configs
+      ansible.builtin.template:
         force: yes
-        src: bind9/{{ item  }}
-        dest: /etc/bind/{{ item  }}
+        src: files/bind9/{{ item }}
+        dest: /etc/bind/{{ item }}
         owner: bind
         group: bind
-        mode: 0644
+        mode: '0644'
       with_items:
         - named.conf.local
         - named.conf.options
@@ -127,12 +129,12 @@
     - name: Download Go tarball
       ansible.builtin.get_url:
         url: "{{ go_tarball_url }}"
-        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/go{{ go_version }}.{{ go_tarball }}"
         mode: "0644"
 
     - name: Extract Go tarball
       ansible.builtin.unarchive:
-        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        src: "/tmp/go{{ go_version }}.{{ go_tarball }}"
         dest: "/usr/local"
         remote_src: true
 
@@ -150,47 +152,41 @@
       ansible.builtin.debug:
         msg: "{{ go_version_output.stdout }}"
 
-    # bind9 exporter local installation
-    # https://github.com/prometheus-community/bind_exporter
-    - name: Clone Bind Exporter repository
-      ansible.builtin.shell: |
-        export GOPATH=$HOME/go
-        export PATH=$PATH:/usr/local/go/bin:$GOPATH/biexport PATH=$PATH:/usr/local/go/bin:$GOPATH/binn
-        go install {{ bind_exporter_repo }}@latest
-      environment:
-        GOPATH: "{{ ansible_env.HOME }}/go"
+    # # bind9 exporter local installation
+    # # https://github.com/prometheus-community/bind_exporter
+    # - name: Clone Bind Exporter repository
+    #   ansible.builtin.shell: |
+    #     export PATH=$PATH:/usr/local/go/bin:$GOPATH/biexport PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+    #     go install {{ bind_exporter_repo }}@latest
 
-    - name: Build from src Bind Exporter
-      ansible.builtin.shell: |
-        cd $GOPATH/src/{{ bind_exporter_repo }}
-        make
-      environment:
-        GOPATH: "{{ ansible_env.HOME }}/go"
+    # - name: Build from src Bind Exporter
+    #   ansible.builtin.shell: |
+    #     cd $HOME/{{ bind_exporter_repo }}
+    #     make
 
-    - name: Create systemd service for Bind Exporter
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/bind_exporter.service
-        content: |
-          [Unit]
-          Description=Prometheus Bind Exporter
-          After=network.target
+    # - name: Create systemd service for Bind Exporter
+    #   ansible.builtin.copy:
+    #     dest: /etc/systemd/system/bind_exporter.service
+    #     content: |
+    #       [Unit]
+    #       Description=Prometheus Bind Exporter
+    #       After=network.target
 
-          [Service]
-          User={{ ansible_user }}
-          Environment="GOPATH={{ ansible_env.HOME }}/go"
-          Environment="PATH=/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
-          WorkingDirectory={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}
-          ExecStart={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}/bind_exporter {{ bind_exporter_flags }}
-          Restart=always
+    #       [Service]
+    #       User={{ ansible_user }}
+    #       Environment="PATH=/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
+    #       WorkingDirectory={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}
+    #       ExecStart={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}/bind_exporter {{ bind_exporter_flags }}
+    #       Restart=always
 
-          [Install]
-          WantedBy=multi-user.target
+    #       [Install]
+    #       WantedBy=multi-user.target
 
-    - name: Reload systemd daemon
-      ansible.builtin.shell: systemctl daemon-reload
+    # - name: Reload systemd daemon
+    #   ansible.builtin.shell: systemctl daemon-reload
 
-    - name: Enable and start Bind Exporter service
-      ansible.builtin.service:
-        name: bind_exporter
-        enabled: true
-        state: started
+    # - name: Enable and start Bind Exporter service
+    #   ansible.builtin.service:
+    #     name: bind_exporter
+    #     enabled: true
+    #     state: started

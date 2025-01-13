@@ -13,16 +13,19 @@ include "/etc/bind/rndc.key";
 zone "cluster.local" {
   type master;
   file "/var/lib/bind/cluster.local.zone";
+  zone-statistics yes;
 };
 
 zone "home" {
   type master;
   file "/var/lib/bind/home.zone";
   allow-update { key rndc-key; };
+  zone-statistics yes;
 };
 
 zone "1.168.192.in-addr.arpa" {
   type master;
   file "/var/lib/bind/db.rev.1.168.192.in-addr.arpa";
   allow-update { key rndc-key; };
+  zone-statistics yes;
 };
