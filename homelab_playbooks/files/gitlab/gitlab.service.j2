@@ -1,0 +1,16 @@
+[Unit]
+Description=Gitlab docker-compose
+After=network-online.target firewalld.service docker.service containerd.service zfs-mount.service zfs.target data01.mount
+Wants=network-online.target
+Requires=docker.service docker.socket containerd.service zfs-mount.service zfs.target data01.mount
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker-compose -f {{ path_home }}/docker-compose.yaml up -d
+ExecStop=/usr/bin/docker-compose -f {{ path_home }}/docker-compose.yaml down
+TimeoutStartSec=0
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+version: '3.6'
+services:
+  gitlab:
+    image: {{ image }}
+    container_name: gitlab
+    restart: always
+    hostname: {{ hostname }}
+    ports:
+      - {{ port_80 }}:80
+      - {{ port_443 }}:443
+      - {{ port_22 }}:22
+    volumes:
+      - {{ path_config }}:/etc/gitlab
+      - {{ path_logs }}:/var/log/gitlab
+      - {{ path_data }}:/var/opt/gitlab
+      - {{ path_home }}/root_password.txt:/root_password.txt
+    shm_size: '256m'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: "from_file('{{ path_home }}/config_gitlab.rb')"
+  gitlab-runner:
+    image: gitlab/gitlab-runner:alpine
+    deploy:
+      mode: replicated
+      replicas: 4

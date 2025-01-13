@@ -1,0 +1,31 @@
+  - name: docker.io
+    become: yes
+    block:
+      - name: packages needed to get started
+        apt:
+          state: present
+          pkg:
+            [ apt-transport-https, ca-certificates, curl, gnupg2, gnupg-agent, software-properties-common ]
+
+      - name: add the docker apt-key
+        apt_key:
+          url: https://download.docker.com/linux/ubuntu/gpg
+
+      - name: adding the repo
+        apt_repository:
+          repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+          state: present
+
+      - name: apt-get update
+        apt: update_cache=yes
+
+      - name: docker packages
+        apt:
+          state: present
+          pkg:
+            [ docker-ce, docker-ce-cli, containerd.io ]
+
+      - name: test docker run
+        command: "{{ item }}"
+        with_items:
+        - docker run --rm hello-world
