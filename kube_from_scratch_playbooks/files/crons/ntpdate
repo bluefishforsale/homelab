@@ -1,0 +1,1 @@
+*/15 * * * * root /usr/sbin/ntpdate time.nist.gov
