@@ -9,6 +9,7 @@
     go_tarball_url: "https://go.dev/dl/go{{ go_version }}.{{ go_tarball }}"
     go_install_dir: "/usr/local/go"
     go_profile_path: "/etc/profile.d/go.sh"
+    bind_exporter_version: v0.8.0
     bind_exporter_repo: "github.com/prometheus-community/bind_exporter"
     bind_exporter_flags: "--web.listen-address=:9119 --bind.stats-url=http://localhost:8053/json/v1/server_stats"
 
@@ -152,16 +153,15 @@
       ansible.builtin.debug:
         msg: "{{ go_version_output.stdout }}"
 
-    # # bind9 exporter local installation
-    # # https://github.com/prometheus-community/bind_exporter
-    # - name: Clone Bind Exporter repository
-    #   ansible.builtin.shell: |
-    #     export PATH=$PATH:/usr/local/go/bin:$GOPATH/biexport PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
-    #     go install {{ bind_exporter_repo }}@latest
+    # bind9 exporter local installation
+    # https://github.com/prometheus-community/bind_exporter
+    - name: Go install bind-exporter
+      ansible.builtin.shell: |
+        go install {{ bind_exporter_repo }}@{{ bind_exporter_version}}
 
     # - name: Build from src Bind Exporter
     #   ansible.builtin.shell: |
-    #     cd $HOME/{{ bind_exporter_repo }}
+    #     cd $HOME/go/pkg/mod/github.com/prometheus-community/bind_exporter@{{ bind_exporter_version}}
     #     make
 
     # - name: Create systemd service for Bind Exporter
