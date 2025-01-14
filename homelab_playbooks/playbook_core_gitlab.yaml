@@ -4,11 +4,13 @@
   become: true
   gather_facts: true
   vars:
+    service: gitlab
     services:
-    - gitlab.service
-    image: "gitlab/gitlab-ce:17.5.5-ce.0"
-    hostname: "gitlab.home"
-    path_home: "/data01/services/gitlab"
+    - "{{ service }}.service"
+    image: "gitlab/gitlab-ce"
+    version: "17.5.5-ce.0"
+    hostname: "{{ service }}.home"
+    path_home: "/data01/services/{{ service }}"
     path_config: "{{ path_home }}/config"
     path_logs: "{{ path_home }}/logs"
     path_data: "{{ path_home }}/data"

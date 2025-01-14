@@ -1,11 +1,8 @@
 ---
-- name: root and system level
+- name: IO Scheduler, CPU scheduler, APC UPS
   become: true
   hosts: baremetal
   strategy: free
-  vars_files:
-    - vars_kube.yaml
-
   tasks:
     - name: Update apt cache if not done in the last 24 hours
       ansible.builtin.apt:

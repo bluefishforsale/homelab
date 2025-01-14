@@ -4,8 +4,7 @@
     nvidia_driver_version: latest
     nvidia_container_toolkit_version: latest
     reboot_required: false
-  vars_files:
-    - vars_kube.yaml
+
 
   tasks:
     - block:

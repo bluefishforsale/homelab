@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Exit immediately if a command exits with a non-zero status
-set -e
+# set -e
 # Return the exit status of the last command in the pipeline that failed
-set -o pipefail
+# set -o pipefail
 
 BASEDIR='/data01/services/audible-downloader'
 TARGET='/data01/complete/audiobooks'

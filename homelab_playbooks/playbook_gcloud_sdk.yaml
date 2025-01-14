@@ -2,8 +2,7 @@
   hosts: local
   collections:
     - google.cloud
-  vars_files:
-    - vars_kube.yaml
+
   vars:
     pip_package_requirements:
       - "requests"

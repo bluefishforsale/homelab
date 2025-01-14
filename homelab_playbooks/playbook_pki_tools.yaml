@@ -1,7 +1,6 @@
 - name: PKI tools and GCP init for kms
   hosts: local
-  vars_files:
-    - vars_kube.yaml
+
 
   tasks:
     - name: "Install pip requests library"

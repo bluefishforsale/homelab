@@ -1,18 +1,22 @@
 ---
-- name: root and system level
+- name: TZ systemctl udev systemd and journald logging
   become: true
   hosts: all
   strategy: free
-  vars_files:
-    - vars_kube.yaml
-  
+  vars:
+    SYSLOG: "192.168.1.65"
   tasks:
-
     ########### Date and Time
     - name: Set the Host TZ and hwclock to UTC
       community.general.timezone:
         hwclock: local
         name: America/Los_Angeles
+
+    - name: Install ntpdate
+      apt:
+        name: ntpdate
+        state: latest
+        update_cache: no
 
     - name: Copy ntpdate cron job
       ansible.builtin.copy:
@@ -38,6 +42,8 @@
         dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
         content: |
           :msg, regex, ".*IPVS.*no destination available" ~
+      notify:
+      - Restart rsyslogd
 
     - name: Rsyslog remote server configuration
       ansible.builtin.copy:
@@ -50,6 +56,8 @@
           module(load="mmutf8fix")
           action(type="mmutf8fix" replacementChar="?")
           action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
+      notify:
+      - Restart rsyslogd
 
 
     ########### Sysctl, modules, swap
@@ -108,9 +116,18 @@
           kern.maxfilesperproc = 524288
           # no swapping
           vm.swappiness = 0
+      notify:
+      - Reload sysctl settings
 
-    - name: Reload sysctl settings
-      ansible.builtin.shell: sysctl --system
+    ########### systemd-system
+    - name: Ensure DefaultEnvironment is set in system.conf
+      ansible.builtin.copy:
+        dest: /etc/systemd/systerm.conf
+        content: |
+          # no pager by default
+          DefaultEnvironment="SYSTEMD_PAGER="
+      notify:
+        - Reload systemd daemon
 
     ########### systemd-journald
     - name: Write journald config
@@ -122,18 +139,15 @@
 
           [Journal]
           Storage=volatile
+          StandardOutput=journal
+          StandardError=journal
           Compress=false
           LineMax=10K
           SystemMaxUse=10M
           SystemMaxFileSize=5M
           ForwardToSyslog=false
-
-    - name: Restart systemd-journald
-      ansible.builtin.systemd:
-        daemon_reload: yes
-        state: restarted
-        enabled: true
-        name: systemd-journald.service
+      notify:
+      - Restart systemd-journald
 
     ########### interfaces are consistently named and have persistent MAC addresses
     - name: Configure systemd-udev MAC link
@@ -146,13 +160,38 @@
           [Link]
           NamePolicy=kernel database onboard slot path
           MACAddressPolicy=persistent
+      notify:
+      - Restart systemd-udevd
 
-    - name: Restart systemd-udevd service
+  handlers:
+    - name: Reload systemd daemon
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart systemd-networkd
+      ansible.builtin.service:
+        name: systemd-networkd
+        state: restarted
+
+    - name: Restart rsyslogd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+        state: restarted
+        enabled: true
+        name: rsyslog.service
+
+    - name: Restart systemd-journald
+      ansible.builtin.systemd:
+        daemon_reload: yes
+        state: restarted
+        enabled: true
+        name: systemd-journald.service
+
+    - name: Restart systemd-udevd
       ansible.builtin.service:
         name: systemd-udevd
         state: restarted
 
-    - name: Restart systemd-networkd service
-      ansible.builtin.service:
-        name: systemd-networkd
-        state: restarted
+    - name: Reload sysctl settings
+      ansible.builtin.shell: sysctl --system
