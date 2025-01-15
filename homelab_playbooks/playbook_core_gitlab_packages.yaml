@@ -7,45 +7,88 @@
     service: gitlab
     services:
     - "{{ service }}.service"
-    image: "gitlab/gitlab-ce"
-    version: "17.5.5-ce.0"
     hostname: "{{ service }}.home"
+    gitlab_external_url: "https://{{ hostname }}"
+    gitlab_version: "17.7.2-ce.0"
     path_home: "/data01/services/{{ service }}"
     path_config: "{{ path_home }}/config"
     path_logs: "{{ path_home }}/logs"
     path_data: "{{ path_home }}/data"
-    docker_compose_file: "{{ path_home }}/docker-compose.yaml"
-    port_80: 8080
-    port_443: 8443
-    port_22: 2222
 
   tasks:
-    - name: Ensure gitlab_home exists
-      ansible.builtin.file:
-        path: "{{ path_home }}"
-        state: directory
-        mode: '0755'
+    - name: Required packages pre-installation
+      block:
+      - name: Update apt cache
+        apt:
+          update_cache: yes
+          cache_valid_time: 3600
 
-    - name: Ensure subdirectories exist
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: '0755'
-      loop:
-      - "{{ path_config }}"
-      - "{{ path_logs }}"
-      - "{{ path_data }}"
+      - name: Install required packages
+        apt:
+          name:
+            - apt-transport-https
+            - ca-certificates
+            - curl
+            - gnupg2
+            - openssh-server
+            - perl
+            - wget
+          state: present
 
-    - name: Create config files
-      ansible.builtin.template:
-        src: "files/gitlab-docker/{{ item }}"
-        dest: "{{ path_home }}/{{ item }}"
-        mode: '0644'
-      with_items:
-        - root_password.txt
-        - gitlab.rb
-      notify:
-        - Restart gitlab service
+    - name: gitlab dirs and config
+      block:
+      - name: Ensure gitlab_home exists
+        ansible.builtin.file:
+          path: "{{ path_home }}"
+          state: directory
+          mode: '0755'
+
+      - name: Ensure subdirectories exist
+        ansible.builtin.file:
+          path: "{{ item }}"
+          state: directory
+          mode: '0755'
+        loop:
+        - "{{ path_config }}"
+        - "{{ path_logs }}"
+        - "{{ path_data }}"
+
+      - name: Create config files
+        ansible.builtin.template:
+          src: "files/gitlab-docker/{{ item }}"
+          dest: "{{ path_home }}/{{ item }}"
+          mode: '0644'
+        with_items:
+          - root_password.txt
+          - gitlab.rb
+        notify:
+          - Restart gitlab service
+
+
+    - name: GitLab installation block
+      block:
+
+        - name: Add GitLab CE repository
+          become: yes
+          shell: |
+            curl -s https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+
+        - name: Install GitLab CE
+          apt:
+            name: "gitlab-ce={{ gitlab_version }}"
+            state: present
+            update_cache: yes
+          environment:
+            EXTERNAL_URL: "{{ gitlab_external_url }}"
+
+
+
+
+
+
+
+
+
 
     - name: Create systemd service
       ansible.builtin.template:
