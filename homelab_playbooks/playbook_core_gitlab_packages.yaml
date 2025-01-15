@@ -1,0 +1,69 @@
+---
+- name: Gitlab Installation
+  hosts: gitlab
+  become: true
+  gather_facts: true
+  vars:
+    service: gitlab
+    services:
+    - "{{ service }}.service"
+    image: "gitlab/gitlab-ce"
+    version: "17.5.5-ce.0"
+    hostname: "{{ service }}.home"
+    path_home: "/data01/services/{{ service }}"
+    path_config: "{{ path_home }}/config"
+    path_logs: "{{ path_home }}/logs"
+    path_data: "{{ path_home }}/data"
+    docker_compose_file: "{{ path_home }}/docker-compose.yaml"
+    port_80: 8080
+    port_443: 8443
+    port_22: 2222
+
+  tasks:
+    - name: Ensure gitlab_home exists
+      ansible.builtin.file:
+        path: "{{ path_home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure subdirectories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+      - "{{ path_config }}"
+      - "{{ path_logs }}"
+      - "{{ path_data }}"
+
+    - name: Create config files
+      ansible.builtin.template:
+        src: "files/gitlab-docker/{{ item }}"
+        dest: "{{ path_home }}/{{ item }}"
+        mode: '0644'
+      with_items:
+        - root_password.txt
+        - gitlab.rb
+      notify:
+        - Restart gitlab service
+
+    - name: Create systemd service
+      ansible.builtin.template:
+        src: "files/gitlab-docker/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop: "{{ services }}"
+      notify:
+        - Reload systemd daemon
+        - Restart gitlab service
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart gitlab service
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ services }}"
