@@ -1,6 +1,6 @@
 ---
 - name: Gitlab Installation
-  hosts: ocean
+  hosts: gitlab
   become: true
   gather_facts: true
   vars:
@@ -38,7 +38,7 @@
 
     - name: Create docker-compose file
       ansible.builtin.template:
-        src: files/gitlab/docker-compose.yaml.j2
+        src: files/gitlab-docker/docker-compose.yaml.j2
         dest: "{{ path_home }}/docker-compose.yaml"
         mode: '0644'
       notify:
@@ -46,18 +46,18 @@
 
     - name: Create config files
       ansible.builtin.template:
-        src: "files/gitlab/{{ item }}"
+        src: "files/gitlab-docker/{{ item }}"
         dest: "{{ path_home }}/{{ item }}"
         mode: '0644'
       with_items:
         - root_password.txt
-        - config_gitlab.rb
+        - gitlab.rb
       notify:
         - Restart gitlab service
 
     - name: Create systemd service
       ansible.builtin.template:
-        src: "files/gitlab/{{ item }}.j2"
+        src: "files/gitlab-docker/{{ item }}.j2"
         dest: "/etc/systemd/system/{{ item }}"
         mode: '0644'
       loop: "{{ services }}"

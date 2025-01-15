@@ -1,10 +1,32 @@
-gitlab_rails['initial_root_password'] = File.read('/root_password.txt').gsub("\n", "")
-
 # External URL
-external_url 'http://{{ hostname }}:{{ port_80 }}
+################################################################################
+################################################################################
+##                Configuration Settings for GitLab CE and EE                 ##
+################################################################################
+################################################################################
+
+external_url 'http://{{ hostname }}
+
+gitlab_rails['initial_root_password'] = "password1234"
+gitlab_rails['store_initial_root_password'] = true
 
 # GitLab Shell
 gitlab_rails['gitlab_shell_ssh_port'] = {{ port_22 }}
+
+### Default Theme
+### Available values:
+##! `1`  for Indigo
+##! `2`  for Dark
+##! `3`  for Light
+##! `4`  for Blue
+##! `5`  for Green
+##! `6`  for Light Indigo
+##! `7`  for Light Blue
+##! `8`  for Light Green
+##! `9`  for Red
+##! `10` for Light Red
+gitlab_rails['gitlab_default_theme'] = 2
+
 
 # Database settings
 # Uncomment and configure these settings if you want to use an external database

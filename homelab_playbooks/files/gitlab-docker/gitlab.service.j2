@@ -11,22 +11,22 @@ Restart=always
 RestartSec=30s
 TimeoutStartSec=10s
 ExecStart=docker run --rm\
-    --log-driver=journald \
-    --name={{ service }} \
-    --hostname={{ service }} \
-    --cpus=4 \
-    --shm-size 256m \
-    -e TZ="America/Los_Angeles" \
-    -p {{ port_80 }}:80 \
-    -p {{ port_443 }}:443 \
-    -p {{ port_22 }}:22 \
-   --env GITLAB_OMNIBUS_CONFIG="external_url 'http://{{ hostname }}'" \
+   --log-driver=journald \
+   --name={{ service }} \
+   --hostname={{ service }} \
+   --cpus=4 \
+   --shm-size 4gb \
+   -e TZ="America/Los_Angeles" \
+   -p {{ port_80 }}:80 \
+   -p {{ port_443 }}:443 \
+   -p {{ port_22 }}:22 \
    --volume {{ path_config }}/config:/etc/gitlab \
    --volume {{ path_logs }}:/var/log/gitlab \
    --volume {{ path_data }}:/var/opt/gitlab \
+   --volume {{ path_home }}/gitlab.rb:/root_password.txt:ro \
+   --volume {{ path_home }}/root_password.txt:/etc/gitlab/gitlab.rb:ro \
   {{ image }}:{{ version }}
 ExecStop=docker rm -f  {{ service }}
-   #--volume {{ path_home }}/config_gitlab.rb:/etc/gitlab/gitlab.rb:ro \
 
 [Install]
 WantedBy=multi-user.target
