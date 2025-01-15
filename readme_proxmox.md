@@ -292,6 +292,17 @@ qm resize 3000 scsi0 +8G
 qm start 3000
 ```
 
+### Gitlab VM
+
+```bash
+qm clone 9999 4000
+qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.8/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 4000 --cores 8
+qm set 4000 --memory 8192
+qm resize 4000 scsi0 +18G
+qm start 4000
+```
+
 ## make six kube VMs from the template
 
 - using cloud-init to set IP and onboot info
