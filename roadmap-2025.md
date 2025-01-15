@@ -47,6 +47,9 @@
 1. Rundeck / Ansible is responsible for all IAC
 
 # Todo list 
+1. Consul DNS
+1. Registrator for docker containers
+1. nginx auto service discovery proxy backends
 1. DNS prometheus exporter & dashboard 
     - exporter and bind config checked in but untested
     - dashboard imported to ocean by hand
