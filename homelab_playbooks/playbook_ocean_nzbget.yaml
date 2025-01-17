@@ -46,6 +46,9 @@
         update: yes
         force: yes
       become_user: "{{ user }}"
+      notify:
+        - Reload systemd daemon
+        - Restart service
 
     - name: Clone VideoSort repository
       ansible.builtin.git:
@@ -55,6 +58,9 @@
         update: yes
         force: yes
       become_user: "{{ user }}"
+      notify:
+        - Reload systemd daemon
+        - Restart service
 
     - name: Create config files
       ansible.builtin.template:
