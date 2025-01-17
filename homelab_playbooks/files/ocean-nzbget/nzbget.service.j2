@@ -23,7 +23,7 @@ ExecStart=docker run --rm \
     -e TZ="America/Los_Angeles" \
     -e PUID=1001 -e PGID=1001 \
     -v /etc/localtime:/etc/localtime:ro \
-    -p {{ port }}:{{ port }} \
+    -p {{ nzbget_port }}:{{ nzbget_port }} \
     -v {{ home }}/scripts:/scripts \
     -v {{ home }}/config:/config \
     -v {{ home }}/scratch:/scratch \
