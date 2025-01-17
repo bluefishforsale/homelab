@@ -11,7 +11,7 @@ gitlab_rails['initial_root_password'] = "password1234"
 gitlab_rails['store_initial_root_password'] = true
 
 # GitLab Shell
-gitlab_rails['gitlab_shell_ssh_port'] = {{ port_22 }}
+gitlab_rails['gitlab_shell_ssh_port'] = 22
 
 ### Default Theme
 ### Available values:
