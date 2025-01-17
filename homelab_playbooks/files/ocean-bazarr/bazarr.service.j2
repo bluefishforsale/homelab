@@ -1,0 +1,31 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=60s
+TimeoutStartSec=60s
+User={{ user }}
+Group={{ user }}
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm \
+    --name {{ service }} \
+    --hostname {{ service }} \
+   -e PUID=1001 -e PGID=1001 \
+   -p {{ port }}:6767 \
+   -v {{home}}:/config \
+   -v {{complete}}/movies:/movies \
+   -v {{complete}}/tv:/tv \
+   {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target
