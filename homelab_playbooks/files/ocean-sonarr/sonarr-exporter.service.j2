@@ -1,0 +1,33 @@
+[Unit]
+Description={{ exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ exporter_service }}
+ExecStartPre=-docker images --filter reference={{ exporter_image }}:{{ exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ exporter_image }}:{{ exporter_version }}
+ExecStart=docker run --rm \
+    --name {{ exporter_service }} \
+    --hostname {{ exporter_service }} \
+    -e TZ="America/Los_Angeles" \
+    -e VERSION={{ exporter_version }} \
+    -e URL=http://192.168.1.143:{{ sonarr_port }} \
+    -e PORT={{ exporter_port }} \
+    -e APIKEY="eb727e9d30f540d59677e7cc08161da4" \
+    -e ENABLE_ADDITIONAL_METRICS=true \
+    -p {{ exporter_port }}:{{ exporter_port }} \
+    -e APIKEY="f04a996effa8494aa68712bdb0b33a6f" \
+    {{ exporter_image }}:{{ exporter_version }} \
+      sonarr
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target

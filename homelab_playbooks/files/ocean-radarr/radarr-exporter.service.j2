@@ -1,5 +1,5 @@
 [Unit]
-Description=sonarr-exporter
+Description=radarr-exporter
 After=docker.service
 Requires=docker.service
 
@@ -17,14 +17,14 @@ ExecStart=docker run --rm \
     --name=%N \
     --hostname=%H \
     -e TZ="America/Los_Angeles" \
-    -e VERSION=${VERSION} \
-    -e PORT=9708 \
-    -e URL="http://ocean.home:8902/sonarr" \
-    -e APIKEY="f04a996effa8494aa68712bdb0b33a6f" \
+    -e VERSION={{ exporter_version }} \
+    -e URL=http://192.168.1.143:{{ radarr_port }} \
+    -e PORT={{ exporter_port }} \
+    -e APIKEY="eb727e9d30f540d59677e7cc08161da4" \
     -e ENABLE_ADDITIONAL_METRICS=true \
-    -p 9708:9708 \
-  ${IMAGE}:${VERSION} \
-    sonarr
+    -p {{ exporter_port }}:{{ exporter_port }} \
+  {{ exporter_image }}:{{ exporter_version }} \
+    radarr
 ExecStop=docker rm -f %N
 
 [Install]
