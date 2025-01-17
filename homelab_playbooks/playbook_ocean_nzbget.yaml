@@ -1,0 +1,87 @@
+---
+- name: Configure systemd service for nzbget
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    image: linuxserver/nzbget
+    version: latest
+    service: nzbget
+    data: /data01
+    files: files/ocean-nzbget
+    incoming: "{{ data }}/incoming"
+    complete: "{{ data }}/complete"
+    home: "{{ data }}/services/{{ service }}"
+    port: 8901
+    user: media
+
+  tasks:
+
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+
+    - name: Ensure directory exists with correct ownership and permissions
+      ansible.builtin.file:
+        path: "{{ home }}/{{ item }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+      with_items:
+      - config
+      - scratch
+      - scripts
+
+    - name: Clone GetScripts repository
+      ansible.builtin.git:
+        repo: https://github.com/clinton-hall/GetScripts.git
+        dest: "{{ home }}/scripts/GetScripts"
+        version: master
+        update: yes
+        force: yes
+      become_user: "{{ user }}"
+
+    - name: Clone VideoSort repository
+      ansible.builtin.git:
+        repo: https://github.com/nzbget/VideoSort.git
+        dest: "{{ home }}/scripts/VideoSort"
+        version: master
+        update: yes
+        force: yes
+      become_user: "{{ user }}"
+
+    - name: Create config files
+      ansible.builtin.template:
+        src: "{{ files }}/config/nzbget.conf.j2"
+        dest: "{{ home }}/config/nzbget.conf"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart service
+
+    - name: Create systemd service 
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      with_items:
+      - nzbget.service
+      notify:
+        - Reload systemd daemon
+        - Restart service
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart service
+      ansible.builtin.systemd:
+        name: nginx.service
+        state: restarted

@@ -1,0 +1,33 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+User={{ user }}
+Group={{ user }}
+Restart=always
+RestartSec=60s
+TimeoutStartSec=60s
+ExecStart=docker run --rm \
+    --name={{ service }} \
+    --hostname={{ service }} \
+    --cpus=6 \
+    -e TZ="America/Los_Angeles" \
+    -e PUID=1001 -e PGID=1001 \
+    -v /etc/localtime:/etc/localtime:ro \
+    -p {{ port }}:{{ port }} \
+    -v {{ home }}/scripts:/scripts \
+    -v {{ home }}/config:/config \
+    -v {{ home }}/scratch:/scratch \
+    -v {{ complete }}:/movies \
+    -v {{ complete }}:/tv \
+    -v {{ incoming }}:/downloads \
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target
