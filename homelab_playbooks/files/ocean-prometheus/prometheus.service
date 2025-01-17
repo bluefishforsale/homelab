@@ -6,6 +6,7 @@ Requires=docker.service
 [Service]
 Restart=always
 RestartSec=10s
+RuntimeMaxSec=30d
 TimeoutStartSec=30s
 Environment=IMAGE="prom/prometheus"
 Environment=VERSION="latest"
