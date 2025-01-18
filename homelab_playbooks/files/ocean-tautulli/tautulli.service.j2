@@ -1,0 +1,33 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+User={{ user }}
+Group={{ user }}
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm \
+    --name={{ service }} \
+    --hostname={{ service }} \
+    --cpus=4 \
+    -e TZ="America/Los_Angeles" \
+    -e PUID=1001 -e PGID=1001 \
+    -v /etc/localtime:/etc/localtime:ro \
+    -p {{ tautulli_port }}:{{ tautulli_port }} \
+    -v "{{ home }}":/config \
+    -v '{{ plex_logs }}':/logs \
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target
