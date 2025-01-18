@@ -90,22 +90,15 @@
         dest: /etc/systemd/system/named.service.d/override.conf
         content: |
           [Service]
-          # Run this command before each attempt to start the service
+          StandardOutput=journal
+          StandardError=journal
+          RuntimeMaxSec=7d
+          Restart=always
+          StartLimitBurst=0
+          RestartSec=10
           ExecStartPre=/usr/bin/find /var/lib/bind -type f -name "*.jnl" -delete
-
-          # Clear the existing ExecStart (required if redefining it)
           ExecStart=
           ExecStart=/usr/sbin/named -f -u bind
-
-          # Always restart the service on failure
-          Restart=always
-
-          # No limit on how many times it will restart
-          StartLimitIntervalSec=0
-          StartLimitBurst=0
-
-          # 10 second delay between restart attempts
-          RestartSec=10
 
     - name: Ensure correct permissions for the override file
       file:
