@@ -13,14 +13,12 @@ $TTL 86400 ; 1 day
 
 gw                IN          A     192.168.1.1
 dns01             IN          A     192.168.1.2
-dns02             IN          A     192.168.1.5
-gitlab            IN          A     192.168.1.8
 pihole            IN          A     192.168.1.9
 unifi             IN          A     192.168.1.10
 
 ; Add a wildcard record to resolve any undefined *.home domains
 ; currently resolves to ocean nginx instance
-*.home          IN        A    192.168.1.143
+*.home.          IN        A    192.168.1.143
 
 
 ;; 192.168.1.64/27 Assigned to MetalLB
@@ -39,9 +37,8 @@ unifi             IN          A     192.168.1.10
 apiserver      IN        A    192.168.1.99
 
 ; Dell iDrac impi OOB starts at 192.168.1.10 and is last digit of IP/name
-node004-idrac    IN        A     192.168.1.14
 node005-idrac    IN        A     192.168.1.15
-node006-idrac    IN        A     192.168.1.16
+ocean-idrac    IN        A     192.168.1.16
 
 ; proxmox vms
 ; node005
@@ -49,42 +46,16 @@ kube500         IN      A       192.168.1.51
 kube501         IN      A       192.168.1.51
 kube502         IN      A       192.168.1.52
 kube503         IN      A       192.168.1.53
-kube504         IN      A       192.168.1.54
-kube511         IN      A       192.168.1.55
-kube512         IN      A       192.168.1.56
-kube513         IN      A       192.168.1.57
-kube514         IN      A       192.168.1.58
-kube515         IN      A       192.168.1.59
+
 ; node006
 kube600         IN      A       192.168.1.61
 kube601         IN      A       192.168.1.61
 kube602         IN      A       192.168.1.62
 kube603         IN      A       192.168.1.63
-kube604         IN      A       192.168.1.64
-kube611         IN      A       192.168.1.65
-kube612         IN      A       192.168.1.66
-kube613         IN      A       192.168.1.67
-kube614         IN      A       192.168.1.68
-kube615         IN      A       192.168.1.69
-; node006
-kube701         IN      A       192.168.1.71
-kube702         IN      A       192.168.1.72
-kube703         IN      A       192.168.1.73
-kube704         IN      A       192.168.1.74
-kube711         IN      A       192.168.1.75
-kube712         IN      A       192.168.1.76
-kube713         IN      A       192.168.1.77
 
-;node000          IN        A    192.168.1.100
-; up squared
-node001          IN        A    192.168.1.101
-node002          IN        A    192.168.1.102
-node003          IN        A    192.168.1.103
 
 ; dells
-node004          IN        A    192.168.1.104
 node005          IN        A    192.168.1.105
-node006          IN        A    192.168.1.106
 
 ; Ocean, do not touch
 ocean            CNAME          ocean-bond0
@@ -99,4 +70,3 @@ us-8-150w-poe           IN    A     192.168.1.242
 uap-ac-pro-home-1       IN    A     192.168.1.243
 uap-ac-pro-home-2       IN    A     192.168.1.244
 uap-ac-pro-garage-1     IN    A     192.168.1.245
-
