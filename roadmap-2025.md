@@ -85,3 +85,11 @@
 1. kubernetes ARM pod affinity
 1. NextCloud ansible playbook
 1. renumber IP network change subnet from /24 to /16
+
+
+# gitlab automation
+1. gitlab pulls from github.com or is triggered via webhook
+1. homelab repo in gitlab triggers build steps on repo update
+1. homelab repo uses ansible semaphore or rundeck in a container
+1. the runner needs access to a private ssh key allowed on the internal hosts
+1. the automation then applies all playbooks, so they all need to be idempotent
