@@ -250,6 +250,9 @@ find /var/lib/ceph/ -mindepth 2 -delete
 
 
 ### Make VM temaplate
+## get SSH keys
+
+curl https://github.com/bluefishforsale.keys > rsa.keys
 
 ```bash
 qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
@@ -296,9 +299,9 @@ qm start 3000
 
 ```bash
 qm clone 9999 4000
-qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.8/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
-qm set 4000 --cores 8
-qm set 4000 --memory 8192
+qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.5/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 4000 --cores 16
+qm set 4000 --memory 32768
 qm resize 4000 scsi0 +18G
 qm start 4000
 ```
