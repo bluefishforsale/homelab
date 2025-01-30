@@ -43,6 +43,8 @@
 1. VM  creation ready to be configured
 
 ## Gitlab vs Rundeck Ansible separation of convern
+1. automate email configuration
+1. automate set default root password
 1. GitLab builds container images
 1. GitLab will install and keep rundeck updated
 1. GitLab will only produce config to be run by Rundeck / Ansible
