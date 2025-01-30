@@ -33,6 +33,8 @@
 1. Automatically installed, configured from network
 
 ## Automated Ansible Playbooks 
+1. ansible semaphore https://semaphoreui.com/
+1. investigate temportal also https://hub.docker.com/r/temporalio/server 
 1. All idempotent 
 1. Writes all configuration
 1. Creates Infrastructure
@@ -69,6 +71,9 @@
 1. Ansible automate VM creation
 1. pihole .local domain passthrough or shut down pi-hole or ansible configure pi-hole on disk to allow this
 1. kubernetes ingress for services
+1. kubernetes etcd exporter
+1. kubernetes dashboards for requests/latency for apiserver, haproxy, vrrp, keepalived, etcd
+1. kubernetes admin kubedash
 1. Loki for all services, systems, and kubernetes logs
 1. kubernetes gpu support
 1. kubernetes argoCD
