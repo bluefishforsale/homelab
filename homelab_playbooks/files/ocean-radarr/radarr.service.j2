@@ -25,8 +25,8 @@ ExecStart=docker run --rm \
     -v /etc/localtime:/etc/localtime:ro \
     -p {{ radarr_port }}:7878 \
     -v {{ home }}:/config \
-    -v {{ complete }}:/downloads \
-    -v {{ complete }}:/movies \
+    -v {{ incoming }}/movies:/downloads \
+    -v {{ complete }}/movies:/movies \
   {{ image }}:{{ version }}
 ExecStop=docker rm -f %N
 
