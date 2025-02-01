@@ -1,0 +1,31 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+        no_follow_redirects: false
+        fail_if_ssl: false
+        fail_if_not_ssl: false
+        tls_config:
+            insecure_skip_verify: false
+        method: GET
+        headers:
+            User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+
+  tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+
+  tcp_connect:
+    prober: tcp
+
+  ssh_banner:
+    prober: tcp
+    tcp:
+      query_response:
+      - expect: "^SSH-2.0-"
+
+  icmp:
+    prober: icmp

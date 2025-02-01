@@ -1,0 +1,31 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm \
+    --name {{ service }} \
+    --hostname {{ service }}  \
+    -e TZ=America/Los_Angeles \
+    -p={{ prom_port }}:9090 \
+    -v {{ path_home }}/config:/config \
+    -v {{ path_home }}/data:/prometheus/data \
+    {{ image }}:{{ version }} \
+        --config.file=/config/{{ prom_config }} \
+        --storage.tsdb.retention.time={{ prom_retention }} \
+        --log.level=info
+ExecStop=docker rm -f {{ service }} 
+
+[Install]
+WantedBy=multi-user.target

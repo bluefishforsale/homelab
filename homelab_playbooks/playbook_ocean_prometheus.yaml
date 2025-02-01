@@ -1,0 +1,130 @@
+---
+- name: Configure systemd service for prometheus
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    image: prom/prometheus
+    version: latest
+    service: prometheus
+    prom_port: 9090
+    prom_retention: 180d
+    prom_config: prometheus.yml
+    path_data01: /data01/services
+    path_home: "{{ path_data01 }}/{{ service }}"
+    blackbox_exporter_service: blackbox-exporter
+    blackbox_exporter_image: prom/blackbox-exporter
+    blackbox_exporter_version: master
+    blackbox_exporter_port: 9115
+    ndt_exporter_service: ndt-exporter
+    ndt_exporter_image: bluefishforsale/ndt-speedtest-exporter
+    ndt_exporter_version: latest
+    ndt_exporter_port: 9140
+
+  tasks:
+
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ path_home }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure subdirectory exists with correct ownership and permissions
+    ansible.builtin.file:
+      path: "{{ path_home }}/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    with_items:
+    - config
+    - data
+
+  - name: Create prometheus config file
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}.j2"
+      dest: "{{ path_home }}/config/{{ item }}"
+      mode: '0644'
+    with_items:
+    - prometheus.yml
+    notify:
+    - Reload systemd daemon
+    - Restart prometheus service
+
+  - name: Create prometheus systemd service
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - prometheus.service
+    notify:
+    - Reload systemd daemon
+    - Restart prometheus service
+
+  - name: Create systemd blackbox-exporter
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - blackbox-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart blackbox-exporter service
+
+  - name: Create blackbox-exporter config file
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}"
+      dest: "{{ path_home }}/config/{{ item }}"
+      mode: '0644'
+    with_items:
+    - blackbox.yml
+    notify:
+    - Reload systemd daemon
+    - Restart blackbox-exporter service
+
+  - name: Create systemd blackbox-exporter
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - blackbox-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart blackbox-exporter service
+
+  - name: Create systemd ndt-exporter.service
+    ansible.builtin.template:
+      src: "files/ocean-prometheus/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - ndt-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart ndt-exporter service
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart prometheus service
+    ansible.builtin.systemd:
+      name: prometheus.service
+      state: restarted
+
+  - name: Restart blackbox-exporter service
+    ansible.builtin.systemd:
+      name: blackbox-exporter.service
+      state: restarted
+
+  - name: Restart ndt-exporter service
+    ansible.builtin.systemd:
+      name: ndt-exporter.service
+      state: restarted

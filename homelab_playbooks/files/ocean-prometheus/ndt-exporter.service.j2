@@ -1,0 +1,26 @@
+[Unit]
+Description={{ ndt_exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ ndt_exporter_service }}
+ExecStartPre=-docker images --filter reference={{ ndt_exporter_image }}:{{ ndt_exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ ndt_exporter_image }}:{{ ndt_exporter_version }}
+ExecStart=docker run --rm \
+    --name {{ ndt_exporter_service }} \
+    --hostname {{ ndt_exporter_service }} \
+    -e TZ=America/Los_Angeles \
+    -p {{ ndt_exporter_port }}:9140 \
+  {{ ndt_exporter_image }}:{{ ndt_exporter_version }}
+ExecStop=docker rm -f {{ ndt_exporter_service }}
+
+[Install]
+WantedBy=multi-user.target

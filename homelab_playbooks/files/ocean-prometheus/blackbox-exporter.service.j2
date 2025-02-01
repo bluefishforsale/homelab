@@ -1,0 +1,28 @@
+[Unit]
+Description={{ blackbox_exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ ndt_exporter_service }}
+ExecStartPre=-docker images --filter reference={{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }}
+ExecStart=docker run --rm \
+    --name {{ blackbox_exporter_service }} \
+    --hostname {{ blackbox_exporter_service }}\
+    -e TZ=America/Los_Angeles \
+    -p {{ blackbox_exporter_port }}:9115 \
+    -v {{ path_home }}/config:/config \
+    {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} \
+      --config.file=/config/blackbox.yml
+ExecStop=docker rm -f {{ blackbox_exporter_service }}
+
+[Install]
+WantedBy=multi-user.target

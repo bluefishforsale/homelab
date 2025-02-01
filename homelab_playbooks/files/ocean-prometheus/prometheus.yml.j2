@@ -1,0 +1,171 @@
+# my global config
+global:
+  scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  # metrics_path defaults to '/metrics'
+  # scheme defaults to 'http'.
+  - job_name: 'pve'
+    relabel_configs: &dropPortNumber
+    - source_labels: [__address__]
+      regex: "([^:]+):\\d+"
+      target_label: instance
+    static_configs:
+    - targets:
+        - node005.home:9221
+    metrics_path: /pve
+    params:
+      module: [default]
+      cluster: ['1']
+      node: ['1']
+
+  - job_name: 'prometheus'
+    relabel_configs: &dropPortNumber
+    - source_labels: [__address__]
+      regex: "([^:]+):\\d+"
+      target_label: instance
+    static_configs:
+    - targets: ['ocean.home:9090']
+
+  - job_name: 'node_exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+{% for host in groups['all'] %}
+    - targets: ['{{ host }}.home:9100']
+{% endfor %}
+
+  - job_name: 'process-exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:9256']
+
+  - job_name: 'zfs-exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:9150']
+
+  - job_name: 'cadvisor'
+    static_configs:
+    - targets: ['ocean.home:8912']
+
+  - job_name: 'nvidia-exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:9400']
+
+  - job_name: 'unpoller'
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:9130']
+
+  - job_name: 'tautulli-exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:8913']
+
+  - job_name: 'plex-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 1m
+    scrape_timeout: 15s
+    static_configs:
+    - targets: ['ocean.home:9594']
+
+  - job_name: 'radarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 3m
+    scrape_timeout: 2m
+    static_configs:
+    - targets: ['ocean.home:9707']
+
+  - job_name: 'sonarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 3m
+    scrape_timeout: 2m
+    static_configs:
+    - targets: ['ocean.home:9708']
+
+  - job_name: 'prowlarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 3m
+    scrape_timeout: 2m
+    static_configs:
+    - targets: ['ocean.home:9710']
+
+  - job_name: 'nzbget-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    static_configs:
+    - targets: ['ocean.home:9452']
+
+  - job_name: 'jellyfin'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    static_configs:
+    - targets: ['ocean.home:8096']
+
+  - job_name: 'ndt-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 5m
+    scrape_timeout: 1m
+    static_configs:
+    - targets: ['ocean.home:9140']
+
+  - job_name: 'blackbox-exporter'
+    metrics_path: /probe
+    params:
+      module: [icmp,http]
+    scrape_interval: 30s
+
+    static_configs:
+      - targets:
+        # DNS providers
+        - 1.0.0.1
+        - 1.1.1.1
+        - 8.8.4.4
+        - 8.8.8.8
+        # XFinityNextHop
+        - nexthop.anarc.at
+        # hardcoded in DNS
+        - cloudflare.com
+        - quizlet.com
+        - terrac.com
+        - el.quizlet.com
+        - github.com
+        - docker.com
+        - reddit.com
+        - netflix.com
+        - amazon.com
+        - www.telefonica.de
+        - cixp.web.cern.ch
+        - www.sbb.ch
+        - cam.ac.uk
+        - web.mit.edu
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115  # The blackbox exporter's real hostname:port.
+
+
