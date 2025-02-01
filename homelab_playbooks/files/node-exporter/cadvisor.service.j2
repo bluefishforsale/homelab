@@ -1,0 +1,32 @@
+[Unit]
+Description={{ cadvisor_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ cadvisor_service }}
+ExecStartPre=-docker images --filter reference={{ cadvisor_image }}:{{ cadvisor_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ cadvisor_image }}:{{ cadvisor_version }}
+ExecStart=docker run --rm \
+    --name {{ cadvisor_service }} \
+    --hostname {{ cadvisor_service }} \
+    --port {{ cadvisor_port }}:8080 \
+    --privileged \
+    --volume=/:/rootfs:ro \
+    --volume=/var/run:/var/run:ro \
+    --volume=/sys:/sys:ro \
+    --volume=/var/lib/docker/:/var/lib/docker:ro \
+    --volume=/dev/disk/:/dev/disk:ro \
+    --device=/dev/kmsg \
+  {{ cadvisor_image }}:{{ cadvisor_version }}
+ExecStop=docker rm -f {{ cadvisor_service }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+---
+- name: Configure host-exporter systemd services
+  hosts: all
+  become: true
+  gather_facts: yes
+
+  vars:
+    cadvisor_service: cadvisor
+    cadvisor_image: gcr.io/cadvisor/cadvisor
+    cadvisor_version: latest
+    cadvisor_port: 8912
+    node_exporter_service: node-exporter
+    node_exporter_image: prom/node-exporter
+    node_exporter_version: latest
+    node_exporter_port: 9100
+    node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
+    process_exporter_service: process-exporter
+    process_exporter_image: ncabatoff/process-exporter
+    process_exporter_version: latest
+    process_exporter_port: 9256
+
+  tasks:
+
+  - name: Ensure node_exporter_textfiles exists
+    ansible.builtin.file:
+      path: "{{ node_exporter_textfiles }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0777' # anyone can write into here
+
+  - name: Create node-exporter systemd service
+    ansible.builtin.template:
+      src: "files/node-exporter/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - cadvisor.service
+    - node-exporter.service
+    - process-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart services
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart services
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+    - cadvisor.service
+    - node-exporter.service
+    - process-exporter.service

@@ -1,0 +1,31 @@
+[Unit]
+Description={{ process_exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ process_exporter_service }}
+ExecStartPre=-docker images --filter reference={{ process_exporter_image }}:{{ process_exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ process_exporter_image }}:{{ process_exporter_version }}
+ExecStart=docker run --rm \
+    --name {{ process_exporter_service }} \
+    --hostname {{ process_exporter_service }} \
+    --environment TZ=America/Los_Angeles \
+    --port {{ process_exporter_port }}:9256 \
+    --privileged \
+    -v /proc:/host/proc \
+    {{ process_exporter_image }}:{{ process_exporter_version }} \
+        --procfs /host/proc \
+        -procnames \
+            accounts-daemon,acpi_thermal_pm,afpd,agetty,arc_prune,ata_sff,atd,atop,atopacctd,avahi-daemon,blackbox_export,blkcg_punt_bio,blkmapd,bond0,cadvisor,charger_manager,cleanupd,cloudflared,cnid_metad,containerd,containerd-shim,cron,cryptd,dbu_evict,dbuf_evict,dbus-daemon,devfreq_wq,dhclient,dnsmasq,docker,dockerd,EMS,main,loop,ext4-rsv-conver,f2b/server,gitstatusd-linu,glances,grafana-server,grep,inotify_auto_co,inotifywait,ipmi-msghandler,ipv6_addrconf,irqbalance,ixgbe,java,jsvc,l2arc_feed,lockd,lpqd,lxcfs,md,metaslab_group_,mmp,mm_percpu_wq,ModemManager,mongod,mono,multipathd,mysqld,netatalk,netns,networkd-dispat,nfsd,nginx,nmbd,node,node_exporter,none,nvidia,nvidia-modeset/,nv_queue,nzbget,oom_reaper,Plex,Media,Serv,Plex,Script,Hos,Plex,Tuner,Serv,polkitd,portainer,process-exporte,prometheus,ps,python3,Radarr,raid5wq,rc.init,rsyslogd,run.sh,run-speedtest.p,s6-ftrigrd,s6-ipcserverd,s6-linux-init-s,s6-rc,s6-supervise,s6-svlisten1,s6-svscan,(sd-pam),sed,sh,sleep,smartd,smbd,smbd-notifyd,snapd,sort,ssh-agent,sshd,sudo,systemd,systemd-journal,systemd-logind,systemd-network,systemd-resolve,systemd-timesyn,systemd-udevd,tautulli_export,Tdarr_Node,Tdarr_Server,tini,tmux:,client,tmux:,server,tpm_dev_wq,ttm_swap,txg_quiesce,txg_sync,udisksd,unattended-upgr,unifi_exporter,upowerd,UVM,deferred,re,queu,vi,vim,writeback,xargs,xprtiod,zfs-exporter,zsh,zthr_procedure,zvol
+ExecStop=docker rm -f {{ process_exporter_service }}
+
+[Install]
+WantedBy=multi-user.target

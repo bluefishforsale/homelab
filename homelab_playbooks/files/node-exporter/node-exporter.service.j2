@@ -1,0 +1,47 @@
+[Unit]
+Description={{ node_exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ node_exporter_service }}
+ExecStartPre=-docker images --filter reference={{ node_exporter_image }}:{{ node_exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ node_exporter_image }}:{{ node_exporter_version }}
+ExecStart=docker run --rm \
+    --name {{ node_exporter_service }} \
+    --hostname {{ node_exporter_service }} \
+    -e TZ=America/Los_Angeles \
+    --pid=host \
+    --net=host \
+    --privileged \
+    --cap-add SYS_ADMIN \
+    --cap-add NET_ADMIN \
+    -v "/:/host:ro,rslave" \
+    -v "{{ node_exporter_textfiles }}:/text_files" \
+    -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
+    {{ node_exporter_image }}:{{ node_exporter_version }}  \
+        --log.level=info \
+        --path.rootfs=/host \
+        --collector.zfs \
+        --collector.nfsd \
+        --collector.thermal_zone \
+        --collector.ethtool \
+        --collector.lnstat \
+        --collector.netstat \
+        --collector.tcpstat \
+        --collector.systemd \
+        --collector.processes \
+        --collector.sysctl \
+        --collector.perf.cpus=1-{{ ansible_processor_vcpus }} \
+        --collector.textfile.directory=/text_files
+ExecStop=docker rm -f {{ node_exporter_service }}
+
+[Install]
+WantedBy=multi-user.target
