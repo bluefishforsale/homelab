@@ -42,18 +42,18 @@ node005-idrac    IN        A     192.168.1.15
 ocean-idrac    IN        A     192.168.1.16
 
 ; proxmox vms
-; node005
-kube500         IN      A       192.168.1.51
+; node005 (control plane and workers)
 kube501         IN      A       192.168.1.51
 kube502         IN      A       192.168.1.52
 kube503         IN      A       192.168.1.53
+kube511         IN      A       192.168.1.54
+kube512         IN      A       192.168.1.55
+kube513         IN      A       192.168.1.56
 
-; node006
-kube600         IN      A       192.168.1.61
-kube601         IN      A       192.168.1.61
-kube602         IN      A       192.168.1.62
-kube603         IN      A       192.168.1.63
-
+; node006 (all workers)
+kube611         IN      A       192.168.1.61
+kube612         IN      A       192.168.1.62
+kube613         IN      A       192.168.1.63
 
 ; dells
 node005          IN        A    192.168.1.105
