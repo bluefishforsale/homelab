@@ -3,64 +3,67 @@
   become: yes
   any_errors_fatal: true
   tasks:
-    - name: Install keepalived and haproxy
-      apt:
-        name:
-          - keepalived
-          - haproxy
-        state: present
-        update_cache: yes
+  - name: Install keepalived and haproxy
+    apt:
+      name:
+      - keepalived
+      - haproxy
+      state: present
+      update_cache: yes
 
-    - name: Create directories
-      file:
-        state: directory
-        path: "{{ item }}"
-        owner: haproxy
-        group: haproxy
-        mode: '0700'
-      with_items:
-        - /etc/keepalived
-        - /etc/haproxy
-        - /etc/ssl/haproxy
+  - name: Create directories
+    file:
+      state: directory
+      path: "{{ item }}"
+      owner: haproxy
+      group: haproxy
+      mode: '0700'
+    with_items:
+    - /etc/keepalived
+    - /etc/haproxy
+    - /etc/ssl/haproxy
 
-    - name: Configure keepalived
-      template:
-        src: files/keepalived.conf.j2
-        dest: /etc/keepalived/keepalived.conf
+  - name: Configure keepalived
+    template:
+      src: files/keepalived.conf.j2
+      dest: /etc/keepalived/keepalived.conf
+    notify:
+    - Reload systemd daemon
+    - Restart keepalived
 
-    - name: Start restart keepalived
-      systemd:
-        name: keepalived
-        state: "{{ item }}"
-        enabled: yes
-      with_items:
-        - started
-        - restarted
+  - name: Check for VIP on the interface
+    shell: "ip addr show | grep {{ vip }}"
+    register: vip_check
+    failed_when: vip_check.rc != 0 and vip_check.rc != 1 # Allow both success and 'not found' status codes
+    ignore_errors: yes
 
-    - name: Check for VIP on the interface
-      shell: "ip addr show | grep {{ vip }}"
-      register: vip_check
-      failed_when: vip_check.rc != 0 and vip_check.rc != 1  # Allow both success and 'not found' status codes
-      ignore_errors: yes
+  - name: Print which host holds the VIP
+    debug:
+      msg: "The host {{ inventory_hostname }} holds the VIP {{ vip }}"
+    when: vip_check.rc == 0
 
-    - name: Print which host holds the VIP
-      debug:
-        msg: "The host {{ inventory_hostname }} holds the VIP {{ vip }}"
-      when: vip_check.rc == 0
+  - name: Configure HAProxy
+    template:
+      src: files/haproxy.cfg.j2
+      dest: /etc/haproxy/haproxy.cfg
+    vars:
+      pem_exists: "{{ pem_file_stat.stat.exists }}"
+    notify:
+    - Restart haproxy
 
-    - name: Configure HAProxy
-      template:
-        src: files/haproxy.cfg.j2
-        dest: /etc/haproxy/haproxy.cfg
-      vars:
-        pem_exists: "{{ pem_file_stat.stat.exists }}"
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
 
-    - name: Start restart haproxy
-      systemd:
-        name: haproxy
-        state: "{{ item }}"
-        enabled: yes
-      with_items:
-        - started
-        - restarted
+  - name: Restart haproxy
+    ansible.builtin.systemd:
+      name: haproxy
+      state: restarted
+      enabled: yes
 
+  - name: Restart keepalived
+    ansible.builtin.systemd:
+      name: keepalived
+      state: restarted
+      enabled: yes

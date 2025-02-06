@@ -1,0 +1,32 @@
+[Unit]
+Description={{ sendmail_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+Restart=always
+RestartSec=30s
+TimeoutStartSec=10s
+ExecStartPre=-docker rm -f {{ sendmail_service }}
+ExecStartPre=-docker images --filter reference={{ sendmail_image }}:{{ sendmail_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ sendmail_image }}:{{ sendmail_version }}
+ExecStart=docker run --rm\
+   --log-driver=journald \
+   --name={{ sendmail_service }} \
+   --hostname={{ sendmail_service }} \
+   --cpus=1 \
+   --shm-size 512m \
+   -e TZ="America/Los_Angeles" \
+   -p {{ sendmail_port }}:25 \
+   -p {{ sendmail_port_tls }}:587 \
+   -e HOSTNAME="{{ hostname }}" \
+   -e WHITELIST_FROM="users.noreply.gitlab.home" \
+   -e SMTP_USE_TLS="no" \
+  {{ sendmail_image }}:{{ sendmail_version }}
+ExecStop=docker rm -f  {{ sendmail_service }}
+
+[Install]
+WantedBy=multi-user.target

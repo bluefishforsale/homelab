@@ -1,0 +1,31 @@
+[Unit]
+Description={{ meta_manager_service }}
+After=docker.service zfs.target data01.mount plex.service
+Requires=docker.service zfs.target data01.mount
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+User={{ user }}
+Group={{ user }}
+ExecStartPre=-docker rm -f {{ meta_manager_service }}
+ExecStartPre=-docker images --filter reference={{ meta_manager_image }}:{{ meta_manager_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ meta_manager_image }}:{{ meta_manager_version }}
+ExecStart=docker run --rm \
+    --name={{ meta_manager_service }} \
+    --hostname={{ meta_manager_service }} \
+    --cpus=4 \
+    -e TZ="America/Los_Angeles" \
+    -e PUID={{ uid }} -e PGID={{ uid }} \
+    -e VERSION={{ meta_manager_version }} \
+    -v {{ meta_manager_home }}/config:/config \
+  {{ meta_manager_image }}:{{ meta_manager_version }}
+ExecStop=docker rm -f {{ meta_manager_service }}
+
+[Install]
+WantedBy=multi-user.target

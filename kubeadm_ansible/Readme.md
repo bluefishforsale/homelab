@@ -16,6 +16,7 @@ ansible-playbook -i inventory.ini 04_configure_ha_proxy_keepalived.yaml  --check
 ansible-playbook -i inventory.ini 05_initialize_master.yaml  --check
 
 # Apply
+ansible-playbook -i inventory.ini 00_create_vms.yaml
 ansible-playbook -i inventory.ini 01_kube_apt_repo.yaml
 ansible-playbook -i inventory.ini 02_install_kubernetes.yaml
 ansible-playbook -i inventory.ini 03_containerd_and_networking.yaml

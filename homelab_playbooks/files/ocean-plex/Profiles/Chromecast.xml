@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+    <Client name="Chromecast">
+      <!-- Edited with Clmcm400's code from https://forums.plex.tv/discussion/244663/chromecast-ultra-profile-doesnt-support-hevc/p2 -->
+      <TranscodeTargets>
+        <VideoProfile protocol="http" container="matroska" codec="h264,h265,hevc" audioCodec="eac3,ac3,aac,mp3" context="streaming" />
+        <MusicProfile container="matroska" codec="mp3" />
+        <PhotoProfile container="jpeg" />
+        <SubtitleProfile container="ass" codec="ass" />
+      </TranscodeTargets>
+      <DirectPlayProfiles>
+    	<VideoProfile container="mp4" codec="Hevc,mpeg1video,mpeg2video,h264,mpeg4" audioCodec="eac3,ac3,aac,mp3,mp2"/>
+    	<VideoProfile container="mkv" codec="vp9,hevc,h265,mpeg1video,mpeg2video,h264,mpeg4" audioCodec="eac3,ac3,aac,mp3,mp2,pcm,flac,alac" subtitleFormat="srt,ass"/>
+      </DirectPlayProfiles>
+      <CodecProfiles>
+        <VideoCodec name="h265,hevc,vp9">
+          <Limitations>
+    		<UpperBound name="video.width" value="3840"/>
+    		<UpperBound name="video.height" value="2176"/>
+    		<UpperBound name="video.bitrate" value="75000"/>
+          </Limitations>
+        </VideoCodec>
+        <VideoAudioCodec name="*">
+          <Limitations>
+            <UpperBound name="audio.channels" value="6" />
+          </Limitations>
+        </VideoAudioCodec>
+      </CodecProfiles>
+    </Client>

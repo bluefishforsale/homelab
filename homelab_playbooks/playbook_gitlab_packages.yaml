@@ -1,0 +1,55 @@
+---
+- name: Gitlab Installation
+  hosts: gitlab
+  become: true
+  gather_facts: true
+  vars:
+    service: gitlab
+    services:
+    - "{{ service }}.service"
+    hostname: "{{ service }}.home"
+    gitlab_external_url: "https://{{ hostname }}"
+    gitlab_version: "17.7.2-ce.0"
+
+  tasks:
+  - name: Required packages pre-installation
+    block:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg2
+        - openssh-server
+        - perl
+        - wget
+        state: present
+
+  - name: GitLab installation block
+    block:
+
+    - name: Add GitLab CE repository
+      become: yes
+      shell: |
+        curl -s https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+      environment: EXTERNAL_URL="{{ gitlab_external_url }}"
+
+    - name: Install GitLab CE
+      shell: |
+        EXTERNAL_URL="{{ gitlab_external_url }}" apt-get install -y "gitlab-ce={{ gitlab_version }}"
+
+  # do this at very end to show login password
+  - name: Read the initial_root_password file
+    slurp:
+      src: /etc/gitlab/initial_root_password
+    register: password_file
+
+  - name: Print the contents of the file
+    debug:
+      msg: "{{ password_file['content'] | b64decode }}"

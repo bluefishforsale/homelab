@@ -5,9 +5,8 @@
 ################################################################################
 ################################################################################
 
-external_url 'http://{{ hostname }}
+external_url 'http://{{ hostname }}'
 
-gitlab_rails['initial_root_password'] = "password1234"
 gitlab_rails['store_initial_root_password'] = true
 
 # GitLab Shell
@@ -26,6 +25,28 @@ gitlab_rails['gitlab_shell_ssh_port'] = {{ port_22 }}
 ##! `9`  for Red
 ##! `10` for Light Red
 gitlab_rails['gitlab_default_theme'] = 2
+
+
+# # email settings
+gitlab_rails['smtp_enable'] = true
+gitlab_rails['smtp_address'] = "smtp.gmail.com"
+gitlab_rails['smtp_port'] = 587
+gitlab_rails['smtp_user_name'] = "terracnosaur@gmail.com"
+gitlab_rails['smtp_password'] = "?F1ft33nM0nk3y5Figh71nG!"
+gitlab_rails['smtp_domain'] = "smtp.gmail.com"
+gitlab_rails['smtp_authentication'] = "login"
+gitlab_rails['smtp_enable_starttls_auto'] = true
+gitlab_rails['smtp_tls'] = false
+gitlab_rails['smtp_openssl_verify_mode'] = 'peer'
+# gitlab_rails['smtp_enable'] = true
+# gitlab_rails['smtp_address'] = "{{ hostname }}"
+# gitlab_rails['smtp_port'] = 25
+# gitlab_rails['smtp_user_name'] = "{{ sendmail_username }}"
+# gitlab_rails['smtp_password'] = "{{ sendmail_password }}"
+# gitlab_rails['smtp_domain'] = "home.terrac.com"
+# gitlab_rails['smtp_authentication'] = "login"
+# gitlab_rails['smtp_enable_starttls_auto'] = true
+# gitlab_rails['smtp_openssl_verify_mode'] = 'peer'
 
 
 # Database settings

@@ -1,0 +1,52 @@
+[Unit]
+Description={{ service }}
+After=docker.service zfs.target data01.mount
+Requires=docker.service zfs.target data01.mount
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+User={{ user }}
+Group={{ user }}
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm \
+    --name={{ service }} \
+    --hostname={{ service }} \
+    {% for dev in devices %}
+    --device {{ dev }}:{{ dev }} \
+    {% endfor %}
+    --runtime=nvidia \
+    --gpus=all,capabilities=video \
+    -e TZ="America/Los_Angeles" \
+    -e VERSION={{ version }} \
+    -e PLEX_CLAIM="{{ plex_claim }}" \
+    -e ADVERTISE_IP="https://192.168.1.143:32400/" \
+    -e PLEX_UID={{ uid }} -e PLEX_GID={{ uid }} \
+    -e NVIDIA_VISIBLE_DEVICES=all \
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
+    {% for port in plex_ports_tcp %}
+    -p {{ port }}:{{ port }}/tcp \
+    {% endfor %}
+    {% for port in plex_ports_udp %}
+    -p {{ port }}:{{ port }}/udp \
+    {% endfor %}
+    -v /etc/letsencrypt/archive/home.terrac.com:/certs \
+    -v {{ DATADIR }}/tv:/tv \
+    -v {{ data }}:/data01 \
+    -v {{ DATADIR }}/music:/music \
+    -v {{ DATADIR }}/movies:/movies \
+    -v {{ home }}/config:/config \
+    -v {{ home }}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro \
+    -v {{ ramdisk }}:/transcode \
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target

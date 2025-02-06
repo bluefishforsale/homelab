@@ -1,0 +1,34 @@
+[Unit]
+Description={{ exporter_service }}
+After=docker.service zfs.target data01.mount plex.service
+Requires=docker.service zfs.target data01.mount
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+User={{ user }}
+Group={{ user }}
+User={{ user }}
+Group={{ user }}
+ExecStartPre=-docker rm -f {{ exporter_service }}
+ExecStartPre=-docker images --filter reference={{ exporter_image }}:{{ exporter_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ exporter_image }}:{{ exporter_version }}
+ExecStart=docker run --rm \
+    --name=%N \
+    --hostname=%H \
+    -e TZ="America/Los_Angeles" \
+    -e VERSION={{ exporter_version }} \
+    -e PLEX_TOKEN="{{ plex_token }}" \
+    -e PLEX_ADDR="http://ocean.home:32400" \
+    -e METRICS_MEDIA_COLLECTING_INTERVAL_SECONDS=60 \
+    -p 9594:9594/tcp \
+  {{ exporter_image }}:{{ exporter_version }}
+ExecStop=docker rm -f %N
+
+[Install]
+WantedBy=multi-user.target
