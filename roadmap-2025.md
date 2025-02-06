@@ -29,8 +29,22 @@
 1. Run ansible playbooks with run deck for web UI, maybe build server triggers rundeck tasks
 1. Maybe run deck just watches the repo for changes 
 
-## Proxmox metals
-1. Automatically installed, configured from network
+## Proxmox
+1. HA for both metals, allowing control plane VMs to migrate between
+1. 
+
+## kubernetes
+1. ~~kubernetes ingress for services~~
+1. kubernetes argoCD private github repo
+1. kubedash admin
+1. Loki for all services, systems, and kubernetes logs
+1. etcd exporter
+1. grafana dashboards for requests/latency for apiserver, haproxy, vrrp, keepalived, etcd
+1. multi-instance gpu support
+1. taints for worker node VMs that have data01 and/or GPU
+1. ollama helm app install
+1. secrets and letsencrypt certs automation - certmanager?
+
 
 ## Automated Ansible Playbooks 
 1. ansible semaphore https://semaphoreui.com/
@@ -42,6 +56,7 @@
 1. Restarts services on config change (CI/CD)
 1. VM  creation ready to be configured
 
+
 ## Gitlab vs Rundeck Ansible separation of convern
 1. automate email configuration
 1. automate set default root password
@@ -49,6 +64,12 @@
 1. GitLab will install and keep rundeck updated
 1. GitLab will only produce config to be run by Rundeck / Ansible
 1. Rundeck / Ansible is responsible for all IAC
+
+## ocean to node006 proxmox host
+1. decide on proxmox boot disk configuration
+1. convert all ocean services to ansible in git
+1. create VM with ocean SSD passthrough
+1. export / import data01 ZFS pool from ocean->node006
 
 # Todo list 
 1. Consul DNS for docker container service discovery
@@ -59,12 +80,9 @@
     - dashboard imported to ocean by hand
     - need to add dashboard to kube-prometheus-stack
 1. DHCP prometheus exporter & dashboard
-1. convert all ocean services to ansible in git
 1. rewrite playbooks so they are idempotent 
-1. proxmox move ocean to VM node006
 1. port ZFS pool to node006 proxmox
 1. proxmox automated installation w/ PXE, TFTP, DHCP
-1. proxmox ocean -> node006
 1. proxmox import existing ZFS pool
 1. docker container for audible downaload and convert
 1. Gitlab ansible playbook on control-plane metal
@@ -72,16 +90,8 @@
 1. List ideas for runbook tasks
 1. Ansible automate VM creation
 1. pihole .local domain passthrough or shut down pi-hole or ansible configure pi-hole on disk to allow this
-1. kubernetes ingress for services
-1. kubernetes etcd exporter
-1. kubernetes dashboards for requests/latency for apiserver, haproxy, vrrp, keepalived, etcd
-1. kubernetes admin kubedash
-1. Loki for all services, systems, and kubernetes logs
-1. kubernetes gpu support
-1. kubernetes argoCD
 1. alertmanager and alerts for critical components
 1. update all charts and have ArgoCD automate their installation
-1. kubernetes secrets and letsencrypt certs automation - certmanager?
 1. kubernetes cilium
 1. iBGP internally
 1. vault for secrets - use it to bootstrap kubernetes?
