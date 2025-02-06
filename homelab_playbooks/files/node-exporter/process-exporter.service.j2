@@ -18,7 +18,7 @@ ExecStart=docker run --rm \
     --name {{ process_exporter_service }} \
     --hostname {{ process_exporter_service }} \
     --environment TZ=America/Los_Angeles \
-    --port {{ process_exporter_port }}:9256 \
+    -p {{ process_exporter_port }}:9256 \
     --privileged \
     -v /proc:/host/proc \
     {{ process_exporter_image }}:{{ process_exporter_version }} \

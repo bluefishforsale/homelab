@@ -17,7 +17,7 @@ ExecStartPre=-/usr/bin/docker pull {{ cadvisor_image }}:{{ cadvisor_version }}
 ExecStart=docker run --rm \
     --name {{ cadvisor_service }} \
     --hostname {{ cadvisor_service }} \
-    --port {{ cadvisor_port }}:8080 \
+    -p {{ cadvisor_port }}:8080 \
     --privileged \
     --volume=/:/rootfs:ro \
     --volume=/var/run:/var/run:ro \
