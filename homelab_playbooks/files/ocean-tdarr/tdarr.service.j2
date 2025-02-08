@@ -21,7 +21,7 @@ ExecStart=docker run --rm\
     -e THREADS_WORKER_INIT_TIMEOUT=200000 \
     -e "webUIPort={{ tdarr_port_web }}" \
     -e "serverPort={{ tdarr_port_api }}" \
-    -e "ROOT_URL=http://ocean.home" \
+    -e "ROOT_URL=http://{{ inventory_hostname }}.home" \
     -e PUID=1001 -e PGID=1001 \
     -p {{ tdarr_port_web }}:8265 \
     -p {{ tdarr_port_api }}:8266 \
