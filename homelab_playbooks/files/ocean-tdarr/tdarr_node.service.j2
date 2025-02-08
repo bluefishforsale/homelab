@@ -30,7 +30,7 @@ ExecStart=docker run --rm\
     -e "nodeID={{ inventory_hostname }}.home" \
     -e "nodeIP={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}" \
     -p {{ node_port }}:8267 \
-    -v {{ path_home }}/plugins/bluefishforsale_tdarr_plugins:/app/server/Tdarr/Plugins/Local \
+    -v {{path_home}}/plugins/{{repo}}:/app/server/Tdarr/Plugins/Local \
     -v {{ path_complete }}:/media \
     -v {{ path_home }}/server:/app/server \
     -v {{ path_home }}/conf:/app/configs \
