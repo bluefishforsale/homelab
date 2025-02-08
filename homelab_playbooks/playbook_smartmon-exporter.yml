@@ -1,0 +1,56 @@
+---
+- name: Configure systemd service for smartmon-exporter
+  hosts: ocean
+  become: true
+  gather_facts: true
+  vars:
+    services:
+      - smartmon-exporter.timer
+      - smartmon-exporter.service
+
+  tasks:
+    - name: Check if directory exists
+      ansible.builtin.stat:
+        path: /data01/services/smartmon-exporter
+      register: dir_status
+
+    - name: Ensure directory exists with correct ownership and permissions
+      ansible.builtin.file:
+        path: /data01/services/smartmon-exporter
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      when: dir_status.stat.exists == False or
+            dir_status.stat.uid != 0 or
+            dir_status.stat.gid != 0 or
+            dir_status.stat.mode != '0755'
+
+    - name: Clone or update github.com/prometheus-community/node-exporter-textfile-collector-scripts
+      ansible.builtin.git:
+        repo: https://github.com/prometheus-community/node-exporter-textfile-collector-scripts.git
+        dest: /data01/services/smartmon-exporter
+        version: master
+        update: yes
+      become_user: root
+
+    - name: Create systemd service and timer
+      ansible.builtin.template:
+        src: "files/smartmon-exporter/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop: "{{ services }}"
+      notify:
+        - Reload systemd daemon
+        - Restart smartmon-exporter services
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart smartmon-exporter services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ services }}"
