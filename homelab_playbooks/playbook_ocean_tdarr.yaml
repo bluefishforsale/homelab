@@ -16,6 +16,8 @@
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
     transcode: /transcode
+    repo: "bluefishforsale_tdarr_plugins"
+    github: "https://github.com/bluefishforsale/{{repo}}.git"
 
   tasks:
   - name: Ensure basedir exists
@@ -52,7 +54,7 @@
 
     - name: Git clone plugins and flows
       ansible.builtin.git:
-        repo: "https://github.com/bluefishforsale/bluefishforsale_tdarr_plugins.git"
+        repo: "{{ github }}"
         dest: "{{ path_home }}/plugins/"
         depth: 1
         update: yes
