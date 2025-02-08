@@ -1,0 +1,58 @@
+---
+- name: Configure systemd service for mysql
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    image: percona/percona-server
+    version: "5.7"
+    service: mysql
+    port: 3306
+    path_data01: /data01/services
+    path_home: "{{ path_data01 }}/{{ service }}"
+    root_password: "mysqlr00tp4ssw0rd"
+    mysql_user: "grafana"
+    mysql_database: "grafana"
+    mysql_database_password: "grafana"
+
+  tasks:
+
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ path_home }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure directory exists with correct ownership and permissions
+    ansible.builtin.file:
+      path: "{{ path_home }}/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    with_items:
+    - logs
+
+  - name: Create systemd service and timer
+    ansible.builtin.template:
+      src: "files/ocean-mysql/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - mysql.service
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart service
+    ansible.builtin.systemd:
+      name: mysql.service
+      state: restarted

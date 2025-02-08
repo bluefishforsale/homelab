@@ -1,0 +1,35 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=120s
+TimeoutStartSec=180s
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm \
+    --name {{ service }}\
+    --hostname {{ service }} \
+    --cpus 2 \
+    -e TZ=America/Los_Angeles \
+    -e PUID=1001 \
+    -e PGID=1001 \
+    -e MYSQL_ROOT_PASSWORD={{ root_password }} \
+    -e MYSQL_USER={{ mysql_user }} \
+    -e MYSQL_DATABASE={{ mysql_database }} \
+    -e MYSQL_PASSWORD={{ mysql_database_password }} \
+    -p {{ port }}:3306 \
+    -v {{ path_home }}/data:/var/lib/mysql \
+    -v {{ path_home }}/logs:/logs \
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target
