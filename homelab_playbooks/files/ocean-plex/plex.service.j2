@@ -19,9 +19,9 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name={{ service }} \
     --hostname={{ service }} \
-    {% for dev in devices %}
+    {% for dev in devices -%}
     --device {{ dev }}:{{ dev }} \
-    {% endfor %}
+    {% endfor -%}
     --runtime=nvidia \
     --gpus=all,capabilities=video \
     -e TZ="America/Los_Angeles" \
@@ -31,19 +31,19 @@ ExecStart=docker run --rm \
     -e PLEX_UID={{ uid }} -e PLEX_GID={{ uid }} \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
-    {% for port in plex_ports_tcp %}
+    {% for port in plex_ports_tcp -%}
     -p {{ port }}:{{ port }}/tcp \
-    {% endfor %}
-    {% for port in plex_ports_udp %}
+    {% endfor -%}
+    {% for port in plex_ports_udp -%}
     -p {{ port }}:{{ port }}/udp \
-    {% endfor %}
+    {% endfor -%}
     -v /etc/letsencrypt/archive/home.terrac.com:/certs \
-    -v {{ DATADIR }}/tv:/tv \
+    -v {{ plex_home }}/tv:/tv \
     -v {{ data }}:/data01 \
-    -v {{ DATADIR }}/music:/music \
-    -v {{ DATADIR }}/movies:/movies \
-    -v {{ home }}/config:/config \
-    -v {{ home }}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro \
+    -v {{ complete }}/music:/music \
+    -v {{ complete }}/movies:/movies \
+    -v {{ plex_home }}/config:/config \
+    -v {{ plex_home }}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro \
     -v {{ ramdisk }}:/transcode \
   {{ image }}:{{ version }}
 ExecStop=docker rm -f {{ service }}

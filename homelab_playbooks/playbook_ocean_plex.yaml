@@ -31,7 +31,7 @@
     data: /data01
     files: files/ocean-plex
     complete: "{{ data }}/complete"
-    home: "{{ data }}/services/{{ service }}"
+    plex_home: "{{ data }}/services/{{ service }}"
     meta_manager_home: "{{ data }}/services/{{ meta_manager_service }}"
     ramdisk: /mnt/ramdisk
     user: media
@@ -41,7 +41,7 @@
 
   - name: Ensure basedir exists
     ansible.builtin.file:
-      path: "{{ home }}"
+      path: "{{ plex_home }}"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
@@ -49,7 +49,7 @@
 
   - name: Ensure subdirs exist
     ansible.builtin.file:
-      path: "{{ home }}/{{ item }}"
+      path: "{{ plex_home }}/{{ item }}"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
@@ -61,27 +61,27 @@
   - name: Create preferences file
     ansible.builtin.template:
       src: "{{ files }}/config/preferences.xml"
-      dest: "{{ home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
-    # notify:
-    # - Reload systemd daemon
-    # - Restart plex service
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
 
-- name: Copy all files from Profiles directory
-  ansible.builtin.copy:
-    src: "{{ files }}/Profiles/"
-    dest: "{{ home }}/Profiles/"
-    mode: '0644'
-    owner: "{{ user }}"
-    group: "{{ user }}"
-    directory_mode: '0755'
-  with_fileglob:
+  - name: Copy all files from Profiles directory
+    ansible.builtin.copy:
+      src: "{{ files }}/Profiles/"
+      dest: "{{ plex_home }}/Profiles/"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      directory_mode: '0755'
+    with_fileglob:
     - "{{ files }}/Profiles/*"
-    # notify:
-    # - Reload systemd daemon
-    # - Restart plex service
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
 
   - name: Create plex systemd service
     ansible.builtin.template:
@@ -90,9 +90,9 @@
       mode: '0644'
     with_items:
     - plex.service
-    # notify:
-    # - Reload systemd daemon
-    # - Restart plex service
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
 
   - name: Create exporter systemd service
     ansible.builtin.template:
@@ -101,9 +101,20 @@
       mode: '0644'
     with_items:
     - plex-exporter.service
-    # notify:
-    # - Reload systemd daemon
-    # - Restart exporter service
+    notify:
+    - Reload systemd daemon
+    - Restart exporter service
+
+  - name: Create meta_manager_home preferences file
+    ansible.builtin.template:
+      src: "{{ files }}/meta-manager/config.yml"
+      dest: "{{ meta_manager_home }}/config/config.yml"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
 
   - name: Create metal-manager systemd service
     ansible.builtin.template:
@@ -112,9 +123,9 @@
       mode: '0644'
     with_items:
     - plex-meta-manager.service
-    # notify:
-    # - Reload systemd daemon
-    # - Restart meta-manager service
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
 
   handlers:
   - name: Reload systemd daemon
@@ -129,4 +140,9 @@
   - name: Restart exporter service
     ansible.builtin.systemd:
       name: plex-exporter.service
+      state: restarted
+
+  - name: Restart meta-manager service
+    ansible.builtin.systemd:
+      name: plex-meta-manager.service
       state: restarted
