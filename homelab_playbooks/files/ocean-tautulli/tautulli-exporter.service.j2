@@ -20,7 +20,7 @@ ExecStart=docker run --rm \
     -e TZ=America/Los_Angeles \
     -p {{ exporter_port }}:9487 \
     -e TAUTULLI_API_KEY="{{ tautulli_api_key }}" \
-    -e TAUTULLI_URI="http://192.168.1.143:{{ tautulli_port }}" \
+    -e TAUTULLI_URI="http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ tautulli_port }}" \
     -e TAUTULLI_TIMEOUT=60s \
     {{ exporter_image }}:{{ exporter_version }} 
 ExecStop=docker rm -f %N

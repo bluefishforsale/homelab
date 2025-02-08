@@ -27,7 +27,7 @@ ExecStart=docker run --rm \
     -e TZ="America/Los_Angeles" \
     -e VERSION={{ version }} \
     -e PLEX_CLAIM="{{ plex_claim }}" \
-    -e ADVERTISE_IP="https://192.168.1.143:32400/" \
+    -e ADVERTISE_IP="https://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}32400/" \
     -e PLEX_UID={{ uid }} -e PLEX_GID={{ uid }} \
     -e NVIDIA_VISIBLE_DEVICES=all \
     -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
