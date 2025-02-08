@@ -1,0 +1,38 @@
+[Unit]
+Description={{ service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=30s
+TimeoutStartSec=10s
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStart=docker run --rm\
+    --name {{ service }} \
+    --hostname {{ service }} \
+    -e TZ="America/Los_Angeles" \
+    -e THREADS_WORKER_INIT_TIMEOUT=200000 \
+    -e "webUIPort={{ tdarr_port_web }}" \
+    -e "serverPort={{ tdarr_port_api }}" \
+    -e "ROOT_URL=http://ocean.home" \
+    -e PUID=1001 -e PGID=1001 \
+    -p {{ tdarr_port_web }}:8265 \
+    -p {{ tdarr_port_api }}:8266 \
+    -v {{path_home}}/plugins/bluefishforsale_tdarr_plugins:/app/server/Tdarr/Plugins/Local \
+    -v {{path_complete}}:/media \
+    -v {{path_home}}/server:/app/server \
+    -v {{path_home}}/conf:/app/configs \
+    -v {{path_home}}/logs:/app/logs \
+    -v {{transcode}}:/temp \
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f  {{ service }}
+
+[Install]
+WantedBy=multi-user.target

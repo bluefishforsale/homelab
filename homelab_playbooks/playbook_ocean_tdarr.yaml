@@ -1,0 +1,80 @@
+---
+- name: Tdarr and Tdarr_Node
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    image: haveagitgat/tdarr
+    version: latest
+    service: tdarr
+    service_node: tdarr-node
+    tdarr_port_web: 8265
+    tdarr_port_api: 8266
+    node_port: 8267
+    path_complete: /data01/complete
+    path_data01: /data01/services
+    path_home: "{{ path_data01 }}/{{ service }}"
+    transcode: /transcode
+
+  tasks:
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ path_home }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure subdirectory exists with correct ownership and permissions
+    ansible.builtin.file:
+      path: "{{ path_home }}/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    with_items:
+    - config
+    - data
+    - plugins
+
+  - name: Create tdarr config files
+    ansible.builtin.template:
+      src: "files/ocean-tdarr/conf/{{ item }}.j2"
+      dest: "{{ path_home }}/conf/{{ item }}"
+      mode: '0644'
+    with_items:
+    - Tdarr_Server_Config.json
+    - Tdarr_Node_Config.json
+    notify:
+    - Reload systemd daemon
+    - Restart tdarr service
+
+    - name: Git clone plugins and flows
+      ansible.builtin.git:
+        repo: "https://github.com/bluefishforsale/bluefishforsale_tdarr_plugins.git"
+        dest: "{{ path_home }}/plugins/"
+        depth: 1
+        update: yes
+
+  - name: Create tdarr systemd service
+    ansible.builtin.template:
+      src: "files/ocean-tdarr/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - tdarr.service
+    - tdarr_node.service
+    notify:
+    - Reload systemd daemon
+    - Restart tdarr service
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart tdarr service
+    ansible.builtin.systemd:
+      name: tdarr.service
+      state: restarted

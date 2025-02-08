@@ -1,0 +1,28 @@
+{
+  "nodeID": "{{ inventory_hostname }}.home",
+  "nodeName": "{{ inventory_hostname }}.home",
+  "serverURL": "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ tdarr_port_api }}",
+  "serverIP": "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}",
+  "serverPort": "{{ tdarr_port_api }}",
+  "handbrakePath": "",
+  "ffmpegPath": "",
+  "mkvpropeditPath": "",
+  "pathTranslators": [
+    {
+      "server": "",
+      "node": ""
+    }
+  ],
+  "nodeType": "mapped",
+  "unmappedNodeCache": "/app/unmappedNodeCache",
+  "logLevel": "INFO",
+  "priority": -1,
+  "cronPluginUpdate": "",
+  "apiKey": "",
+  "maxLogSizeMB": 10,
+  "pollInterval": 2000,
+  "startPaused": false,
+  "platform_arch": "linux_x64_docker_true",
+  "nodeIP": "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}",
+  "nodePort": "8267"
+}
