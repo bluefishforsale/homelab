@@ -1,0 +1,93 @@
+---
+- name: Configure systemd service for cloudflared
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    package: cloudflared
+    service: cloudflared
+    files: "files/{{ service }}"
+    path_data01: /data01/services
+    path_home: "{{ path_data01 }}/{{ service }}"
+    config: "{{ path_home }}/config.yaml"
+    cert: "{{ path_home }}/cert.pem"
+    cred_file: "{{ path_home }}/1808d97e-fc1b-4244-8233-f076ff6f9e8a.json"
+    tunnel: 1808d97e-fc1b-4244-8233-f076ff6f9e8a
+
+  tasks:
+
+  - name: Ensure base directory exists
+    file:
+      path: "{{ path_home }}"
+      state: directory
+      mode: '0755'
+
+  - name: Ensure keyrings directory exists
+    file:
+      path: /usr/share/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Cloudflare package signing key
+    ansible.builtin.get_url:
+      url: https://pkg.cloudflare.com/cloudflare-main.gpg
+      dest: /usr/share/keyrings/cloudflare-main.gpg
+      mode: '0644'
+
+  - name: Add Cloudflare repository
+    ansible.builtin.copy:
+      dest: /etc/apt/sources.list.d/cloudflared.list
+      content: |
+        deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main
+      mode: '0644'
+
+  - name: Install cloudflared
+    ansible.builtin.apt:
+      update_cache: yes
+      name: cloudflared
+      state: present
+
+  - name: Copy cert and tunnel
+    ansible.builtin.copy:
+      src: "{{ files }}/{{ item }}"
+      dest: "{{ path_home }}/"
+      mode: '0600'
+    loop:
+    - 1808d97e-fc1b-4244-8233-f076ff6f9e8a.json
+    - cert.pem
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  - name: Template configuration and keys
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "{{ path_home }}/{{item}}"
+      mode: '0600'
+    loop:
+    - config.yaml
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  - name: Create systemd service and timer
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - cloudflared.service
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart service
+    ansible.builtin.systemd:
+      name: cloudflared.service
+      state: restarted

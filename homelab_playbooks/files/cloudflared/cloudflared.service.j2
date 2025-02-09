@@ -1,0 +1,15 @@
+[Unit]
+Description={{ service }}
+After=network.target
+
+[Service]
+Restart=always
+RestartSec=10s
+TimeoutStartSec=5
+PrivateTmp=true
+Type=simple
+PIDFile=/var/run/cloudflared.pid
+ExecStart=cloudflared tunnel --config {{ config }} --origincert {{ cert }} --cred-file  {{ cred_file }} run
+
+[Install]
+WantedBy=multi-user.target
