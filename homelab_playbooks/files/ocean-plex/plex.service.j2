@@ -38,13 +38,13 @@ ExecStart=docker run --rm \
     -p {{ port }}:{{ port }}/udp \
     {% endfor -%}
     -v /etc/letsencrypt/archive/home.terrac.com:/certs \
-    -v {{ plex_home }}/tv:/tv \
-    -v {{ data }}:/data01 \
-    -v {{ complete }}/music:/music \
-    -v {{ complete }}/movies:/movies \
     -v {{ plex_home }}/config:/config \
     -v {{ plex_home }}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro \
+    -v {{ complete }}/tv:/tv \
+    -v {{ complete }}/music:/music \
+    -v {{ complete }}/movies:/movies \
     -v {{ ramdisk }}:/transcode \
+    -v {{ data }}:/data01 \
   {{ image }}:{{ version }}
 ExecStop=docker rm -f {{ service }}
 
