@@ -1,0 +1,11 @@
+[Unit]
+Description={{ service }}
+After=network.target
+
+[Service]
+Type=oneshot
+Restart=on-failure
+ExecStart=/bin/bash -c "{{ path_home }}/ddns_updater.sh"
+
+[Install]
+WantedBy=multi-user.target

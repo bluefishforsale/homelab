@@ -1,0 +1,16 @@
+#!/bin/bash
+
+PUBLIC_IP=$(curl -s  https://ifconfig.co)
+
+curl -s --request PUT \
+  --url "https://api.cloudflare.com/client/v4/zones/{{ cf_zone_id }}/dns_records/{{ cf_record_id }}" \
+  --header 'Content-Type: application/json' \
+  --header "Authorization: Bearer {{ cf_api_key }} " \
+  --data '{
+      "content": "'"${PUBLIC_IP}"'",
+      "name": "'"{{ cf_dns_record }}"'",
+      "proxied": false,
+      "type": "A",
+      "comment": "{{ cf_dns_record }}",
+      "ttl": 300
+    }'

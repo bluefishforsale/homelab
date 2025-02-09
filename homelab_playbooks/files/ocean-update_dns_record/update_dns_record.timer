@@ -1,9 +1,0 @@
-[Unit]
-Description=Update Cloudflare DNS record every 5 minutes
-
-[Timer]
-Unit=update_dns_record.service
-OnCalendar=*:00:*/5
-
-[Install]
-WantedBy=timers.target

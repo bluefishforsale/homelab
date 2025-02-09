@@ -1,0 +1,9 @@
+[Unit]
+Description={{ service }} timer
+
+[Timer]
+Unit={{ service }}.service
+OnCalendar=*:00:*/5
+
+[Install]
+WantedBy=timers.target
