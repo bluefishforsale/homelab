@@ -4,17 +4,24 @@
   become: true
   gather_facts: true
   vars:
-    data01: /data01/service
+    data01: /data01/services
     service: cloudflare_ddns
     path_home: "{{ data01 }}/{{ service }}"
     files: files/cloudflare_ddns
     systemd_services:
     - "{{ service }}.timer"
     - "{{ service }}.service"
-    cf_dns_record: home.terrac.com
     cf_api_key: pTnVwZxlUxY4q9BIO2IG_V23MhEoKptBzWswLQrb
     cf_zone_id: f3be74ced16c63d68b522f569ecba43b
-    cf_record_id: 5c45e94490466b3fe4901d913c31a9b5
+    cf_records:
+    - dns: terrac.com
+      api_key: "{{ cf_api_key }}"
+      zone_id: "{{ cf_zone_id }}"
+      record_id: 81fa8a096a6ceb11e264f0ccde2a4c86
+    - dns: home.terrac.com
+      api_key: "{{ cf_api_key }}"
+      zone_id: "{{ cf_zone_id }}"
+      record_id: 5c45e94490466b3fe4901d913c31a9b5
 
   tasks:
 
@@ -24,13 +31,13 @@
       state: directory
       mode: '0755'
 
-  - name: Template updater script
+  - name: Template script
     ansible.builtin.template:
       src: "{{ files }}/{{ item }}.j2"
       dest: "{{ path_home }}/{{ item }}"
       mode: '0755'
-    loop:
-    - ddns_updater.sh
+    with_items:
+    - cloudflare_ddns.sh
     notify:
     - Reload systemd daemon
     - Restart cloudflare_ddns services

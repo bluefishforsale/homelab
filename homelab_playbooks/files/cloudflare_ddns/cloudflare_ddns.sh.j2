@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Ensure all required arguments are provided
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <api_key> <zone_id> <record_id> <dns>"
+    exit 1
+fi
+
+# Assign command-line arguments to variables
+api_key="$1"
+zone_id="$2"
+record_id="$3"
+dns="$4"
+
+# Fetch the public IP
+PUBLIC_IP=$(curl -s https://ifconfig.co)
+
+# Update Cloudflare DNS record
+curl -s --request PUT \
+  --url "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records/${record_id}" \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer ${api_key}" \
+  --data '{
+      "content": "'"${PUBLIC_IP}"'",
+      "name": "'"${dns}"'",
+      "proxied": false,
+      "type": "A",
+      "comment": "'"${dns}"'",
+      "ttl": 300
+    }'
+
+# Print success message
+echo "Updated ${dns} to ${PUBLIC_IP}"
