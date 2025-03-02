@@ -67,8 +67,6 @@
       path: "{{ home }}/scripts/"
       state: directory
       recurse: yes
-      user: "{{ user }}"
-      grou: "{{ user }}"
 
   - name: Create config files
     ansible.builtin.template:
