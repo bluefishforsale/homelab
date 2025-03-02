@@ -261,16 +261,21 @@ qm set 9999 --ide2 vm-boot-lvm-thin:cloudinit
 qm set 9999 --scsihw virtio-scsi-pci --scsi0 vm-boot-lvm-thin:vm-9999-disk-0
 qm set 9999 --boot order='scsi0'
 qm set 9999 --serial0 socket --vga serial0
-qm set 9999 --sshkeys rsa.key
+qm set 9999 --sshkeys rsa.keys
 qm set 9999 --hotplug network,disk
 qm set 9999 --bios ovmf
 qm set 9999 --machine q35
-qm set 9999 --efidisk0 vm-boot-lvm-thin:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=1M
+qm set 9999 --efidisk0 vm-boot-lvm-thin:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
 qm set 9999 --cores 2
 qm set 9999 --memory 4096
 qm set 9999 --agent enabled=1
 qm template 9999
 ```
+
+#  just in case a root account is needed and keys don't work
+qm set 9999 --ciuser debian
+qm set 9999 --cipassword admin
+
 
 
 ### dns01 VM
@@ -319,7 +324,6 @@ for y in 0 1 ; do
         n="${x}${y}${z}"
         qm clone 9999 ${n}
         qm set ${n} --name kube${n} --ipconfig0 ip=$(host kube${n}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
-        qm set ${n} --sshkeys rsa.key
         qm resize ${n} scsi0 +8G  # 10G
         if [ $x = 0 ] ; then
             qm set ${n} --cores 4
@@ -348,4 +352,17 @@ for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do  qm start "$x
 ```bash
 for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do qm stop "$x$y$z" ; qm destroy "$x$y$z" ; done ; done ; done
 ```
+
+
+
+# OCEAN VM
+qm clone 9999 5000
+qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm resize 5000 scsi0 +126G  # 10G
+qm set 5000 --cores 40
+qm set 5000 --memory 640000  # 640GB
+qm set 5000 --hostpci0=42:00,pcie=1
+qm set 5000 --hostpci1=02:00,pcie=1
+
+
 

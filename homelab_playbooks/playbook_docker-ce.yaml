@@ -1,6 +1,9 @@
 - name: Install Docker on Ubuntu
   hosts: all
   become: yes
+  vars:
+    docker_keyring_path: /etc/apt/keyrings/docker.asc
+
   tasks:
   - name: Install prerequisite packages
     apt:
@@ -9,19 +12,26 @@
       - ca-certificates
       - curl
       - gnupg
-      - gnupg-agent
+      - lsb-release
       - software-properties-common
       state: present
       update_cache: yes
 
-  - name: Add Docker APT key
-    apt_key:
-      url: https://download.docker.com/linux/ubuntu/gpg
-      state: present
+  - name: Ensure /etc/apt/keyrings directory exists
+    file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Docker APT key directly (replacing deprecated apt_key)
+    ansible.builtin.get_url:
+      url: https://download.docker.com/linux/debian/gpg
+      dest: "{{ docker_keyring_path }}"
+      mode: '0644'
 
   - name: Add Docker repository
     apt_repository:
-      repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+      repo: "deb [signed-by={{ docker_keyring_path }}] https://download.docker.com/linux/debian {{ ansible_lsb.codename }} stable"
       state: present
       filename: docker
 
@@ -39,3 +49,36 @@
 
   - name: Test Docker installation
     command: docker run --rm hello-world
+    register: hello_world_result
+    changed_when: false
+    failed_when: hello_world_result.rc != 0
+
+  - name: Add debian and media users to docker group
+    ansible.builtin.user:
+      name: "{{ item }}"
+      groups: docker
+      append: yes
+    with_items:
+    - debian
+    - media
+
+  - name: Ensure /etc/docker directory exists
+    file:
+      path: /etc/docker
+      state: directory
+      mode: '0755'
+
+  - name: Ensure Docker daemon.json is configured correctly
+    ansible.builtin.template:
+      src: files/docker/daemon.json.j2
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: '0644'
+    notify: restart docker
+
+  handlers:
+  - name: restart docker
+    ansible.builtin.systemd:
+      name: docker
+      state: restarted

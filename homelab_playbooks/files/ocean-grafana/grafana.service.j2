@@ -1,8 +1,8 @@
 [Unit]
 Description=grafana
-After=docker.service
-Requires=docker.service
-Requires=mysql.service
+After=docker.service zfs-mount.service zfs-import.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
 
 [Service]
 Restart=always

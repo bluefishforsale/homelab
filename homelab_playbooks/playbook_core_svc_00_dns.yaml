@@ -61,7 +61,7 @@
         force: yes
         dest: "/var/lib/bind/{{item}}"
         content: '{{ lookup("template", "files/bind9/{{item}}.j2") }}'
-        mode: 644
+        mode: "0644"
         owner: bind
         group: bind
       with_items:

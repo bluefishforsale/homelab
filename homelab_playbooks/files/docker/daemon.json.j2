@@ -1,0 +1,14 @@
+{
+{% if docker is defined and docker | length > 0 %}
+    "data-root": "{{ docker }}"{% if nvidia_gpu is defined and nvidia_gpu %},{% endif %}
+{% endif %}
+
+{% if nvidia_gpu is defined and nvidia_gpu %}
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+{% endif %}
+}

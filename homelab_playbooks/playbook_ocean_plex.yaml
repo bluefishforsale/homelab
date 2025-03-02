@@ -17,8 +17,7 @@
     - 32410
     - "32412-34414"
     devices:
-    - /dev/nvidia-uvm
-    - /dev/nvidia-uvm-tools
+    - /dev/nvidia-modeset
     - /dev/nvidia0
     - /dev/nvidiactl
     exporter_service: plex-exporter

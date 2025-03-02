@@ -1,7 +1,9 @@
 [Unit]
 Description={{ service }}
-After=docker.service zfs.target data01.mount
-Requires=docker.service zfs.target data01.mount
+After=docker.service zfs-mount.service zfs-import.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
 
 [Service]
 Type=simple
@@ -9,8 +11,6 @@ StandardOutput=journal
 StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
-RestartSec=120s
-TimeoutStartSec=180s
 User={{ user }}
 Group={{ user }}
 ExecStartPre=-docker rm -f {{ service }}
@@ -19,10 +19,10 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name={{ service }} \
     --hostname={{ service }} \
+    --runtime nvidia \
     {% for dev in devices -%}
     --device {{ dev }}:{{ dev }} \
     {% endfor -%}
-    --runtime=nvidia \
     --gpus=all,capabilities=video \
     -e TZ="America/Los_Angeles" \
     -e VERSION={{ version }} \

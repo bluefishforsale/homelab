@@ -3,8 +3,13 @@ github: bluefishforsale
 
 # dict of users to add
 user:
-  - name: terrac
-    first: Terrac
-    last: Skiens
-    groups: [sudo]
-    github: bluefishforsale
+- name: terrac
+  first: Terrac
+  last: Skiens
+  groups: [ sudo, docker ]
+  github: bluefishforsale
+- name: debian
+  first: debian
+  last: debian
+  groups: [ sudo, docker ]
+  github: bluefishforsale

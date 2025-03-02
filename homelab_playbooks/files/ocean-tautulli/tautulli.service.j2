@@ -1,7 +1,9 @@
 [Unit]
 Description={{ service }}
-After=docker.service
-Requires=docker.service
+After=docker.service zfs-mount.service zfs-import.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
 
 [Service]
 Type=simple

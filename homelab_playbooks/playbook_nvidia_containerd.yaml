@@ -5,19 +5,18 @@
     nvidia_container_toolkit_version: latest
     reboot_required: false
 
-
   tasks:
-    - block:
-    - name: Driver and Patch
-      become: true
-      when: nvidia_gpu | default(False) | bool
-
+  - block:
     - name: Ensure 'contrib' and 'non-free' repositories are enabled
       ansible.builtin.apt_repository:
         repo: "deb http://deb.debian.org/debian {{ ansible_lsb.codename }} main contrib non-free non-free-firmware"
         state: present
         filename: "debian_contrib_non_free"
       register: contrib_non_free_repo
+
+    - name: Debug - Confirm Nvidia GPU variable
+      ansible.builtin.debug:
+        msg: "Nvidia GPU detected: {{ nvidia_gpu }}"
 
     - name: Update apt cache if repository changes occurred
       ansible.builtin.apt:
@@ -27,11 +26,11 @@
     - name: Install prerequisite packages
       ansible.builtin.apt:
         name:
-          - build-essential
-          - dkms
-          - linux-headers-{{ ansible_kernel }}
-          - pciutils
-          - curl
+        - build-essential
+        - dkms
+        - linux-headers-{{ ansible_kernel }}
+        - pciutils
+        - curl
         state: present
         update_cache: yes
 
@@ -61,6 +60,29 @@
       register: remove_nouveau
       changed_when: remove_nouveau.stdout != ""
 
+    - name: Download NVIDIA Docker GPG key
+      ansible.builtin.shell: |
+        curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey > /etc/apt/keyrings/nvidia-docker.key
+      args:
+        creates: /etc/apt/keyrings/nvidia-docker.key
+
+    - name: Download NVIDIA Docker repository list for Debian 11
+      ansible.builtin.shell: |
+        curl -s -L https://nvidia.github.io/nvidia-docker/debian11/nvidia-docker.list > /etc/apt/sources.list.d/nvidia-docker.list
+      args:
+        creates: /etc/apt/sources.list.d/nvidia-docker.list
+      register: nvidia_repo_file_download
+
+    - name: Set fact to trigger apt cache update if repo changed
+      ansible.builtin.set_fact:
+        nvidia_container_repo_changed: true
+      when: nvidia_repo_file_download.changed or nvidia_repo_modified.changed
+
+    - name: Update apt cache if NVIDIA Container Toolkit repository changed
+      ansible.builtin.apt:
+        update_cache: yes
+      when: nvidia_container_repo_changed | default(false) | bool
+
     - name: Install NVIDIA driver
       ansible.builtin.apt:
         name: "nvidia-driver"
@@ -68,29 +90,19 @@
       register: nvidia_driver_install
       notify: set_reboot_required
 
-    - name: Add NVIDIA Container Toolkit repository GPG key
-      ansible.builtin.apt_key:
-        url: https://nvidia.github.io/libnvidia-container/gpgkey
-        state: present
-
-    - name: Add NVIDIA Container Toolkit repository
-      ansible.builtin.apt_repository:
-        repo: "deb https://nvidia.github.io/libnvidia-container/debian{{ ansible_distribution_major_version }} {{ ansible_lsb.codename }} main"
-        state: present
-        filename: "nvidia_container_toolkit"
-      register: nvidia_container_repo
-
-    - name: Update apt cache if NVIDIA Container Toolkit repository changed
-      ansible.builtin.apt:
-        update_cache: yes
-      when: nvidia_container_repo.changed
-
     - name: Install NVIDIA Container Toolkit
       ansible.builtin.apt:
         name: "nvidia-container-toolkit"
         state: "{{ nvidia_container_toolkit_version }}"
       register: nvidia_container_toolkit_install
       notify: restart_containerd
+
+    - name: Install Docker and NVIDIA Container Runtime
+      ansible.builtin.shell: |
+        apt-get install -y \
+          docker.io \
+          nvidia-container-runtime
+      changed_when: true
 
     - name: Configure NVIDIA Container Runtime
       ansible.builtin.shell: |
@@ -103,8 +115,7 @@
       ansible.builtin.systemd:
         name: containerd
         state: restarted
-      when: nvidia_container_runtime_configure.changed or
-            'restart_containerd' in ansible_run_tags
+      when: nvidia_container_runtime_configure.changed
 
     - name: Reboot system if required
       ansible.builtin.reboot:
@@ -114,7 +125,7 @@
         pre_reboot_delay: 5
         post_reboot_delay: 30
       when: reboot_required
-      become: yes
+      become: true
 
     - name: Verify NVIDIA driver installation with nvidia-smi
       ansible.builtin.command: nvidia-smi
@@ -124,32 +135,22 @@
       until: nvidia_smi_output.rc == 0
       changed_when: false
 
+    when: nvidia_gpu | default(false) | bool
+    become: true
+
   handlers:
-    - name: update-initramfs
-      ansible.builtin.command: update-initramfs -u
-      listen: update-initramfs
-      notify: set_reboot_required
+  - name: update-initramfs
+    ansible.builtin.command: update-initramfs -u
+    listen: update-initramfs
+    notify: set_reboot_required
 
-    - name: set_reboot_required
-      ansible.builtin.set_fact:
-        reboot_required: true
-      listen: set_reboot_required
+  - name: set_reboot_required
+    ansible.builtin.set_fact:
+      reboot_required: true
+    listen: set_reboot_required
 
-    - name: restart_containerd
-      ansible.builtin.systemd:
-        name: containerd
-        state: restarted
-      listen: restart_containerd
-
-
-    - name: Reboot target to apply changes
-      reboot:
-        reboot_timeout: 600
-
-    - name: Start containerd / kubelet
-      ansible.builtin.systemd:
-        state: restarted
-        name: "{{ item }}"
-      with_items:
-        - containerd
-        - kubelet
+  - name: restart_containerd
+    ansible.builtin.systemd:
+      name: containerd
+      state: restarted
+    listen: restart_containerd

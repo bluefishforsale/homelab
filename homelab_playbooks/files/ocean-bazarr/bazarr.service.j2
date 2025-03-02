@@ -1,7 +1,7 @@
 [Unit]
 Description={{ service }}
-After=docker.service
-Requires=docker.service
+After=docker.service data01.mount
+Requires=docker.service data01.mount
 
 [Service]
 Type=simple

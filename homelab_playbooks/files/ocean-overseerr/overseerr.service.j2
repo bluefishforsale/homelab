@@ -6,30 +6,25 @@ RequiresMountsFor=/data01
 
 
 [Service]
-Type=simple
-StandardOutput=journal
-StandardError=journal
-RuntimeMaxSec=7d
 Restart=always
-RestartSec=120s
-TimeoutStartSec=180s
-User={{ user }}
-Group={{ user }}
+RuntimeMaxSec=7d
+RestartSec=10s
+TimeoutStartSec=60
+Environment=IMAGE="sctx/overseerr"
+Environment=VERSION="latest"
+Environment=LOCALDIR="/data01/services/%N"
+Environment=DATADIR="/data01/complete"
+PassEnvironment=IMAGE VERSION LOCALDIR DATADIR
 ExecStartPre=-docker rm -f {{ service }}
 ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
-    --name={{ service }} \
-    --hostname={{ service }} \
-    --cpus=4 \
-    -e TZ="America/Los_Angeles" \
-    -e PUID=1001 -e PGID=1001 \
-    -v /etc/localtime:/etc/localtime:ro \
-    -p {{ sonarr_port }}:8902 \
-    -v {{ home }}:/config \
-    -v {{ complete }}/tv:/tv \
-    -v {{ incoming }}/tv:/downloads \
-  {{ image }}:{{ version }}
+    --name {{ service }} \
+    --hostname {{ service }} \
+    -e TZ=America/Los_Angeles \
+    -p {{ port }}:5055 \
+    -v {{ home }}/config:/app/config \
+    {{ image }}:{{ version }}
 ExecStop=docker rm -f {{ service }}
 
 [Install]

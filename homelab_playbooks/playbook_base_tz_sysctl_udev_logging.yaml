@@ -127,7 +127,7 @@
   ########### systemd-system
   - name: Ensure DefaultEnvironment is set in system.conf
     ansible.builtin.copy:
-      dest: /etc/systemd/systerm.conf
+      dest: /etc/systemd/system.conf
       content: |
         # no pager by default
         DefaultEnvironment="SYSTEMD_PAGER="

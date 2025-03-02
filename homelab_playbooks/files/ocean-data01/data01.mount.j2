@@ -1,12 +1,12 @@
 [Unit]
-Description=ZFS Mount for /data01
-After=zfs.target
+Description=Mount 9p share data01 at /mnt/data01
+After=network.target
 
 [Mount]
-What=/data01
+What=data01
 Where=/data01
-Type=zfs
-Options=defaults
+Type=9p
+Options=trans=virtio,version=9p2000.L
 
 [Install]
 WantedBy=multi-user.target
