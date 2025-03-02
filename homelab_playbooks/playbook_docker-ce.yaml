@@ -74,7 +74,26 @@
       owner: root
       group: root
       mode: '0644'
-    notify: restart docker
+
+  - name: Install jq package
+    ansible.builtin.apt:
+      name: jq
+      state: present
+      update_cache: yes
+
+  - name: Format Docker daemon.json using jq and write it back to /etc/docker/daemon.json
+    ansible.builtin.command:
+      cmd: jq . /etc/docker/daemon.json
+    register: formatted_json
+    changed_when: false
+
+  - name: Overwrite /etc/docker/daemon.json with formatted version
+    ansible.builtin.copy:
+      content: "{{ formatted_json.stdout }}"
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: '0644'
 
   - name: Ensure docker service override directory exists
     ansible.builtin.file:
