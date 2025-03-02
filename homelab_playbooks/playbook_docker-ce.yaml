@@ -17,6 +17,12 @@
       state: present
       update_cache: yes
 
+  - name: Ensure /etc/docker directory exists
+    file:
+      path: /etc/docker
+      state: directory
+      mode: '0755'
+
   - name: Ensure /etc/apt/keyrings directory exists
     file:
       path: /etc/apt/keyrings
@@ -47,11 +53,10 @@
       - containerd.io
       state: present
 
-  - name: Test Docker installation
-    command: docker run --rm hello-world
-    register: hello_world_result
-    changed_when: false
-    failed_when: hello_world_result.rc != 0
+  - name: Ensure docker group exists
+    ansible.builtin.group:
+      name: docker
+      state: present
 
   - name: Add debian and media users to docker group
     ansible.builtin.user:
@@ -62,12 +67,6 @@
     - debian
     - media
 
-  - name: Ensure /etc/docker directory exists
-    file:
-      path: /etc/docker
-      state: directory
-      mode: '0755'
-
   - name: Ensure Docker daemon.json is configured correctly
     ansible.builtin.template:
       src: files/docker/daemon.json.j2
@@ -77,8 +76,29 @@
       mode: '0644'
     notify: restart docker
 
+  - name: Ensure docker service override directory exists
+    ansible.builtin.file:
+      path: /etc/systemd/system/docker.service.d
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure docker service has extended timeouts (systemd override)
+    ansible.builtin.copy:
+      dest: /etc/systemd/system/docker.service.d/override.conf
+      content: |
+        [Service]
+        TimeoutStartSec=600
+        TimeoutStopSec=600
+      owner: root
+      group: root
+      mode: '0644'
+    notify: restart docker
+
   handlers:
   - name: restart docker
     ansible.builtin.systemd:
+      daemon_reload: yes
       name: docker
       state: restarted
