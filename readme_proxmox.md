@@ -311,6 +311,19 @@ qm resize 4000 scsi0 +18G
 qm start 4000
 ```
 
+# OCEAN VM
+## passes through specific PCIE addresses for GPU and SAS controller
+```bash
+qm clone 9999 5000
+qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm resize 5000 scsi0 +126G  # 10G
+qm set 5000 --cores 40
+qm set 5000 --memory 512000  # 512GB
+qm set 5000 --hostpci0=42:00,pcie=1
+qm set 5000 --hostpci1=02:00,pcie=1
+```
+
+
 ## make six kube VMs from the template
 
 - using cloud-init to set IP and onboot info
@@ -352,17 +365,6 @@ for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do  qm start "$x
 ```bash
 for x in 5 ; do for y in $(seq  0 1) ; do for z in $(seq 1 3) ; do qm stop "$x$y$z" ; qm destroy "$x$y$z" ; done ; done ; done
 ```
-
-
-
-# OCEAN VM
-qm clone 9999 5000
-qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
-qm resize 5000 scsi0 +126G  # 10G
-qm set 5000 --cores 40
-qm set 5000 --memory 640000  # 640GB
-qm set 5000 --hostpci0=42:00,pcie=1
-qm set 5000 --hostpci1=02:00,pcie=1
 
 
 
