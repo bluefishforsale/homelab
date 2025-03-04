@@ -1,7 +1,9 @@
 [Unit]
 Description={{ exporter_service }}
-After=docker.service zfs.target data01.mount plex.service
-Requires=docker.service zfs.target data01.mount
+After=docker.service zfs-mount.service zfs-import.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
 
 [Service]
 Type=simple
@@ -10,11 +12,7 @@ StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
 RestartSec=120s
-TimeoutStartSec=300s
-User={{ user }}
-Group={{ user }}
-User={{ user }}
-Group={{ user }}
+TimeoutStartSec=180s
 ExecStartPre=-docker rm -f {{ exporter_service }}
 ExecStartPre=-docker images --filter reference={{ exporter_image }}:{{ exporter_version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ exporter_image }}:{{ exporter_version }}
@@ -22,12 +20,13 @@ ExecStart=docker run --rm \
     --name=%N \
     --hostname=%H \
     -e TZ="America/Los_Angeles" \
-    -e VERSION={{ exporter_version }} \
-    -e PLEX_TOKEN="{{ plex_token }}" \
-    -e PLEX_ADDR="http://ocean.home:32400" \
-    -e METRICS_MEDIA_COLLECTING_INTERVAL_SECONDS=60 \
-    -p 9594:9594/tcp \
-  {{ exporter_image }}:{{ exporter_version }}
+    -e VERSION=${VERSION} \
+    -e PORT={{ exporter_port }} \
+    -e URL="http://ocean.home:{{ prowlarr_port }}" \
+    -e APIKEY="83e44c481a5d4060a3c8f9214ed3fba5" \
+    -e ENABLE_ADDITIONAL_METRICS=true \
+    -p {{ exporter_port }}:9710 \
+    {{ exporter_image }}:{{ exporter_version }} prowlarr
 ExecStop=docker rm -f %N
 
 [Install]

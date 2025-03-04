@@ -76,28 +76,6 @@
     - Reload systemd daemon
     - Restart blackbox-exporter service
 
-  - name: Create blackbox-exporter config file
-    ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}"
-      dest: "{{ path_home }}/config/{{ item }}"
-      mode: '0644'
-    with_items:
-    - blackbox.yml
-    notify:
-    - Reload systemd daemon
-    - Restart blackbox-exporter service
-
-  - name: Create systemd blackbox-exporter
-    ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - blackbox-exporter.service
-    notify:
-    - Reload systemd daemon
-    - Restart blackbox-exporter service
-
   - name: Create systemd ndt-exporter.service
     ansible.builtin.template:
       src: "files/ocean-prometheus/{{ item }}.j2"

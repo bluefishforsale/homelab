@@ -11,10 +11,11 @@ StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
 RestartSec=30s
-TimeoutStartSec=10s
+TimeoutStartSec=601s
+TimeoutStopSec=600s
 ExecStartPre=-docker rm -f {{ service_node }}
-ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
+ExecStartPre=-docker images --filter reference={{ node_image }}:{{ node_version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ node_image }}:{{ node_version }}
 ExecStart=docker run --rm\
     --name={{ service_node }} \
     --hostname={{ service_node }} \
@@ -37,7 +38,7 @@ ExecStart=docker run --rm\
     -v {{ path_home }}/conf:/app/configs \
     -v {{ path_home }}/logs:/app/logs \
     -v {{ transcode }}:/temp \
-  {{ image }}:{{ version }}
+  {{ node_image }}:{{ node_version }}
 ExecStop=docker rm -f  {{ service }}
 
 [Install]

@@ -7,7 +7,7 @@ RequiresMountsFor=/data01
 [Service]
 Restart=always
 RestartSec=30s
-TimeoutStartSec=60s
+TimeoutStartSec=300s
 Environment=IMAGE="grafana/grafana"
 Environment=VERSION="latest"
 Environment=LOCALDIR="/data01/services/%N"

@@ -12,7 +12,8 @@ StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
 RestartSec=30s
-TimeoutStartSec=10s
+TimeoutStartSec=600s
+TimeoutStopSec=600s
 ExecStartPre=-docker rm -f {{ service }}
 ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}

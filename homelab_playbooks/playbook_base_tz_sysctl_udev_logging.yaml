@@ -81,6 +81,13 @@
       content: |
         # This file is managed by ansible
 
+        # max port range
+        ipv4.ip_local_port_range = "1024 65535"
+        # fin timeout
+        net.ipv4.tcp_fin_timeout = 15
+        # allows fast cycling of sockets in time_wait 
+        net.ipv4.tcp_tw_recycle = 1
+        net.ipv4.tcp_tw_reuse = 1 
         # allow binding to interfaces not yet up (haproxy/keepalived)
         net.ipv4.ip_nonlocal_bind = 1
         # don't cache ss-thresh from previous connection

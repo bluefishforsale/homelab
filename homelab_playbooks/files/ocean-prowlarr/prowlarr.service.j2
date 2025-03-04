@@ -11,25 +11,19 @@ StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
 RestartSec=120s
-TimeoutStartSec=300s
-User={{ user }}
-Group={{ user }}
+TimeoutStartSec=180s
 ExecStartPre=-docker rm -f {{ service }}
 ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
-    --name={{ service }} \
-    --hostname={{ service }} \
-    --cpus=4 \
+    --name {{ service }} \
+    --hostname {{ service }} \
     -e TZ="America/Los_Angeles" \
     -e PUID=1001 -e PGID=1001 \
-    -v /etc/localtime:/etc/localtime:ro \
-    -p {{ radarr_port }}:7878 \
-    -v {{ home }}:/config \
-    -v {{ incoming }}/movies:/downloads \
-    -v {{ complete }}/movies:/movies \
+    -p {{ prowlarr_port }}:9696 \
+    -v {{ home }}/config:/config \
   {{ image }}:{{ version }}
-ExecStop=docker rm -f %N
+ExecStop=docker rm -f {{ service }}
 
 [Install]
 WantedBy=multi-user.target

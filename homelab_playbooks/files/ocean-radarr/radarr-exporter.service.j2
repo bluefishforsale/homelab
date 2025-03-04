@@ -6,7 +6,7 @@ Requires=docker.service
 [Service]
 Restart=always
 RestartSec=10s
-TimeoutStartSec=30s
+TimeoutStartSec=300s
 Environment=IMAGE="ghcr.io/onedr0p/exportarr"
 Environment=VERSION="latest"
 PassEnvironment=IMAGE VERSION
