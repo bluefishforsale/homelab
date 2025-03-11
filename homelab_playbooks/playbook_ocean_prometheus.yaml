@@ -28,16 +28,16 @@
     ansible.builtin.file:
       path: "{{ path_home }}"
       state: directory
-      owner: root
-      group: root
+      owner: nobody
+      group: nogroup
       mode: '0755'
 
   - name: Ensure subdirectory exists with correct ownership and permissions
     ansible.builtin.file:
       path: "{{ path_home }}/{{ item }}"
       state: directory
-      owner: root
-      group: root
+      owner: nobody
+      group: nogroup
       mode: '0755'
     with_items:
     - config
@@ -47,6 +47,8 @@
     ansible.builtin.template:
       src: "files/ocean-prometheus/{{ item }}.j2"
       dest: "{{ path_home }}/config/{{ item }}"
+      owner: nobody
+      group: nogroup
       mode: '0644'
     with_items:
     - prometheus.yml
