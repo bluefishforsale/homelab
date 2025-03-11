@@ -78,6 +78,11 @@
     ansible.builtin.systemd:
       daemon_reload: yes
 
+  - name: Restart tdarr service
+    ansible.builtin.systemd:
+      name: tdarr.service
+      state: restarted
+
   - name: Restart tdarr node service
     ansible.builtin.systemd:
       name: tdarr_node.service
