@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars:
-    image: grafana
-    version: 1.27.3-alpine
+    image: grafana/grafana
+    version: 11.5.4
     service: grafana
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"

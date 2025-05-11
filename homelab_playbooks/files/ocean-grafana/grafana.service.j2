@@ -5,16 +5,16 @@ Requires=docker.service zfs-mount.service zfs-import.target
 RequiresMountsFor=/data01
 
 [Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+TimeoutStartSec=600s
+TimeoutStopSec=600s
 Restart=always
-RestartSec=30s
-TimeoutStartSec=300s
-Environment=IMAGE="grafana/grafana"
-Environment=VERSION="latest"
-Environment=LOCALDIR="/data01/services/%N"
-PassEnvironment=IMAGE VERSION LOCALDIR
-ExecStartPre=-docker rm -f %N
-ExecStartPre=-docker images | awk \'(/%N/){print $3}\' | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
+ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name=%N \
     --hostname=%H \
@@ -23,8 +23,8 @@ ExecStart=docker run --rm \
     -e "GF_INSTALL_PLUGINS=marcusolsson-treemap-panel 2.0.0" \
     -v ${LOCALDIR}:/etc/grafana \
     -v ${LOCALDIR}/plugins:/var/lib/grafana/plugins \
-    ${IMAGE}:${VERSION}
-ExecStop=docker rm -f %N
+  {{ image }}:{{ version }}
+ExecStop=docker rm -f {{ service }}
 
 [Install]
 WantedBy=multi-user.target
