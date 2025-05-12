@@ -8,7 +8,6 @@ RequiresMountsFor=/data01
 Type=simple
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
 TimeoutStartSec=600s
 TimeoutStopSec=600s
 Restart=always
@@ -18,11 +17,10 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name={{ service }} \
     --hostname={{ service }} \
+    --gpus=all \
     -e TZ=America/Los_Angeles \
-    -p={{ port_ext }}:{{ port_int }} \
-    -e "GF_INSTALL_PLUGINS=marcusolsson-treemap-panel 2.0.0" \
-    -v {{ path_home }}:/etc/grafana \
-    -v {{ path_home }}/plugins:/var/lib/grafana/plugins \
+    -p {{ port }}:{{ port }} \
+    -v {{ path_home }}:/root/.ollama \
   {{ image }}:{{ version }}
 ExecStop=docker rm -f {{ service }}
 

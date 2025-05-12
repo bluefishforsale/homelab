@@ -1,15 +1,14 @@
 ---
-- name: Configure systemd service for grafana
+- name: Configure systemd service for ollama
   hosts: ocean
   become: true
   gather_facts: true
 
   vars:
-    image: grafana/grafana
-    version: 11.5.4
-    service: grafana
-    port_int: 3000
-    port_ext: 8910
+    image: ollama/ollama
+    version: latest
+    service: ollama
+    port: 11434
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
 
@@ -34,27 +33,29 @@
     - logs
     - conf
 
-  - name: Create config files
+  - name: Create systemd service
     ansible.builtin.template:
-      src: "files/ocean-grafana/{{ item }}"
-      dest: "{{ path_home }}/{{ item }}"
+      src: "files/ocean-ollama/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
-    - grafana.ini
+    - ollama.service
     notify:
     - Reload systemd daemon
     - Restart service
 
-  - name: Create systemd service
-    ansible.builtin.template:
-      src: "files/ocean-grafana/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - grafana.service
-    notify:
-    - Reload systemd daemon
-    - Restart service
+  - name: Wait for Ollama service to be active
+    ansible.builtin.systemd:
+      name: ollama
+      state: started
+    register: service_status
+    until: service_status.status.ActiveState == "active"
+    retries: 30
+    delay: 10
+
+  - name: Run llama3 model
+    ansible.builtin.command: docker exec -it ollama ollama run llama3
+    when: service_status.status.ActiveState == "active"
 
   handlers:
   - name: Reload systemd daemon
@@ -63,5 +64,5 @@
 
   - name: Restart service
     ansible.builtin.systemd:
-      name: grafana.service
+      name: ollama.service
       state: restarted
