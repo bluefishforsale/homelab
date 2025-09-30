@@ -1,112 +1,123 @@
-# Vision Statement
-1. Fully automated
-1. SSH free for 99% of tasks
-1. Everything secured with publicly signed certs (no self-signed anywhere)
-1. Git driven infrastructure as code
-1. Git driven build for services / containers
-1. Logg aggregation service
-1. Control plane for building infrastructure
-1. Isolated "clusters" and "environments" / dev-prod
-1. Versioned releases
-1. iBGP we can use metalLB / Cilium Loadbalancer in GBP modes
-1. Service discovery for both docker and kubernetes eg. grafana.home, grafana.svc.cluster.local
-1. HA for all critical components (dns, dhcp, LB)
-1. Resiliancy and Redundancy to achieve higher reliability
-1. DR plan for all services config and data, recover / restore within x mins
-1. local LLM RAG
+# 🎯 Vision Statement
 
-# Architecture
-## Github stores the Ansible playbooks
-1. Laptop creates control plane metal
-1. Git repo, build server backs up to github
+1. 🤖 Fully automated
+2. 🔐 SSH free for 99% of tasks
+3. 🛡️ Everything secured with publicly signed certs (no self-signed anywhere)
+4. 📝 Git driven infrastructure as code
+5. 🏗️ Git driven build for services / containers
+6. 📊 Log aggregation service
+7. 🎛️ Control plane for building infrastructure
+8. 🏢 Isolated "clusters" and "environments" / dev-prod
+9. 🏷️ Versioned releases
+10. 🌐 iBGP we can use MetalLB / Cilium LoadBalancer in BGP modes
+11. 🔍 Service discovery for both Docker and Kubernetes (e.g., grafana.home, grafana.svc.cluster.local)
+12. ⚡ HA for all critical components (DNS, DHCP, LB)
+13. 🛠️ Resiliency and Redundancy to achieve higher reliability
+14. 🚨 DR plan for all services config and data, recover / restore within x mins
+15. 🧠 Local LLM RAG
 
-## Control plane metal 
-1. dhcp dns setup by manual install
-1. pxe tftp gitlab manual install
-1. gitlab deploys rundeck
-1. pxe boot automated install of proxmox
-1. rundeck creates VMs on proxmox metals
-1. Run ansible playbooks with run deck for web UI, maybe build server triggers rundeck tasks
-1. Maybe run deck just watches the repo for changes 
+# 🏗️ Architecture
 
-## Proxmox
-1. HA for both metals, allowing control plane VMs to migrate between
-1. 
+## 📦 GitHub stores the Ansible playbooks
 
-## kubernetes
-1. ~~kubernetes ingress for services~~
-1. kubernetes argoCD private github repo
-1. kubedash admin
-1. Loki for all services, systems, and kubernetes logs
-1. etcd exporter
-1. grafana dashboards for requests/latency for apiserver, haproxy, vrrp, keepalived, etcd
-1. multi-instance gpu support
-1. taints for worker node VMs that have data01 and/or GPU
-1. ollama helm app install
-1. secrets and letsencrypt certs automation - certmanager?
+1. 💻 Laptop creates control plane metal
+2. 📚 Git repo, build server backs up to GitHub
 
+## 🖥️ Control plane metal
 
-## Automated Ansible Playbooks 
-1. ansible semaphore https://semaphoreui.com/
-1. investigate temportal also https://hub.docker.com/r/temporalio/server 
-1. All idempotent 
-1. Writes all configuration
-1. Creates Infrastructure
-1. Perform investigation actions
-1. Restarts services on config change (CI/CD)
-1. VM  creation ready to be configured
+1. 🌐 DHCP DNS setup by manual install
+2. 📡 PXE TFTP GitLab manual install
+3. 🚀 GitLab deploys Rundeck
+4. ⚙️ PXE boot automated install of Proxmox
+5. 🖥️ Rundeck creates VMs on Proxmox metals
+6. 🔧 Run Ansible playbooks with Rundeck for web UI, maybe build server triggers Rundeck tasks
+7. 👀 Maybe Rundeck just watches the repo for changes
+
+## 🏠 Proxmox
+
+1. ⚡ HA for both metals, allowing control plane VMs to migrate between
+2. 🔄 _[Additional Proxmox items to be added]_
+
+## ☸️ Kubernetes
+
+1. ~~🌐 Kubernetes ingress for services~~
+2. 🔄 Kubernetes ArgoCD private GitHub repo
+3. 📊 KubeDash admin
+4. 📝 Loki for all services, systems, and Kubernetes logs
+5. 📊 etcd exporter
+6. 📈 Grafana dashboards for requests/latency for apiserver, HAProxy, VRRP, keepalived, etcd
+7. 🎮 Multi-instance GPU support
+8. 🏷️ Taints for worker node VMs that have data01 and/or GPU
+9. 🦙 Ollama Helm app install
+10. 🔐 Secrets and Let's Encrypt certs automation - cert-manager?
 
 
-## Gitlab vs Rundeck Ansible separation of convern
-1. automate email configuration
-1. automate set default root password
-1. GitLab builds container images
-1. GitLab will install and keep rundeck updated
-1. GitLab will only produce config to be run by Rundeck / Ansible
-1. Rundeck / Ansible is responsible for all IAC
+## 🤖 Automated Ansible Playbooks
 
-## ocean to node006 proxmox host
-1. decide on proxmox boot disk configuration
-1. convert all ocean services to ansible in git
-1. create VM with ocean SSD passthrough
-1. export / import data01 ZFS pool from ocean->node006
-
-# Todo list 
-1. Consul DNS for docker container service discovery
-1. Registrator for docker containers
-1. nginx auto service discovery proxy backends
-1. DNS prometheus exporter & dashboard 
-    - exporter and bind config checked in but untested
-    - dashboard imported to ocean by hand
-    - need to add dashboard to kube-prometheus-stack
-1. DHCP prometheus exporter & dashboard
-1. rewrite playbooks so they are idempotent 
-1. port ZFS pool to node006 proxmox
-1. proxmox automated installation w/ PXE, TFTP, DHCP
-1. proxmox import existing ZFS pool
-1. docker container for audible downaload and convert
-1. Gitlab ansible playbook on control-plane metal
-1. Runbook on contol-plane metal deplyoed by gitlab
-1. List ideas for runbook tasks
-1. Ansible automate VM creation
-1. pihole .local domain passthrough or shut down pi-hole or ansible configure pi-hole on disk to allow this
-1. alertmanager and alerts for critical components
-1. update all charts and have ArgoCD automate their installation
-1. kubernetes cilium
-1. iBGP internally
-1. vault for secrets - use it to bootstrap kubernetes?
-1. local container repo
-1. LLM on kubernetes
-1. proxmox raspberry pi 5
-1. kubernetes VM worker on pi-5
-1. kubernetes ARM pod affinity
-1. NextCloud ansible playbook
-1. renumber IP network change subnet from /24 to /16
+1. 🎭 Ansible Semaphore - https://semaphoreui.com/
+2. 🔍 Investigate Temporal also - https://hub.docker.com/r/temporalio/server
+3. ♻️ All idempotent
+4. ✍️ Writes all configuration
+5. 🏗️ Creates Infrastructure
+6. 🔎 Perform investigation actions
+7. 🔄 Restarts services on config change (CI/CD)
+8. 🖥️ VM creation ready to be configured
 
 
-# gitlab automation
-1. gitlab pulls from github.com or is triggered via webhook
-1. homelab repo in gitlab triggers build steps on repo update
-1. homelab repo uses ansible semaphore or rundeck in a container
-1. the runner needs access to a private ssh key allowed on the internal hosts
-1. the automation then applies all playbooks, so they all need to be idempotent
+## 🦊 GitLab vs Rundeck Ansible separation of concern
+
+1. 📧 Automate email configuration
+2. 🔑 Automate set default root password
+3. 🐳 GitLab builds container images
+4. 🔄 GitLab will install and keep Rundeck updated
+5. ⚙️ GitLab will only produce config to be run by Rundeck / Ansible
+6. 🏗️ Rundeck / Ansible is responsible for all IaC
+
+## 🌊 Ocean to node006 Proxmox host
+
+1. 💾 Decide on Proxmox boot disk configuration
+2. 🔄 Convert all ocean services to Ansible in Git
+3. 🖥️ Create VM with ocean SSD passthrough
+4. 📦 Export / import data01 ZFS pool from ocean → node006
+
+# 📋 Todo List
+
+1. 🔍 Consul DNS for Docker container service discovery
+2. 📝 Registrator for Docker containers
+3. 🌐 Nginx auto service discovery proxy backends
+4. 📊 DNS Prometheus exporter & dashboard
+   - ✅ Exporter and bind config checked in but untested
+   - ✅ Dashboard imported to ocean by hand
+   - ❌ Need to add dashboard to kube-prometheus-stack
+5. 🌐 DHCP Prometheus exporter & dashboard
+6. ♻️ Rewrite playbooks so they are idempotent
+7. 📦 Port ZFS pool to node006 Proxmox
+8. ⚙️ Proxmox automated installation w/ PXE, TFTP, DHCP
+9. 📥 Proxmox import existing ZFS pool
+10. 🎧 Docker container for Audible download and convert
+11. 🦊 GitLab Ansible playbook on control-plane metal
+12. 📖 Runbook on control-plane metal deployed by GitLab
+13. 💡 List ideas for runbook tasks
+14. 🤖 Ansible automate VM creation
+15. 🕳️ Pi-hole .local domain passthrough or shut down Pi-hole or Ansible configure Pi-hole on disk to allow this
+16. 🚨 AlertManager and alerts for critical components
+17. 📈 Update all charts and have ArgoCD automate their installation
+18. 🐝 Kubernetes Cilium
+19. 🌐 iBGP internally
+20. 🔐 Vault for secrets - use it to bootstrap Kubernetes?
+21. 📦 Local container repo
+22. 🧠 LLM on Kubernetes
+23. 🥧 Proxmox Raspberry Pi 5
+24. ☸️ Kubernetes VM worker on Pi-5
+25. 🏷️ Kubernetes ARM pod affinity
+26. ☁️ NextCloud Ansible playbook
+27. 🔢 Renumber IP network change subnet from /24 to /16
+
+
+# 🦊 GitLab Automation
+
+1. 🔄 GitLab pulls from github.com or is triggered via webhook
+2. 🏠 Homelab repo in GitLab triggers build steps on repo update
+3. 🎭 Homelab repo uses Ansible Semaphore or Rundeck in a container
+4. 🔑 The runner needs access to a private SSH key allowed on the internal hosts
+5. ♻️ The automation then applies all playbooks, so they all need to be idempotent
