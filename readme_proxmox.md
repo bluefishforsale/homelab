@@ -256,16 +256,16 @@ curl https://github.com/bluefishforsale.keys > rsa.keys
 
 ```bash
 qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
-qm importdisk 9999 	debian-12-generic-amd64.qcow2 vm-boot-lvm-thin
-qm set 9999 --ide2 vm-boot-lvm-thin:cloudinit
+qm importdisk 9999 debian-12-generic-amd64.qcow2 vm-boot-lvm-thin
 qm set 9999 --scsihw virtio-scsi-pci --scsi0 vm-boot-lvm-thin:vm-9999-disk-0
-qm set 9999 --boot order='scsi0'
-qm set 9999 --serial0 socket --vga serial0
-qm set 9999 --sshkeys rsa.keys
-qm set 9999 --hotplug network,disk
 qm set 9999 --bios ovmf
 qm set 9999 --machine q35
 qm set 9999 --efidisk0 vm-boot-lvm-thin:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
+qm set 9999 --boot order=scsi0
+qm set 9999 --ide2 vm-boot-lvm-thin:cloudinit
+qm set 9999 --serial0 socket --vga serial0
+qm set 9999 --sshkeys rsa.keys
+qm set 9999 --hotplug network,disk
 qm set 9999 --cores 2
 qm set 9999 --memory 4096
 qm set 9999 --agent enabled=1
@@ -307,7 +307,7 @@ qm clone 9999 4000
 qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.5/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
 qm set 4000 --cores 16
 qm set 4000 --memory 32768
-qm resize 4000 scsi0 +18G
+qm resize 4000 scsi0 +28G
 qm start 4000
 ```
 
