@@ -41,6 +41,16 @@
     notify:
     - Reload systemd daemon
     - Restart services
+    
+  - name: Base case endure services are started and enabled
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: started
+      enabled: true
+    with_items:
+    - cadvisor.service
+    - node-exporter.service
+    - process-exporter.service
 
   handlers:
   - name: Reload systemd daemon
