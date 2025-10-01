@@ -1,35 +1,28 @@
-tunnel: 1808d97e-fc1b-4244-8233-f076ff6f9e8a
-credentials-file: /home/terrac/.cloudflared/1808d97e-fc1b-4244-8233-f076ff6f9e8a.json
+tunnel: {{ tunnel }}
+credentials-file: "{{ cred_file }}"
+
+# Force IPv4-only connections to Cloudflare Edge
+edge-ip-version: 4
 
 ingress:
-- hostname: overseerr.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:5055"
-- hostname: nzbget.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8901"
-- hostname: sonarr.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8902"
-- hostname: radarr.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8903"
-- hostname: tautulli.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8905"
-- hostname: tdarr.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8265"
-- hostname: grafana.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8910"
-- hostname: portainer.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8000"
-- hostname: bazarr.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:6767"
-- hostname: prometheus.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:9090"
-- hostname: cadvisor.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8912"
-- hostname: home-assistant.terrac.com
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:8123"
-- hostname: unifi.terrac.com
-  service: "https://192.168.1.10"
+{% for rule in cloudflared.tunnels[tunnel_name].ingress %}
+- hostname: "{{ rule.hostname }}"
+{% if rule.service_url is defined %}
+  service: "{{ rule.service_url }}"
+{% elif rule.service_type == 'http_status:404' %}
+  service: "http_status:404"
+{% elif rule.port is defined %}
+  service: "{{ rule.service_type }}://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ rule.port }}"
+{% else %}
+  service: "{{ rule.service_type }}"
+{% endif %}
+{% if rule.origin_request is defined %}
   originRequest:
-  noTLSverify: true
-  originServerName: “unifi”
-- hostname: "*"
-  service: "http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:80"
+{% if rule.origin_request.no_tls_verify is defined %}
+    noTLSverify: {{ rule.origin_request.no_tls_verify }}
+{% endif %}
+{% if rule.origin_request.origin_server_name is defined %}
+    originServerName: "{{ rule.origin_request.origin_server_name }}"
+{% endif %}
+{% endif %}
+{% endfor %}

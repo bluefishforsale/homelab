@@ -1,22 +1,379 @@
 ---
 - name: Configure systemd service for cloudflared
-  hosts: ocean
   become: true
   gather_facts: true
+  hosts: all  # Can run on any host
+
+  vars_files:
+    - vars_cloudflared.yaml
+    - vars_cloudflare_secrets.yaml
 
   vars:
     package: cloudflared
     service: cloudflared
     files: "files/{{ service }}"
-    path_data01: /data01/services
-    path_home: "{{ path_data01 }}/{{ service }}"
+    path_home: "/etc/{{ service }}"
     config: "{{ path_home }}/config.yaml"
     cert: "{{ path_home }}/cert.pem"
-    cred_file: "{{ path_home }}/1808d97e-fc1b-4244-8233-f076ff6f9e8a.json"
-    tunnel: 1808d97e-fc1b-4244-8233-f076ff6f9e8a
+    # Ocean gets the main tunnel (web apps + SSH), others get SSH-only
+    tunnel_name: "{{ 'main' if inventory_hostname == 'ocean' else 'ssh_only' }}"
+    # Dynamically set based on host - will be overridden by set_fact for non-ocean hosts
+    cred_file: "{{ path_home }}/{{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}.json"
+    tunnel: "{{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}"
 
   tasks:
 
+  # Tunnel Management Tasks
+  - name: Check if SSH tunnel already exists for non-ocean hosts
+    ansible.builtin.command: >
+      cloudflared tunnel --origincert {{ files }}/cert.pem info ssh-{{ inventory_hostname }}
+    register: tunnel_check
+    failed_when: false
+    changed_when: false
+    when: inventory_hostname != 'ocean'
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Create SSH tunnel for non-ocean hosts
+    ansible.builtin.command: >
+      cloudflared tunnel --origincert {{ files }}/cert.pem create ssh-{{ inventory_hostname }}
+    register: tunnel_creation
+    when: 
+      - inventory_hostname != 'ocean'
+      - tunnel_check.rc != 0
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Extract tunnel ID from creation output
+    ansible.builtin.set_fact:
+      ssh_tunnel_id: "{{ tunnel_creation.stdout | regex_search('([a-f0-9-]{36})', '\\1') | first }}"
+    when: 
+      - inventory_hostname != 'ocean'
+      - tunnel_creation is defined
+      - tunnel_creation.changed
+
+  - name: Get existing tunnel ID if tunnel already existed
+    ansible.builtin.command: >
+      cloudflared tunnel --origincert {{ files }}/cert.pem --output json info ssh-{{ inventory_hostname }}
+    register: existing_tunnel_info
+    when: 
+      - inventory_hostname != 'ocean'
+      - tunnel_check.rc == 0
+    delegate_to: localhost
+    become: false
+
+  - name: Extract existing tunnel ID
+    ansible.builtin.set_fact:
+      ssh_tunnel_id: "{{ (existing_tunnel_info.stdout | from_json).id }}"
+    when: 
+      - inventory_hostname != 'ocean'
+      - existing_tunnel_info is defined
+      - existing_tunnel_info.stdout is defined
+      - existing_tunnel_info.stdout != ""
+      - not ansible_check_mode
+
+  - name: Verify tunnel credentials file exists
+    ansible.builtin.stat:
+      path: "{{ files }}/{{ ssh_tunnel_id }}.json"
+    register: cred_file_check
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
+    delegate_to: localhost
+    become: false
+
+  - name: Display tunnel creation success
+    ansible.builtin.debug:
+      msg: "✅ SSH tunnel created: ssh-{{ inventory_hostname }} ({{ ssh_tunnel_id }})"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
+      - cred_file_check.stat.exists
+
+  - name: Test SSH tunnel connectivity
+    ansible.builtin.command: >
+      cloudflared access ssh --hostname ssh-{{ inventory_hostname }}.terrac.com --dry-run
+    register: ssh_test
+    failed_when: false
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
+    delegate_to: localhost
+    become: false
+
+  - name: Display SSH test result
+    ansible.builtin.debug:
+      msg: "SSH tunnel test: {{ 'PASS' if ssh_test.rc == 0 else 'FAIL - ' + ssh_test.stderr }}"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_test is defined
+
+  - name: Debug Cloudflare credentials
+    ansible.builtin.debug:
+      msg: 
+        - "Zone ID: {{ cloudflare.zone_id }}"
+        - "API Key: {{ cloudflare.api_key[:10] }}..."
+        - "SSH Tunnel ID: {{ ssh_tunnel_id }}"
+        - "DNS CNAME: ssh-{{ inventory_hostname }}.terrac.com → {{ ssh_tunnel_id }}.cfargotunnel.com"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
+
+  - name: Create DNS route for SSH tunnel using cloudflared
+    ansible.builtin.command: >
+      cloudflared tunnel --origincert {{ files }}/cert.pem route dns ssh-{{ inventory_hostname }} ssh-{{ inventory_hostname }}.terrac.com
+    register: dns_route_result
+    failed_when: 
+      - dns_route_result.rc != 0
+      - "'already exists' not in dns_route_result.stderr"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+
+  - name: Display DNS route creation result
+    ansible.builtin.debug:
+      msg: "DNS route: {{ 'Created successfully' if dns_route_result is defined and dns_route_result.rc == 0 else 'Already exists' if dns_route_result is defined and 'already exists' in dns_route_result.stderr else 'Skipped' }}"
+    when: 
+      - inventory_hostname != 'ocean'
+
+  - name: Test SSH tunnel connectivity after DNS route creation
+    ansible.builtin.command: >
+      timeout 10 cloudflared access ssh --hostname ssh-{{ inventory_hostname }}.terrac.com --dry-run
+    register: ssh_final_test
+    failed_when: false
+    when: 
+      - inventory_hostname != 'ocean'
+      - dns_route_result is defined
+      - dns_route_result.rc == 0
+    delegate_to: localhost
+    become: false
+
+  - name: Debug SSH test result structure
+    ansible.builtin.debug:
+      msg: "SSH final test result: {{ ssh_final_test | default('undefined') }}"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_final_test is defined
+
+  - name: Display final SSH test result
+    ansible.builtin.debug:
+      msg: "Final SSH test: {{ 'PASS - Ready for SSH' if (ssh_final_test is defined and ssh_final_test.rc is defined and ssh_final_test.rc == 0) else 'FAIL - Check tunnel configuration' }}"
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_final_test is defined
+
+  - name: Disable IPv6 compatibility for zone (IPv4 only)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/settings/ipv6"
+      method: PATCH
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        value: "off"
+      status_code: [200]
+    register: ipv6_disable_result
+    when: 
+      - inventory_hostname != 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - cloudflare.zone_id != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Set Pseudo IPv4 to add IPv4 headers for IPv6 visitors
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/settings/pseudo_ipv4"
+      method: PATCH
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        value: "add_header"
+      status_code: [200]
+    register: pseudo_ipv4_result
+    when: 
+      - inventory_hostname != 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - cloudflare.zone_id != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Display IPv4-only configuration result
+    ansible.builtin.debug:
+      msg: 
+        - "IPv6 disabled: {{ 'SUCCESS' if ipv6_disable_result is defined and ipv6_disable_result.status == 200 else 'SKIPPED' }}"
+        - "Pseudo IPv4 enabled: {{ 'SUCCESS' if pseudo_ipv4_result is defined and pseudo_ipv4_result.status == 200 else 'SKIPPED' }}"
+    when: 
+      - inventory_hostname != 'ocean'
+
+  # Cloudflare Access Application (Zero Trust) for SSH
+  - name: Set Access application variables
+    ansible.builtin.set_fact:
+      cf_access_app_name: "ssh-{{ inventory_hostname }}"
+      cf_access_app_domain: "ssh-{{ inventory_hostname }}.terrac.com"
+    when:
+      - inventory_hostname != 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+
+  - name: Get existing Cloudflare Access applications
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: cf_access_apps
+    when:
+      - inventory_hostname != 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Debug Access apps response
+    ansible.builtin.debug:
+      msg:
+        - "Access apps result: {{ cf_access_apps.json.result | default('undefined') }}"
+        - "Looking for domain: {{ cf_access_app_domain }}"
+    when:
+      - inventory_hostname != 'ocean'
+      - cf_access_apps is defined
+
+  - name: Select existing Access app by domain
+    ansible.builtin.set_fact:
+      cf_access_app_existing: "{{ (cf_access_apps.json.result | selectattr('domain','equalto', cf_access_app_domain) | list | first) | default(None) }}"
+    when:
+      - inventory_hostname != 'ocean'
+      - cf_access_apps is defined
+      - cf_access_apps.json.result | default([]) | length > 0
+
+  - name: Debug selected existing app
+    ansible.builtin.debug:
+      msg: "Selected existing app: {{ cf_access_app_existing | default('None found') }}"
+    when:
+      - inventory_hostname != 'ocean'
+
+  - name: Create Cloudflare Access application (if missing)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ cf_access_app_name }}"
+        domain: "{{ cf_access_app_domain }}"
+        type: "self_hosted"
+        session_duration: "24h"
+      status_code: [200]
+    register: cf_access_app_create
+    when:
+      - inventory_hostname != 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - cf_access_app_existing is not defined or cf_access_app_existing == None
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Determine Access app ID
+    ansible.builtin.set_fact:
+      cf_access_app_id: >-
+        {%- if cf_access_app_existing is defined and cf_access_app_existing is not none and cf_access_app_existing != None -%}
+          {{ cf_access_app_existing.id | default(cf_access_app_existing) }}
+        {%- elif cf_access_app_create is defined and cf_access_app_create.json is defined -%}
+          {{ cf_access_app_create.json.result.id }}
+        {%- else -%}
+          undefined
+        {%- endif -%}
+    when:
+      - inventory_hostname != 'ocean'
+
+  - name: Debug determined Access app ID
+    ansible.builtin.debug:
+      msg: "Determined Access app ID: {{ cf_access_app_id | default('undefined') }}"
+    when:
+      - inventory_hostname != 'ocean'
+
+  - name: Warning when Access app ID is invalid
+    ansible.builtin.debug:
+      msg: "⚠️ WARNING: Cannot proceed with Access policies - Access app ID is invalid or undefined"
+    when:
+      - inventory_hostname != 'ocean'
+      - cf_access_app_id is not defined or cf_access_app_id == '' or cf_access_app_id == 'undefined'
+
+  - name: Get existing policies for Access app
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps/{{ cf_access_app_id }}/policies"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: cf_access_policies
+    when:
+      - inventory_hostname != 'ocean'
+      - cf_access_app_id is defined
+      - cf_access_app_id != ''
+      - cf_access_app_id != 'undefined'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Create default Allow policy for SSH (if missing)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps/{{ cf_access_app_id }}/policies"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "Allow SSH"
+        decision: "allow"
+        include:
+          - email: "{{ cloudflare.access_allow_emails.public }}"
+      status_code: [200]
+    register: cf_access_policy_create
+    when:
+      - inventory_hostname != 'ocean'
+      - cf_access_app_id is defined
+      - cf_access_app_id != ''
+      - cf_access_app_id != 'undefined'
+      - cf_access_policies is defined
+      - (cf_access_policies.json.result | selectattr('name','equalto','Allow SSH') | list | length) == 0
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - cloudflare.access_allow_emails.public is defined
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  # Standard Installation Tasks
   - name: Ensure base directory exists
     file:
       path: "{{ path_home }}"
@@ -48,17 +405,17 @@
       name: cloudflared
       state: present
 
-  - name: Copy cert and tunnel
+  - name: Copy cert and tunnel credentials
     ansible.builtin.copy:
       src: "{{ files }}/{{ item }}"
       dest: "{{ path_home }}/"
       mode: '0600'
     loop:
-    - 1808d97e-fc1b-4244-8233-f076ff6f9e8a.json
-    - cert.pem
+      - "{{ ssh_tunnel_id if inventory_hostname != 'ocean' else cloudflared.tunnels[tunnel_name].id }}.json"
+      - cert.pem
     notify:
-    - Reload systemd daemon
-    - Restart service
+      - Reload systemd daemon
+      - Restart service
 
   - name: Template configuration and keys
     ansible.builtin.template:

@@ -8,5 +8,8 @@ qemu-output/
 *.csr
 *.pem
 
+# ignore secrets files
+homelab_playbooks/vars_cloudflare_secrets.yaml
+
 # large files from upstreams
 *.iso
