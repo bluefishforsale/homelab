@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  llamacpp:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    # GPU support using runtime (compatible with older docker-compose)
+    runtime: nvidia
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - NVIDIA_VISIBLE_DEVICES=all
+    
+    ports:
+      - "{{ port }}:{{ port }}"
+    
+    volumes:
+      - {{ home }}/models:/models
+      - {{ home }}/config:/config
+      - {{ home }}/logs:/logs
+    
+    # Start server with Phi-3.5 model pre-loaded and GPU acceleration
+    # Try fewer GPU layers to avoid memory buffer issues
+    command: 
+      - "--host"
+      - "0.0.0.0"
+      - "--port" 
+      - "{{ port }}"
+      - "--model"
+      - "/models/Phi-3.5-mini-instruct-Q4_K_M.gguf"
+      - "--n-gpu-layers"
+      - "20"
+      - "--ctx-size"
+      - "4096"
+      - "--verbose"
+    
+    # Health check - check if server is responding
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/v1/models || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # User mapping
+    user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Network configuration
+    networks:
+      - llamacpp_network
+
+networks:
+  llamacpp_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-llamacpp
