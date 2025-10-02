@@ -35,13 +35,22 @@
     run_once: true
     become: false
 
+  - name: Debug tunnel_check variable
+    ansible.builtin.debug:
+      msg: 
+        - "tunnel_check defined: {{ tunnel_check is defined }}"
+        - "tunnel_check content: {{ tunnel_check | default('undefined') }}"
+        - "tunnel_check.rc exists: {{ tunnel_check.rc is defined if tunnel_check is defined else 'N/A' }}"
+        - "tunnel_check.rc value: {{ tunnel_check.rc if (tunnel_check is defined and tunnel_check.rc is defined) else 'N/A' }}"
+    when: inventory_hostname != 'ocean'
+
   - name: Create SSH tunnel for non-ocean hosts
     ansible.builtin.command: >
       cloudflared tunnel --origincert {{ files }}/cert.pem create ssh-{{ inventory_hostname }}
     register: tunnel_creation
     when: 
       - inventory_hostname != 'ocean'
-      - tunnel_check.rc != 0
+      - (tunnel_check is not defined) or (tunnel_check.rc is not defined) or (tunnel_check.rc != 0)
     delegate_to: localhost
     run_once: true
     become: false
@@ -60,6 +69,8 @@
     register: existing_tunnel_info
     when: 
       - inventory_hostname != 'ocean'
+      - tunnel_check is defined
+      - tunnel_check.rc is defined
       - tunnel_check.rc == 0
     delegate_to: localhost
     become: false
@@ -422,6 +433,37 @@
       - ocean_ssh_dns_create.status == 400
       - "'already exists' not in ocean_ssh_dns_create.json.errors[0].message | default('')"
 
+  # Create Access application for ocean SSH tunnel
+  - name: Create Access application for ocean SSH
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "ssh-ocean"
+        domain: "ssh-ocean.terrac.com"
+        type: "self_hosted"
+        app_type: "ssh"
+        session_duration: "24h"
+        policies:
+          - "{{ reusable_admin_policy.json.result.id }}"
+      status_code: [200, 400]
+    register: ocean_ssh_app_create
+    when:
+      - inventory_hostname == 'ocean'
+      - reusable_admin_policy.json.result.id is defined
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+    failed_when:
+      - ocean_ssh_app_create.status == 400
+      - "'already exists' not in ocean_ssh_app_create.json.errors[0].message | default('')"
+
   # Cloudflare Access Application (Zero Trust) for SSH
   - name: Set Access application variables
     ansible.builtin.set_fact:
@@ -486,6 +528,7 @@
         name: "{{ cf_access_app_name }}"
         domain: "{{ cf_access_app_domain }}"
         type: "self_hosted"
+        app_type: "ssh"
         session_duration: "24h"
       status_code: [200]
     register: cf_access_app_create
@@ -558,6 +601,7 @@
         name: "{{ cf_access_app_name }}"
         domain: "{{ cf_access_app_domain }}"
         type: "self_hosted"
+        app_type: "ssh"
         session_duration: "24h"
         policies:
           - "{{ hostvars['ocean']['reusable_admin_policy']['json']['result']['id'] }}"

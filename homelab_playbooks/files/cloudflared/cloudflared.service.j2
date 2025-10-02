@@ -8,8 +8,13 @@ RestartSec=10s
 TimeoutStartSec=5
 PrivateTmp=true
 Type=simple
-PIDFile=/var/run/cloudflared.pid
+PIDFile=/run/cloudflared.pid
 ExecStart=cloudflared tunnel --config {{ config }} run {{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared
 
 [Install]
 WantedBy=multi-user.target
