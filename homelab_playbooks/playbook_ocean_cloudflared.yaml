@@ -40,8 +40,6 @@
       msg: 
         - "tunnel_check defined: {{ tunnel_check is defined }}"
         - "tunnel_check content: {{ tunnel_check | default('undefined') }}"
-        - "tunnel_check.rc exists: {{ tunnel_check.rc is defined if tunnel_check is defined else 'N/A' }}"
-        - "tunnel_check.rc value: {{ tunnel_check.rc if (tunnel_check is defined and tunnel_check.rc is defined) else 'N/A' }}"
     when: inventory_hostname != 'ocean'
 
   - name: Create SSH tunnel for non-ocean hosts
