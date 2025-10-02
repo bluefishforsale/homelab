@@ -65,7 +65,6 @@ cloudflared:
         
         # Ocean SSH access (local)
         - hostname: "ssh-ocean.terrac.com"
-          service_type: "ssh"
           service_url: "ssh://127.0.0.1:22"
         
         # Catch-all rule (must be last)

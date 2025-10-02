@@ -2,7 +2,7 @@ tunnel: {{ tunnel }}
 credentials-file: "{{ cred_file }}"
 
 # Force IPv4-only connections to Cloudflare Edge
-edge-ip-version: 4
+edge-ip-version: "4"
 
 ingress:
 {% for rule in cloudflared.tunnels[tunnel_name].ingress %}

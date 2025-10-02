@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    # GPU support for Nvidia P2000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
+    
+    # Runtime configuration for nvidia
+    runtime: nvidia
+    
+    environment:
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://n8n.terrac.com/
+      - GENERIC_TIMEZONE=America/Los_Angeles
+      - TZ=America/Los_Angeles
+      - N8N_HOST={{ ansible_default_ipv4.address }}
+      - N8N_PORT={{ port }}
+      - N8N_PROTOCOL=http
+      - N8N_LOG_LEVEL=info
+      - N8N_LOG_OUTPUT=console
+      - N8N_USER_FOLDER=/home/node/.n8n
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - DB_TYPE=sqlite
+      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      # GPU and CUDA environment variables
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_VISIBLE_DEVICES=all
+    
+    ports:
+      - "{{ port }}:{{ port }}"
+    
+    volumes:
+      - {{ home }}/data:/home/node/.n8n
+      - {{ home }}/config:/home/node/.n8n/config
+      - {{ home }}/logs:/var/log/n8n
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount for GPU libraries
+      - /usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:ro
+      - /usr/local/cuda:/usr/local/cuda:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:{{ port }}/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # User mapping
+    user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Network configuration
+    networks:
+      - n8n_network
+
+networks:
+  n8n_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-n8n
