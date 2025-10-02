@@ -42,6 +42,9 @@ cloudflared:
           service_url: "http://192.168.1.143:8912"
         
         # Management services (running on ocean - 192.168.1.143)
+        - hostname: "n8n.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:5678"
         - hostname: "portainer.terrac.com"
           service_type: "http"
           service_url: "http://192.168.1.143:8000"
@@ -78,7 +81,6 @@ cloudflared:
       ingress:
         # SSH access for this specific host
         - hostname: "ssh-{{ inventory_hostname }}.terrac.com"
-          service_type: "ssh"
           service_url: "ssh://127.0.0.1:22"
         
         # Catch-all rule (required)
