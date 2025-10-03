@@ -37,6 +37,7 @@
     - data
     - config
     - logs
+    - database
 
   - name: Create docker-compose.yml
     ansible.builtin.template:

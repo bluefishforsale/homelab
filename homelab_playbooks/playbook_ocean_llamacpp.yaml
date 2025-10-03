@@ -15,6 +15,7 @@
     user: media
     uid: 1001
     gid: 1001
+    api_key: llamacpp-homelab-key
 
   tasks:
 

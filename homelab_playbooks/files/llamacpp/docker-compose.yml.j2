@@ -35,11 +35,13 @@ services:
       - "20"
       - "--ctx-size"
       - "4096"
+      - "--api-key"
+      - "{{ api_key | default('llamacpp-homelab-key') }}"
       - "--verbose"
     
     # Health check - check if server is responding
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/v1/models || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:{{ port }}/v1/models || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -52,12 +54,10 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Network configuration
+    # Network configuration - use n8n network for inter-service communication
     networks:
-      - llamacpp_network
+      - n8n_n8n_network
 
 networks:
-  llamacpp_network:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: br-llamacpp
+  n8n_n8n_network:
+    external: true
