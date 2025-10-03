@@ -1,0 +1,123 @@
+---
+- name: Configure Open WebUI for llama.cpp with Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    service: open-webui
+    image: ghcr.io/open-webui/open-webui
+    version: main
+    port: 3000
+    data: /data01
+    files: files/open-webui
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+    # Using SQLite for database storage (stored in /data01/services/open-webui/data)
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure subdirectories exist with proper permissions
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - data
+    - config
+    - logs
+
+  - name: Ensure database directory has write permissions for container
+    ansible.builtin.file:
+      path: "{{ home }}/data"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure data directory has proper permissions for container
+    ansible.builtin.shell: |
+      chmod -R 777 {{ home }}/data
+      chmod -R 777 {{ home }}/config  
+      chmod -R 777 {{ home }}/logs
+      touch {{ home }}/data/webui.db
+      chmod 666 {{ home }}/data/webui.db
+    changed_when: false
+
+  - name: Verify database file creation
+    ansible.builtin.stat:
+      path: "{{ home }}/data/webui.db"
+    register: db_file_stat
+
+  - name: Debug database file status
+    ansible.builtin.debug:
+      msg: "Database file exists: {{ db_file_stat.stat.exists }}, permissions: {{ db_file_stat.stat.mode if db_file_stat.stat.exists else 'N/A' }}"
+
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart open-webui service
+
+  - name: Create open-webui environment file
+    ansible.builtin.template:
+      src: "{{ files }}/open-webui.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart open-webui service
+
+  - name: Create open-webui systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - open-webui.service
+    notify:
+    - Reload systemd daemon
+    - Restart open-webui service
+
+  - name: Enable open-webui service
+    ansible.builtin.systemd:
+      name: open-webui.service
+      enabled: yes
+      daemon_reload: yes
+
+  - name: Wait for open-webui service to start
+    ansible.builtin.wait_for:
+      port: "{{ port }}"
+      host: "{{ ansible_default_ipv4.address }}"
+      timeout: 60
+    ignore_errors: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart open-webui service
+    ansible.builtin.systemd:
+      name: open-webui.service
+      state: restarted

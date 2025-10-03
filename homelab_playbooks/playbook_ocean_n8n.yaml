@@ -49,16 +49,6 @@
     - Reload systemd daemon
     - Restart n8n service
 
-  - name: Create n8n environment file
-    ansible.builtin.template:
-      src: "{{ files }}/n8n.env.j2"
-      dest: "{{ home }}/.env"
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0600'
-    notify:
-    - Reload systemd daemon
-    - Restart n8n service
 
   - name: Create n8n systemd service
     ansible.builtin.template:

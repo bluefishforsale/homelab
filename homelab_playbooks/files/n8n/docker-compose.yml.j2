@@ -20,23 +20,46 @@ services:
     runtime: nvidia
     
     environment:
-      - NODE_ENV=production
-      - WEBHOOK_URL=https://n8n.terrac.com/
-      - GENERIC_TIMEZONE=America/Los_Angeles
-      - TZ=America/Los_Angeles
-      - N8N_HOST={{ ansible_default_ipv4.address }}
-      - N8N_PORT={{ port }}
-      - N8N_PROTOCOL=http
-      - N8N_LOG_LEVEL=info
-      - N8N_LOG_OUTPUT=console
-      - N8N_USER_FOLDER=/home/node/.n8n
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Encryption key for sensitive data
+      - N8N_ENCRYPTION_KEY=AbacbAbdbs122212ABabsbvdjdjsjdhBBabbs
+      # Database Configuration
       - DB_TYPE=sqlite
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
-      # GPU and CUDA environment variables
+      # Network Configuration
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT={{ port }}
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n.home/
+      - N8N_EDITOR_BASE_URL=http://n8n.home/
+      # Security Configuration
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=root
+      - N8N_BASIC_AUTH_PASSWORD=admin
+      - N8N_SECURE_COOKIE=false
+      # Proxy Configuration
+      - N8N_PATH=/
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
+      # Logging Configuration
+      - N8N_LOG_LEVEL=info
+      - N8N_LOG_OUTPUT=console
+      # Timezone Configuration
+      - GENERIC_TIMEZONE=America/Los_Angeles
+      - TZ=America/Los_Angeles
+      # Performance Configuration
+      - N8N_PAYLOAD_SIZE_MAX=16
+      - N8N_METRICS=true
+      - N8N_DIAGNOSTICS_ENABLED=true
+      # GPU Configuration
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - CUDA_VISIBLE_DEVICES=all
+      # Node.js Configuration
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=4096
+      # User Configuration
+      - N8N_USER_FOLDER=/home/node/.n8n
+      - N8N_DISABLE_UI=false
+      - N8N_PERSONALIZATION_ENABLED=false
     
     ports:
       - "{{ port }}:{{ port }}"

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  open-webui:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    environment:
+      - TZ=America/Los_Angeles
+      # Required environment variables
+      - WEBUI_SECRET_KEY=ocean-ai-secret-key-2024
+      - SCARF_NO_ANALYTICS=true
+      - DO_NOT_TRACK=true
+      # Configure to connect to llama.cpp via host IP
+      - OPENAI_API_BASE_URL=http://{{ ansible_default_ipv4.address }}:8080/v1
+      - OPENAI_API_KEY=dummy
+      # Enable local API models
+      - ENABLE_OPENAI_API=true
+      - ENABLE_OLLAMA_API=false
+      # WebUI Configuration  
+      - WEBUI_NAME=Ocean AI Chat
+      - WEBUI_URL=http://{{ ansible_default_ipv4.address }}:{{ port }}
+      - DEFAULT_MODELS=Phi-3.5-mini-instruct-Q4_K_M.gguf
+      # Pre-configure OpenAI API connection
+      - OPENAI_API_KEYS=[{"api_key":"dummy","api_base_url":"http://{{ ansible_default_ipv4.address }}:8080/v1","api_name":"llama.cpp Local"}]
+      # Auto-enable OpenAI API
+      - DEFAULT_OPENAI_API_BASE_URL=http://{{ ansible_default_ipv4.address }}:8080/v1
+      - DEFAULT_OPENAI_API_KEY=dummy
+      # Database and storage - Use SQLite for stability
+      - DATABASE_URL=sqlite:////data/webui.db
+      - DATA_DIR=/data
+      # Authentication
+      - ENABLE_SIGNUP=true
+      - ENABLE_LOGIN_FORM=true
+      - ENABLE_COMMUNITY_SHARING=false
+      # Security and features
+      - ENABLE_RAG_WEB_SEARCH=false
+      - ENABLE_WEB_BROWSE=false
+      - ENABLE_RAG=false
+      - ENABLE_IMAGE_GENERATION=false
+      # Model management and caching
+      - ENABLE_MODEL_FILTER=true
+      - MODEL_FILTER_ENABLED=true
+      - CACHE_BASE_MODEL_LIST=true
+      - ENABLE_DIRECT_CONNECTIONS=true
+      # Force Open WebUI to use port 3000 with host networking
+      - PORT={{ port }}
+    
+    # Use host networking to access llama.cpp directly
+    network_mode: host
+    
+    volumes:
+      - {{ home }}/data:/data
+      - {{ home }}/config:/config
+      - {{ home }}/logs:/logs
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # Run as root to avoid permission issues with SQLite
+    # user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
