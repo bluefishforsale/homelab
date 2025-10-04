@@ -17,6 +17,10 @@ comfyui_models:
       url: https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors
       size_gb: 0.3
       timeout: 180
+    - name: wan2.2_vae.safetensors
+      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/vae/wan2.2_vae.safetensors
+      size_gb: 0.3
+      timeout: 180
 
   clip:
     - name: t5xxl_fp8.safetensors
@@ -43,6 +47,16 @@ comfyui_models:
       url: https://comfyanonymous.github.io/ComfyUI_examples/flux/flux_dev_example.png
       size_gb: 0.001
       timeout: 30
+    - name: text_to_video_wan22_5B.webp
+      url: https://comfyanonymous.github.io/ComfyUI_examples/wan22/text_to_video_wan22_5B.webp
+      size_gb: 0.001
+      timeout: 30
+  
+  text_encoders:
+    - name: umt5_xxl_fp8_e4m3fn_scaled.safetensors
+      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/tree/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+      size_gb: 4.9
+      timeout: 600
 
 # Model symlinks to avoid duplicating large files
 comfyui_model_symlinks:
