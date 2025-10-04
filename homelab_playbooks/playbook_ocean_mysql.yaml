@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     image: percona/percona-server
     version: "5.7"
@@ -11,10 +14,10 @@
     port: 3306
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
-    root_password: "mysqlr00tp4ssw0rd"
+    root_password: "{{ databases.mysql.root_password }}"
     mysql_user: "grafana"
     mysql_database: "grafana"
-    mysql_database_password: "grafana"
+    mysql_database_password: "{{ monitoring.grafana.database_password }}"
 
   tasks:
 

@@ -6,7 +6,7 @@
 
   vars_files:
     - vars_cloudflared.yaml
-    - vars_cloudflare_secrets.yaml
+    - vault_secrets.yaml
 
   vars:
     package: cloudflared

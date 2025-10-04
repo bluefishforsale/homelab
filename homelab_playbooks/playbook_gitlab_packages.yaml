@@ -3,6 +3,10 @@
   hosts: gitlab
   become: true
   gather_facts: true
+  
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     service: gitlab
     services:
@@ -10,9 +14,9 @@
     hostname: "{{ service }}.home"
     gitlab_external_url: "http://{{ hostname }}"
     gitlab_version: "18.2.0-ce.0"
-    gitlab_root_username: "root"
-    gitlab_root_password: "admin"
-    gitlab_registration_token: "glrt-3vrkXP2CIB1R00O0l_lxom86MQp0OjEKdToxCw.01.121epd4z0"
+    gitlab_root_username: "{{ gitlab.root_username }}"
+    gitlab_root_password: "{{ gitlab.root_password }}"
+    gitlab_registration_token: "{{ gitlab.registration_token }}"
 
   tasks:
   - name: Required packages pre-installation

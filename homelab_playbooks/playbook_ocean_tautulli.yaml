@@ -2,12 +2,16 @@
 - name: Configure systemd service for tautulli
   hosts: ocean
   become: true
+  
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     service: tautulli
     image: linuxserver/tautulli
     version: latest
     tautulli_port: 8905
-    tautulli_api_key: 11c4a8c245984a6cb2b96414cac61923
+    tautulli_api_key: "{{ media_services.tautulli.api_key }}"
     exporter_service: tautulli-exporter
     exporter_image: nwalke/tautulli_exporter
     exporter_version: latest

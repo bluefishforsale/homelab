@@ -2,12 +2,16 @@
 - name: Plex and companion docker systemd services
   hosts: ocean
   become: true
+  
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     service: plex
     image: plexinc/pms-docker
     version: latest
-    plex_claim: "claim-MUrzf7bhg6xrQ5GEqtF7"
-    plex_token: "Bgwuadg8qBRS1EVYSyws"
+    plex_claim: "{{ media_services.plex.claim_token }}"
+    plex_token: "{{ media_services.plex.api_key }}"
     plex_ports_tcp:
     - 3005
     - 8324

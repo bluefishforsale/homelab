@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     service: n8n
     image: n8nio/n8n

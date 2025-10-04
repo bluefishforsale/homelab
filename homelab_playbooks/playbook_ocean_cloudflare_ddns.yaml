@@ -3,6 +3,10 @@
   hosts: ocean
   become: true
   gather_facts: true
+  
+  vars_files:
+    - vault_secrets.yaml
+
   vars:
     data01: /data01/services
     service: cloudflare_ddns
@@ -11,8 +15,8 @@
     systemd_services:
     - "{{ service }}.timer"
     - "{{ service }}.service"
-    cf_api_key: pTnVwZxlUxY4q9BIO2IG_V23MhEoKptBzWswLQrb
-    cf_zone_id: f3be74ced16c63d68b522f569ecba43b
+    cf_api_key: "{{ external_apis.ddns.cloudflare_token }}"
+    cf_zone_id: "{{ cloudflare.zone_id }}"
     cf_records:
     - dns: terrac.com
       api_key: "{{ cf_api_key }}"
