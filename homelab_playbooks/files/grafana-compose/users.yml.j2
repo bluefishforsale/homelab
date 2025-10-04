@@ -1,0 +1,38 @@
+# Grafana User Provisioning Configuration
+# This file defines default users that are created automatically when Grafana starts
+# Users defined here are created/updated on every Grafana startup
+
+apiVersion: 1
+
+# Delete users not defined in this file (set to false to keep existing users)
+deleteUsers: false
+
+users:
+  # Admin user - terrac
+  - name: "Terrac"
+    login: "terrac"
+    email: "terrac@home.lab"
+    password: "{{ monitoring.grafana.terrac_password | default('admin123') }}"
+    orgRole: "Admin"  # Organization role: Viewer, Editor, or Admin
+    isGrafanaAdmin: true  # Global Grafana admin (can manage all orgs)
+    theme: "dark"  # UI theme: light, dark, or auto
+    timezone: "America/Los_Angeles"
+    
+  # Optional: Additional default admin user
+  # - name: "Admin User"
+  #   login: "admin"
+  #   email: "admin@home.lab"
+  #   password: "{{ monitoring.grafana.admin_password | default('admin123') }}"
+  #   orgRole: "Admin"
+  #   isGrafanaAdmin: true
+  #   theme: "dark"
+  #   timezone: "America/Los_Angeles"
+
+# Organizations (optional - creates additional organizations)
+# organizations:
+#   - name: "Homelab"
+#     orgRole: "Admin"
+
+# Note: Default admin user (admin/admin) will still exist unless explicitly changed
+# You can disable it by setting GF_SECURITY_ADMIN_USER and GF_SECURITY_ADMIN_PASSWORD
+# environment variables in docker-compose.yml

@@ -72,6 +72,7 @@ services:
       - {{ home }}/plugins:/var/lib/grafana/plugins
       - {{ home }}/data:/var/lib/grafana
       - {{ home }}/logs:/var/log/grafana
+      - {{ home }}/provisioning:/etc/grafana/provisioning:ro
     
     # Health check - check if Grafana web interface is responding
     healthcheck:
@@ -96,4 +97,3 @@ services:
     # Resource limits
     cpus: '1.0'
     mem_limit: 1024m
-
