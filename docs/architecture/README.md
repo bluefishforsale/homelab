@@ -5,7 +5,8 @@ This directory contains comprehensive architecture diagrams for the homelab infr
 ## Architecture Diagrams
 
 ### 1. Physical Architecture
-![Physical Architecture](./physical-architecture.png)
+![Rack Front](./homelab_rack_front.jpg)
+![Rack Rear](./homelab_rack_front.jpg)
 
 **Overview**: Shows the two physical servers and their relationships:
 - **Ocean Server** (192.168.1.143): Ubuntu Docker host with ZFS and NVIDIA P2000 GPU

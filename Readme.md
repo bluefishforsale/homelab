@@ -1,6 +1,6 @@
 # 🏠 Homelab Infrastructure Automation
 
-A comprehensive, production-ready homelab built on enterprise automation principles with fully automated deployment, secrets management, and monitoring.
+A bare-bones, semi-production like homelab built on FOSS principles with automated deployment, secrets management, and monitoring.
 
 ## 🎯 Vision & Goals
 
@@ -18,8 +18,8 @@ A comprehensive, production-ready homelab built on enterprise automation princip
 ### Infrastructure Stack  
 - **Ocean Server** - Ubuntu Docker host with ZFS storage and NVIDIA P2000 GPU
 - **Proxmox Host** - Hypervisor running VMs (DNS, GitLab, K8s cluster, Pi-hole)
-- **Docker Services** - 21 containerized services including media stack and AI/ML workloads
-- **Kubernetes Cluster** - 4-node cluster for scalable workloads
+- **Docker Services** - Containerized services, primary workloads currently
+- **Kubernetes Cluster** - 4-node cluster for future scalable workloads
 - **Core Network Services** - DNS (BIND), DHCP, Pi-hole ad-blocking
 - **Automation Platform** - GitLab CI/CD with Ansible automation
 - **Secure Access** - Cloudflare tunnels with zero-trust policies
@@ -27,12 +27,16 @@ A comprehensive, production-ready homelab built on enterprise automation princip
 ### Key Services
 | Service | Purpose | Access |
 |---------|---------|---------|
-| **Plex** | Media streaming server | https://plex.terrac.com |
-| **Grafana** | Monitoring dashboards | https://grafana.terrac.com |
-| **N8N** | Workflow automation | https://n8n.terrac.com |
-| **Open WebUI** | AI chat interface | https://open-webui.terrac.com |
+| **Plex** | Media streaming server | https://plex.home |
+| **Grafana** | Monitoring dashboards | https://grafana.home |
+| **N8N** | Workflow automation | https://n8n.home |
+| **Open WebUI** | AI chat interface | https://open-webui.home|
 | **GitLab** | CI/CD and source control | http://gitlab.home |
-| **Pi-hole** | Network ad-blocking | http://192.168.1.9/admin |
+| **Pi-hole** | Network ad-blocking | http://pihole.home/admin |
+
+### Administration Endpoints
+| Service | Purpose | Access |
+|---------|---------|---------|
 
 ## 📚 Documentation
 

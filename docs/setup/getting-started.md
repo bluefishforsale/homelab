@@ -437,6 +437,23 @@ ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
 # ComfyUI: http://192.168.1.143:8188
 ```
 
+### Cloud Services
+
+#### 1. Deploy Cloud Stack
+```bash
+# Deploy NextCloud file sharing and collaboration (pre-configured, no setup wizard!)
+ansible-playbook -i inventory.ini playbook_ocean_nextcloud.yaml --ask-vault-pass
+
+# Access services:
+# NextCloud: http://192.168.1.143:8081 or http://nextcloud.home
+# Login with admin credentials from vault secrets
+
+# Troubleshooting: If version mismatch error occurs
+# sudo systemctl stop nextcloud.service
+# sudo rm -rf /data01/services/nextcloud/config  
+# Re-run playbook to recreate config
+```
+
 ### Monitoring Services
 
 #### 1. Deploy Monitoring Stack
@@ -482,12 +499,13 @@ ansible-playbook -i inventory.ini playbook_ocean_tautulli.yaml
 ansible-playbook -i inventory.ini playbook_ocean_overseerr.yaml
 ```
 
-#### Phase 4: AI/ML Services
+#### Phase 4: AI/ML & Cloud Services
 ```bash
 ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
 ansible-playbook -i inventory.ini playbook_ocean_open_webui.yaml
 ansible-playbook -i inventory.ini playbook_ocean_n8n.yaml
 ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
+ansible-playbook -i inventory.ini playbook_ocean_nextcloud.yaml
 ```
 
 #### Phase 5: Optional Services
@@ -595,33 +613,11 @@ kubectl get pods --all-namespaces
 ```
 
 ### Performance Validation
-```bash
 # Network performance
 iperf3 -c 192.168.1.143 -t 30
 
 # Storage performance  
 dd if=/dev/zero of=/tmp/testfile bs=1G count=1 oflag=direct
-```
-
-## 🎉 Completion
-
-Congratulations! Your homelab should now be fully operational with:
-
-- ✅ **High-availability Proxmox cluster** with Ceph storage
-- ✅ **Core network services** (DNS, DHCP, Pi-hole)  
-- ✅ **CI/CD platform** (GitLab)
-- ✅ **Container platforms** (Docker + Kubernetes)
-- ✅ **Media services** (Plex ecosystem)
-- ✅ **AI/ML services** (N8N, Open WebUI, llama.cpp)
-- ✅ **Monitoring & observability** (Grafana, Prometheus)
-- ✅ **Secure remote access** (Cloudflare tunnels)
-- ✅ **Automated secrets management** (Ansible Vault)
-
-## 📚 Next Steps
-
-1. Review the [Operations Guide](../operations/README.md) for day-to-day management
-2. Explore service-specific documentation in the `docs/operations/` directory  
-3. Set up additional services based on your needs
 4. Configure automated backups and disaster recovery procedures
 5. Implement advanced monitoring and alerting
 
