@@ -15,7 +15,7 @@ services:
       - DO_NOT_TRACK=true
       # Configure to connect to llama.cpp via host IP
       - OPENAI_API_BASE_URL=http://{{ ansible_default_ipv4.address }}:8080/v1
-      - OPENAI_API_KEY=dummy
+      - OPENAI_API_KEY=llamacpp-homelab-key
       # Enable local API models
       - ENABLE_OPENAI_API=true
       - ENABLE_OLLAMA_API=false
@@ -71,3 +71,10 @@ services:
     security_opt:
       - no-new-privileges:true
     
+    # Network configuration - use n8n network for inter-service communication
+    networks:
+      - n8n_n8n_network
+
+networks:
+  n8n_n8n_network:
+    external: true

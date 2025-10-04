@@ -1,0 +1,100 @@
+# ComfyUI Models Configuration
+# Define models to download automatically during deployment
+
+comfyui_models:
+  checkpoints:
+    - name: v1-5-pruned-emaonly-fp16.safetensors
+      url: https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
+      size_gb: 2.1
+      timeout: 300
+    - name: FLUX1/flux1-dev-fp8.safetensors
+      url: https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors
+      size_gb: 11.9
+      timeout: 600
+
+  vae:
+    - name: ae.safetensors
+      url: https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors
+      size_gb: 0.3
+      timeout: 180
+
+  clip:
+    - name: t5xxl_fp8.safetensors
+      url: https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors
+      size_gb: 4.9
+      timeout: 600
+    - name: t5xxl_fp16.safetensors
+      url: https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors
+      size_gb: 9.8
+      timeout: 600
+    - name: clip_l.safetensors
+      url: https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors
+      size_gb: 0.25
+      timeout: 180
+
+  unet:
+    - name: flux1-dev.safetensors
+      url: https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev.safetensors
+      size_gb: 23.8
+      timeout: 900
+
+  workflows:
+    - name: flux_dev_example.png
+      url: https://comfyanonymous.github.io/ComfyUI_examples/flux/flux_dev_example.png
+      size_gb: 0.001
+      timeout: 30
+
+# Model symlinks to avoid duplicating large files
+comfyui_model_symlinks:
+  - src: "{{ home }}/ComfyUI/models/checkpoints/FLUX1/flux1-dev-fp8.safetensors"
+    dest: "{{ home }}/ComfyUI/models/diffusion_models/flux1-dev-fp8.safetensors"
+    description: "Link flux1-dev-fp8 from diffusion_models to checkpoints for compatibility"
+
+  # Example additional model types (uncomment and populate as needed)
+  # vae:
+  #   - name: vae-ft-mse-840000-ema-pruned.safetensors
+  #     url: https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors
+  #     size_gb: 0.3
+  #     timeout: 180
+
+  # loras:
+  #   - name: example-lora.safetensors
+  #     url: https://huggingface.co/example/lora/resolve/main/example-lora.safetensors
+  #     size_gb: 0.1
+  #     timeout: 120
+
+  # upscale_models:
+  #   - name: RealESRGAN_x4plus.pth
+  #     url: https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth
+  #     size_gb: 0.06
+  #     timeout: 120
+
+  # controlnet:
+  #   - name: control_v11p_sd15_canny.pth
+  #     url: https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_canny.pth
+  #     size_gb: 1.4
+  #     timeout: 300
+
+# Valid model directories in ComfyUI
+comfyui_model_types:
+  - audio_encoders
+  - checkpoints
+  - clip
+  - clip_vision
+  - configs
+  - controlnet
+  - diffusers
+  - diffusion_models
+  - embeddings
+  - gligen
+  - hypernetworks
+  - loras
+  - model_patches
+  - photomaker
+  - style_models
+  - text_encoders
+  - unet
+  - upscale_models
+  - vae
+  - vae_approx
+  - workflows

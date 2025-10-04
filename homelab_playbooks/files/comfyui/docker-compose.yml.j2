@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  comfyui:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    # GPU support using runtime (compatible with older docker-compose)
+    runtime: nvidia
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CLI_ARGS=--listen 0.0.0.0 --port 8188 --fast --use-pytorch-cross-attention --verbose
+    
+    ports:
+      - "{{ port }}:{{ port }}"
+    
+    volumes:
+      - {{ home }}/ComfyUI/models:/root/ComfyUI/models
+      - {{ home }}/ComfyUI/input:/root/ComfyUI/input
+      - {{ home }}/ComfyUI/output:/root/ComfyUI/output
+      - {{ home }}/ComfyUI/custom_nodes:/root/ComfyUI/custom_nodes
+      - {{ home }}/.cache:/root/.cache
+      - {{ home }}/.local:/root/.local
+    
+    # Health check - check if ComfyUI web interface is responding
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    
+    # Run as root (YanWenKun image default)
+    # user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Network configuration - use n8n network for inter-service communication
+    networks:
+      - n8n_n8n_network
+
+networks:
+  n8n_n8n_network:
+    external: true
