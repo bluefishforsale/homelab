@@ -12,6 +12,7 @@
     gitlab_version: "18.2.0-ce.0"
     gitlab_root_username: "root"
     gitlab_root_password: "admin"
+    gitlab_registration_token: "glrt-3vrkXP2CIB1R00O0l_lxom86MQp0OjEKdToxCw.01.121epd4z0"
 
   tasks:
   - name: Required packages pre-installation
@@ -137,6 +138,44 @@
     ignore_errors: true
 
   # Robust root user credential setup
+  - name: Install GitLab Runner
+    block:
+    - name: Download and run GitLab Runner repository setup script
+      shell: |
+        curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | bash
+      args:
+        creates: /etc/apt/sources.list.d/runner_gitlab-runner.list
+
+    - name: Install GitLab Runner package
+      apt:
+        name: gitlab-runner
+        state: present
+        update_cache: yes
+
+    - name: Check if GitLab Runner is already registered
+      command: gitlab-runner list
+      register: runner_list
+      changed_when: false
+      failed_when: false
+
+    - name: Register GitLab Runner
+      command: >
+        gitlab-runner register
+        --non-interactive
+        --url "{{ gitlab_external_url }}"
+        --token "{{ gitlab_registration_token }}"
+        --executor "shell"
+      when: "'{{ hostname }}' not in runner_list.stderr"
+      register: runner_registered
+
+    - name: Display runner registration status
+      debug:
+        msg: |
+          GitLab Runner registered successfully!
+          Note: Configure tags, description, and other settings in GitLab UI at:
+          Admin Area -> Runners -> Edit runner settings
+      when: runner_registered.changed
+
   - name: Configure GitLab root user credentials
     block:
       - name: Set up root user with custom credentials
