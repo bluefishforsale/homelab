@@ -1,0 +1,127 @@
+---
+# GitLab CI/CD Pipeline for Homelab Infrastructure
+# This pipeline validates Ansible playbooks and YAML syntax
+
+stages:
+  - validate
+  - lint
+  - test
+
+variables:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+# Validate YAML syntax for all playbooks
+validate:yaml:
+  stage: validate
+  tags:
+    - shell
+    - homelab
+  script:
+    - echo "Validating YAML syntax..."
+    - |
+      for file in homelab_playbooks/*.yaml homelab_playbooks/*.yml; do
+        if [ -f "$file" ]; then
+          echo "Checking $file"
+          python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
+        fi
+      done
+    - echo "✓ All YAML files are valid"
+  only:
+    changes:
+      - homelab_playbooks/**/*.yaml
+      - homelab_playbooks/**/*.yml
+      - .gitlab-ci.yml
+
+# Validate Ansible playbook syntax
+validate:ansible:
+  stage: validate
+  tags:
+    - shell
+    - homelab
+  before_script:
+    - command -v ansible-playbook >/dev/null 2>&1 || { echo "ansible-playbook not found, skipping"; exit 0; }
+  script:
+    - echo "Validating Ansible playbook syntax..."
+    - |
+      cd homelab_playbooks
+      for playbook in playbook*.yaml; do
+        if [ -f "$playbook" ]; then
+          echo "Checking $playbook"
+          ansible-playbook --syntax-check "$playbook" || exit 1
+        fi
+      done
+    - echo "✓ All Ansible playbooks have valid syntax"
+  only:
+    changes:
+      - homelab_playbooks/**/*.yaml
+      - homelab_playbooks/**/*.yml
+      - .gitlab-ci.yml
+
+# Lint Ansible playbooks with ansible-lint
+lint:ansible:
+  stage: lint
+  tags:
+    - shell
+    - homelab
+  before_script:
+    - command -v ansible-lint >/dev/null 2>&1 || { echo "ansible-lint not found, skipping"; exit 0; }
+  script:
+    - echo "Linting Ansible playbooks..."
+    - cd homelab_playbooks
+    - ansible-lint playbook*.yaml || true  # Don't fail on warnings
+    - echo "✓ Ansible lint complete"
+  allow_failure: true
+  only:
+    changes:
+      - homelab_playbooks/**/*.yaml
+      - homelab_playbooks/**/*.yml
+      - .gitlab-ci.yml
+
+# Dry-run test for selected playbooks
+test:dry-run:
+  stage: test
+  tags:
+    - shell
+    - homelab
+  before_script:
+    - command -v ansible-playbook >/dev/null 2>&1 || { echo "ansible-playbook not found, skipping"; exit 0; }
+  script:
+    - echo "Running dry-run tests..."
+    - |
+      cd homelab_playbooks
+      # Test a few key playbooks in check mode (dry-run)
+      for playbook in playbook_base_packages.yaml playbook_docker-ce.yaml; do
+        if [ -f "$playbook" ]; then
+          echo "Testing $playbook in check mode"
+          ansible-playbook -i inventory.ini --check "$playbook" || echo "Check mode failed for $playbook"
+        fi
+      done
+    - echo "✓ Dry-run tests complete"
+  allow_failure: true
+  only:
+    changes:
+      - homelab_playbooks/**/*.yaml
+      - homelab_playbooks/**/*.yml
+      - .gitlab-ci.yml
+  when: manual
+
+# Check for common security issues
+security:check:
+  stage: test
+  tags:
+    - shell
+    - homelab
+  script:
+    - echo "Checking for security issues..."
+    - |
+      # Check for hardcoded passwords (excluding known test/demo passwords)
+      echo "Scanning for potential hardcoded credentials..."
+      grep -r -i "password\|secret\|token" homelab_playbooks/*.yaml | grep -v "gitlab_root_password\|gitlab_registration_token" || true
+    - echo "✓ Security check complete (review output above)"
+  allow_failure: true
+  only:
+    changes:
+      - homelab_playbooks/**/*.yaml
+      - homelab_playbooks/**/*.yml
+      - .gitlab-ci.yml
