@@ -1,0 +1,40 @@
+[mysqld]
+# Custom MySQL configuration for Grafana
+# Optimized for single-service dedicated MySQL instance
+
+# Memory allocation - smaller since dedicated to Grafana only
+innodb_buffer_pool_size = 512M
+max_connections = 50
+
+# Character set - UTF8MB4 for full Unicode support including emojis
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# Logging configuration
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/mysql-slow.log
+log_error = /var/log/mysql/mysql-error.log
+
+# Security configuration
+# bind-address = 0.0.0.0 allows connections from all interfaces
+# This is safe since MySQL is running in an isolated container
+bind-address = 0.0.0.0
+skip-name-resolve
+
+# Performance tuning for smaller dedicated instance
+query_cache_type = 1
+query_cache_size = 32M
+
+# Fix MySQL timestamp warnings
+explicit_defaults_for_timestamp = 1
+
+# Additional performance settings for Grafana workload
+# Grafana primarily does reads with occasional writes
+table_open_cache = 200
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+# InnoDB optimizations for smaller instance
+innodb_log_file_size = 64M
+innodb_log_buffer_size = 16M
+innodb_flush_method = O_DIRECT

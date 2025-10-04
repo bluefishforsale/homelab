@@ -1,0 +1,211 @@
+##################### Grafana Configuration Example #####################
+#
+# Everything has defaults so you only need to uncomment things you want to
+# change
+
+# possible values : production, development
+;app_mode = production
+
+# instance name, defaults to HOSTNAME environment variable value or hostname if HOSTNAME var is empty
+instance_name = grafana.home
+
+#################################### Paths ####################################
+[paths]
+# Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used)
+;data = /var/lib/grafana
+
+# Temporary files in `data` directory older than given duration will be removed
+;temp_data_lifetime = 24h
+
+# Directory where grafana can store logs
+;logs = /var/log/grafana
+
+# Directory where grafana will automatically scan and look for plugins
+;plugins = /var/lib/grafana/plugins
+
+# folder that contains provisioning config files that grafana will apply on startup and while running.
+;provisioning = conf/provisioning
+
+#################################### Server ####################################
+[server]
+# Protocol (http, https, h2, socket)
+;protocol = http
+
+# The ip address to bind to, empty will bind to all interfaces
+;http_addr =
+
+# The http port  to use
+;http_port = 3000
+
+# The public facing domain name used to access grafana from a browser
+domain = grafana.home
+
+# Redirect to correct domain if host header does not match domain
+# Prevents DNS rebinding attacks
+;enforce_domain = false
+
+# The full public facing url you use in browser, used for redirects and emails
+# If you use reverse proxy and sub path specify full url (with sub path)
+;root_url = %(protocol)s://%(domain)s:%(http_port)s/
+;root_url = %(protocol)s://%(domain)s/grafana
+
+# Serve Grafana from subpath specified in `root_url` setting. By default it is set to `false` for compatibility reasons.
+;serve_from_sub_path = false
+serve_from_sub_path = true
+
+# Log web requests
+;router_logging = false
+
+# the path relative working path
+;static_root_path = public
+;static_root_path = grafana
+
+# enable gzip
+;enable_gzip = false
+
+# https certs & key file
+;cert_file =
+;cert_key =
+
+# Unix socket path
+;socket =
+
+# CDN Url
+;cdn_url =
+
+# Sets the maximum time using a duration format (5s/5m/5ms) before timing out read of an incoming request and closing idle connections.
+# `0` means there is no timeout for reading the request.
+;read_timeout = 0
+
+#################################### Database ####################################
+[database]
+# You can configure the database connection by specifying type, host, name, user and password
+# as separate properties or as on string using the url properties.
+
+# Either "mysql", "postgres" or "sqlite3", it's your choice
+;type = sqlite3
+;host = 127.0.0.1:3306
+;name = grafana
+;user = root
+# If the password contains # or ; you have to wrap it with triple quotes. Ex """#password;"""
+;password =
+
+# Use either URL or the previous fields to configure the database
+# Example: mysql://user:secret@host:port/database
+;url =
+url = mysql://grafana:{{ monitoring.grafana.database_password }}@192.168.1.143:3306/grafana
+
+# For "postgres" only, either "disable", "require" or "verify-full"
+;ssl_mode = disable
+
+# Database drivers may support different transaction isolation levels.
+# Currently, only "mysql" driver supports isolation levels.
+# If the value is empty - driver's default isolation level is applied.
+# For "mysql" use "READ-UNCOMMITTED", "READ-COMMITTED", "REPEATABLE-READ" or "SERIALIZABLE".
+;isolation_level =
+
+;ca_cert_path =
+;client_key_path =
+;client_cert_path =
+;server_cert_name =
+
+# For "sqlite3" only, path relative to data_path setting
+;path = grafana.db
+
+# Max idle conn setting default is 2
+;max_idle_conn = 2
+
+# Max conn setting default is 0 (mean not set)
+;max_open_conn =
+
+# Connection Max Lifetime default is 14400 (means 14400 seconds or 4 hours)
+;conn_max_lifetime = 14400
+
+# Set to true to log the sql calls and execution times.
+;log_queries =
+
+# For "sqlite3" only. cache mode setting used for connecting to the database. (private, shared)
+;cache_mode = private
+
+################################### Data sources #########################
+[datasources]
+# Upper limit of data sources that Grafana will return. This limit is a temporary configuration and it will be deprecated when pagination will be introduced on the list data sources API.
+;datasource_limit = 5000
+
+#################################### Cache server #############################
+[remote_cache]
+# Either "redis", "memcached" or "database" default is "database"
+;type = database
+
+# cache connectionstring options
+# database: will use Grafana primary database.
+# redis: config like redis server e.g. `addr=127.0.0.1:6379,pool_size=100,db=0,ssl=false`. Only addr is required. ssl may be 'true', 'false', or 'insecure'.
+# memcache: 127.0.0.1:11211
+;connstr =
+
+#################################### Security ####################################
+[security]
+# disable creation of admin user on first start of grafana
+disable_initial_admin_creation = false
+
+# default admin user, created on startup
+admin_user = admin
+
+# default admin password, can be changed before first start of grafana,  or in profile settings
+admin_password = 2brak4u2
+
+# used for signing
+;secret_key = SW2YcwTIb9zpOOhoPsMm
+
+# disable gravatar profile images
+;disable_gravatar = false
+
+# data source proxy whitelist (ip_or_domain:port separated by spaces)
+;data_source_proxy_whitelist =
+
+# disable protection against brute force login attempts
+;disable_brute_force_login_protection = false
+
+# set to true if you host Grafana behind HTTPS. default is false.
+;cookie_secure = false
+
+# set cookie SameSite attribute. defaults to `lax`. can be set to "lax", "strict", "none" and "disabled"
+;cookie_samesite = lax
+
+# set to true if you want to allow browsers to render Grafana in a <frame>, <iframe>, <embed> or <object>. default is false.
+;allow_embedding = false
+
+#################################### Users ###############################
+[users]
+# disable user signup / registration
+;allow_sign_up = true
+
+# Allow non admin users to create organizations
+;allow_org_create = true
+
+# Set to true to automatically assign new users to the default organization (id 1)
+;auto_assign_org = true
+
+# Set this value to automatically add new users to the provided organization (if auto_assign_org above is set to true)
+;auto_assign_org_id = 1
+
+# Default role new users will be automatically assigned (if disabled above is set to true)
+;auto_assign_org_role = Viewer
+
+# Default UI theme ("dark" or "light")
+;default_theme = dark
+
+#################################### Anonymous Auth ######################
+[auth.anonymous]
+# enable anonymous access
+;enabled = false
+
+# specify organization name that should be used for unauthenticated users
+;org_name = Main Org.
+
+# specify role for unauthenticated users
+;org_role = Viewer
+
+#################################### Basic Auth ##########################
+[auth.basic]
+;enabled = true

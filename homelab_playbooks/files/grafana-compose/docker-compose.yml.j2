@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: percona/percona-server:5.7
+    container_name: grafana-mysql
+    hostname: mysql
+    restart: unless-stopped
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - MYSQL_ROOT_PASSWORD={{ monitoring.mysql.root_password | default(monitoring.grafana.database_password) }}
+      - MYSQL_DATABASE=grafana
+      - MYSQL_USER=grafana
+      - MYSQL_PASSWORD={{ monitoring.grafana.database_password }}
+      - MYSQL_ROOT_HOST=%
+      
+    ports:
+      - "3306:3306"
+      
+    volumes:
+      - {{ home }}/mysql-data:/var/lib/mysql
+      - {{ home }}/mysql-logs:/var/log/mysql
+      - {{ home }}/mysql-conf:/etc/mysql/conf.d
+      - {{ home }}/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    
+    # Tmpfs mounts for runtime directories
+    tmpfs:
+      - /var/run/mysqld:uid=1001,gid=1001
+      - /tmp
+    
+    # Health check - check if MySQL is ready to accept connections
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{{ monitoring.mysql.root_password | default(monitoring.grafana.database_password) }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # Run as standard homelab user for proper file permissions
+    # user: "{{ uid }}:{{ gid }}"  # Temporarily disabled - may prevent MySQL startup
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+    # Resource limits
+    cpus: '1.0'
+    mem_limit: 1024m
+
+  grafana:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: on-failure
+    
+    # Run as custom user to match host file permissions
+    user: "{{ uid }}:{{ gid }}"
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - GF_INSTALL_PLUGINS={{ plugins | default('marcusolsson-treemap-panel 2.0.0') }}
+      
+    ports:
+      - "{{ port_ext }}:{{ port_int }}"
+    
+    volumes:
+      - {{ home }}/grafana.ini:/etc/grafana/grafana.ini:ro
+      - {{ home }}/plugins:/var/lib/grafana/plugins
+      - {{ home }}/data:/var/lib/grafana
+      - {{ home }}/logs:/var/log/grafana
+    
+    # Health check - check if Grafana web interface is responding
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port_int }}/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+    # Service dependencies - wait for MySQL to be healthy
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    # Resource limits
+    cpus: '1.0'
+    mem_limit: 1024m
+

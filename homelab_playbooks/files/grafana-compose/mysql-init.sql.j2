@@ -1,0 +1,41 @@
+-- MySQL initialization script for Grafana
+-- This runs automatically when MySQL container starts for the first time
+-- All operations are idempotent and can be run multiple times safely
+
+-- Create Grafana database with proper charset for international characters
+CREATE DATABASE IF NOT EXISTS grafana 
+CHARACTER SET utf8mb4 
+COLLATE utf8mb4_unicode_ci;
+
+-- Create Grafana user if it doesn't exist
+CREATE USER IF NOT EXISTS 'grafana'@'%' IDENTIFIED BY '{{ monitoring.grafana.database_password }}';
+
+-- Ensure user has correct password (in case it changed)
+ALTER USER 'grafana'@'%' IDENTIFIED BY '{{ monitoring.grafana.database_password }}';
+
+-- Grant all privileges on grafana database to grafana user
+GRANT ALL PRIVILEGES ON grafana.* TO 'grafana'@'%';
+
+-- Apply privilege changes
+FLUSH PRIVILEGES;
+
+-- Verify setup by switching to grafana database
+USE grafana;
+
+-- Log successful initialization
+SELECT 
+    'Grafana MySQL setup completed successfully' as status,
+    NOW() as timestamp,
+    'Root password length: {{ monitoring.mysql.root_password | default(monitoring.grafana.database_password) | length }} chars' as root_info,
+    'Grafana password length: {{ monitoring.grafana.database_password | length }} chars' as grafana_info;
+
+-- Show database charset to verify UTF8MB4
+SELECT 
+    SCHEMA_NAME as database_name,
+    DEFAULT_CHARACTER_SET_NAME as charset,
+    DEFAULT_COLLATION_NAME as collation
+FROM information_schema.SCHEMATA 
+WHERE SCHEMA_NAME = 'grafana';
+
+-- Show user privileges
+SHOW GRANTS FOR 'grafana'@'%';

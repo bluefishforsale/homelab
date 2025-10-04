@@ -1,0 +1,147 @@
+---
+- name: Configure Grafana Monitoring Dashboard using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vault_secrets.yaml
+
+  vars:
+    service: grafana
+    image: grafana/grafana
+    version: 11.5.4
+    port_int: 3000
+    port_ext: 8910
+    plugins: "marcusolsson-treemap-panel 2.0.0"
+    data: /data01
+    files: files/grafana-compose
+    home: "{{ data }}/services/{{ service }}"
+    user: grafana
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Ensure grafana and mysql subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    with_items:
+    - logs
+    - plugins
+    - data
+    - mysql-data
+    - mysql-logs
+    - mysql-conf
+
+  - name: Check if MySQL database is already initialized
+    ansible.builtin.find:
+      paths: "{{ home }}/mysql-data"
+      file_type: any
+    register: mysql_data_contents
+
+  - name: Show MySQL initialization status
+    ansible.builtin.debug:
+      msg: "MySQL data directory contains {{ mysql_data_contents.matched }} files"
+
+  - name: Ensure all directories have correct ownership for containers
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+      recurse: yes
+    with_items:
+    - data
+    - plugins
+    - logs
+    - mysql-data
+    - mysql-logs
+
+  - name: Create MySQL initialization script from template
+    ansible.builtin.template:
+      src: "{{ files }}/mysql-init.sql.j2"
+      dest: "{{ home }}/mysql-init.sql"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: mysql_init_script
+
+  - name: Create MySQL configuration from template
+    ansible.builtin.template:
+      src: "{{ files }}/mysql-custom.cnf.j2"
+      dest: "{{ home }}/mysql-conf/custom.cnf"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: mysql_config
+
+  - name: Create grafana configuration file with integrated MySQL
+    ansible.builtin.template:
+      src: "{{ files }}/grafana-mysql-container.ini.j2"
+      dest: "{{ home }}/grafana.ini"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: grafana_config
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: docker_compose_config
+
+  - name: Create grafana environment file
+    ansible.builtin.template:
+      src: "{{ files }}/grafana.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: grafana_env
+
+  - name: Show what configuration files changed
+    ansible.builtin.debug:
+      msg: "Configuration files have been updated"
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed
+
+  - name: Create grafana systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/grafana.service.j2"
+      dest: "/etc/systemd/system/grafana.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart grafana service
+  
+  - name: Enable grafana service
+    ansible.builtin.systemd:
+      name: grafana.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart grafana service
+    ansible.builtin.systemd:
+      name: grafana.service
+      state: restarted
