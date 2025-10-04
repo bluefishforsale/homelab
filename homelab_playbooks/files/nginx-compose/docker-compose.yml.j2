@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    environment:
+      - TZ=America/Los_Angeles
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - {{ home }}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ home }}/conf.d:/etc/nginx/conf.d:ro
+      - {{ home }}/logs:/var/log/nginx
+    
+    # Health check - check if nginx is responding
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/nginx-health || nginx -t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    cpus: '2.0'
+    mem_limit: 512m
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge
