@@ -13,10 +13,13 @@ A comprehensive, production-ready homelab built on enterprise automation princip
 
 ## 🏗️ Architecture Overview
 
-### Infrastructure Stack
-- **Proxmox VE Cluster** - High-availability hypervisor with Ceph storage
-- **Docker Services** - Media stack, AI/ML services, monitoring (Ocean host)
-- **Kubernetes Cluster** - Scalable container orchestration (6-node cluster)
+📋 **[View Visual Architecture Diagrams](docs/architecture/README.md)** - Complete infrastructure diagrams including physical layout, services, network topology, and deployment flow.
+
+### Infrastructure Stack  
+- **Ocean Server** - Ubuntu Docker host with ZFS storage and NVIDIA P2000 GPU
+- **Proxmox Host** - Hypervisor running VMs (DNS, GitLab, K8s cluster, Pi-hole)
+- **Docker Services** - 21 containerized services including media stack and AI/ML workloads
+- **Kubernetes Cluster** - 4-node cluster for scalable workloads
 - **Core Network Services** - DNS (BIND), DHCP, Pi-hole ad-blocking
 - **Automation Platform** - GitLab CI/CD with Ansible automation
 - **Secure Access** - Cloudflare tunnels with zero-trust policies

@@ -347,24 +347,71 @@ ansible ocean -i inventory.ini -a "docker --version"
 ansible ocean -i inventory.ini -a "docker-compose --version"
 ```
 
+### Infrastructure Services
+
+#### 1. Deploy Base Infrastructure
+```bash
+
+# Deploy MySQL database
+ansible-playbook -i inventory.ini playbook_ocean_mysql.yaml
+
+# Deploy Nginx reverse proxy
+ansible-playbook -i inventory.ini playbook_ocean_nginx.yaml
+```
+
+#### 2. Deploy Network Services
+```bash
+# Deploy Cloudflare DDNS
+ansible-playbook -i inventory.ini playbook_ocean_cloudflare_ddns.yaml
+
+# Deploy Cloudflare tunnels and Access
+ansible-playbook -i inventory.ini playbook_ocean_cloudflared.yaml
+```
+
 ### Media Services
 
-#### 1. Deploy Media Stack
+#### 1. Deploy Core Media Stack
 ```bash
 # Deploy Plex media server
 ansible-playbook -i inventory.ini playbook_ocean_plex.yaml
 
-# Deploy Tautulli monitoring
-ansible-playbook -i inventory.ini playbook_ocean_tautulli.yaml
+# Deploy download client
+ansible-playbook -i inventory.ini playbook_ocean_nzbget.yaml
 
-# Deploy Sonarr/Radarr (Arr suite)
-ansible-playbook -i inventory.ini playbook_ocean_sonarr.yaml
-ansible-playbook -i inventory.ini playbook_ocean_radarr.yaml
+# Deploy media management suite (Arr stack)
+ansible-playbook -i inventory.ini playbook_ocean_prowlarr.yaml  # Indexer management
+ansible-playbook -i inventory.ini playbook_ocean_sonarr.yaml    # TV shows
+ansible-playbook -i inventory.ini playbook_ocean_radarr.yaml    # Movies
+ansible-playbook -i inventory.ini playbook_ocean_bazarr.yaml    # Subtitles
 
 # Access services:
 # Plex: http://192.168.1.143:32400
-# Tautulli: http://192.168.1.143:8905  
+# NZBGet: http://192.168.1.143:6789
+# Prowlarr: http://192.168.1.143:9696
 # Sonarr: http://192.168.1.143:8902
+# Radarr: http://192.168.1.143:7878
+# Bazarr: http://192.168.1.143:6767
+```
+
+#### 2. Deploy Media Enhancement Services
+```bash
+# Deploy Plex monitoring
+ansible-playbook -i inventory.ini playbook_ocean_tautulli.yaml
+
+# Deploy request management
+ansible-playbook -i inventory.ini playbook_ocean_overseerr.yaml
+
+# Deploy transcoding optimization
+ansible-playbook -i inventory.ini playbook_ocean_tdarr.yaml
+
+# Deploy audiobook downloader
+ansible-playbook -i inventory.ini playbook_ocean_audible-downloader.yaml
+
+# Access services:
+# Tautulli: http://192.168.1.143:8905  
+# Overseerr: http://192.168.1.143:5055
+# Tdarr: http://192.168.1.143:8265
+# Audible Downloader: http://192.168.1.143:8080
 ```
 
 ### AI/ML Services
@@ -374,15 +421,81 @@ ansible-playbook -i inventory.ini playbook_ocean_radarr.yaml
 # Deploy N8N workflow automation
 ansible-playbook -i inventory.ini playbook_ocean_n8n.yaml
 
+# Deploy llama.cpp API server (GPU-accelerated LLM)
+ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
+
 # Deploy Open WebUI for LLM interaction
 ansible-playbook -i inventory.ini playbook_ocean_open_webui.yaml
 
-# Deploy llama.cpp API server  
-ansible-playbook -i inventory.ini playbook_ocean_llama_cpp.yaml
+# Deploy ComfyUI for AI image generation
+ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
 
 # Access services:
 # N8N: http://192.168.1.143:5678
+# Llama.cpp API: http://192.168.1.143:8080
 # Open WebUI: http://192.168.1.143:3000
+# ComfyUI: http://192.168.1.143:8188
+```
+
+### Monitoring Services
+
+#### 1. Deploy Monitoring Stack
+```bash
+# Deploy Prometheus metrics collection
+ansible-playbook -i inventory.ini playbook_ocean_prometheus.yaml
+
+# Deploy Grafana dashboards
+ansible-playbook -i inventory.ini playbook_ocean_grafana.yaml
+
+# Access services:
+# Prometheus: http://192.168.1.143:9090
+# Grafana: http://192.168.1.143:3001
+```
+
+### Service Deployment Order
+
+For a complete deployment, run services in this recommended order:
+
+#### Phase 1: Infrastructure Foundation
+```bash
+ansible-playbook -i inventory.ini playbook_ocean_base.yaml
+ansible-playbook -i inventory.ini playbook_ocean_data01_virtio.yaml
+ansible-playbook -i inventory.ini playbook_ocean_mysql.yaml
+ansible-playbook -i inventory.ini playbook_ocean_nginx.yaml
+```
+
+#### Phase 2: Network Services
+```bash
+ansible-playbook -i inventory.ini playbook_ocean_cloudflare_ddns.yaml
+ansible-playbook -i inventory.ini playbook_ocean_cloudflared.yaml
+```
+
+#### Phase 3: Media Stack
+```bash
+ansible-playbook -i inventory.ini playbook_ocean_plex.yaml
+ansible-playbook -i inventory.ini playbook_ocean_nzbget.yaml
+ansible-playbook -i inventory.ini playbook_ocean_prowlarr.yaml
+ansible-playbook -i inventory.ini playbook_ocean_sonarr.yaml
+ansible-playbook -i inventory.ini playbook_ocean_radarr.yaml
+ansible-playbook -i inventory.ini playbook_ocean_bazarr.yaml
+ansible-playbook -i inventory.ini playbook_ocean_tautulli.yaml
+ansible-playbook -i inventory.ini playbook_ocean_overseerr.yaml
+```
+
+#### Phase 4: AI/ML Services
+```bash
+ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
+ansible-playbook -i inventory.ini playbook_ocean_open_webui.yaml
+ansible-playbook -i inventory.ini playbook_ocean_n8n.yaml
+ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
+```
+
+#### Phase 5: Optional Services
+```bash
+ansible-playbook -i inventory.ini playbook_ocean_tdarr.yaml              # Transcoding
+ansible-playbook -i inventory.ini playbook_ocean_audible-downloader.yaml # Audiobooks
+ansible-playbook -i inventory.ini playbook_ocean_prometheus.yaml         # Monitoring
+ansible-playbook -i inventory.ini playbook_ocean_grafana.yaml           # Dashboards
 ```
 
 ### Kubernetes Cluster
