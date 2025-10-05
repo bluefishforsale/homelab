@@ -71,10 +71,7 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Network configuration - use n8n network for inter-service communication
-    networks:
-      - n8n_n8n_network
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
 
-networks:
-  n8n_n8n_network:
-    external: true
+# No custom networks needed - using default bridge

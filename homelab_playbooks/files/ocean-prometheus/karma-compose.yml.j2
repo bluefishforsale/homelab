@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  karma:
+    image: {{ karma_image }}:{{ karma_version }}
+    container_name: {{ karma_service }}
+    restart: unless-stopped
+    
+    # Networking
+    ports:
+      - "{{ karma_port }}:8080"
+    
+    # Configuration - mount config file directly
+    volumes:
+      - {{ karma_home }}/config/karma.yml:/etc/karma.yml:ro
+    
+    # Environment variables
+    environment:
+      - CONFIG_FILE=/etc/karma.yml
+    
+    # Health Check (check web interface)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

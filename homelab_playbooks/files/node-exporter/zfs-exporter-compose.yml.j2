@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  zfs-exporter:
+    image: {{ zfs_exporter_image }}:{{ zfs_exporter_version }}
+    container_name: {{ zfs_exporter_service }}
+    restart: unless-stopped
+    
+    # Networking
+    ports:
+      - "{{ zfs_exporter_port }}:9150"
+    
+    # Basic privileges for ZFS access
+    cap_add:
+      - SYS_ADMIN
+    
+    # Security - try minimal restrictions first
+    security_opt:
+      - no-new-privileges:true
+    
+    # Mount host filesystem for ZFS monitoring
+    volumes:
+      - /proc:/proc:ro
+      - /sys:/sys:ro
+    
+    # Health Check (using wget to check metrics endpoint)
+    healthcheck:
+      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9150/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

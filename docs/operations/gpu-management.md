@@ -275,6 +275,7 @@ cat /etc/docker/daemon.json
 ```
 
 #### Performance Issues
+
 ```bash
 # Check for thermal throttling
 nvidia-smi --query-gpu=clocks_throttle_reasons.active --format=csv,noheader,nounits
@@ -289,30 +290,64 @@ nvidia-smi --query-gpu=pci.link.gen.current,pci.link.width.current --format=csv,
 ## 📊 GPU Monitoring & Alerting
 
 ### Prometheus GPU Exporter
+
+**NVIDIA GPU Exporter**: [utkuozdemir/nvidia_gpu_exporter](https://github.com/utkuozdemir/nvidia_gpu_exporter)
+
+This exporter provides comprehensive GPU metrics for Prometheus monitoring, deployed automatically via the `playbook_node-exporter.yaml` playbook alongside other hardware exporters.
+
+**Installation & Configuration**:
 ```bash
-# Install nvidia_gpu_exporter
-wget https://github.com/mindprince/nvidia_gpu_prometheus_exporter/releases/download/v1.2.0/nvidia_gpu_prometheus_exporter-1.2.0.linux-amd64.tar.gz
-tar xzf nvidia_gpu_prometheus_exporter-1.2.0.linux-amd64.tar.gz
-sudo cp nvidia_gpu_prometheus_exporter /usr/local/bin/
+# Deployed via consolidated node-exporter playbook (includes all hardware exporters)
+ansible-playbook playbook_node-exporter.yaml
 
-# Create systemd service
-cat > /etc/systemd/system/nvidia-gpu-exporter.service << EOF
-[Unit]
-Description=NVIDIA GPU Prometheus Exporter
-After=network.target
+# The playbook automatically:
+# 1. Detects NVIDIA GPU presence (GPU-specific tasks only run if GPU found)
+# 2. Creates Docker Compose deployment with health checks
+# 3. Configures systemd service management alongside other exporters
+# 4. Sets up proper GPU access and security settings
 
-[Service]
-Type=simple
-User=nobody
-ExecStart=/usr/local/bin/nvidia_gpu_prometheus_exporter --web.listen-address=:9445
-Restart=on-failure
+# Manual verification (if needed)
+systemctl status nvidia-gpu-exporter
+docker-compose -f /data01/services/nvidia-gpu-exporter/docker-compose.yml ps
+curl http://localhost:9445/metrics | grep nvidia_gpu
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# Check container health
+docker inspect nvidia-gpu-exporter --format='{{.State.Health.Status}}'
 
-sudo systemctl enable --now nvidia-gpu-exporter
+# Check all hardware exporters status
+systemctl status cadvisor node-exporter process-exporter nvidia-gpu-exporter
 ```
+
+**Docker Compose Deployment**:
+The service uses Docker Compose with the official `utkuozdemir/nvidia_gpu_exporter` image, managed by systemd.
+
+**Key Features**:
+
+- **Health Checks**: bash TCP socket monitoring every 30 seconds (curl-free)
+- **GPU Runtime**: Full NVIDIA Docker runtime integration
+- **Security**: no-new-privileges, resource limits, read-only filesystem
+- **Logging**: JSON file driver with rotation (10MB, 3 files)
+- **Auto-restart**: unless-stopped policy with systemd integration
+
+**Service Configuration**:
+```yaml
+# docker-compose.yml
+services:
+  nvidia-gpu-exporter:
+    image: utkuozdemir/nvidia_gpu_exporter:1.4.0
+    runtime: nvidia
+    ports:
+      - "9445:9835"
+    healthcheck:
+      test: ["CMD", "timeout", "5", "bash", "-c", "</dev/tcp/localhost/9835"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+```
+
+**Metrics Endpoint**: `http://localhost:9445/metrics`
 
 ### Key Metrics to Monitor
 ```yaml

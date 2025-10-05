@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  node-exporter:
+    image: {{ node_exporter_image }}:{{ node_exporter_version }}
+    container_name: {{ node_exporter_service }}
+    restart: unless-stopped
+    
+    # Host monitoring requires privileged access and host networking
+    pid: host
+    network_mode: host
+    # Note: no ports section needed with host networking
+    
+    # Mount host filesystems for monitoring
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+      - /run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+      - {{ node_exporter_textfiles }}:/var/lib/node_exporter/textfile_collector:ro
+    
+    # Environment variables
+    environment:
+      - TZ=America/Los_Angeles
+    
+    # Privileged access for host monitoring
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    
+    # Command line options (matching original service)
+    command:
+      - '--log.level=info'
+      - '--path.rootfs=/rootfs'
+      - '--collector.zfs'
+      - '--collector.nfsd'
+      - '--collector.thermal_zone'
+      - '--collector.ethtool'
+      - '--collector.lnstat'
+      - '--collector.netstat'
+      - '--collector.tcpstat'
+      - '--collector.systemd'
+      - '--collector.processes'
+      - '--collector.sysctl'
+      - '--collector.perf.cpus=1-{{ ansible_processor_vcpus }}'
+      - '--collector.textfile.directory=/var/lib/node_exporter/textfile_collector'
+    
+    # Health Check (using wget to check metrics endpoint)
+    healthcheck:
+      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

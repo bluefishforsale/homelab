@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  nvidia-gpu-exporter:
+    image: {{ nvidia_gpu_exporter_image }}:{{ nvidia_gpu_exporter_version }}
+    container_name: {{ nvidia_gpu_exporter_service }}
+    restart: unless-stopped
+    
+    # GPU Access
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    
+    # Networking  
+    ports:
+      - "{{ nvidia_gpu_exporter_port }}:9835"
+    
+    # Health Check (using bash TCP socket since curl not available)
+    healthcheck:
+      test: ["CMD", "timeout", "5", "bash", "-c", "</dev/tcp/localhost/9835"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  cadvisor:
+    image: {{ cadvisor_image }}:{{ cadvisor_version }}
+    container_name: {{ cadvisor_service }}
+    restart: unless-stopped
+    
+    # Networking
+    ports:
+      - "{{ cadvisor_port }}:8080"
+    
+    # Privileged access for container monitoring
+    privileged: true
+    
+    # Mount host filesystems and Docker for container monitoring
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    
+    # Device access
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    
+    # Health Check (using wget to check cAdvisor web interface)
+    healthcheck:
+      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/containers/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

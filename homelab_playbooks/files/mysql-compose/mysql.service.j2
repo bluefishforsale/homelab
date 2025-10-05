@@ -1,6 +1,6 @@
 [Unit]
-Description=Grafana Monitoring Dashboard with Docker Compose
-Documentation=https://grafana.com/docs/
+Description=MySQL Database Server with Docker Compose
+Documentation=https://dev.mysql.com/doc/
 After=docker.service zfs-mount.service zfs-import.target network-online.target
 Wants=network-online.target
 Requires=docker.service zfs-mount.service zfs-import.target
@@ -27,14 +27,13 @@ ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
 # Stop command  
 ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
 
-# Reload command - force recreation to pick up new config files
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d --force-recreate
+# Reload command
+ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml restart
 
 # Service behavior
 Restart=on-failure
-RestartSec=30
-TimeoutStartSec=180
+RestartSec=120
+TimeoutStartSec=300
 TimeoutStopSec=60
 
 # Security

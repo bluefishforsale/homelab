@@ -1,14 +1,14 @@
 [Unit]
-Description={{ cadvisor_service }}
-After=docker.service zfs-mount.service zfs-import.target
+Description={{ karma_service }}
+After=docker.service zfs-mount.service zfs-import.target alertmanager.service
 Requires=docker.service zfs-mount.service zfs-import.target
 RequiresMountsFor=/data01
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory={{ cadvisor_home }}
-EnvironmentFile={{ cadvisor_home }}/.env
+WorkingDirectory={{ karma_home }}
+EnvironmentFile={{ karma_home }}/.env
 
 # Stop running instance
 ExecStartPre=-docker-compose down --timeout 30

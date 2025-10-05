@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  smart-exporter:
+    image: {{ smart_exporter_image }}:{{ smart_exporter_version }}
+    container_name: {{ smart_exporter_service }}
+    restart: unless-stopped
+    
+    # Networking
+    ports:
+      - "{{ smart_exporter_port }}:9633"
+    
+    # Maximum privileges for SMART data access
+    privileged: true
+    user: "0:0"  # Run as root
+    
+    # Grant all capabilities
+    cap_add:
+      - ALL
+    
+    # Remove all security restrictions
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
+    
+    # Mount host devices for SMART monitoring
+    volumes:
+      - /dev:/dev
+      - /proc:/proc
+      - /sys:/sys
+    
+    # Health Check (using wget to check metrics endpoint)
+    healthcheck:
+      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9633/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

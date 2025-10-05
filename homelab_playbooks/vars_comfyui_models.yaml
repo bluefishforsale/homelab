@@ -52,6 +52,13 @@ comfyui_models:
       size_gb: 0.001
       timeout: 30
   
+  diffusion_models:
+    - name: wan2.2_fp16.safetensors
+      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors
+      size10: 10.0
+      timeout: 900
+      
+      
   text_encoders:
     - name: umt5_xxl_fp8_e4m3fn_scaled.safetensors
       url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/tree/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors

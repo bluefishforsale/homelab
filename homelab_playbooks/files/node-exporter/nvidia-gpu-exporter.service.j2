@@ -1,5 +1,5 @@
 [Unit]
-Description={{ cadvisor_service }}
+Description={{ nvidia_gpu_exporter_service }}
 After=docker.service zfs-mount.service zfs-import.target
 Requires=docker.service zfs-mount.service zfs-import.target
 RequiresMountsFor=/data01
@@ -7,8 +7,8 @@ RequiresMountsFor=/data01
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory={{ cadvisor_home }}
-EnvironmentFile={{ cadvisor_home }}/.env
+WorkingDirectory={{ nvidia_gpu_exporter_home }}
+EnvironmentFile={{ nvidia_gpu_exporter_home }}/.env
 
 # Stop running instance
 ExecStartPre=-docker-compose down --timeout 30

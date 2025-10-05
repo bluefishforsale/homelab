@@ -1,0 +1,50 @@
+global:
+  # Global configuration options
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alertmanager@{{ ansible_default_ipv4.address }}'
+
+# The directory from which notification templates are read.
+templates: []
+
+# The root route on which each incoming alert enters.
+route:
+  # The labels by which incoming alerts are grouped together.
+  group_by: ['alertname']
+  
+  # How long to wait before sending a notification about new group of alerts
+  group_wait: 10s
+  
+  # How long to wait before sending notification about new alerts added to group
+  group_interval: 10s
+  
+  # How long to wait before re-sending notification about group
+  repeat_interval: 1h
+  
+  # Default receiver (fallback)
+  receiver: 'web.hook'
+
+# Inhibition rules allow to mute a set of alerts given that another alert is firing.
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    # Apply inhibition if the alertname is the same.
+    equal: ['alertname', 'dev', 'instance']
+
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://127.0.0.1:5001/'
+    send_resolved: true
+
+# Example email receiver (commented out)
+# - name: 'email'
+#   email_configs:
+#   - to: 'admin@{{ ansible_default_ipv4.address }}'
+#     subject: 'Alert: {{ "{{ .GroupLabels.alertname }}" }}'
+#     body: |
+#       {{ "{{ range .Alerts }}" }}
+#       Alert: {{ "{{ .Annotations.summary }}" }}
+#       Description: {{ "{{ .Annotations.description }}" }}
+#       {{ "{{ end }}" }}

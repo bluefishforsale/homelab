@@ -1,0 +1,64 @@
+groups:
+- name: basic_alerts
+  rules:
+  # High CPU usage alert
+  - alert: HighCpuUsage
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on {{ "{{ $labels.instance }}" }}"
+      description: "CPU usage is above 80% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
+
+  # High memory usage alert
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ "{{ $labels.instance }}" }}"
+      description: "Memory usage is above 85% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
+
+  # High disk usage alert
+  - alert: HighDiskUsage
+    expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 90
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High disk usage on {{ "{{ $labels.instance }}" }}"
+      description: "Disk usage is above 90% on filesystem {{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }}"
+
+  # Service down alert
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service {{ "{{ $labels.job }}" }} is down"
+      description: "Service {{ "{{ $labels.job }}" }} on {{ "{{ $labels.instance }}" }} has been down for more than 1 minute"
+
+  # GPU temperature alert (if NVIDIA GPU is present)
+  - alert: HighGpuTemperature
+    expr: nvidia_gpu_temperature_celsius > 85
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High GPU temperature on {{ "{{ $labels.instance }}" }}"
+      description: "GPU temperature is {{ "{{ $value }}" }}°C on {{ "{{ $labels.instance }}" }}"
+
+- name: smart_alerts
+  rules:
+  # SMART health alert
+  - alert: SmartDeviceUnhealthy
+    expr: smart_device_health_ok != 1
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: "SMART health check failed for {{ "{{ $labels.device }}" }}"
+      description: "Drive {{ "{{ $labels.device }}" }} on {{ "{{ $labels.instance }}" }} has failed SMART health check"

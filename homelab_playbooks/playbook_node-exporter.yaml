@@ -9,15 +9,42 @@
     cadvisor_image: gcr.io/cadvisor/cadvisor
     cadvisor_version: latest
     cadvisor_port: 8912
+    cadvisor_home: "/data01/services/{{ cadvisor_service }}"
+    cadvisor_files: "files/node-exporter"
     node_exporter_service: node-exporter
     node_exporter_image: prom/node-exporter
     node_exporter_version: latest
     node_exporter_port: 9100
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
+    node_exporter_home: "/data01/services/{{ node_exporter_service }}"
+    node_exporter_files: "files/node-exporter"
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
     process_exporter_port: 9256
+    # NVIDIA GPU Exporter (Docker Compose deployment)
+    nvidia_gpu_exporter_service: nvidia-gpu-exporter
+    nvidia_gpu_exporter_image: utkuozdemir/nvidia_gpu_exporter
+    nvidia_gpu_exporter_version: 1.4.0
+    nvidia_gpu_exporter_port: 9445
+    nvidia_gpu_exporter_home: "/data01/services/{{ nvidia_gpu_exporter_service }}"
+    nvidia_gpu_exporter_files: "files/node-exporter"
+    # SMART monitoring (Docker Compose deployment)
+    smart_exporter_service: smart-exporter
+    smart_exporter_image: prometheuscommunity/smartctl-exporter
+    smart_exporter_version: latest
+    smart_exporter_port: 9633
+    smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"
+    smart_exporter_files: "files/node-exporter"
+    # ZFS monitoring (Docker Compose deployment)
+    zfs_exporter_service: zfs-exporter
+    zfs_exporter_image: pdf/zfs_exporter
+    zfs_exporter_version: latest
+    zfs_exporter_port: 9150
+    zfs_exporter_home: "/data01/services/{{ zfs_exporter_service }}"
+    zfs_exporter_files: "files/node-exporter"
+    uid: 1001  # Ocean user ID
+    gid: 1001  # Users group ID
 
   tasks:
 
@@ -29,28 +56,375 @@
       group: root
       mode: '0777' # anyone can write into here
 
-  - name: Create node-exporter systemd service
+  - name: Create node exporter Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ node_exporter_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Create node exporter docker-compose.yml
     ansible.builtin.template:
-      src: "files/node-exporter/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ node_exporter_files }}/node-exporter-compose.yml.j2"
+      dest: "{{ node_exporter_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
       mode: '0644'
-    with_items:
-    - cadvisor.service
-    - node-exporter.service
-    - process-exporter.service
+    register: node_docker_compose_config
+
+  - name: Create node exporter environment file
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/node-exporter.env.j2"
+      dest: "{{ node_exporter_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: node_env_config
+
+  - name: Create cadvisor Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ cadvisor_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Create cadvisor docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ cadvisor_files }}/cadvisor-compose.yml.j2"
+      dest: "{{ cadvisor_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: cadvisor_docker_compose_config
+
+  - name: Create cadvisor environment file
+    ansible.builtin.template:
+      src: "{{ cadvisor_files }}/cadvisor.env.j2"
+      dest: "{{ cadvisor_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: cadvisor_env_config
+
+  - name: Check if NVIDIA GPU is present
+    ansible.builtin.shell: lspci | grep -i nvidia
+    register: gpu_check
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Show GPU detection result
+    ansible.builtin.debug:
+      msg: "NVIDIA GPU detected: {{ gpu_check.stdout_lines }}"
+    when: gpu_check.rc == 0
+
+  - name: Create NVIDIA GPU exporter Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ nvidia_gpu_exporter_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    when: gpu_check.rc == 0
+
+  - name: Create NVIDIA GPU exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ nvidia_gpu_exporter_files }}/nvidia-gpu-exporter-compose.yml.j2"
+      dest: "{{ nvidia_gpu_exporter_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    when: gpu_check.rc == 0
+    register: gpu_docker_compose_config
+
+  - name: Create NVIDIA GPU exporter environment file
+    ansible.builtin.template:
+      src: "{{ nvidia_gpu_exporter_files }}/nvidia-gpu-exporter.env.j2"
+      dest: "{{ nvidia_gpu_exporter_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    when: gpu_check.rc == 0
+    register: gpu_env_config
+
+  - name: Create NVIDIA GPU exporter README documentation
+    ansible.builtin.copy:
+      src: "{{ nvidia_gpu_exporter_files }}/README.md"
+      dest: "{{ nvidia_gpu_exporter_home }}/README.md"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    when: gpu_check.rc == 0
+
+  - name: Create process-exporter systemd service (non-compose)
+    ansible.builtin.template:
+      src: "files/node-exporter/process-exporter.service.j2"
+      dest: "/etc/systemd/system/process-exporter.service"
+      mode: '0644'
     notify:
     - Reload systemd daemon
     - Restart services
+
+  - name: Create cadvisor Docker Compose systemd service
+    ansible.builtin.template:
+      src: "{{ cadvisor_files }}/cadvisor.service.j2"
+      dest: "/etc/systemd/system/cadvisor.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart cadvisor service
+
+  - name: Create node exporter Docker Compose systemd service
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/node-exporter.service.j2"
+      dest: "/etc/systemd/system/node-exporter.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart node exporter service
+
+  - name: Show node exporter configuration status
+    ansible.builtin.debug:
+      msg: "Node exporter configuration files have been updated - containers will be recreated"
+    when: node_docker_compose_config.changed or node_env_config.changed
+
+  - name: Force node exporter container recreation when configs change
+    ansible.builtin.shell: |
+      cd {{ node_exporter_home }}
+      echo "Recreating node exporter containers due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "Node exporter container recreation completed"
+    when: node_docker_compose_config.changed or node_env_config.changed
+
+  - name: Show cadvisor configuration status
+    ansible.builtin.debug:
+      msg: "cAdvisor configuration files have been updated - containers will be recreated"
+    when: cadvisor_docker_compose_config.changed or cadvisor_env_config.changed
+
+  - name: Force cadvisor container recreation when configs change
+    ansible.builtin.shell: |
+      cd {{ cadvisor_home }}
+      echo "Recreating cAdvisor containers due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "cAdvisor container recreation completed"
+    when: cadvisor_docker_compose_config.changed or cadvisor_env_config.changed
+
+  - name: Create SMART exporter Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ smart_exporter_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Create SMART exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ smart_exporter_files }}/smart-exporter-compose.yml.j2"
+      dest: "{{ smart_exporter_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: smart_docker_compose_config
+
+  - name: Create SMART exporter environment file
+    ansible.builtin.template:
+      src: "{{ smart_exporter_files }}/smart-exporter.env.j2"
+      dest: "{{ smart_exporter_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: smart_env_config
+
+  - name: Show SMART exporter configuration status
+    ansible.builtin.debug:
+      msg: "SMART exporter configuration files have been updated - containers will be recreated"
+    when: smart_docker_compose_config.changed or smart_env_config.changed
+
+  - name: Force SMART exporter container recreation when configs change
+    ansible.builtin.shell: |
+      cd {{ smart_exporter_home }}
+      echo "Recreating SMART exporter containers due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "SMART exporter container recreation completed"
+    when: smart_docker_compose_config.changed or smart_env_config.changed
+
+  - name: Create SMART exporter Docker Compose systemd service
+    ansible.builtin.template:
+      src: "{{ smart_exporter_files }}/smart-exporter.service.j2"
+      dest: "/etc/systemd/system/smart-exporter.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart smart exporter service
+
+  - name: Create ZFS exporter Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ zfs_exporter_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Create ZFS exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ zfs_exporter_files }}/zfs-exporter-compose.yml.j2"
+      dest: "{{ zfs_exporter_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: zfs_docker_compose_config
+
+  - name: Create ZFS exporter environment file
+    ansible.builtin.template:
+      src: "{{ zfs_exporter_files }}/zfs-exporter.env.j2"
+      dest: "{{ zfs_exporter_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: zfs_env_config
+
+  - name: Show ZFS exporter configuration status
+    ansible.builtin.debug:
+      msg: "ZFS exporter configuration files have been updated - containers will be recreated"
+    when: zfs_docker_compose_config.changed or zfs_env_config.changed
+
+  # - name: Force ZFS exporter container recreation when configs change
+  #   ansible.builtin.shell: |
+  #     cd {{ zfs_exporter_home }}
+  #     echo "Recreating ZFS exporter containers due to configuration changes..."
+  #     docker-compose down --timeout 30
+  #     docker-compose up -d --force-recreate
+  #     echo "ZFS exporter container recreation completed"
+  #   when: zfs_docker_compose_config.changed or zfs_env_config.changed
+
+  # - name: Create ZFS exporter Docker Compose systemd service
+  #   ansible.builtin.template:
+  #     src: "{{ zfs_exporter_files }}/zfs-exporter.service.j2"
+  #     dest: "/etc/systemd/system/zfs-exporter.service"
+  #     mode: '0644'
+  #   notify:
+  #   - Reload systemd daemon
+  #   - Restart zfs exporter service
+
+  - name: Check if NVIDIA GPU is present
+    ansible.builtin.shell: lspci | grep -i nvidia
+    register: gpu_check
+    ignore_errors: yes
+    changed_when: false
+
+  - name: Show GPU detection result
+    ansible.builtin.debug:
+      msg: "NVIDIA GPU detected: {{ gpu_check.stdout_lines }}"
+    when: gpu_check.rc == 0
+
+  - name: Create NVIDIA GPU exporter Docker Compose directory
+    ansible.builtin.file:
+      path: "{{ nvidia_gpu_exporter_home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    when: gpu_check.rc == 0
+
+  - name: Create NVIDIA GPU exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ nvidia_gpu_exporter_files }}/nvidia-gpu-exporter-compose.yml.j2"
+      dest: "{{ nvidia_gpu_exporter_home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    when: gpu_check.rc == 0
+    register: gpu_docker_compose_config
+
+  - name: Create NVIDIA GPU exporter environment file
+    ansible.builtin.template:
+      src: "{{ nvidia_gpu_exporter_files }}/nvidia-gpu-exporter.env.j2"
+      dest: "{{ nvidia_gpu_exporter_home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    when: gpu_check.rc == 0
+    register: gpu_env_config
+
+  - name: Create NVIDIA GPU exporter README documentation
+    ansible.builtin.copy:
+      src: "{{ nvidia_gpu_exporter_files }}/README.md"
+      dest: "{{ nvidia_gpu_exporter_home }}/README.md"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    when: gpu_check.rc == 0
+
+  - name: Create NVIDIA GPU exporter Docker Compose systemd service (GPU hosts only)
+    ansible.builtin.template:
+      src: "{{ nvidia_gpu_exporter_files }}/nvidia-gpu-exporter.service.j2"
+      dest: "/etc/systemd/system/nvidia-gpu-exporter.service"
+      mode: '0644'
+    when: gpu_check.rc == 0
+    notify:
+    - Reload systemd daemon
+    - Restart services
+    - Restart GPU services
+
+  - name: Show GPU configuration status
+    ansible.builtin.debug:
+      msg: "GPU configuration files have been updated - containers will be recreated"
+    when: gpu_check.rc == 0 and (gpu_docker_compose_config.changed or gpu_env_config.changed)
+
+  - name: Force GPU container recreation when configs change
+    ansible.builtin.shell: |
+      cd {{ nvidia_gpu_exporter_home }}
+      echo "Recreating GPU containers due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "GPU container recreation completed"
+    when: gpu_check.rc == 0 and (gpu_docker_compose_config.changed or gpu_env_config.changed)
     
-  - name: Base case endure services are started and enabled
+  - name: Start and enable process-exporter (non-compose service)
     ansible.builtin.systemd:
-      name: "{{ item }}"
+      name: process-exporter.service
       state: started
       enabled: true
-    with_items:
-    - cadvisor.service
-    - node-exporter.service
-    - process-exporter.service
+
+  - name: Start and enable cadvisor Docker Compose service
+    ansible.builtin.systemd:
+      name: cadvisor.service
+      state: started
+      enabled: true
+      daemon_reload: yes
+
+  - name: Start and enable node exporter Docker Compose service
+    ansible.builtin.systemd:
+      name: node-exporter.service
+      state: started
+      enabled: true
+      daemon_reload: yes
+
+  - name: Start and enable NVIDIA GPU exporter (GPU hosts only)
+    ansible.builtin.systemd:
+      name: nvidia-gpu-exporter.service
+      state: started
+      enabled: true
+    when: gpu_check.rc == 0
+
+  - name: Start and enable SMART exporter Docker Compose service
+    ansible.builtin.systemd:
+      name: smart-exporter.service
+      state: started
+      enabled: true
+      daemon_reload: yes
+
+  # ZFS exporter temporarily disabled due to container runtime issues
+  # - name: Start and enable ZFS exporter Docker Compose service
+  #   ansible.builtin.systemd:
+  #     name: zfs-exporter.service
+  #     state: started
+  #     enabled: true
+  #     daemon_reload: yes
 
   handlers:
   - name: Reload systemd daemon
@@ -59,9 +433,31 @@
 
   - name: Restart services
     ansible.builtin.systemd:
-      name: "{{ item }}"
+      name: process-exporter.service
       state: restarted
-    with_items:
-    - cadvisor.service
-    - node-exporter.service
-    - process-exporter.service
+
+  - name: Restart cadvisor service
+    ansible.builtin.systemd:
+      name: cadvisor.service
+      state: restarted
+
+  - name: Restart node exporter service
+    ansible.builtin.systemd:
+      name: node-exporter.service
+      state: restarted
+
+  - name: Restart GPU services
+    ansible.builtin.systemd:
+      name: nvidia-gpu-exporter.service
+      state: restarted
+    when: gpu_check.rc == 0
+
+  - name: Restart smart exporter service
+    ansible.builtin.systemd:
+      name: smart-exporter.service
+      state: restarted
+
+  - name: Restart zfs exporter service
+    ansible.builtin.systemd:
+      name: zfs-exporter.service
+      state: restarted

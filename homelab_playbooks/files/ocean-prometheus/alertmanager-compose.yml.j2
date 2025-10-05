@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  alertmanager:
+    image: {{ alertmanager_image }}:{{ alertmanager_version }}
+    container_name: {{ alertmanager_service }}
+    restart: unless-stopped
+    
+    # Networking
+    ports:
+      - "{{ alertmanager_port }}:9093"
+    
+    # Configuration and data
+    volumes:
+      - {{ alertmanager_home }}/config:/etc/alertmanager:ro
+      - {{ alertmanager_home }}/data:/alertmanager
+    
+    # Command line arguments
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port }}/'
+      - '--log.level=info'
+    
+    # Health Check (check web interface)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

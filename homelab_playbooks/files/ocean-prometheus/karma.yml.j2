@@ -1,0 +1,31 @@
+# Karma configuration file
+# Documentation: https://github.com/prymitive/karma
+
+# Alertmanager instances
+alertmanager:
+  interval: 30s
+  servers:
+    - name: "alertmanager"
+      uri: "http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port }}"
+      timeout: 20s
+      proxy: false
+
+# Listen settings
+listen:
+  address: "0.0.0.0"
+  port: 8080
+
+# Log settings
+log:
+  level: "info"
+
+# UI settings
+ui:
+  refresh: "30s"
+  hideFiltersWhenIdle: true
+  colorTitlebar: false
+  theme: "auto"
+  animations: true
+  minimalGroupWidth: 420
+  alertsPerGroup: 5
+  collapseGroups: "collapsed"

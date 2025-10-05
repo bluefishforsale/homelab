@@ -9,10 +9,10 @@ services:
     
     environment:
       - TZ=America/Los_Angeles
-      - MYSQL_ROOT_PASSWORD={{ monitoring.mysql.root_password | default(monitoring.grafana.database_password) }}
+      - MYSQL_ROOT_PASSWORD={{ databases.mysql.root_password }}
       - MYSQL_DATABASE=grafana
       - MYSQL_USER=grafana
-      - MYSQL_PASSWORD={{ monitoring.grafana.database_password }}
+      - MYSQL_PASSWORD={{ databases.mysql.app_passwords.grafana }}
       - MYSQL_ROOT_HOST=%
       
     ports:
@@ -31,7 +31,7 @@ services:
     
     # Health check - check if MySQL is ready to accept connections
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{{ monitoring.mysql.root_password | default(monitoring.grafana.database_password) }}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p{{ databases.mysql.root_password }}"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -97,3 +97,8 @@ services:
     # Resource limits
     cpus: '1.0'
     mem_limit: 1024m
+
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

@@ -130,13 +130,8 @@ services:
     # Security options
     security_opt:
       - no-new-privileges:true
-    
-    # Network configuration
-    networks:
-      - n8n_network
 
-networks:
-  n8n_network:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: br-n8n
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+# No custom networks needed - using default bridge

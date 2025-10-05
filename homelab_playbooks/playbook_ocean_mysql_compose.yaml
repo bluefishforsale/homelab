@@ -1,0 +1,220 @@
+---
+- name: Configure MySQL Database Server using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vault_secrets.yaml
+
+  vars:
+    service: mysql
+    image: percona/percona-server
+    version: "5.7"
+    port: 3306
+    data: /data01
+    files: files/mysql-compose
+    home: "{{ data }}/services/{{ service }}"
+    user: mysql
+    uid: 1001
+    gid: 1001
+    # Database configuration from vault
+    root_password: "{{ databases.mysql.root_password }}"
+    mysql_user: "grafana"
+    mysql_database: "grafana"
+    mysql_database_password: "{{ monitoring.grafana.database_password }}"
+
+  tasks:
+
+  - name: Ensure base directory exists with homelab standard ownership
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Ensure mysql subdirectories exist with consistent homelab permissions
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item.path }}"
+      state: directory
+      owner: "{{ item.owner | default(uid) }}"
+      group: "{{ item.group | default(gid) }}"
+      mode: "{{ item.mode | default('0755') }}"
+    with_items:
+    - { path: "data", owner: "{{ uid }}", group: "{{ gid }}", mode: "0755" }    # Homelab standard user
+    - { path: "logs", owner: "{{ uid }}", group: "{{ gid }}", mode: "0755" }    # Homelab standard user
+    - { path: "conf.d", owner: "{{ uid }}", group: "{{ gid }}", mode: "0755" }  # Homelab standard user
+
+  - name: Fix ownership of existing MySQL data files to homelab standard
+    ansible.builtin.command:
+      cmd: chown -R {{ uid }}:{{ gid }} "{{ home }}/data"
+    changed_when: false
+
+  - name: Fix ownership of existing MySQL log files to homelab standard
+    ansible.builtin.command:
+      cmd: chown -R {{ uid }}:{{ gid }} "{{ home }}/logs"
+    changed_when: false
+
+  - name: Stop any existing MySQL service to ensure clean state
+    ansible.builtin.systemd:
+      name: mysql.service
+      state: stopped
+    ignore_errors: true
+
+  - name: Clean up existing MySQL data files for fresh start
+    ansible.builtin.file:
+      path: "{{ home }}/data/{{ item }}"
+      state: absent
+    with_items:
+    - "xb_doublewrite"      # Corrupted doublewrite file
+    - "ib_buffer_pool"      # InnoDB buffer pool dump  
+    - "auto.cnf"            # MySQL auto config
+    - "ibdata1"             # InnoDB system tablespace (force recreation)
+    - "ib_logfile0"         # InnoDB log files
+    - "ib_logfile1"         # InnoDB log files
+    - "mysql"               # System database (will be recreated)
+    - "performance_schema"  # Performance schema (will be recreated)
+    - "sys"                 # System database (will be recreated)
+    ignore_errors: true
+
+  - name: Ensure MySQL directories are completely clean with homelab standard permissions
+    ansible.builtin.shell: |
+      # Remove everything in the data directory
+      rm -rf {{ home }}/data/*
+      rm -rf {{ home }}/data/.*
+      
+      # Clean logs directory too
+      rm -rf {{ home }}/logs/*
+      
+      # Ensure directories exist with consistent homelab permissions
+      mkdir -p {{ home }}/data
+      mkdir -p {{ home }}/logs
+      chown {{ uid }}:{{ gid }} {{ home }}/data
+      chown {{ uid }}:{{ gid }} {{ home }}/logs
+      chmod 755 {{ home }}/data
+      chmod 755 {{ home }}/logs
+      
+      # Also ensure config directory has consistent ownership
+      chown {{ uid }}:{{ gid }} {{ home }}/conf.d
+      
+      # Recursively fix any remaining files in the entire mysql directory
+      chown -R {{ uid }}:{{ gid }} {{ home }}
+      
+      # Verify ownership of all directories
+      echo "=== Directory ownership verification ==="
+      ls -la {{ home }}/
+      echo "=== Data directory contents ==="
+      ls -la {{ home }}/data/ 2>/dev/null || echo "Data directory is empty (expected)"
+      echo "=== Logs directory contents ==="
+      ls -la {{ home }}/logs/ 2>/dev/null || echo "Logs directory is empty (expected)"
+      echo "=== Config directory contents ==="
+      ls -la {{ home }}/conf.d/
+    register: cleanup_result
+    changed_when: true
+
+  - name: Display directory permissions after cleanup
+    ansible.builtin.debug:
+      var: cleanup_result.stdout_lines
+
+  - name: Create MySQL custom configuration
+    ansible.builtin.copy:
+      content: |
+        [mysqld]
+        # Custom MySQL configuration
+        innodb_buffer_pool_size = 1G
+        max_connections = 200
+        character-set-server = utf8mb4
+        collation-server = utf8mb4_unicode_ci
+        
+        # Logging
+        slow_query_log = 1
+        slow_query_log_file = /var/log/mysql/mysql-slow.log
+        log_error = /var/log/mysql/mysql-error.log
+        
+        # Security
+        bind-address = 0.0.0.0
+        skip-name-resolve
+        
+        # Performance
+        query_cache_type = 1
+        query_cache_size = 64M
+        
+        # Fix timestamp warnings
+        explicit_defaults_for_timestamp = 1
+        
+        # Ensure proper file permissions
+        secure_file_priv = ""
+      dest: "{{ home }}/conf.d/custom.cnf"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart mysql service
+
+  - name: Display important migration notice
+    ansible.builtin.debug:
+      msg: |
+        ==========================================
+        IMPORTANT: MySQL Fresh Installation
+        ==========================================
+        This deployment performs a fresh MySQL installation.
+        All existing MySQL data has been cleared for clean container initialization.
+        
+        After successful deployment:
+        1. MySQL will initialize with empty databases
+        2. The 'grafana' database and user will be created automatically
+        3. If you had existing data, restore from backup after initialization
+        ==========================================
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart mysql service
+
+  - name: Create mysql environment file
+    ansible.builtin.template:
+      src: "{{ files }}/mysql.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart mysql service
+
+  - name: Create mysql systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/mysql.service.j2"
+      dest: "/etc/systemd/system/mysql.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart mysql service
+
+  - name: Create mysql_legacy network (managed by docker-compose)
+    ansible.builtin.debug:
+      msg: "mysql_legacy network will be created automatically by docker-compose"
+
+  - name: Enable mysql service
+    ansible.builtin.systemd:
+      name: mysql.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart mysql service
+    ansible.builtin.systemd:
+      name: mysql.service
+      state: restarted
