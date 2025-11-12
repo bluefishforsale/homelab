@@ -9,22 +9,59 @@
         update_cache: yes
         cache_valid_time: 86400  # 24 hours
 
+    - name: Check if ZFS is loaded
+      ansible.builtin.shell: lsmod | grep -q '^zfs' && zpool list 2>/dev/null
+      register: zfs_check
+      changed_when: false
+      failed_when: false
 
-    - name: Write IO scheduler script
+    - name: Set ZFS presence fact
+      ansible.builtin.set_fact:
+        has_zfs: "{{ zfs_check.rc == 0 }}"
+
+    - name: Show ZFS detection result
+      ansible.builtin.debug:
+        msg: "ZFS detected: {{ has_zfs }}"
+
+    - name: Write IO scheduler script (ZFS hosts)
       ansible.builtin.copy:
         force: true
         dest: "/etc/systemd/system/io-scheduler.sh"
         mode: 0755
         content: |
+          # For ZFS, use 'none' scheduler as ZFS has its own IO scheduling
           for SCH in /sys/block/*/queue/scheduler ; do
-              echo "deadline" > "${SCH}" 2>/dev/null
+              echo "none" > "${SCH}" 2>/dev/null || echo "noop" > "${SCH}" 2>/dev/null
           done
+          # Larger queue depth for better throughput
+          for DEPTH in /sys/block/*/queue/nr_requests ; do
+              echo "2048" > "${DEPTH}" 2>/dev/null
+          done
+          # Larger readahead for sequential media streaming (8MB)
+          for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
+              echo "8192" > "${RAHEAD}" 2>/dev/null
+          done
+      when: has_zfs | bool
+
+    - name: Write IO scheduler script (non-ZFS hosts)
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/io-scheduler.sh"
+        mode: 0755
+        content: |
+          # Use deadline scheduler for traditional filesystems
+          for SCH in /sys/block/*/queue/scheduler ; do
+              echo "mq-deadline" > "${SCH}" 2>/dev/null || echo "deadline" > "${SCH}" 2>/dev/null
+          done
+          # Standard queue depth
           for DEPTH in /sys/block/*/queue/nr_requests ; do
               echo "1024" > "${DEPTH}" 2>/dev/null
           done
+          # Moderate readahead (4MB)
           for RAHEAD in /sys/block/*/queue/read_ahead_kb ; do
               echo "4096" > "${RAHEAD}" 2>/dev/null
           done
+      when: not (has_zfs | bool)
 
     - name: Write IO scheduler service
       ansible.builtin.copy:
@@ -44,7 +81,7 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Write blockdev readahead service
+    - name: Write blockdev readahead service (ZFS hosts)
       ansible.builtin.copy:
         force: true
         dest: "/etc/systemd/system/blockdev-setra.service"
@@ -55,10 +92,32 @@
 
           [Service]
           Type=oneshot
-          ExecStart=bash -c '/sbin/blockdev --setra 8192 /dev/sd*'
+          # 16MB readahead for large sequential media file streaming
+          # Handle /dev/sd*, /dev/nvme*, and /dev/vd* devices
+          ExecStart=/bin/bash -c 'for dev in /dev/sd[a-z] /dev/sd[a-z][a-z] /dev/nvme[0-9]n[0-9] /dev/vd[a-z]; do [ -b "$dev" ] && /sbin/blockdev --setra 16384 "$dev" 2>/dev/null || true; done'
 
           [Install]
           WantedBy=multi-user.target
+      when: has_zfs | bool
+
+    - name: Write blockdev readahead service (non-ZFS hosts)
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/systemd/system/blockdev-setra.service"
+        content: |
+          [Unit]
+          Description=Set readahead for the hard drive device
+          After=local-fs.target
+
+          [Service]
+          Type=oneshot
+          # 8MB readahead for standard filesystems
+          # Handle /dev/sd*, /dev/nvme*, and /dev/vd* devices
+          ExecStart=/bin/bash -c 'for dev in /dev/sd[a-z] /dev/sd[a-z][a-z] /dev/nvme[0-9]n[0-9] /dev/vd[a-z]; do [ -b "$dev" ] && /sbin/blockdev --setra 8192 "$dev" 2>/dev/null || true; done'
+
+          [Install]
+          WantedBy=multi-user.target
+      when: not (has_zfs | bool)
 
     - name: Write cpufrequtils GOVERNOR
       ansible.builtin.copy:
@@ -94,6 +153,105 @@
 
           [Install]
           WantedBy=multi-user.target
+
+    - name: Write ZFS tuning sysctl configuration (ZFS hosts)
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/sysctl.d/99-zfs-tuning.conf"
+        mode: "0644"
+        content: |
+          # ZFS-specific tuning
+          # ZFS ARC tuning for media streaming workload
+          # Set ARC max to 50% of RAM (adjust based on your total RAM)
+          # This caches metadata and frequently accessed files
+          # Example: 32GB RAM = 16GB ARC max (in bytes)
+          # vm.arc_max = 17179869184
+          
+          # Minimum ARC size (25% of max, adjust to your needs)
+          # vm.arc_min = 4294967296
+          
+          # Network tuning for streaming
+          # Increase TCP buffer sizes for better streaming performance
+          net.core.rmem_max = 134217728
+          net.core.wmem_max = 134217728
+          net.core.rmem_default = 16777216
+          net.core.wmem_default = 16777216
+          net.ipv4.tcp_rmem = 4096 87380 67108864
+          net.ipv4.tcp_wmem = 4096 65536 67108864
+          
+          # Reduce swappiness - prefer using RAM for caching
+          vm.swappiness = 10
+          
+          # VFS cache pressure - lower value preserves directory/inode cache
+          # Good for media libraries with many files
+          vm.vfs_cache_pressure = 50
+      when: has_zfs | bool
+
+    - name: Write general tuning sysctl configuration (non-ZFS hosts)
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/sysctl.d/99-system-tuning.conf"
+        mode: "0644"
+        content: |
+          # General system tuning for media streaming
+          
+          # Network tuning for streaming
+          # Increase TCP buffer sizes for better streaming performance
+          net.core.rmem_max = 134217728
+          net.core.wmem_max = 134217728
+          net.core.rmem_default = 16777216
+          net.core.wmem_default = 16777216
+          net.ipv4.tcp_rmem = 4096 87380 67108864
+          net.ipv4.tcp_wmem = 4096 65536 67108864
+          
+          # Reduce swappiness - prefer using RAM for caching
+          vm.swappiness = 10
+          
+          # VFS cache pressure - lower value preserves directory/inode cache
+          # Good for media libraries with many files
+          vm.vfs_cache_pressure = 50
+          
+          # Dirty page writeback tuning
+          vm.dirty_ratio = 40
+          vm.dirty_background_ratio = 10
+      when: not (has_zfs | bool)
+
+    - name: Write ZFS module parameters
+      ansible.builtin.copy:
+        force: true
+        dest: "/etc/modprobe.d/zfs.conf"
+        mode: "0644"
+        content: |
+          # ZFS ARC size limits (in bytes)
+          # Uncomment and adjust based on your RAM
+          # For 32GB RAM, 16GB max ARC is reasonable
+          # options zfs zfs_arc_max=17179869184
+          # options zfs zfs_arc_min=4294967296
+          
+          # Enable ZFS prefetcher for sequential reads (media streaming)
+          options zfs zfs_prefetch_disable=0
+          
+          # Prefetch metadata more aggressively (helps with directory listings)
+          options zfs zfs_arc_meta_prune=10000
+          
+          # L2ARC tuning (if you add an SSD cache later)
+          # options zfs l2arc_write_max=50331648
+          # options zfs l2arc_write_boost=67108864
+      when: has_zfs | bool
+
+    - name: Apply ZFS sysctl settings
+      ansible.builtin.command:
+        cmd: sysctl -p /etc/sysctl.d/99-zfs-tuning.conf
+      changed_when: false
+      failed_when: false
+      when: has_zfs | bool
+
+    - name: Apply general sysctl settings (non-ZFS hosts)
+      ansible.builtin.command:
+        cmd: sysctl -p /etc/sysctl.d/99-system-tuning.conf
+      changed_when: false
+      failed_when: false
+      when: not (has_zfs | bool)
 
     - name: Temporarily disable services
       ansible.builtin.systemd:
