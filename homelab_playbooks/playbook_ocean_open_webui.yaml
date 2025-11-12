@@ -77,17 +77,6 @@
     - Reload systemd daemon
     - Restart open-webui service
 
-  - name: Create open-webui environment file
-    ansible.builtin.template:
-      src: "{{ files }}/open-webui.env.j2"
-      dest: "{{ home }}/.env"
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0600'
-    notify:
-    - Reload systemd daemon
-    - Restart open-webui service
-
   - name: Create open-webui systemd service
     ansible.builtin.template:
       src: "{{ files }}/{{ item }}.j2"

@@ -6,6 +6,8 @@ services:
     container_name: {{ service }}
     hostname: {{ service }}
     restart: unless-stopped
+    ports:
+      - "{{ port }}:{{ port }}"
     
     environment:
       - TZ=America/Los_Angeles
@@ -47,9 +49,6 @@ services:
       - ENABLE_DIRECT_CONNECTIONS=true
       # Force Open WebUI to use port 3000 with host networking
       - PORT={{ port }}
-    
-    # Use host networking to access llama.cpp directly
-    network_mode: host
     
     volumes:
       - {{ home }}/data:/data

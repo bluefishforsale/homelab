@@ -1,0 +1,84 @@
+---
+- name: Configure Navidrome music server with Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    service: navidrome
+    image: deluan/navidrome
+    version: latest
+    port: 4533
+    data: /data01
+    files: files/navidrome
+    home: "{{ data }}/services/{{ service }}"
+    music: "{{ data }}/complete/music"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - data
+
+  - name: Ensure music directory exists
+    ansible.builtin.file:
+      path: "{{ music }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart navidrome service
+
+  - name: Create navidrome systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - navidrome.service
+    notify:
+    - Reload systemd daemon
+    - Restart navidrome service
+
+  - name: Enable navidrome service
+    ansible.builtin.systemd:
+      name: navidrome.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart navidrome service
+    ansible.builtin.systemd:
+      name: navidrome.service
+      state: restarted

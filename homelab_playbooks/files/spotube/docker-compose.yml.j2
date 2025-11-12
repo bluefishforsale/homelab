@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  spotube:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    environment:
+      # LinuxServer.io User/Group Configuration
+      - PUID={{ uid }}
+      - PGID={{ gid }}
+      - TZ=America/Los_Angeles
+      
+      # Disable HTTPS requirement - use HTTP only
+      - SELKIES_ENABLE_HTTPS=false
+    
+    ports:
+      - "{{ port }}:3000"
+      - "3001:3001"
+    
+    volumes:
+      - {{ home }}/config:/config
+    
+    # Shared memory size for browser rendering
+    shm_size: "1gb"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M

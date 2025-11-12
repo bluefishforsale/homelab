@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  navidrome:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    user: "{{ uid }}:{{ gid }}"
+    
+    environment:
+      # Navidrome Configuration
+      - ND_LOGLEVEL=info
+      - ND_SESSIONTIMEOUT=24h
+      - ND_SCANSCHEDULE=1h
+      - ND_ENABLETRANSCODINGCONFIG=true
+      - ND_TRANSCODINGCACHESIZE=100MB
+    
+    ports:
+      - "{{ port }}:4533"
+    
+    volumes:
+      - {{ home }}/data:/data
+      - {{ music }}:/music:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:4533/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
