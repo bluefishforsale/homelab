@@ -57,6 +57,14 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:8081"
 
+        # Music services (running on ocean - 192.168.1.143)
+        - hostname: "spotube.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:3100"
+        - hostname: "navidrome.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:4533"
+
         # Management services (running on ocean - 192.168.1.143)
         - hostname: "portainer.terrac.com"
           service_type: "http"
