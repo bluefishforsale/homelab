@@ -55,11 +55,6 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9256']
 
-  - job_name: 'zfs-exporter'
-    relabel_configs: *dropPortNumber
-    static_configs:
-    - targets: ['ocean.home:9150']
-
   - job_name: 'cadvisor'
     static_configs:
     - targets: ['ocean.home:8912']
@@ -78,12 +73,6 @@ scrape_configs:
     relabel_configs: *dropPortNumber
     static_configs:
     - targets: ['ocean.home:9633']
-
-  # ZFS exporter temporarily disabled due to container runtime issues
-  # - job_name: 'zfs-exporter'
-  #   relabel_configs: *dropPortNumber
-  #   static_configs:
-  #   - targets: ['ocean.home:9150']
 
   - job_name: 'unpoller'
     relabel_configs: *dropPortNumber
