@@ -1,0 +1,53 @@
+[Unit]
+Description=Frigate NVR with Docker Compose
+Documentation=https://docs.frigate.video/
+After=docker.service zfs-mount.service zfs-import.target network-online.target
+Wants=network-online.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User={{ user }}
+Group={{ user }}
+WorkingDirectory={{ home }}
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME={{ service }}
+Environment=COMPOSE_HTTP_TIMEOUT=60
+
+# Pre-start commands (idempotent)
+ExecStartPre=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker-compose -f {{ home }}/docker-compose.yml pull --quiet
+
+# Start command
+ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
+
+# Stop command  
+ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+
+# Reload command
+ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml restart
+
+# Service behavior
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ home }}
+ReadOnlyPaths=/var/run/docker.sock
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ service }}
+
+[Install]
+WantedBy=multi-user.target

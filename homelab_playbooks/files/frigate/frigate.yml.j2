@@ -1,0 +1,70 @@
+mqtt:
+  enabled: false
+
+database:
+  path: /config/frigate.db
+
+detectors:
+  cpu1:
+    type: cpu
+    num_threads: 3
+
+# GPU Hardware Acceleration for NVIDIA P2000
+ffmpeg:
+  hwaccel_args: preset-nvidia-h264
+
+# Global object detection settings
+objects:
+  track:
+    - person
+    - car
+    - dog
+    - cat
+  filters:
+    person:
+      min_area: 5000
+      max_area: 100000
+      threshold: 0.7
+    car:
+      min_area: 10000
+      threshold: 0.7
+
+# Recording configuration
+record:
+  enabled: true
+  retain:
+    days: 7
+    mode: motion
+  events:
+    retain:
+      default: 14
+      mode: motion
+
+# Snapshots configuration
+snapshots:
+  enabled: true
+  timestamp: true
+  bounding_box: true
+  crop: false
+  retain:
+    default: 14
+
+# Motion detection
+motion:
+  threshold: 30
+  contour_area: 10
+  frame_alpha: 0.01
+  frame_height: 100
+
+# Live view settings
+live:
+  height: 720
+  quality: 8
+
+# Birdseye view (multi-camera overview)
+birdseye:
+  enabled: true
+  mode: motion
+
+# Camera configurations (add cameras below)
+cameras: {}
