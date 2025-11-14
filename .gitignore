@@ -1,5 +1,6 @@
 # macOS files
 .DS_Store
+.vscode/settings.json
 
 # ignore qemu-local
 qemu-output/
