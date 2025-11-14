@@ -180,7 +180,7 @@
   ########### System log rotation
   - name: Configure logrotate for system logs
     ansible.builtin.copy:
-      dest: /etc/logrotate.d/homelab
+      dest: /etc/logrotate.d/rsyslog
       content: |
         # Custom logrotate config for homelab
         /var/log/syslog {
