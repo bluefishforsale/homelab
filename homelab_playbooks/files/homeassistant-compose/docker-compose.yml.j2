@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  homeassistant:
+    image: "{{ image }}:{{ version }}"
+    container_name: "{{ service }}"
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    environment:
+      TZ: "America/Los_Angeles"
+      PUID: "{{ uid }}"
+      PGID: "{{ gid }}"
+    volumes:
+      - "{{ home }}:/config"
+      - "/etc/localtime:/etc/localtime:ro"
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+      - "/dev/ttyUSB1:/dev/ttyUSB1"
+      - "/dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_61600611-if00-port0:/dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_61600611-if00-port0"
+      - "/dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_61600611-if01-port0:/dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_61600611-if01-port0"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8123/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s

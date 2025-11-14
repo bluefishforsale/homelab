@@ -1,0 +1,94 @@
+---
+- name: Configure Home Assistant using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    service: homeassistant
+    image: ghcr.io/home-assistant/home-assistant
+    version: stable
+    port: 8123
+    data: /data01
+    files: files/homeassistant-compose
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Ensure Home Assistant subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    with_items:
+    - config
+    - logs
+
+  - name: Ensure all directories have correct ownership
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+      recurse: yes
+
+  - name: Create Home Assistant configuration.yaml
+    ansible.builtin.template:
+      src: "{{ files }}/configuration.yaml.j2"
+      dest: "{{ home }}/configuration.yaml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart homeassistant service
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart homeassistant service
+
+  - name: Create Home Assistant systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/homeassistant.service.j2"
+      dest: "/etc/systemd/system/homeassistant.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart homeassistant service
+
+  - name: Enable Home Assistant service
+    ansible.builtin.systemd:
+      name: homeassistant.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart homeassistant service
+    ansible.builtin.systemd:
+      name: homeassistant.service
+      state: restarted
