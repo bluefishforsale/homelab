@@ -4,6 +4,7 @@ services:
   cadvisor:
     image: {{ cadvisor_image }}:{{ cadvisor_version }}
     container_name: {{ cadvisor_service }}
+    hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
     # Networking

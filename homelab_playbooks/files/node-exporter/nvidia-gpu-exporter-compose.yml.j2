@@ -4,6 +4,7 @@ services:
   nvidia-gpu-exporter:
     image: {{ nvidia_gpu_exporter_image }}:{{ nvidia_gpu_exporter_version }}
     container_name: {{ nvidia_gpu_exporter_service }}
+    hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
     # GPU Access

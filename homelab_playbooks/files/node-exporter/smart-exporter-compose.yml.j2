@@ -4,6 +4,7 @@ services:
   smart-exporter:
     image: {{ smart_exporter_image }}:{{ smart_exporter_version }}
     container_name: {{ smart_exporter_service }}
+    hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
     # Networking

@@ -9,6 +9,7 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory={{ karma_home }}
 EnvironmentFile={{ karma_home }}/.env
+Environment="COMPOSE_HTTP_TIMEOUT=180"
 
 # Stop running instance
 ExecStartPre=-docker-compose down --timeout 30

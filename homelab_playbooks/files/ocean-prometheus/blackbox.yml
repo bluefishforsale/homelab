@@ -1,4 +1,5 @@
 modules:
+  # Standard HTTP 2xx check
   http_2xx:
     prober: http
     timeout: 5s
@@ -12,20 +13,167 @@ modules:
         headers:
             User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
 
+  # TLS Certificate validation and details
+  http_tls:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      no_follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+      headers:
+        User-Agent: "Prometheus BlackBox Exporter"
+
+  # API endpoints with JSON response validation
+  http_api_json:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      no_follow_redirects: false
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      valid_status_codes: [200]
+      fail_if_not_matches_regexp:
+        - "application/json"
+      tls_config:
+        insecure_skip_verify: false
+      headers:
+        User-Agent: "Prometheus BlackBox Exporter"
+        Accept: "application/json"
+
+  # Expected 4xx responses (for testing error pages)
+  http_4xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      no_follow_redirects: false
+      valid_status_codes: [400, 401, 403, 404, 405]
+      tls_config:
+        insecure_skip_verify: false
+      headers:
+        User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+  # HTTP POST with body (for API testing)
+  http_post_json:
+    prober: http
+    timeout: 10s
+    http:
+      method: POST
+      headers:
+        Content-Type: "application/json"
+        User-Agent: "Prometheus BlackBox Exporter"
+      body: '{"test": "probe"}'
+      valid_status_codes: [200, 201, 400, 404]
+
+  # DNS over TCP
+  dns_tcp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: "tcp"
+      preferred_ip_protocol: "ip4"
+      query_name: "google.com"
+      query_type: "A"
+
+  # DNS over UDP  
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: "udp"
+      preferred_ip_protocol: "ip4"
+      query_name: "google.com"
+      query_type: "A"
+
+  # DNS SOA query for domain validation
+  dns_soa:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: "udp"
+      preferred_ip_protocol: "ip4"
+      query_name: "google.com"
+      query_type: "SOA"
+
+  # TLS connection test
   tls_connect:
     prober: tcp
-    timeout: 5s
+    timeout: 10s
     tcp:
       tls: true
+      tls_config:
+        insecure_skip_verify: false
 
+  # Basic TCP connection
   tcp_connect:
     prober: tcp
+    timeout: 5s
 
+  # TCP with TLS and certificate validation
+  tcp_tls:
+    prober: tcp
+    timeout: 10s
+    tcp:
+      tls: true
+      tls_config:
+        insecure_skip_verify: false
+        server_name: ""
+
+  # SSH banner check
   ssh_banner:
     prober: tcp
+    timeout: 10s
     tcp:
       query_response:
       - expect: "^SSH-2.0-"
 
+  # FTP banner check
+  ftp_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+      - expect: "^220.*FTP"
+
+  # SMTP check
+  smtp_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+      - expect: "^220 "
+
+  # POP3 check
+  pop3_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+      - expect: "^\\+OK"
+
+  # IMAP check
+  imap_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+      - expect: "^\\* OK"
+
+  # ICMP ping
   icmp:
     prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"
+
+  # ICMP IPv6 ping
+  icmp_ipv6:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip6"

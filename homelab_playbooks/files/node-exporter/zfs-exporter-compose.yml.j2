@@ -4,6 +4,7 @@ services:
   zfs-exporter:
     image: {{ zfs_exporter_image }}:{{ zfs_exporter_version }}
     container_name: {{ zfs_exporter_service }}
+    hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
     # Networking

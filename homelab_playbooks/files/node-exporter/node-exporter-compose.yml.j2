@@ -4,6 +4,7 @@ services:
   node-exporter:
     image: {{ node_exporter_image }}:{{ node_exporter_version }}
     container_name: {{ node_exporter_service }}
+    hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
     # Host monitoring requires privileged access and host networking

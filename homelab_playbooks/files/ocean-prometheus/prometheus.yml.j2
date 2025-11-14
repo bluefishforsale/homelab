@@ -133,12 +133,110 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9140']
 
-  - job_name: 'blackbox-exporter'
+  # HTTP Probes - Web services and APIs
+  - job_name: 'blackbox-http'
     metrics_path: /probe
     params:
-      module: [icmp,http]
+      module: [http_2xx]
     scrape_interval: 30s
+    static_configs:
+      - targets:
+        # Major websites
+        - https://google.com
+        - https://cloudflare.com
+        - https://github.com
+        - https://stackoverflow.com
+        - https://reddit.com
+        - https://youtube.com
+        - https://wikipedia.org
+        - https://aws.amazon.com
+        - https://microsoft.com
+        - https://docker.com
+        labels:
+          probe_type: "http"
+          category: "major_sites"
+      - targets:
+        # Cloud providers
+        - https://console.aws.amazon.com
+        - https://portal.azure.com
+        - https://console.cloud.google.com
+        - https://dashboard.heroku.com
+        - https://app.netlify.com
+        - https://vercel.com
+        - https://digitalocean.com
+        - https://linode.com
+        labels:
+          probe_type: "http"
+          category: "cloud_providers"
+      - targets:
+        # Development services
+        - https://api.github.com
+        - https://registry.npmjs.org
+        - https://pypi.org
+        - https://hub.docker.com
+        - https://quay.io
+        - https://gcr.io
+        labels:
+          probe_type: "http"
+          category: "dev_services"
+      - targets:
+        # Media/Entertainment
+        - https://netflix.com
+        - https://twitch.tv
+        - https://spotify.com
+        - https://discord.com
+        - https://slack.com
+        labels:
+          probe_type: "http"
+          category: "media"
+      - targets:
+        # Personal/Project sites
+        - https://terrac.com
+        - https://quizlet.com
+        - https://el.quizlet.com
+        labels:
+          probe_type: "http"
+          category: "personal"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
 
+  # HTTPS/TLS Certificate Probes
+  - job_name: 'blackbox-tls'
+    metrics_path: /probe
+    params:
+      module: [http_tls]
+    scrape_interval: 1h
+    static_configs:
+      - targets:
+        # Critical TLS endpoints
+        - https://terrac.com:443
+        - https://github.com:443
+        - https://google.com:443
+        - https://cloudflare.com:443
+        - https://aws.amazon.com:443
+        - https://quizlet.com:443
+        labels:
+          probe_type: "tls"
+          category: "certificate_check"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # ICMP Ping Probes - Network connectivity
+  - job_name: 'blackbox-icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    scrape_interval: 30s
     static_configs:
       - targets:
         # DNS providers
@@ -146,30 +244,181 @@ scrape_configs:
         - 1.1.1.1
         - 8.8.4.4
         - 8.8.8.8
-        # XFinityNextHop
+        - 9.9.9.9
+        - 208.67.222.222
+        labels:
+          probe_type: "icmp"
+          category: "dns_servers"
+      - targets:
+        # CDN providers
+        - 104.16.132.229  # Cloudflare
+        - 13.107.42.14    # Microsoft
+        - 172.217.12.142  # Google
+        - 151.101.1.140   # Fastly
+        labels:
+          probe_type: "icmp"
+          category: "cdn_providers"
+      - targets:
+        # Major internet infrastructure
         - nexthop.anarc.at
-        # hardcoded in DNS
-        - cloudflare.com
-        - quizlet.com
-        - terrac.com
-        - el.quizlet.com
-        - github.com
-        - docker.com
-        - reddit.com
-        - netflix.com
-        - amazon.com
         - www.telefonica.de
         - cixp.web.cern.ch
         - www.sbb.ch
         - cam.ac.uk
         - web.mit.edu
-
+        labels:
+          probe_type: "icmp"
+          category: "infrastructure"
+      - targets:
+        # Local network
+        - 192.168.1.1     # Router
+        - 192.168.1.143   # Ocean server
+        labels:
+          probe_type: "icmp"
+          category: "local_network"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: ocean.home:9115  # The blackbox exporter's real hostname:port.
+        replacement: ocean.home:9115
+
+  # DNS Probes - Domain resolution
+  - job_name: 'blackbox-dns'
+    metrics_path: /probe
+    params:
+      module: [dns_tcp]
+    scrape_interval: 1m
+    static_configs:
+      - targets:
+        # Test DNS resolution through different servers
+        - 1.1.1.1:53
+        - 8.8.8.8:53
+        - 9.9.9.9:53
+        - 208.67.222.222:53
+        labels:
+          probe_type: "dns"
+          category: "dns_tcp"
+      - targets:
+        # Local DNS
+        - 192.168.1.1:53
+        labels:
+          probe_type: "dns"
+          category: "local_dns"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # TCP Probes - Service ports
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    scrape_interval: 1m
+    static_configs:
+      - targets:
+        # SSH services
+        - github.com:22
+        - gitlab.com:22
+        labels:
+          probe_type: "tcp"
+          category: "ssh"
+      - targets:
+        # SMTP services  
+        - smtp.gmail.com:587
+        - smtp.outlook.com:587
+        labels:
+          probe_type: "tcp"
+          category: "smtp"
+      - targets:
+        # Database ports (external)
+        - db.example.com:5432
+        - redis.example.com:6379
+        labels:
+          probe_type: "tcp"
+          category: "databases"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # HTTP Probes for APIs - JSON/REST endpoints  
+  - job_name: 'blackbox-api'
+    metrics_path: /probe
+    params:
+      module: [http_api_json]
+    scrape_interval: 2m
+    static_configs:
+      - targets:
+        # Public APIs
+        - https://api.github.com/zen
+        - https://httpbin.org/json
+        - https://jsonplaceholder.typicode.com/posts/1
+        - https://api.coindesk.com/v1/bpi/currentprice.json
+        labels:
+          probe_type: "http_api"
+          category: "public_apis"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # HTTP Probes with specific response codes
+  - job_name: 'blackbox-http-status'
+    metrics_path: /probe
+    params:
+      module: [http_4xx]
+    scrape_interval: 5m
+    static_configs:
+      - targets:
+        # Expected 4xx responses
+        - https://httpbin.org/status/404
+        - https://httpbin.org/status/403
+        labels:
+          probe_type: "http_status"
+          category: "expected_errors"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # Internal Service Health Checks
+  - job_name: 'blackbox-internal'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+        # Internal homelab services
+        - http://192.168.1.143:32400   # Plex
+        - http://192.168.1.143:8188    # ComfyUI
+        - http://192.168.1.143:5678    # n8n
+        - http://192.168.1.143:8910    # Grafana
+        - http://192.168.1.143:9090    # Prometheus
+        labels:
+          probe_type: "http"
+          category: "internal_services"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
 
 
