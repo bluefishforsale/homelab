@@ -153,10 +153,12 @@
         Storage=volatile
         StandardOutput=journal
         StandardError=journal
-        Compress=false
+        Compress=true
         LineMax=10K
-        SystemMaxUse=10M
-        SystemMaxFileSize=5M
+        SystemMaxUse=500M
+        SystemMaxFileSize=100M
+        SystemMaxFiles=5
+        MaxRetentionSec=2week
         ForwardToSyslog=false
     notify:
     - Restart systemd-journald
@@ -174,6 +176,64 @@
         MACAddressPolicy=persistent
     notify:
     - Restart systemd-udevd
+
+  ########### System log rotation
+  - name: Configure logrotate for system logs
+    ansible.builtin.copy:
+      dest: /etc/logrotate.d/homelab
+      content: |
+        # Custom logrotate config for homelab
+        /var/log/syslog {
+            daily
+            rotate 7
+            missingok
+            notifempty
+            compress
+            delaycompress
+            sharedscripts
+            postrotate
+                /usr/lib/rsyslog/rsyslog-rotate
+            endscript
+        }
+        
+        /var/log/kern.log {
+            daily
+            rotate 7
+            missingok
+            notifempty
+            compress
+            delaycompress
+        }
+        
+        /var/log/auth.log {
+            daily
+            rotate 14
+            missingok
+            notifempty
+            compress
+            delaycompress
+        }
+        
+        /var/log/daemon.log {
+            daily
+            rotate 7
+            missingok
+            notifempty
+            compress
+            delaycompress
+        }
+      mode: '0644'
+
+  - name: Configure APT to clean cache automatically
+    ansible.builtin.copy:
+      dest: /etc/apt/apt.conf.d/99-clean-cache
+      content: |
+        APT::Periodic::Download-Upgradeable-Packages "0";
+        APT::Periodic::AutocleanInterval "7";
+        APT::Archives::MaxAge "30";
+        APT::Archives::MinAge "2";
+        APT::Archives::MaxSize "500";
+      mode: '0644'
 
   handlers:
   - name: Reload systemd daemon

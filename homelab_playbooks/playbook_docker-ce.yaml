@@ -115,6 +115,75 @@
       mode: '0644'
     notify: restart docker
 
+  - name: Create Docker cleanup script
+    ansible.builtin.copy:
+      dest: /usr/local/bin/docker-cleanup
+      content: |
+        #!/bin/bash
+        # Docker cleanup script for homelab hosts
+        set -e
+        echo "$(date): Starting Docker cleanup..."
+        docker container prune -f --filter "until=24h" || true
+        docker image prune -f || true
+        docker image prune -a -f --filter "until=168h" || true
+        docker volume prune -f || true
+        docker builder prune -a -f --filter "until=168h" || true
+        docker network prune -f || true
+        echo "$(date): Docker cleanup completed"
+      mode: '0755'
+      owner: root
+      group: root
+
+  - name: Create systemd timer for Docker cleanup
+    ansible.builtin.copy:
+      dest: /etc/systemd/system/docker-cleanup.timer
+      content: |
+        [Unit]
+        Description=Docker cleanup timer
+        
+        [Timer]
+        OnCalendar=weekly
+        Persistent=true
+        
+        [Install]
+        WantedBy=timers.target
+      mode: '0644'
+
+  - name: Create systemd service for Docker cleanup
+    ansible.builtin.copy:
+      dest: /etc/systemd/system/docker-cleanup.service
+      content: |
+        [Unit]
+        Description=Docker cleanup service
+        After=docker.service
+        Requires=docker.service
+        
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/docker-cleanup
+        StandardOutput=journal
+        StandardError=journal
+        
+        [Install]
+        WantedBy=multi-user.target
+      mode: '0644'
+
+  - name: Enable Docker cleanup timer
+    ansible.builtin.systemd:
+      name: docker-cleanup.timer
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
+  - name: Truncate large existing Docker logs
+    ansible.builtin.shell: |
+      for log in $(find /var/lib/docker/containers -name '*-json.log' -size +10M 2>/dev/null); do
+        echo "Truncating $log ($(du -h $log | cut -f1))"
+        truncate -s 0 "$log"
+      done
+    changed_when: true
+    failed_when: false
+
   handlers:
   - name: restart docker
     ansible.builtin.systemd:
