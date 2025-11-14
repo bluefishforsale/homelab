@@ -1,5 +1,13 @@
 {
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "10m",
+        "max-file": "3",
+        "compress": "true"
+    },
+    "live-restore": true
 {% if docker is defined and docker | length > 0 %}
+    ,
     "data-root": "{{ docker }}"
 {% endif %}
 {% if storage_driver is defined and storage_driver | length > 0 %}
