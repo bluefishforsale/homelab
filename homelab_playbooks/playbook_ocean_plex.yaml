@@ -108,6 +108,14 @@
     - Reload systemd daemon
     - Restart exporter service
 
+  - name: Ensure meta-manager basedir exists
+    ansible.builtin.file:
+      path: "{{ meta_manager_home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
   - name: Create meta_manager_home preferences file
     ansible.builtin.template:
       src: "{{ files }}/meta-manager/config.yml"
@@ -119,7 +127,21 @@
     - Reload systemd daemon
     - Restart meta-manager service
 
-  - name: Create metal-manager systemd service
+  - name: Create meta-manager docker-compose files
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item.src }}"
+      dest: "{{ meta_manager_home }}/{{ item.dest }}"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    with_items:
+    - { src: "plex-meta-manager-compose.yml.j2", dest: "docker-compose.yml" }
+    - { src: "plex-meta-manager.env.j2", dest: ".env" }
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
+
+  - name: Create meta-manager docker-compose systemd service
     ansible.builtin.template:
       src: "{{ files }}/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
@@ -129,6 +151,12 @@
     notify:
     - Reload systemd daemon
     - Restart meta-manager service
+
+  - name: Enable meta-manager service
+    ansible.builtin.systemd:
+      name: plex-meta-manager.service
+      enabled: true
+      state: started
 
   handlers:
   - name: Reload systemd daemon

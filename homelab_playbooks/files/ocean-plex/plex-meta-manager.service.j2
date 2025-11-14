@@ -1,31 +1,49 @@
 [Unit]
-Description={{ meta_manager_service }}
-After=docker.service zfs.target data01.mount plex.service
+Description=Plex Meta Manager Docker Compose Service
 Requires=docker.service zfs.target data01.mount
+After=docker.service zfs.target data01.mount plex.service
+Wants=network-online.target
+After=network-online.target
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+WorkingDirectory={{ meta_manager_home }}
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=plex-meta-manager
+Environment=COMPOSE_HTTP_TIMEOUT=60
+Environment=TMPDIR=/tmp
+Environment=TMP=/tmp
+Environment=TEMP=/tmp
+
+# Pre-start commands (idempotent)
+ExecStartPre=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml pull --quiet
+
+# Start command
+ExecStart=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml up -d
+
+# Stop command
+ExecStop=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml down
+
+# Service behavior
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+# Security
+NoNewPrivileges=true
+ReadWritePaths={{ meta_manager_home }} /tmp
+ReadOnlyPaths=/var/run/docker.sock
+
+# Logging
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
-Restart=always
-RestartSec=120s
-TimeoutStartSec=300s
-User={{ user }}
-Group={{ user }}
-ExecStartPre=-docker rm -f {{ meta_manager_service }}
-ExecStartPre=-docker images --filter reference={{ meta_manager_image }}:{{ meta_manager_version }} -q | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull {{ meta_manager_image }}:{{ meta_manager_version }}
-ExecStart=docker run --rm \
-    --name={{ meta_manager_service }} \
-    --hostname={{ meta_manager_service }} \
-    --cpus=4 \
-    -e TZ="America/Los_Angeles" \
-    -e PUID={{ uid }} -e PGID={{ uid }} \
-    -e VERSION={{ meta_manager_version }} \
-    -v {{ meta_manager_home }}/config:/config \
-  {{ meta_manager_image }}:{{ meta_manager_version }}
-ExecStop=docker rm -f {{ meta_manager_service }}
+SyslogIdentifier=plex-meta-manager
 
 [Install]
 WantedBy=multi-user.target
