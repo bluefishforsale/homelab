@@ -56,6 +56,7 @@ scrape_configs:
     - targets: ['ocean.home:9256']
 
   - job_name: 'cadvisor'
+    relabel_configs: *dropPortNumber
     static_configs:
     - targets: ['ocean.home:8912']
 
