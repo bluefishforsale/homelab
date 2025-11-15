@@ -78,14 +78,14 @@
       loop: "{{ services }}"
       notify:
         - Reload systemd daemon
-        - Restart smartmon-exporter services
+        - Restart audible-download services
 
   handlers:
     - name: Reload systemd daemon
       ansible.builtin.systemd:
         daemon_reload: yes
 
-    - name: Restart smartmon-exporter services
+    - name: Restart audible-download services
       ansible.builtin.systemd:
         name: "{{ item }}"
         state: restarted
