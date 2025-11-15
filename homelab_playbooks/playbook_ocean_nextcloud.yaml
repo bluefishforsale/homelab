@@ -1,0 +1,165 @@
+---
+- name: Configure NextCloud file sharing platform with Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vault_secrets.yaml
+
+  vars:
+    service: nextcloud
+    image: nextcloud
+    version: 28-apache
+    port_ext: 8081
+    port_int: 80
+    data: /data01
+    files: files/nextcloud
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure NextCloud subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - data
+    - config
+    - apps
+    - themes
+    - mariadb-data
+    - mariadb-logs
+    - mariadb-conf
+    - redis-data
+
+  - name: Check if MariaDB database is already initialized
+    ansible.builtin.find:
+      paths: "{{ home }}/mariadb-data"
+      file_type: any
+    register: mariadb_data_contents
+
+  - name: Show MariaDB initialization status
+    ansible.builtin.debug:
+      msg: "MariaDB data directory contains {{ mariadb_data_contents.matched }} files"
+
+  - name: Ensure all directories have correct ownership for containers
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+      recurse: yes
+    with_items:
+    - data
+    - config
+    - apps
+    - themes
+    - mariadb-data
+    - mariadb-logs
+    - redis-data
+
+  - name: Create MariaDB configuration from template
+    ansible.builtin.template:
+      src: "{{ files }}/mariadb-custom.cnf.j2"
+      dest: "{{ home }}/mariadb-conf/custom.cnf"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    register: mariadb_config
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    register: docker_compose_config
+
+  - name: Create NextCloud environment file
+    ansible.builtin.template:
+      src: "{{ files }}/nextcloud.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    register: nextcloud_env
+
+  - name: Fix ownership of all nextcloud files for media user
+    ansible.builtin.file:
+      path: "{{ home }}"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+
+  - name: Show what configuration files changed
+    ansible.builtin.debug:
+      msg: "Configuration files have been updated - containers will be recreated"
+    when: mariadb_config.changed or docker_compose_config.changed or nextcloud_env.changed
+
+  - name: Create nextcloud systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/nextcloud.service.j2"
+      dest: "/etc/systemd/system/nextcloud.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart nextcloud service
+  
+  - name: Enable nextcloud service
+    ansible.builtin.systemd:
+      name: nextcloud.service
+      enabled: yes
+      daemon_reload: yes
+
+  - name: Start NextCloud service if not running
+    ansible.builtin.systemd:
+      name: nextcloud.service
+      state: started
+
+  - name: Wait for NextCloud container to start and fix volume permissions
+    ansible.builtin.shell: |
+      # Wait for container to be running
+      timeout 60 bash -c 'until docker ps | grep -q "nextcloud.*Up"; do sleep 2; done'
+      # Fix ownership of NextCloud volumes to www-data (33:33) inside container
+      docker exec nextcloud chown -R www-data:www-data /var/www/html
+      docker exec nextcloud chmod -R 755 /var/www/html
+      docker exec nextcloud chmod 755 /var/www/html/config
+      docker exec nextcloud chmod 644 /var/www/html/config/* || true
+    register: permission_fix
+    failed_when: false
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart nextcloud service
+    ansible.builtin.systemd:
+      name: nextcloud.service
+      state: restarted
+
+  - name: Force container recreation when ANY configuration changes
+    ansible.builtin.shell: |
+      cd {{ home }}
+      echo "Recreating containers due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "Container recreation completed"
+    when: mariadb_config.changed or docker_compose_config.changed or nextcloud_env.changed

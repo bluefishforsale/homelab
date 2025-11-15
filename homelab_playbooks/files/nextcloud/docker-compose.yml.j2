@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  nextcloud:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    environment:
+      # Database Configuration
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD={{ cloud_services.nextcloud.database_password }}
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_PORT=3306
+      # Redis Configuration
+      - REDIS_HOST=nextcloud-redis
+      - REDIS_PORT=6379
+      # NextCloud Configuration
+      - NEXTCLOUD_ADMIN_USER={{ cloud_services.nextcloud.admin_user }}
+      - NEXTCLOUD_ADMIN_PASSWORD={{ cloud_services.nextcloud.admin_password }}
+      - NEXTCLOUD_TRUSTED_DOMAINS={{ ansible_default_ipv4.address }} nextcloud.home {{ cloud_services.nextcloud.domain | default('nextcloud.terrac.com') }}
+      - OVERWRITEHOST={{ cloud_services.nextcloud.domain | default('nextcloud.terrac.com') }}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITECLIURL=https://{{ cloud_services.nextcloud.domain | default('nextcloud.terrac.com') }}
+      - OVERWRITEWEBROOT=/
+      # Performance Configuration
+      - PHP_MEMORY_LIMIT=1024M
+      - PHP_UPLOAD_LIMIT=10G
+      - PHP_MAX_FILE_UPLOADS=100
+      # Timezone Configuration
+      - TZ=America/Los_Angeles
+      # Apache Configuration
+      - APACHE_DISABLE_REWRITE_IP=1
+    
+    ports:
+      - "{{ port_ext }}:{{ port_int }}"
+    
+    volumes:
+      - {{ home }}/data:/var/www/html
+      - {{ home }}/config:/var/www/html/config
+      - {{ home }}/apps:/var/www/html/custom_apps
+      - {{ home }}/themes:/var/www/html/themes
+      - /data01/media:/media:ro  # Read-only media access
+      - /data01/backups:/backups:rw  # Backup storage
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port_int }}/status.php || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # NextCloud handles user mapping internally via Apache
+    # No external user mapping needed for NextCloud service
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    
+    # Service dependencies
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    
+    # Network configuration
+    networks:
+      - nextcloud_internal
+
+  nextcloud-db:
+    image: mariadb:11
+    container_name: nextcloud-db
+    hostname: nextcloud-db
+    restart: unless-stopped
+    
+    environment:
+      - MYSQL_ROOT_PASSWORD={{ cloud_services.nextcloud.database_root_password }}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD={{ cloud_services.nextcloud.database_password }}
+      - MYSQL_CHARSET=utf8mb4
+      - MYSQL_COLLATION=utf8mb4_unicode_ci
+    
+    volumes:
+      - {{ home }}/mariadb-data:/var/lib/mysql
+      - {{ home }}/mariadb-logs:/var/log/mysql
+      - {{ home }}/mariadb-conf/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u nextcloud -p{{ cloud_services.nextcloud.database_password }} || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # User mapping
+    user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Network configuration
+    networks:
+      - nextcloud_internal
+
+  nextcloud-redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    hostname: nextcloud-redis
+    restart: unless-stopped
+    
+    command: redis-server --requirepass {{ cloud_services.nextcloud.redis_password }} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    
+    volumes:
+      - {{ home }}/redis-data:/data
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a {{ cloud_services.nextcloud.redis_password }} ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    # User mapping
+    user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    
+    # Network configuration
+    networks:
+      - nextcloud_internal
+
+networks:
+  nextcloud_internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
