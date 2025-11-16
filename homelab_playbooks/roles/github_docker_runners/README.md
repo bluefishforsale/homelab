@@ -119,7 +119,7 @@ ansible-vault edit vault_secrets.yaml
 vault_github_registration_token: "YOUR_TOKEN_HERE"
 
 # Reference in group_vars/github_runners.yml
-github_registration_token: "{{ vault_github_registration_token }}"
+github_registration_token: "{{ development.github.vault_github_registration_token }}"
 ```
 
 **Option B: Command-line override**

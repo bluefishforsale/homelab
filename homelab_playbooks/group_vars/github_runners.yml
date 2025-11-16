@@ -15,16 +15,16 @@
 # Runner scope: "org" for organization-level, "repo" for repository-level
 # Organization-level: Runners available to all repos in the org
 # Repository-level: Runners available only to a specific repo
-github_scope: "org"
+github_scope: "repo"
 
 # GitHub organization name (required if github_scope is "org")
 # Example: "bluefishforsale"
-github_org: "your-org-name"
+#github_org: "bluefishforsale"
 
 # GitHub repository (required if github_scope is "repo")
 # Format: "owner/repo-name"
 # Example: "bluefishforsale/homelab"
-github_repo: "owner/repo-name"
+github_repo: "bluefishforsale/homelab"
 
 # GitHub runner registration token
 # CRITICAL: DO NOT commit this token to version control!
@@ -39,11 +39,11 @@ github_repo: "owner/repo-name"
 #   3. Pass it via --extra-vars at runtime
 #
 # Recommended: Store in vault_secrets.yaml
-#   github_registration_token: "{{ vault_github_registration_token }}"
+github_registration_token: "{{ development.github.vault_github_registration_token }}"
 #
 # Or pass at runtime:
 #   ansible-playbook github-docker-runners.yml --extra-vars "github_registration_token=YOUR_TOKEN"
-github_registration_token: ""  # REQUIRED: Set this before running
+#github_registration_token: ""  # REQUIRED: Set this before running
 
 # ============================================================================
 # RUNNER CONFIGURATION
@@ -189,7 +189,7 @@ github_runners_service_name: "github-docker-runners"
 #
 # github_scope: "org"
 # github_org: "bluefishforsale"
-# github_registration_token: "{{ vault_github_registration_token }}"
+# github_registration_token: "{{ development.github.vault_github_registration_token }}"
 # github_runner_labels:
 #   - self-hosted
 #   - homelab
@@ -205,7 +205,7 @@ github_runners_service_name: "github-docker-runners"
 #
 # github_scope: "repo"
 # github_repo: "bluefishforsale/homelab"
-# github_registration_token: "{{ vault_github_registration_token }}"
+# github_registration_token: "{{ development.github.vault_github_registration_token }}"
 # github_runner_labels:
 #   - self-hosted
 #   - homelab
