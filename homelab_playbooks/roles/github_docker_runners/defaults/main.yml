@@ -16,7 +16,8 @@ github_repo: "owner/repo-name"
 # GitHub runner registration token
 # REQUIRED: Obtain from GitHub and provide via Vault or --extra-vars
 # DO NOT commit this token to version control
-github_registration_token: ""
+# Reference from vault: development.github.github_registration_token
+github_registration_token: "{{ development.github.github_registration_token }}"
 
 # Runner labels
 # These labels determine which workflows can use these runners

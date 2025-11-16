@@ -115,11 +115,13 @@ https://github.com/YOUR-OWNER/YOUR-REPO/settings/actions/runners/new
 # Edit vault file
 ansible-vault edit vault_secrets.yaml
 
-# Add token
-vault_github_registration_token: "YOUR_TOKEN_HERE"
+# Add token in vault structure
+development:
+  github:
+    github_registration_token: "YOUR_TOKEN_HERE"
 
 # Reference in group_vars/github_runners.yml
-github_registration_token: "{{ development.github.vault_github_registration_token }}"
+github_registration_token: "{{ development.github.github_registration_token }}"
 ```
 
 **Option B: Command-line override**

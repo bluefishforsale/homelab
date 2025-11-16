@@ -123,10 +123,12 @@ ansible-vault create vault_secrets.yaml
 
 # Add this content:
 ---
-vault_github_registration_token: "AAAA...YOUR_TOKEN_HERE"
+development:
+  github:
+    github_registration_token: "AAAA...YOUR_TOKEN_HERE"
 
 # In group_vars/github_runners.yml, reference it:
-github_registration_token: "{{ vault_github_registration_token }}"
+github_registration_token: "{{ development.github.github_registration_token }}"
 ```
 
 **Option B: Command-line (quick testing)**

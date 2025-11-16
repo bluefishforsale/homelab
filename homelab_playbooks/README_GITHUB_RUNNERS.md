@@ -91,7 +91,7 @@ Edit `group_vars/github_runners.yml`:
 github_scope: "org"
 github_org: "your-org-name"
 github_runner_count: 4
-github_registration_token: "{{ development.github.vault_github_registration_token }}"
+github_registration_token: "{{ development.github.github_registration_token }}"
 ```
 
 ### 4. Get GitHub Token
@@ -263,11 +263,11 @@ github_repo: "bluefishforsale/homelab"
 
 ```yaml
 # Use Ansible Vault
-github_registration_token: "{{ development.github.vault_github_registration_token }}"
+github_registration_token: "{{ development.github.github_registration_token }}"
 
 # Or pass at runtime
 ansible-playbook github-docker-runners.yml \
-  --extra-vars "github_registration_token=TOKEN"
+  --extra-vars "github_registration_token=YOUR_TOKEN"
 ```
 
 ### Docker Socket Access
