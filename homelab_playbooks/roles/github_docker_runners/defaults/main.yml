@@ -1,0 +1,90 @@
+---
+# Default variables for github_docker_runners role
+# Override these in group_vars/github_runners.yml or host_vars
+
+# GitHub configuration
+# Scope: "org" for organization-level runners, "repo" for repository-level runners
+github_scope: "org"
+
+# GitHub organization name (used when github_scope is "org")
+github_org: "your-org-name"
+
+# GitHub repository (used when github_scope is "repo")
+# Format: "owner/repo-name"
+github_repo: "owner/repo-name"
+
+# GitHub runner registration token
+# REQUIRED: Obtain from GitHub and provide via Vault or --extra-vars
+# DO NOT commit this token to version control
+github_registration_token: ""
+
+# Runner labels
+# These labels determine which workflows can use these runners
+github_runner_labels:
+  - self-hosted
+  - homelab
+  - ansible
+  - ephemeral
+  - docker
+
+# Number of concurrent runner containers to maintain
+github_runner_count: 4
+
+# Runner Docker image
+# Using myoung34/github-runner - popular community image with excellent ephemeral support
+# Well-documented environment variables and Docker/Ansible capabilities
+# Alternatives:
+#   - myoung34/github-runner:latest (recommended, excellent ephemeral support)
+#   - ghcr.io/actions/actions-runner:latest (official, less documented for ephemeral mode)
+github_runner_image: "myoung34/github-runner"
+github_runner_version: "latest"
+
+# Ephemeral runner configuration
+# When true, runners will:
+# - Register as ephemeral (fresh per job)
+# - Run one job then exit
+# - Be restarted by Docker and re-register as new ephemeral runner
+github_runner_ephemeral: true
+
+# Docker socket mounting for Docker-on-host
+# When true, mounts /var/run/docker.sock from host into containers
+# This allows job steps to run Docker commands using the host's Docker daemon
+# Set to false if you prefer full Docker-in-Docker (more isolated but heavier)
+github_runner_mount_docker_socket: true
+
+# Runner working directory on host
+# Each runner gets a subdirectory: /opt/github-runners/runner-N
+github_runners_base_dir: "/opt/github-runners"
+
+# System user for running Docker containers
+github_runner_user: "github-runner"
+github_runner_group: "github-runner"
+github_runner_uid: 1100
+github_runner_gid: 1100
+
+# SSH key directory for Ansible access to homelab
+# If runners need to SSH to other hosts, mount this directory
+# Leave empty to disable SSH key mounting
+github_runner_ssh_key_dir: "/home/{{ github_runner_user }}/.ssh"
+
+# Docker Compose configuration
+github_runners_compose_file: "{{ github_runners_base_dir }}/docker-compose.yml"
+github_runners_service_name: "github-docker-runners"
+
+# Runner container resource limits (optional)
+# Uncomment to set CPU and memory limits per container
+# github_runner_cpus: "2.0"
+# github_runner_memory: "4g"
+
+# Docker installation
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Docker APT repository
+docker_apt_repo_url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}"
+docker_apt_gpg_key_url: "{{ docker_apt_repo_url }}/gpg"
+docker_apt_repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] {{ docker_apt_repo_url }} {{ ansible_distribution_release }} stable"

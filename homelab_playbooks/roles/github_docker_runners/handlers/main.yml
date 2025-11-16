@@ -1,0 +1,11 @@
+---
+# Handlers for github_docker_runners role
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart github-docker-runners service
+  ansible.builtin.systemd:
+    name: "{{ github_runners_service_name }}"
+    state: restarted

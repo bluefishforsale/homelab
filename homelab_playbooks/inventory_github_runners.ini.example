@@ -1,0 +1,18 @@
+# Example inventory file for GitHub Actions runners
+# Copy this to your main inventory or create a dedicated inventory for runners
+#
+# Usage:
+#   ansible-playbook -i inventory_github_runners.ini github-docker-runners.yml
+
+[github_runners]
+# Runner host created by 00_create_runner_vm.yaml
+gh-runner-01 ansible_host=192.168.1.250 ansible_user=root
+
+# If you create additional runner hosts, add them here
+# gh-runner-02 ansible_host=192.168.1.251 ansible_user=root
+# gh-runner-03 ansible_host=192.168.1.252 ansible_user=root
+
+[github_runners:vars]
+# Common variables for all runner hosts
+# These can be overridden in group_vars/github_runners.yml
+ansible_python_interpreter=/usr/bin/python3

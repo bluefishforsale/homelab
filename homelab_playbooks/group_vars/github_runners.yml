@@ -1,0 +1,252 @@
+---
+# GitHub Actions runner configuration
+# This file configures ephemeral Docker-based runners for your homelab
+#
+# Usage:
+#   1. Copy this file to your inventory's group_vars/ directory
+#   2. Customize the values below for your environment
+#   3. Store sensitive values (tokens) in Ansible Vault
+#   4. Run: ansible-playbook github-docker-runners.yml
+
+# ============================================================================
+# GITHUB CONFIGURATION
+# ============================================================================
+
+# Runner scope: "org" for organization-level, "repo" for repository-level
+# Organization-level: Runners available to all repos in the org
+# Repository-level: Runners available only to a specific repo
+github_scope: "org"
+
+# GitHub organization name (required if github_scope is "org")
+# Example: "bluefishforsale"
+github_org: "your-org-name"
+
+# GitHub repository (required if github_scope is "repo")
+# Format: "owner/repo-name"
+# Example: "bluefishforsale/homelab"
+github_repo: "owner/repo-name"
+
+# GitHub runner registration token
+# CRITICAL: DO NOT commit this token to version control!
+# 
+# Obtain a registration token from:
+#   Organization: https://github.com/organizations/YOUR-ORG/settings/actions/runners/new
+#   Repository: https://github.com/YOUR-OWNER/YOUR-REPO/settings/actions/runners/new
+#
+# Token expires after 1 hour, so you must:
+#   1. Generate a fresh token before deployment
+#   2. Store it in Ansible Vault, OR
+#   3. Pass it via --extra-vars at runtime
+#
+# Recommended: Store in vault_secrets.yaml
+#   github_registration_token: "{{ vault_github_registration_token }}"
+#
+# Or pass at runtime:
+#   ansible-playbook github-docker-runners.yml --extra-vars "github_registration_token=YOUR_TOKEN"
+github_registration_token: ""  # REQUIRED: Set this before running
+
+# ============================================================================
+# RUNNER CONFIGURATION
+# ============================================================================
+
+# Runner labels
+# Workflows target runners using: runs-on: [self-hosted, homelab, ...]
+# Add custom labels to match your workflow requirements
+github_runner_labels:
+  - self-hosted      # Required: Identifies as self-hosted runner
+  - homelab          # Custom: Identifies this as a homelab runner
+  - ansible          # Custom: Indicates Ansible is available
+  - ephemeral        # Custom: Indicates fresh runner per job
+  - docker           # Custom: Indicates Docker is available
+  - linux            # Optional: OS identifier
+  - x64              # Optional: Architecture identifier
+
+# Number of concurrent runner containers
+# Each container is an independent ephemeral runner
+# Adjust based on:
+#   - Expected concurrent job load
+#   - Available CPU/memory on runner host
+#   - GitHub Actions plan limits (concurrent jobs)
+# Example: 4 runners = up to 4 jobs running simultaneously
+github_runner_count: 4
+
+# ============================================================================
+# RUNNER IMAGE CONFIGURATION
+# ============================================================================
+
+# Runner Docker image
+# Using myoung34/github-runner - popular community image with excellent ephemeral support
+# Well-documented environment variables and Docker/Ansible capabilities
+#
+# Recommended: myoung34/github-runner:latest (default)
+#   - Excellent ephemeral support
+#   - Docker and Docker Compose included
+#   - Well-maintained and documented
+#   - Supports multiple architectures
+#
+# Alternative: ghcr.io/actions/actions-runner:latest
+#   - Official from GitHub
+#   - May require additional configuration for Docker support
+#   - Less documented for ephemeral mode
+github_runner_image: "myoung34/github-runner"
+github_runner_version: "latest"
+
+# ============================================================================
+# EPHEMERAL CONFIGURATION
+# ============================================================================
+
+# Ephemeral mode: Fresh runner per job
+# When true:
+#   - Runner registers as ephemeral
+#   - Runs ONE job
+#   - Automatically de-registers and exits
+#   - Docker restarts the container (restart: always)
+#   - Container re-registers as NEW ephemeral runner
+#   - Next job gets a fresh, clean runner
+#
+# Benefits:
+#   - No state pollution between jobs
+#   - Cleaner builds (no cache/artifact carryover)
+#   - Better security (fresh environment each time)
+#   - Easier debugging (isolated job executions)
+#
+# Set to false for persistent runners (not recommended)
+github_runner_ephemeral: true
+
+# ============================================================================
+# DOCKER CONFIGURATION
+# ============================================================================
+
+# Docker socket mounting for Docker-on-host
+# When true:
+#   - Mounts /var/run/docker.sock from host into runner containers
+#   - Job steps can run Docker commands using host's Docker daemon
+#   - More efficient than Docker-in-Docker
+#   - Images built in jobs are available on host
+#
+# Example workflow step that uses Docker:
+#   - name: Build Docker image
+#     run: docker build -t myapp:latest .
+#
+# Security note:
+#   - Mounting Docker socket gives containers access to Docker daemon
+#   - Ensure only trusted code runs in your workflows
+#   - Consider using GitHub's environment protection rules
+#
+# Alternative: Full Docker-in-Docker
+#   - Set this to false
+#   - Enable privileged mode in docker-compose.yml.j2
+#   - More isolated but heavier resource usage
+github_runner_mount_docker_socket: true
+
+# ============================================================================
+# RESOURCE LIMITS (OPTIONAL)
+# ============================================================================
+
+# CPU and memory limits per runner container
+# Uncomment and adjust based on your workload
+# 
+# Example values:
+#   16 vCPUs / 4 runners = 4 CPUs per runner (with headroom)
+#   64 GB RAM / 4 runners = 16 GB per runner (with headroom)
+#
+# Adjust based on your typical job requirements
+# github_runner_cpus: "3.0"
+# github_runner_memory: "12g"
+
+# ============================================================================
+# PATHS AND DIRECTORIES
+# ============================================================================
+
+# Base directory for runner configuration and working directories
+github_runners_base_dir: "/opt/github-runners"
+
+# System user/group for running containers
+github_runner_user: "github-runner"
+github_runner_group: "github-runner"
+github_runner_uid: 1100
+github_runner_gid: 1100
+
+# SSH key directory for Ansible access to homelab
+# Runners can SSH to other hosts in your inventory
+# Useful for running Ansible playbooks against your infrastructure
+# Leave empty to disable SSH key mounting
+github_runner_ssh_key_dir: "/home/{{ github_runner_user }}/.ssh"
+
+# ============================================================================
+# ADVANCED CONFIGURATION
+# ============================================================================
+
+# Docker Compose file path
+github_runners_compose_file: "{{ github_runners_base_dir }}/docker-compose.yml"
+
+# Systemd service name
+github_runners_service_name: "github-docker-runners"
+
+# ============================================================================
+# EXAMPLE: ORGANIZATION-LEVEL RUNNERS
+# ============================================================================
+#
+# github_scope: "org"
+# github_org: "bluefishforsale"
+# github_registration_token: "{{ vault_github_registration_token }}"
+# github_runner_labels:
+#   - self-hosted
+#   - homelab
+#   - ansible
+#   - ephemeral
+# github_runner_count: 4
+# github_runner_ephemeral: true
+# github_runner_mount_docker_socket: true
+
+# ============================================================================
+# EXAMPLE: REPOSITORY-LEVEL RUNNERS
+# ============================================================================
+#
+# github_scope: "repo"
+# github_repo: "bluefishforsale/homelab"
+# github_registration_token: "{{ vault_github_registration_token }}"
+# github_runner_labels:
+#   - self-hosted
+#   - homelab
+#   - ansible
+#   - ephemeral
+# github_runner_count: 2
+# github_runner_ephemeral: true
+# github_runner_mount_docker_socket: true
+
+# ============================================================================
+# WORKFLOW USAGE EXAMPLES
+# ============================================================================
+#
+# Target these runners in your GitHub Actions workflows:
+#
+# Example 1: Simple job
+#   jobs:
+#     deploy:
+#       runs-on: [self-hosted, homelab, ansible]
+#       steps:
+#         - uses: actions/checkout@v4
+#         - name: Run Ansible
+#           run: ansible-playbook deploy.yml
+#
+# Example 2: Docker build
+#   jobs:
+#     build:
+#       runs-on: [self-hosted, homelab, docker]
+#       steps:
+#         - uses: actions/checkout@v4
+#         - name: Build image
+#           run: docker build -t myapp:latest .
+#
+# Example 3: Matrix build across multiple runners
+#   jobs:
+#     test:
+#       runs-on: [self-hosted, homelab, ephemeral]
+#       strategy:
+#         matrix:
+#           python: [3.9, 3.10, 3.11]
+#       steps:
+#         - uses: actions/checkout@v4
+#         - name: Run tests
+#           run: python${{ matrix.python }} -m pytest
