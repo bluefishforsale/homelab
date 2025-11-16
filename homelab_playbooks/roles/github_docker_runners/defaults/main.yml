@@ -87,4 +87,4 @@ docker_packages:
 # Docker APT repository
 docker_apt_repo_url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}"
 docker_apt_gpg_key_url: "{{ docker_apt_repo_url }}/gpg"
-docker_apt_repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] {{ docker_apt_repo_url }} {{ ansible_distribution_release }} stable"
+docker_apt_repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] {{ docker_apt_repo_url }} {{ ansible_distribution_release }} stable"
