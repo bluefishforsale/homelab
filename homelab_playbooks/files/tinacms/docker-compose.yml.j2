@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  tinacms:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    # Run as custom user to match host file permissions
+    user: "{{ uid }}:{{ gid }}"
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - NODE_ENV=production
+      - TINA_PUBLIC_IS_LOCAL=${TINA_PUBLIC_IS_LOCAL:-true}
+      - GITHUB_OWNER=${GITHUB_OWNER:-}
+      - GITHUB_REPO=${GITHUB_REPO:-}
+      - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
+      
+    ports:
+      - "{{ port_ext }}:{{ port_int }}"
+    
+    volumes:
+      # Optional: Mount content directory for local development
+      - {{ home }}/content:/app/content
+    
+    # Health check - verify API health endpoint
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:{{ port_int }}/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Use default bridge network mode
+    network_mode: bridge
+
+    # Resource limits
+    cpus: '2.0'
+    mem_limit: 2048m
+
+# No custom networks needed - using default bridge

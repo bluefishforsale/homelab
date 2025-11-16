@@ -1,0 +1,58 @@
+[Unit]
+Description=TinaCMS Next.js Blog with Docker Compose
+Documentation=https://tina.io/docs/
+After=docker.service zfs-mount.service zfs-import.target network-online.target
+Wants=network-online.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+WorkingDirectory={{ home }}
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME={{ service }}
+Environment=COMPOSE_HTTP_TIMEOUT=60
+Environment=DOCKER_CONFIG={{ home }}/.docker
+
+# Pre-start commands (idempotent)
+ExecStartPre=/bin/mkdir -p {{ home }}/.docker
+ExecStartPre=-/bin/bash -c 'cat {{ home }}/.dockerhub_token | docker login --username bluefishforsale --password-stdin'
+ExecStartPre=-/usr/bin/docker pull bluefishforsale/tinacms-nextjs:latest
+ExecStartPre=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+
+# Start command
+ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
+
+# Stop command  
+ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+
+# Reload command - force recreation to pick up new config files
+ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d --force-recreate
+
+# Service behavior
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=180
+TimeoutStopSec=60
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ home }}
+ReadWritePaths={{ home }}/.docker
+ReadOnlyPaths=/var/run/docker.sock
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ service }}
+
+[Install]
+WantedBy=multi-user.target
