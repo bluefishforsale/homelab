@@ -6,9 +6,9 @@
 - name: Validate GitHub registration token is provided
   ansible.builtin.assert:
     that:
-      - github_registration_token is defined
-      - github_registration_token | length > 0
-    fail_msg: "github_registration_token must be provided via Vault or --extra-vars"
+      - development.github.github_registration_token is defined
+      - development.github.github_registration_token | length > 0
+    fail_msg: "development.github.github_registration_token must be provided via Vault or --extra-vars"
     success_msg: "GitHub registration token validated"
 
 - name: Validate GitHub scope configuration
