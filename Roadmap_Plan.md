@@ -1,10 +1,10 @@
 # 🎯 Vision Statement
 
-1. 🔄 🤖 Fully automated (Partially - Ansible playbooks exist, need GitLab/Rundeck orchestration)
+1. 🔄 🤖 Fully automated (Partially - Ansible playbooks exist, GitHub Actions runners deployed)
 2. ✅ 🔐 SSH free for 99% of tasks (Cloudflare tunnels + Access policies deployed)
 3. ✅ 🛡️ Everything secured with publicly signed certs (Let's Encrypt via Cloudflare)
 4. ✅ 📝 Git driven infrastructure as code (All playbooks in Git, idempotent)
-5. 🔄 🏗️ Git driven build for services / containers (GitLab not deployed yet)
+5. 🔄 🏗️ Git driven build for services / containers (GitHub Actions with 4 ephemeral runners)
 6. ❌ 📊 Log aggregation service (Loki not deployed)
 7. ❌ 🎛️ Control plane for building infrastructure (Rundeck/Semaphore not deployed)
 8. ❌ 🏢 Isolated "clusters" and "environments" / dev-prod
@@ -22,6 +22,7 @@
 
 1. ✅ 💻 Laptop creates control plane metal
 2. ✅ 📚 Git repo, build server backs up to GitHub (All playbooks in homelab repo)
+3. ✅ 🏃 GitHub Actions self-hosted runners deployed (4 ephemeral Docker runners with Ansible)
 
 ## 🖥️ Control plane metal
 
@@ -86,6 +87,16 @@ aybooks
 12. ✅ Media stack (Plex, Sonarr, Radarr, Prowlarr, etc.)
 13. ✅ Prometheus monitoring
 14. ✅ CMS platforms (PayloadCMS, Strapi, TinaCMS)
+15. ✅ 🏃 GitHub Actions self-hosted runners (4 ephemeral Docker containers with Ansible + Docker support)
+16. ✅ 📝 TinaCMS Next.js demo blog (bluefishforsale/tinacms-nextjs with SHA-based image tags)
+
+## AI/ML Infrastructure
+
+1. ✅ 🦙 llama.cpp GPU-accelerated LLM API server (Nvidia P2000 CUDA support)
+2. ✅ 🌐 Open WebUI with automatic llama.cpp integration (pre-configured API endpoints)
+3. ✅ 🎨 ComfyUI with automated model management (FLUX, VAE, LoRA, ControlNet)
+4. ✅ 🔄 n8n workflow automation with PostgreSQL backend and GPU access
+5. ✅ 📦 Automated model downloading and permission management
 
 ## Monitoring
 
@@ -158,10 +169,56 @@ aybooks
 2. ❌ 🛠️ Resiliency and Redundancy implementation
 3. ❌ ⚡ HA for DNS, DHCP, LoadBalancer
 
-# 🦊 GitLab Automation (Part of Phase 2)
+# 🏃 GitHub Actions Automation (Current Approach)
+
+## ✅ Deployed Configuration
+
+1. ✅ 🐳 4 ephemeral Docker-based runners on ocean server
+2. ✅ 🔄 Fresh runner container per job (ephemeral mode)
+3. ✅ 🐋 Docker socket mounted for container builds in workflows
+4. ✅ 🎭 Ansible pre-installed for infrastructure automation
+5. ✅ 🏷️ Custom labels: self-hosted, homelab, ansible, ephemeral, docker
+6. ✅ ♻️ Auto-restart after job completion for next workflow
+7. ✅ 📦 Using myoung34/github-runner image (well-maintained ephemeral support)
+8. ✅ 🔐 SSH key mounting for Ansible access to homelab hosts
+9. ✅ 🎯 Repository-level runners (bluefishforsale/homelab)
+10. ✅ ⚙️ Systemd service management for runner lifecycle
+
+## 📝 Example Workflow Usage
+
+```yaml
+jobs:
+  deploy:
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy with Ansible
+        run: ansible-playbook playbook_ocean_nginx.yaml
+
+  build:
+    runs-on: [self-hosted, homelab, docker]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t myapp:${{ github.sha }} .
+```
+
+## 🔄 Benefits of Current Setup
+
+- No GitLab infrastructure needed
+- Integrated with GitHub repository
+- Ephemeral runners = clean builds every time
+- Can run Ansible playbooks directly from workflows
+- Docker builds available for CI/CD pipelines
+- Runs on existing ocean server (no additional hardware)
+- Free for private repositories with self-hosted runners
+
+# 🦊 GitLab Automation (Future Alternative - Part of Phase 2)
 
 1. ❌ 🔄 GitLab pulls from github.com or is triggered via webhook
 2. ❌ 🏠 Homelab repo in GitLab triggers build steps on repo update
 3. ❌ 🎭 Homelab repo uses Ansible Semaphore or Rundeck in a container
-4. ❌ 🔑 The runner needs access to a private SSH key allowed on the internal hosts
+4. ✅ 🔑 SSH key access pattern established with GitHub runners (can be reused)
 5. ✅ ♻️ The automation then applies all playbooks, so they all need to be idempotent
+
+**Note**: GitHub Actions runners provide similar functionality to GitLab + Rundeck approach.
