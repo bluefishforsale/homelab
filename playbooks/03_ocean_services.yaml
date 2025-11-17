@@ -1,0 +1,109 @@
+---
+# Ocean Server Application Services
+# All services running on the ocean server
+#
+# Usage:
+#   ansible-playbook playbooks/03_ocean_services.yaml
+#   ansible-playbook playbooks/03_ocean_services.yaml --check  # Dry run
+#   ansible-playbook playbooks/03_ocean_services.yaml --ask-vault-pass  # With vault
+
+# ============================================================================
+# Network Services
+# ============================================================================
+
+- name: Deploy Cloudflare DDNS
+  ansible.builtin.import_playbook: individual/ocean/network/cloudflare_ddns.yaml
+
+- name: Deploy Cloudflare Tunnels
+  ansible.builtin.import_playbook: individual/ocean/network/cloudflared.yaml
+
+- name: Deploy nginx Reverse Proxy
+  ansible.builtin.import_playbook: individual/ocean/network/nginx_compose.yaml
+
+# ============================================================================
+# AI/ML Services
+# ============================================================================
+
+- name: Deploy llama.cpp GPU-Accelerated LLM Server
+  ansible.builtin.import_playbook: individual/ocean/ai/llamacpp.yaml
+
+- name: Deploy Open WebUI for LLM Interface
+  ansible.builtin.import_playbook: individual/ocean/ai/open_webui.yaml
+
+- name: Deploy ComfyUI for AI Image Generation
+  ansible.builtin.import_playbook: individual/ocean/ai/comfyui.yaml
+
+- name: Deploy n8n Workflow Automation
+  ansible.builtin.import_playbook: individual/ocean/ai/n8n.yaml
+
+# ============================================================================
+# Media Services
+# ============================================================================
+
+- name: Deploy Plex Media Server
+  ansible.builtin.import_playbook: individual/ocean/media/plex.yaml
+
+- name: Deploy Sonarr for TV Shows
+  ansible.builtin.import_playbook: individual/ocean/media/sonarr.yaml
+
+- name: Deploy Radarr for Movies
+  ansible.builtin.import_playbook: individual/ocean/media/radarr.yaml
+
+- name: Deploy Prowlarr for Indexer Management
+  ansible.builtin.import_playbook: individual/ocean/media/prowlarr.yaml
+
+- name: Deploy Bazarr for Subtitles
+  ansible.builtin.import_playbook: individual/ocean/media/bazarr.yaml
+
+- name: Deploy NZBGet for Downloads
+  ansible.builtin.import_playbook: individual/ocean/media/nzbget.yaml
+
+- name: Deploy Overseerr for Media Requests
+  ansible.builtin.import_playbook: individual/ocean/media/overseerr.yaml
+
+- name: Deploy Tautulli for Plex Monitoring
+  ansible.builtin.import_playbook: individual/ocean/media/tautulli.yaml
+
+- name: Deploy Tdarr for Media Transcoding
+  ansible.builtin.import_playbook: individual/ocean/media/tdarr.yaml
+
+# ============================================================================
+# Monitoring Services
+# ============================================================================
+
+- name: Deploy Prometheus Monitoring
+  ansible.builtin.import_playbook: individual/ocean/monitoring/prometheus.yaml
+
+- name: Deploy Grafana Dashboards
+  ansible.builtin.import_playbook: individual/ocean/monitoring/grafana_compose.yaml
+
+- name: Deploy NVIDIA DCGM Exporter
+  ansible.builtin.import_playbook: individual/ocean/monitoring/nvidia_dcgm.yaml
+
+- name: Deploy UniFi Poller Exporter
+  ansible.builtin.import_playbook: individual/ocean/monitoring/unpoller.yaml
+
+# ============================================================================
+# Application Services
+# ============================================================================
+
+- name: Deploy NextCloud File Sharing
+  ansible.builtin.import_playbook: individual/ocean/services/nextcloud.yaml
+
+- name: Deploy TinaCMS Blog Platform
+  ansible.builtin.import_playbook: individual/ocean/services/tinacms.yaml
+
+- name: Deploy Audible Downloader
+  ansible.builtin.import_playbook: individual/ocean/services/audible_downloader.yaml
+
+- name: Deploy Navidrome Music Server
+  ansible.builtin.import_playbook: individual/ocean/services/navidrome.yaml
+
+- name: Deploy Spotube Music Streaming
+  ansible.builtin.import_playbook: individual/ocean/services/spotube.yaml
+
+- name: Deploy Frigate NVR
+  ansible.builtin.import_playbook: individual/ocean/services/frigate.yaml
+
+- name: Deploy Home Assistant
+  ansible.builtin.import_playbook: individual/ocean/services/homeassistant_compose.yaml

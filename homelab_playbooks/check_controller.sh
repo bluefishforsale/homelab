@@ -1,2 +1,0 @@
-ansible-inventory -i inventory.ini --list | jq  -r '.k8s_controller.hosts | @sh' | xargs -n1 -I% ssh %.home 'hostname ; sudo kubectl get nodes --kubeconfig /var/lib/kubernetes/admin.kubeconfig'
-ansible-inventory -i inventory.ini --list | jq  -r '.k8s_controller.hosts | @sh' | xargs -n1 -I% ssh %.home 'hostname ; sudo systemctl status etcd keepalived haproxy kube-apiserver kube-scheduler'

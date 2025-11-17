@@ -1,0 +1,304 @@
+---
+name: Deploy Critical Service (Protected)
+
+on:
+    workflow_dispatch:
+        inputs:
+            service:
+                description: "CRITICAL service to deploy"
+                required: true
+                type: choice
+                options:
+                    # Core Infrastructure (CRITICAL - DO NOT BREAK)
+                    - dns
+                    - dhcp
+                    - plex
+            require_approval:
+                description: "Require manual approval before deployment"
+                required: true
+                type: boolean
+                default: true
+            health_check_timeout:
+                description: "Health check timeout (seconds)"
+                required: false
+                type: number
+                default: 60
+
+env:
+    ANSIBLE_FORCE_COLOR: "true"
+    ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+    # ALWAYS run validation first
+    validate:
+        name: ⚠️  Validate CRITICAL Service
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Identify service playbook
+              id: identify
+              run: |
+                  SERVICE="${{ inputs.service }}"
+                  case "$SERVICE" in
+                    dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+                    dhcp) PLAYBOOK="playbooks/individual/core/services/dhcp_ddns.yaml" ;;
+                    plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
+                    *) echo "❌ Unknown critical service"; exit 1 ;;
+                  esac
+                  echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
+                  echo "🔴 CRITICAL SERVICE: $SERVICE"
+                  echo "📋 Playbook: $PLAYBOOK"
+
+            - name: Validate YAML syntax
+              run: |
+                  python3 -c "import yaml; yaml.safe_load(open('${{ steps.identify.outputs.playbook }}'))"
+
+            - name: Validate Ansible syntax
+              run: |
+                  ansible-playbook --syntax-check ${{ steps.identify.outputs.playbook }}
+
+            - name: Lint playbook
+              run: |
+                  if command -v ansible-lint &> /dev/null; then
+                    ansible-lint ${{ steps.identify.outputs.playbook }}
+                  fi
+
+    # ALWAYS run dry-run for critical services
+    dry-run:
+        name: 🔍 MANDATORY Dry-Run
+        needs: validate
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Get playbook from validation
+              id: playbook
+              run: |
+                  SERVICE="${{ inputs.service }}"
+                  case "$SERVICE" in
+                    dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+                    dhcp) PLAYBOOK="playbooks/individual/core/services/dhcp_ddns.yaml" ;;
+                    plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
+                  esac
+                  echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
+
+            - name: Pre-deployment health check
+              run: |
+                  echo "🏥 Checking current service health..."
+                  case "${{ inputs.service }}" in
+                    dns)
+                      echo "Testing DNS resolution..."
+                      dig @192.168.1.2 ocean.home +short || exit 1
+                      dig @192.168.1.2 google.com +short || exit 1
+                      ;;
+                    dhcp)
+                      echo "Testing DHCP server..."
+                      ssh dns01 "systemctl is-active isc-dhcp-server" || exit 1
+                      ;;
+                    plex)
+                      echo "Testing Plex availability..."
+                      curl -f http://192.168.1.143:32400/web/index.html || exit 1
+                      ;;
+                  esac
+                  echo "✅ Pre-deployment health check PASSED"
+
+            - name: Run mandatory dry-run
+              env:
+                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  set -e
+                  set -o pipefail
+
+                  CMD="ansible-playbook ${{ steps.playbook.outputs.playbook }} --check"
+
+                  if [ -n "$VAULT_PASSWORD" ]; then
+                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
+                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
+                  fi
+
+                  echo "🔍 Running MANDATORY dry-run for CRITICAL service..."
+                  eval $CMD
+                  EXIT_CODE=$?
+
+                  rm -f /tmp/vault_pass
+
+                  if [ $EXIT_CODE -ne 0 ]; then
+                    echo "❌ Dry-run FAILED - deployment will NOT proceed"
+                    echo "🛑 CRITICAL service protection activated"
+                    exit $EXIT_CODE
+                  fi
+
+                  echo "✅ Dry-run PASSED"
+
+    # Manual approval gate
+    approval:
+        name: 🛡️  Require Manual Approval
+        needs: [validate, dry-run]
+        if: ${{ inputs.require_approval == true }}
+        runs-on: [self-hosted, homelab, ansible]
+        environment:
+            name: critical-services
+        steps:
+            - name: Waiting for approval
+              run: |
+                  echo "⏸️  Deployment paused - waiting for manual approval"
+                  echo "🔴 CRITICAL SERVICE: ${{ inputs.service }}"
+                  echo ""
+                  echo "Review dry-run logs above before approving!"
+
+    # Actual deployment with safety checks
+    deploy:
+        name: 🚀 Deploy (Protected)
+        needs: [validate, dry-run, approval]
+        if: ${{ always() && needs.validate.result == 'success' && needs.dry-run.result == 'success' && (needs.approval.result == 'success' || needs.approval.result == 'skipped') }}
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Get playbook
+              id: playbook
+              run: |
+                  SERVICE="${{ inputs.service }}"
+                  case "$SERVICE" in
+                    dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+                    dhcp) PLAYBOOK="playbooks/individual/core/services/dhcp_ddns.yaml" ;;
+                    plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
+                  esac
+                  echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
+
+            - name: Create deployment snapshot
+              run: |
+                  echo "📸 Creating configuration snapshot..."
+                  case "${{ inputs.service }}" in
+                    dns)
+                      ssh dns01 "tar -czf /tmp/bind9-backup-$(date +%Y%m%d-%H%M%S).tar.gz /etc/bind /var/cache/bind"
+                      echo "✅ DNS configuration backed up"
+                      ;;
+                    dhcp)
+                      ssh dns01 "tar -czf /tmp/dhcp-backup-$(date +%Y%m%d-%H%M%S).tar.gz /etc/dhcp"
+                      echo "✅ DHCP configuration backed up"
+                      ;;
+                    plex)
+                      ssh ocean "docker exec plex ls -la /config > /tmp/plex-config-snapshot-$(date +%Y%m%d-%H%M%S).txt"
+                      echo "✅ Plex configuration snapshot created"
+                      ;;
+                  esac
+
+            - name: Deploy with protection
+              env:
+                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  set -e
+                  set -o pipefail
+
+                  echo "🔴 Deploying CRITICAL SERVICE: ${{ inputs.service }}"
+                  echo "⚠️  Protection enabled: service health will be verified"
+
+                  CMD="ansible-playbook ${{ steps.playbook.outputs.playbook }}"
+
+                  if [ -n "$VAULT_PASSWORD" ]; then
+                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
+                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
+                  fi
+
+                  echo "Running: $CMD"
+                  eval $CMD
+                  EXIT_CODE=$?
+
+                  rm -f /tmp/vault_pass
+
+                  if [ $EXIT_CODE -ne 0 ]; then
+                    echo "❌ Deployment FAILED"
+                    echo "🔴 CRITICAL SERVICE MAY BE IMPACTED"
+                    exit $EXIT_CODE
+                  fi
+
+                  echo "✅ Deployment completed"
+
+            - name: Post-deployment health check
+              timeout-minutes: 2
+              run: |
+                  echo "🏥 Verifying service health after deployment..."
+                  sleep 10  # Allow service to stabilize
+
+                  case "${{ inputs.service }}" in
+                    dns)
+                      echo "Testing DNS resolution..."
+                      for i in {1..10}; do
+                        if dig @192.168.1.2 ocean.home +short && dig @192.168.1.2 google.com +short; then
+                          echo "✅ DNS responding correctly (attempt $i)"
+                          break
+                        fi
+                        if [ $i -eq 10 ]; then
+                          echo "❌ DNS HEALTH CHECK FAILED"
+                          exit 1
+                        fi
+                        sleep 5
+                      done
+                      ;;
+                    dhcp)
+                      echo "Testing DHCP server..."
+                      ssh dns01 "systemctl is-active isc-dhcp-server" || exit 1
+                      ssh dns01 "journalctl -u isc-dhcp-server -n 20 --no-pager"
+                      ;;
+                    plex)
+                      echo "Testing Plex availability..."
+                      for i in {1..10}; do
+                        if curl -f http://192.168.1.143:32400/web/index.html; then
+                          echo "✅ Plex responding (attempt $i)"
+                          break
+                        fi
+                        if [ $i -eq 10 ]; then
+                          echo "❌ PLEX HEALTH CHECK FAILED"
+                          exit 1
+                        fi
+                        sleep 5
+                      done
+                      ;;
+                  esac
+
+                  echo "✅ Post-deployment health check PASSED"
+                  echo "🎉 CRITICAL SERVICE deployed successfully and verified healthy"
+
+            - name: Health check failed - alert
+              if: failure()
+              run: |
+                  echo "🚨 CRITICAL ALERT 🚨"
+                  echo "Service: ${{ inputs.service }}"
+                  echo "Status: HEALTH CHECK FAILED"
+                  echo ""
+                  echo "IMMEDIATE ACTION REQUIRED:"
+                  echo "1. Check service logs"
+                  echo "2. Verify service is accessible"
+                  echo "3. Consider rollback if needed"
+                  echo ""
+                  echo "Backup available at: /tmp/*-backup-*.tar.gz"
+                  exit 1
+
+    summary:
+        name: 📊 Deployment Summary
+        needs: [validate, dry-run, approval, deploy]
+        if: always()
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Summary
+              run: |
+                  echo "═══════════════════════════════════════"
+                  echo "  CRITICAL SERVICE DEPLOYMENT SUMMARY"
+                  echo "═══════════════════════════════════════"
+                  echo ""
+                  echo "Service: ${{ inputs.service }}"
+                  echo "Validation: ${{ needs.validate.result }}"
+                  echo "Dry-run: ${{ needs.dry-run.result }}"
+                  echo "Approval: ${{ needs.approval.result }}"
+                  echo "Deployment: ${{ needs.deploy.result }}"
+                  echo ""
+                  if [ "${{ needs.deploy.result }}" = "success" ]; then
+                    echo "✅ Deployment successful and verified"
+                  else
+                    echo "❌ Deployment failed or was not attempted"
+                  fi

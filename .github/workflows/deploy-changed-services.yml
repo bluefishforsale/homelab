@@ -1,0 +1,369 @@
+---
+name: Deploy Changed Services
+
+on:
+    workflow_dispatch:
+        inputs:
+            base_ref:
+                description: "Base branch to compare against"
+                required: false
+                type: string
+                default: "main"
+            check_mode:
+                description: "Run in check mode (dry-run)"
+                required: false
+                type: boolean
+                default: false
+            skip_critical:
+                description: "Skip critical services (DNS/DHCP/Plex)"
+                required: false
+                type: boolean
+                default: true
+
+env:
+    ANSIBLE_FORCE_COLOR: "true"
+    ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+    detect-changes:
+        name: Detect Changed Playbooks
+        runs-on: [self-hosted, homelab, ansible]
+        outputs:
+            ocean_services: ${{ steps.parse.outputs.ocean_services }}
+            critical_services: ${{ steps.parse.outputs.critical_services }}
+            master_playbooks: ${{ steps.parse.outputs.master_playbooks }}
+            has_changes: ${{ steps.parse.outputs.has_changes }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Full history for comparison
+
+            - name: Detect changed playbooks
+              id: changes
+              run: |
+                  echo "Comparing against: ${{ inputs.base_ref }}"
+
+                  # Get list of changed .yaml files in playbooks/
+                  git diff --name-only origin/${{ inputs.base_ref }}...HEAD | \
+                    grep "^playbooks/.*\.yaml$" > changed_playbooks.txt || true
+
+                  echo "Changed playbooks:"
+                  cat changed_playbooks.txt
+
+                  # Save for next step
+                  echo "CHANGED_FILES<<EOF" >> $GITHUB_OUTPUT
+                  cat changed_playbooks.txt >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+
+            - name: Parse and categorize changes
+              id: parse
+              run: |
+                  OCEAN_SERVICES=()
+                  CRITICAL_SERVICES=()
+                  MASTER_PLAYBOOKS=()
+
+                  while IFS= read -r file; do
+                    [[ -z "$file" ]] && continue
+                    
+                    echo "Processing: $file"
+                    
+                    # Master playbooks
+                    if [[ "$file" =~ ^playbooks/0[0-3]_.*.yaml$ ]]; then
+                      MASTER_PLAYBOOKS+=("$file")
+                      echo "  → Master playbook"
+                    
+                    # Critical services
+                    elif [[ "$file" =~ playbooks/individual/core/services/(bind9_ddns|dhcp_ddns)\.yaml$ ]]; then
+                      CRITICAL_SERVICES+=("dns-dhcp")
+                      echo "  → Critical service (DNS/DHCP)"
+                    
+                    elif [[ "$file" =~ playbooks/individual/ocean/media/plex\.yaml$ ]]; then
+                      CRITICAL_SERVICES+=("plex")
+                      echo "  → Critical service (Plex)"
+                    
+                    # Ocean services (map playbook to service name)
+                    elif [[ "$file" =~ playbooks/individual/ocean/.*/([^/]+)\.yaml$ ]]; then
+                      service="${BASH_REMATCH[1]}"
+                      # Remove _compose suffix
+                      service="${service/_compose/}"
+                      # Convert underscores to hyphens for service names
+                      service="${service//_/-}"
+                      OCEAN_SERVICES+=("$service")
+                      echo "  → Ocean service: $service"
+                    
+                    else
+                      echo "  → Skipped (not a deployable service)"
+                    fi
+                  done < <(echo "${{ steps.changes.outputs.CHANGED_FILES }}")
+
+                  # Remove duplicates and convert to JSON arrays
+                  OCEAN_SERVICES=($(printf '%s\n' "${OCEAN_SERVICES[@]}" | sort -u))
+                  CRITICAL_SERVICES=($(printf '%s\n' "${CRITICAL_SERVICES[@]}" | sort -u))
+                  MASTER_PLAYBOOKS=($(printf '%s\n' "${MASTER_PLAYBOOKS[@]}" | sort -u))
+
+                  # Convert to JSON
+                  OCEAN_JSON=$(printf '%s\n' "${OCEAN_SERVICES[@]}" | jq -R . | jq -s .)
+                  CRITICAL_JSON=$(printf '%s\n' "${CRITICAL_SERVICES[@]}" | jq -R . | jq -s .)
+                  MASTER_JSON=$(printf '%s\n' "${MASTER_PLAYBOOKS[@]}" | jq -R . | jq -s .)
+
+                  echo "ocean_services=${OCEAN_JSON}" >> $GITHUB_OUTPUT
+                  echo "critical_services=${CRITICAL_JSON}" >> $GITHUB_OUTPUT
+                  echo "master_playbooks=${MASTER_JSON}" >> $GITHUB_OUTPUT
+
+                  # Check if we have any changes to deploy
+                  if [ ${#OCEAN_SERVICES[@]} -gt 0 ] || [ ${#CRITICAL_SERVICES[@]} -gt 0 ] || [ ${#MASTER_PLAYBOOKS[@]} -gt 0 ]; then
+                    echo "has_changes=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "has_changes=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Display deployment plan
+              run: |
+                  echo "════════════════════════════════════════"
+                  echo "  DEPLOYMENT PLAN"
+                  echo "════════════════════════════════════════"
+                  echo ""
+
+                  OCEAN_SERVICES='${{ steps.parse.outputs.ocean_services }}'
+                  CRITICAL_SERVICES='${{ steps.parse.outputs.critical_services }}'
+                  MASTER_PLAYBOOKS='${{ steps.parse.outputs.master_playbooks }}'
+
+                  if [ "$OCEAN_SERVICES" != "[]" ] && [ "$OCEAN_SERVICES" != "" ]; then
+                    echo "📦 Ocean Services to Deploy:"
+                    echo "$OCEAN_SERVICES" | jq -r '.[]' | sed 's/^/  - /'
+                    echo ""
+                  fi
+
+                  if [ "$CRITICAL_SERVICES" != "[]" ] && [ "$CRITICAL_SERVICES" != "" ]; then
+                    echo "🔴 Critical Services Detected:"
+                    echo "$CRITICAL_SERVICES" | jq -r '.[]' | sed 's/^/  - /'
+                    echo ""
+                    if [ "${{ inputs.skip_critical }}" = "true" ]; then
+                      echo "⚠️  SKIPPED (use deploy-critical-service.yml workflow)"
+                    else
+                      echo "⚠️  WILL BE DEPLOYED (manual approval required)"
+                    fi
+                    echo ""
+                  fi
+
+                  if [ "$MASTER_PLAYBOOKS" != "[]" ] && [ "$MASTER_PLAYBOOKS" != "" ]; then
+                    echo "📚 Master Playbooks Changed:"
+                    echo "$MASTER_PLAYBOOKS" | jq -r '.[]' | sed 's/^/  - /'
+                    echo ""
+                    echo "ℹ️  Use 'Deploy Services' workflow for master playbooks"
+                    echo ""
+                  fi
+
+                  if [ "${{ steps.parse.outputs.has_changes }}" = "false" ]; then
+                    echo "ℹ️  No deployable services changed"
+                  fi
+
+    validate-all:
+        name: Validate All Changes
+        needs: detect-changes
+        if: needs.detect-changes.outputs.has_changes == 'true'
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Validate changed playbooks
+              run: |
+                  echo "Validating all changed playbooks..."
+
+                  # Get changed files from previous job
+                  git diff --name-only origin/${{ inputs.base_ref }}...HEAD | \
+                    grep "^playbooks/.*\.yaml$" | while read file; do
+                    
+                    if [ -f "$file" ]; then
+                      echo "Validating: $file"
+                      
+                      # YAML syntax
+                      python3 -c "import yaml; yaml.safe_load(open('$file'))"
+                      
+                      # Ansible syntax
+                      ansible-playbook --syntax-check "$file"
+                      
+                      echo "✅ $file validated"
+                    fi
+                  done
+
+                  echo ""
+                  echo "✅ All validations passed"
+
+    deploy-ocean-services:
+        name: Deploy Ocean Service (${{ matrix.service }})
+        needs: [detect-changes, validate-all]
+        if: needs.detect-changes.outputs.ocean_services != '[]'
+        runs-on: [self-hosted, homelab, ansible]
+        strategy:
+            matrix:
+                service: ${{ fromJson(needs.detect-changes.outputs.ocean_services) }}
+            fail-fast: true # Stop on first failure
+            max-parallel: 1 # Deploy one at a time
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Map service to playbook
+              id: playbook
+              run: |
+                  SERVICE="${{ matrix.service }}"
+
+                  # Map service names to playbook paths
+                  case "$SERVICE" in
+                    # Network
+                    nginx) PLAYBOOK="playbooks/individual/ocean/network/nginx_compose.yaml" ;;
+                    cloudflared) PLAYBOOK="playbooks/individual/ocean/network/cloudflared.yaml" ;;
+                    cloudflare-ddns) PLAYBOOK="playbooks/individual/ocean/network/cloudflare_ddns.yaml" ;;
+                    
+                    # Media
+                    sonarr) PLAYBOOK="playbooks/individual/ocean/media/sonarr.yaml" ;;
+                    radarr) PLAYBOOK="playbooks/individual/ocean/media/radarr.yaml" ;;
+                    prowlarr) PLAYBOOK="playbooks/individual/ocean/media/prowlarr.yaml" ;;
+                    bazarr) PLAYBOOK="playbooks/individual/ocean/media/bazarr.yaml" ;;
+                    nzbget) PLAYBOOK="playbooks/individual/ocean/media/nzbget.yaml" ;;
+                    tautulli) PLAYBOOK="playbooks/individual/ocean/media/tautulli.yaml" ;;
+                    overseerr) PLAYBOOK="playbooks/individual/ocean/media/overseerr.yaml" ;;
+                    plex-meta-manager) PLAYBOOK="playbooks/individual/ocean/media/plex-meta-manager.yaml" ;;
+                    tdarr) PLAYBOOK="playbooks/individual/ocean/media/tdarr.yaml" ;;
+                    audible-downloader) PLAYBOOK="playbooks/individual/ocean/media/audible-downloader.yaml" ;;
+                    
+                    # AI/ML
+                    llamacpp) PLAYBOOK="playbooks/individual/ocean/ai/llamacpp.yaml" ;;
+                    open-webui) PLAYBOOK="playbooks/individual/ocean/ai/open-webui.yaml" ;;
+                    n8n) PLAYBOOK="playbooks/individual/ocean/ai/n8n.yaml" ;;
+                    comfyui) PLAYBOOK="playbooks/individual/ocean/ai/comfyui.yaml" ;;
+                    
+                    # Cloud
+                    nextcloud) PLAYBOOK="playbooks/individual/ocean/services/nextcloud.yaml" ;;
+                    payloadcms) PLAYBOOK="playbooks/individual/ocean/services/payloadcms.yaml" ;;
+                    strapi) PLAYBOOK="playbooks/individual/ocean/services/strapi.yaml" ;;
+                    tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
+                    
+                    # Monitoring
+                    prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;
+                    grafana) PLAYBOOK="playbooks/individual/ocean/monitoring/grafana_compose.yaml" ;;
+                    
+                    *) echo "❌ Unknown service: $SERVICE"; exit 1 ;;
+                  esac
+
+                  echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
+                  echo "📦 Deploying: $PLAYBOOK"
+
+            - name: Dry-run deployment
+              if: inputs.check_mode == false
+              env:
+                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  set -e
+                  set -o pipefail
+
+                  CMD="ansible-playbook ${{ steps.playbook.outputs.playbook }} --check"
+
+                  if [ -n "$VAULT_PASSWORD" ]; then
+                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
+                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
+                  fi
+
+                  echo "🔍 Running dry-run..."
+                  eval $CMD
+                  EXIT_CODE=$?
+
+                  rm -f /tmp/vault_pass
+
+                  if [ $EXIT_CODE -ne 0 ]; then
+                    echo "❌ Dry-run FAILED"
+                    exit $EXIT_CODE
+                  fi
+
+                  echo "✅ Dry-run passed"
+
+            - name: Deploy service
+              env:
+                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  set -e
+                  set -o pipefail
+
+                  CMD="ansible-playbook ${{ steps.playbook.outputs.playbook }}"
+
+                  if [ "${{ inputs.check_mode }}" = "true" ]; then
+                    CMD="$CMD --check"
+                    echo "⚠️  Running in CHECK MODE (no changes will be made)"
+                  fi
+
+                  if [ -n "$VAULT_PASSWORD" ]; then
+                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
+                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
+                  fi
+
+                  echo "🚀 Deploying: ${{ matrix.service }}"
+                  eval $CMD
+                  EXIT_CODE=$?
+
+                  rm -f /tmp/vault_pass
+
+                  if [ $EXIT_CODE -ne 0 ]; then
+                    echo "❌ Deployment FAILED: ${{ matrix.service }}"
+                    exit $EXIT_CODE
+                  fi
+
+                  echo "✅ Deployed successfully: ${{ matrix.service }}"
+
+    summary:
+        name: Deployment Summary
+        needs: [detect-changes, validate-all, deploy-ocean-services]
+        if: always() && needs.detect-changes.outputs.has_changes == 'true'
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Generate summary
+              run: |
+                  echo "════════════════════════════════════════"
+                  echo "  DEPLOYMENT SUMMARY"
+                  echo "════════════════════════════════════════"
+                  echo ""
+
+                  echo "Validation: ${{ needs.validate-all.result }}"
+                  echo "Ocean Services: ${{ needs.deploy-ocean-services.result }}"
+                  echo ""
+
+                  CRITICAL='${{ needs.detect-changes.outputs.critical_services }}'
+                  MASTER='${{ needs.detect-changes.outputs.master_playbooks }}'
+
+                  if [ "$CRITICAL" != "[]" ] && [ "$CRITICAL" != "" ]; then
+                    echo "🔴 Critical Services Detected (not deployed):"
+                    echo "$CRITICAL" | jq -r '.[]' | sed 's/^/  - /'
+                    echo ""
+                    echo "⚠️  Deploy these manually using: deploy-critical-service.yml"
+                    echo ""
+                  fi
+
+                  if [ "$MASTER" != "[]" ] && [ "$MASTER" != "" ]; then
+                    echo "📚 Master Playbooks Changed (not deployed):"
+                    echo "$MASTER" | jq -r '.[]' | sed 's/^/  - /'
+                    echo ""
+                    echo "ℹ️  Deploy these using: deploy-services.yml"
+                    echo ""
+                  fi
+
+                  if [ "${{ needs.deploy-ocean-services.result }}" = "success" ]; then
+                    echo "✅ All ocean services deployed successfully"
+                  elif [ "${{ needs.deploy-ocean-services.result }}" = "failure" ]; then
+                    echo "❌ Some services failed to deploy"
+                    echo "Check logs above for details"
+                  fi
+
+    no-changes:
+        name: No Deployable Changes
+        needs: detect-changes
+        if: needs.detect-changes.outputs.has_changes == 'false'
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Report no changes
+              run: |
+                  echo "ℹ️  No deployable service changes detected"
+                  echo ""
+                  echo "Changed files may not include individual service playbooks,"
+                  echo "or changes may only affect documentation/config files."
