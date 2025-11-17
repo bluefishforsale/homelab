@@ -1,0 +1,25 @@
+---
+# Base System Configuration
+# Foundation configuration applied to all homelab hosts
+#
+# Usage:
+#   ansible-playbook playbooks/01_base_system.yaml
+#   ansible-playbook playbooks/01_base_system.yaml --check  # Dry run
+
+- name: Configure I/O, CPU, and UPS Settings
+  ansible.builtin.import_playbook: individual/base/io_cpu_ups.yaml
+
+- name: Install Base System Packages
+  ansible.builtin.import_playbook: individual/base/packages.yaml
+
+- name: Configure System Users and Groups
+  ansible.builtin.import_playbook: individual/base/users.yaml
+
+- name: Configure Timezone, Sysctl, Udev, and Logging
+  ansible.builtin.import_playbook: individual/base/tz_sysctl_udev_logging.yaml
+
+- name: Configure Unattended Security Upgrades
+  ansible.builtin.import_playbook: individual/base/unattended_upgrade.yaml
+
+- name: Configure RAM Disk (if applicable)
+  ansible.builtin.import_playbook: individual/base/ramdisk.yaml

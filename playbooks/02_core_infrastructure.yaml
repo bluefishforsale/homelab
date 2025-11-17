@@ -1,0 +1,34 @@
+---
+# Core Infrastructure Services
+# Essential services: DNS, DHCP, Docker, networking, storage
+#
+# Usage:
+#   ansible-playbook playbooks/02_core_infrastructure.yaml
+#   ansible-playbook playbooks/02_core_infrastructure.yaml --check  # Dry run
+
+- name: Configure Network Ethtool Settings
+  ansible.builtin.import_playbook: individual/core/network/ethtool.yaml
+
+- name: Configure Dell BCM NIC Bonding
+  ansible.builtin.import_playbook: individual/core/network/dell_bcm_bnx2x_bond.yaml
+
+- name: Configure Dell Intel X520-DA2 NIC Bonding
+  ansible.builtin.import_playbook: individual/core/network/dell_intel_x520_da2_bond.yaml
+
+- name: Configure Network QoS (qdisc)
+  ansible.builtin.import_playbook: individual/core/network/qdisc.yaml
+
+- name: Configure Dell PERC RAID
+  ansible.builtin.import_playbook: individual/core/storage/dell_perc_raid.yaml
+
+- name: Install Docker
+  ansible.builtin.import_playbook: individual/core/services/docker.yaml
+
+- name: Configure DNS Service
+  ansible.builtin.import_playbook: individual/core/services/dns.yaml
+
+- name: Configure DHCP with DDNS
+  ansible.builtin.import_playbook: individual/core/services/dhcp_ddns.yaml
+
+- name: Configure Pi-hole
+  ansible.builtin.import_playbook: individual/core/services/pi_hole.yaml

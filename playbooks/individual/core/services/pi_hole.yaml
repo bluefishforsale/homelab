@@ -1,0 +1,77 @@
+---
+- name: Install Pi-hole on Debian 12
+  hosts: pi-hole
+  become: true
+  vars:
+    pihole_admin_password: "admin"
+
+  tasks:
+    ############  fix dpkg if things went sideways #####################
+    - name: Handle dpkg locks and repair
+      include_tasks: ../../../tasks/dpkg_lock.yaml
+
+    ############  apt install #####################
+    - name: update cache once
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - procps
+        - lsb-release
+        - git
+
+    - name: Git clone Pi-hole
+      ansible.builtin.git:
+        repo: https://github.com/pi-hole/pi-hole.git
+        dest: /opt/pi-hole
+        accept_hostkey: true
+        force: true
+        depth: 1
+    
+    - name: Create /etc/pihole directory
+      file:
+        path: /etc/pihole
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create /etc/pihole/setupVars.conf with specified variables
+      template:
+        src: files/pihole/etc/setupVars.conf.j2
+        dest: /etc/pihole/setupVars.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Install Pi-hole
+      ansible.builtin.command: /opt/pi-hole/automated\ install/basic-install.sh --unattended
+
+    - name: Restart DNS and Web services
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: true
+      loop:
+        - pihole-FTL
+        - lighttpd
+
+    - name: Update Pi-Hole
+      ansible.builtin.command: pihole -u
+
+    - name: Enable Pi-hole at startup
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        enabled: true
+
+    - name: Set Pi-hole admin password
+      ansible.builtin.command: pihole -a -p "{{ pihole_admin_password }}"
+      environment:
+        PIHOLE_SKIP_OS_CHECK: 1
+      no_log: true
+

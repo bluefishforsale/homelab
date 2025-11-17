@@ -1,0 +1,17 @@
+---
+# Ansible Collections Requirements
+# Install with: ansible-galaxy collection install -r collections/requirements.yml
+#
+# Common useful collections:
+# - community.general
+# - community.docker
+# - ansible.posix
+
+collections: []
+  # Example collections (uncomment and add to array as needed):
+  # - name: community.general
+  #   version: ">=8.0.0"
+  # - name: community.docker
+  #   version: ">=3.0.0"
+  # - name: ansible.posix
+  #   version: ">=1.5.0"
