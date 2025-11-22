@@ -2,151 +2,163 @@
 name: CI - Validate & Lint
 
 on:
-    push:
-        branches:
-            - main
-            - master
-            - develop
-        paths:
-            - "playbooks/**/*.yaml"
-            - "playbooks/**/*.yml"
-            - "files/**"
-            - "vars/**/*.yaml"
-            - ".github/workflows/**"
-    pull_request:
-        branches:
-            - main
-            - master
-        paths:
-            - "playbooks/**/*.yaml"
-            - "playbooks/**/*.yml"
-            - "files/**"
-            - "vars/**/*.yaml"
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - "playbooks/**/*.yaml"
+      - "playbooks/**/*.yml"
+      - "files/**"
+      - "vars/**/*.yaml"
+      - ".github/workflows/**"
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - "playbooks/**/*.yaml"
+      - "playbooks/**/*.yml"
+      - "files/**"
+      - "vars/**/*.yaml"
 
 env:
-    ANSIBLE_FORCE_COLOR: "true"
-    ANSIBLE_HOST_KEY_CHECKING: "false"
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
 
 jobs:
-    validate-yaml:
-        name: Validate YAML Syntax
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  validate-yaml:
+    name: Validate YAML Syntax
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Validate YAML files
-              run: |
-                  echo "Validating YAML syntax..."
-                  find playbooks -name "*.yaml" -o -name "*.yml" | while read file; do
-                    echo "Checking $file"
-                    python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
-                  done
-                  echo "✓ All YAML files are valid"
+      - name: Install PyYAML
+        run: |
+          if ! python3 -c "import yaml" 2>/dev/null; then
+            pip3 install --user pyyaml
+          fi
 
-    validate-ansible:
-        name: Validate Ansible Playbooks
-        runs-on: [self-hosted, homelab, ansible]
-        needs: validate-yaml
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Validate YAML files
+        run: |
+          echo "Validating YAML syntax..."
+          find playbooks -name "*.yaml" -o -name "*.yml" | while read file; do
+            echo "Checking $file"
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
+          done
+          echo "✓ All YAML files are valid"
 
-            - name: Check Ansible version
-              run: ansible --version
+  validate-ansible:
+    name: Validate Ansible Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    needs: validate-yaml
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Validate playbook syntax
-              run: |
-                  echo "Validating Ansible playbook syntax..."
-                  for playbook in playbooks/*.yaml; do
-                    if [ -f "$playbook" ]; then
-                      echo "Checking $playbook"
-                      ansible-playbook --syntax-check "$playbook"
-                    fi
-                  done
+      - name: Check Ansible version
+        run: ansible --version
 
-                  # Also check individual playbooks
-                  find playbooks/individual -name "*.yaml" | while read playbook; do
-                    echo "Checking $playbook"
-                    ansible-playbook --syntax-check "$playbook"
-                  done
-                  echo "✓ All Ansible playbooks have valid syntax"
+      - name: Validate playbook syntax
+        run: |
+          echo "Validating Ansible playbook syntax..."
+          for playbook in playbooks/*.yaml; do
+            if [ -f "$playbook" ]; then
+              echo "Checking $playbook"
+              ansible-playbook --syntax-check "$playbook"
+            fi
+          done
 
-    lint-ansible:
-        name: Lint Ansible Playbooks
-        runs-on: [self-hosted, homelab, ansible]
-        needs: validate-ansible
-        continue-on-error: true
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+          # Also check individual playbooks
+          find playbooks/individual -name "*.yaml" | while read playbook; do
+            echo "Checking $playbook"
+            ansible-playbook --syntax-check "$playbook"
+          done
+          echo "✓ All Ansible playbooks have valid syntax"
 
-            - name: Install ansible-lint
-              run: |
-                  if ! command -v ansible-lint &> /dev/null; then
-                    pip3 install --user ansible-lint
-                  fi
+  lint-ansible:
+    name: Lint Ansible Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    needs: validate-ansible
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Lint playbooks
-              run: |
-                  echo "Linting Ansible playbooks..."
-                  ansible-lint playbooks/*.yaml || true
-                  echo "✓ Ansible lint complete"
+      - name: Install ansible-lint
+        run: |
+          if ! command -v ansible-lint &> /dev/null; then
+            pip3 install --user ansible-lint
+          fi
 
-    validate-templates:
-        name: Validate Jinja2 Templates
-        runs-on: [self-hosted, homelab, ansible]
-        needs: validate-yaml
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Lint playbooks
+        run: |
+          echo "Linting Ansible playbooks..."
+          ansible-lint playbooks/*.yaml || true
+          echo "✓ Ansible lint complete"
 
-            - name: Check Jinja2 templates
-              run: |
-                  echo "Validating Jinja2 templates..."
-                  find files -name "*.j2" | while read template; do
-                    echo "Checking $template"
-                    python3 -c "from jinja2 import Template; Template(open('$template').read())" || exit 1
-                  done
-                  echo "✓ All Jinja2 templates are valid"
+  validate-templates:
+    name: Validate Jinja2 Templates
+    runs-on: [self-hosted, homelab, ansible]
+    needs: validate-yaml
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    security-scan:
-        name: Security Scan
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Install Jinja2
+        run: |
+          if ! python3 -c "import jinja2" 2>/dev/null; then
+            pip3 install --user jinja2
+          fi
 
-            - name: Scan for hardcoded secrets
-              run: |
-                  echo "Scanning for potential hardcoded credentials..."
-                  echo "⚠️  Review the following matches (if any):"
-                  grep -r -i "password\|secret\|token" playbooks/ files/ --include="*.yaml" --include="*.yml" | \
-                    grep -v "vault" | \
-                    grep -v "ask-vault-pass" | \
-                    grep -v "{{ " || echo "✓ No obvious hardcoded credentials found"
+      - name: Check Jinja2 templates
+        run: |
+          echo "Validating Jinja2 templates..."
+          find files -name "*.j2" | while read template; do
+            echo "Checking $template"
+            python3 -c "from jinja2 import Template; Template(open('$template').read())" || exit 1
+          done
+          echo "✓ All Jinja2 templates are valid"
 
-                  echo ""
-                  echo "Note: All secrets should be in encrypted vault files"
+  security-scan:
+    name: Security Scan
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    check-vault:
-        name: Verify Vault Files
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "Scanning for potential hardcoded credentials..."
+          echo "⚠️  Review the following matches (if any):"
+          grep -r -i "password\|secret\|token" playbooks/ files/ --include="*.yaml" --include="*.yml" | \
+            grep -v "vault" | \
+            grep -v "ask-vault-pass" | \
+            grep -v "{{ " || echo "✓ No obvious hardcoded credentials found"
 
-            - name: Check vault encryption
-              run: |
-                  echo "Checking vault files are encrypted..."
-                  for vault in vault/*.yaml; do
-                    if [ -f "$vault" ] && [ "$vault" != "vault/secrets.yaml.template" ]; then
-                      if ! head -n 1 "$vault" | grep -q "ANSIBLE_VAULT"; then
-                        echo "ERROR: $vault is not encrypted!"
-                        exit 1
-                      else
-                        echo "✓ $vault is encrypted"
-                      fi
-                    fi
-                  done
-                  echo "✓ All vault files are properly encrypted"
+          echo ""
+          echo "Note: All secrets should be in encrypted vault files"
+
+  check-vault:
+    name: Verify Vault Files
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check vault encryption
+        run: |
+          echo "Checking vault files are encrypted..."
+          for vault in vault/*.yaml; do
+            if [ -f "$vault" ] && [ "$vault" != "vault/secrets.yaml.template" ]; then
+              if ! head -n 1 "$vault" | grep -q "ANSIBLE_VAULT"; then
+                echo "ERROR: $vault is not encrypted!"
+                exit 1
+              else
+                echo "✓ $vault is encrypted"
+              fi
+            fi
+          done
+          echo "✓ All vault files are properly encrypted"
