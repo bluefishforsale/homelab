@@ -5,13 +5,13 @@
   hosts: all  # Can run on any host
 
   vars_files:
-    - vars_cloudflared.yaml
-    - vault_secrets.yaml
+    - ../../../../vars/vars_cloudflared.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     package: cloudflared
     service: cloudflared
-    files: "files/{{ service }}"
+    files: "../../../../files/{{ service }}"
     path_home: "/etc/{{ service }}"
     config: "{{ path_home }}/config.yaml"
     cert: "{{ path_home }}/cert.pem"
@@ -122,7 +122,7 @@
   - name: Debug Cloudflare credentials
     ansible.builtin.debug:
       msg: 
-        - "Zone ID: {{ cloudflare.zone_id }}"
+        - "Zone ID: {{ cloudflare.terrac_com }}"
         - "API Key: {{ cloudflare.api_key[:10] }}..."
         - "SSH Tunnel ID: {{ ssh_tunnel_id }}"
         - "DNS CNAME: ssh-{{ inventory_hostname }}.terrac.com → {{ ssh_tunnel_id }}.cfargotunnel.com"
@@ -179,7 +179,7 @@
 
   - name: Disable IPv6 compatibility for zone (IPv4 only)
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/settings/ipv6"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/settings/ipv6"
       method: PATCH
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -194,14 +194,14 @@
       - inventory_hostname != 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
-      - cloudflare.zone_id != ''
+      - cloudflare.terrac_com != ''
     delegate_to: localhost
     run_once: true
     become: false
 
   - name: Set Pseudo IPv4 to add IPv4 headers for IPv6 visitors
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/settings/pseudo_ipv4"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/settings/pseudo_ipv4"
       method: PATCH
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -216,7 +216,7 @@
       - inventory_hostname != 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
-      - cloudflare.zone_id != ''
+      - cloudflare.terrac_com != ''
     delegate_to: localhost
     run_once: true
     become: false
@@ -233,6 +233,15 @@
   - name: Define public services list
     ansible.builtin.set_fact:
       public_services: ["overseerr"]
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+
+  # Define which services need NO authentication (bypass policy)
+  - name: Define fully public services list (no authentication required)
+    ansible.builtin.set_fact:
+      fully_public_services: ["blog"]
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -257,23 +266,23 @@
 
   - name: Add each service to ocean_access_apps
     ansible.builtin.set_fact:
-      ocean_access_apps: "{{ ocean_access_apps + [{'name': item.split('.')[0], 'domain': item, 'access_type': 'public' if item.split('.')[0] in public_services else 'private'}] }}"
+      ocean_access_apps: "{{ ocean_access_apps + [{'name': item.split('.')[0], 'domain': item, 'access_type': 'fully_public' if item.split('.')[0] in fully_public_services else ('public' if item.split('.')[0] in public_services else 'private'), 'zone_id': cloudflare.saetnere_com if 'saetnere.com' in item else cloudflare.terrac_com}] }}"
     loop: "{{ http_hostnames }}"
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
 
-  - name: Get existing Cloudflare Access applications for ocean
+  - name: Get existing Cloudflare Access applications for terrac.com zone
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
       method: GET
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
         X-Auth-Key: "{{ cloudflare.api_key }}"
         Content-Type: "application/json"
       status_code: 200
-    register: ocean_cf_access_apps
+    register: ocean_cf_access_apps_terrac
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -282,9 +291,37 @@
     run_once: true
     become: false
 
+  - name: Get existing Cloudflare Access applications for saetnere.com zone
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.saetnere_com }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: ocean_cf_access_apps_saetnere
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Combine Access apps from both zones
+    ansible.builtin.set_fact:
+      ocean_cf_access_apps:
+        json:
+          result: "{{ (ocean_cf_access_apps_terrac.json.result | default([])) + (ocean_cf_access_apps_saetnere.json.result | default([])) }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+
   - name: Create/Update Access applications for ocean services
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ item.zone_id }}/access/apps"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -320,7 +357,7 @@
   # Create reusable policies first
   - name: Create reusable admin policy (always included)
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/policies"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -346,7 +383,7 @@
 
   - name: Create reusable plex-users policy
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/policies"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -370,10 +407,64 @@
       - reusable_plex_policy.status == 400
       - "'already exists' not in reusable_plex_policy.json.errors[0].message | default('')"
 
+  - name: Create reusable public bypass policy for terrac.com zone (no authentication)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "Allow everyone (bypass)"
+        decision: "bypass"
+        include:
+          - everyone: {}
+        reusable: true
+      status_code: [200, 400]
+    register: reusable_bypass_policy
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+    failed_when:
+      - reusable_bypass_policy.status == 400
+      - "'already exists' not in reusable_bypass_policy.json.errors[0].message | default('')"
+
+  - name: Create reusable public bypass policy for saetnere.com zone (no authentication)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.saetnere_com }}/access/policies"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "Allow everyone (bypass)"
+        decision: "bypass"
+        include:
+          - everyone: {}
+        reusable: true
+      status_code: [200, 400]
+    register: reusable_bypass_policy_saetnere
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+    failed_when:
+      - reusable_bypass_policy_saetnere.status == 400
+      - "'already exists' not in reusable_bypass_policy_saetnere.json.errors[0].message | default('')"
+
   # Replace ALL policies with ONLY reusable policies for applications
   - name: Replace all policies with reusable policies (ocean apps)
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps/{{ ocean_access_app_ids[item.domain] }}"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ item.zone_id }}/access/apps/{{ ocean_access_app_ids[item.domain] }}"
       method: PUT
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -385,7 +476,7 @@
         domain: "{{ item.domain }}"
         type: "self_hosted"
         session_duration: "24h"
-        policies: "{{ [reusable_admin_policy.json.result.id] + ([reusable_plex_policy.json.result.id] if item.access_type == 'public' else []) }}"
+        policies: "{{ [reusable_bypass_policy_saetnere.json.result.id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy.json.result.id] if item.access_type == 'fully_public' else ([reusable_admin_policy.json.result.id] + ([reusable_plex_policy.json.result.id] if item.access_type == 'public' else [])) }}"
       status_code: [200, 400]
     register: replace_policy_result
     loop: "{{ ocean_access_apps }}"
@@ -394,18 +485,47 @@
       - ocean_access_app_ids[item.domain] is defined
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
-      - reusable_admin_policy.json.result.id is defined
-      - (item.access_type == 'private') or (item.access_type == 'public' and reusable_plex_policy.json.result.id is defined)
+      - (item.access_type == 'fully_public' and ((item.zone_id == cloudflare.saetnere_com and reusable_bypass_policy_saetnere.json.result.id is defined) or (item.zone_id == cloudflare.terrac_com and reusable_bypass_policy.json.result.id is defined))) or (item.access_type == 'private' and reusable_admin_policy.json.result.id is defined) or (item.access_type == 'public' and reusable_admin_policy.json.result.id is defined and reusable_plex_policy.json.result.id is defined)
     delegate_to: localhost
     become: false
     failed_when:
       - replace_policy_result.status == 400
       - "'already exists' not in replace_policy_result.json.errors[0].message | default('')"
 
+  # Create DNS records for all HTTP services in their respective zones
+  - name: Create DNS CNAME records for HTTP services
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ item.zone_id }}/dns_records"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        type: "CNAME"
+        name: "{{ item.name }}"
+        content: "{{ cloudflared.tunnels[tunnel_name].id }}.cfargotunnel.com"
+        ttl: 1
+        proxied: true
+        comment: "Cloudflare Tunnel for {{ item.domain }}"
+      status_code: [200, 400]
+    register: http_dns_create
+    loop: "{{ ocean_access_apps }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+    failed_when:
+      - http_dns_create.status == 400
+      - "'already exists' not in http_dns_create.json.errors[0].message | default('')"
+
   # Create DNS record for ocean SSH tunnel
   - name: Create DNS CNAME record for ocean SSH tunnel
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/dns_records"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/dns_records"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -434,7 +554,7 @@
   # Create Access application for ocean SSH tunnel
   - name: Create Access application for ocean SSH
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -474,7 +594,7 @@
 
   - name: Get existing Cloudflare Access applications
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
       method: GET
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -515,7 +635,7 @@
 
   - name: Create Cloudflare Access application (if missing)
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -567,7 +687,7 @@
 
   - name: Get existing policies for Access app
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps/{{ cf_access_app_id }}/policies"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps/{{ cf_access_app_id }}/policies"
       method: GET
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -588,7 +708,7 @@
 
   - name: Replace all policies with reusable admin policy (SSH apps)
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/access/apps/{{ cf_access_app_id }}"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps/{{ cf_access_app_id }}"
       method: PUT
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"
@@ -624,7 +744,7 @@
   # Create DNS record for SSH tunnel
   - name: Create DNS CNAME record for SSH tunnel  
     ansible.builtin.uri:
-      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.zone_id }}/dns_records"
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/dns_records"
       method: POST
       headers:
         X-Auth-Email: "{{ cloudflare.api_email }}"

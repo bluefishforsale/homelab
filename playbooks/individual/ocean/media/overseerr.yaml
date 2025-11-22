@@ -8,7 +8,7 @@
     image: sctx/overseerr
     version: latest
     service: overseerr
-    files: files/ocean-overseerr
+    files: ../../../../files/ocean-overseerr
     data: /data01
     home: "{{ data }}/services/{{ service }}"
     port: 5055

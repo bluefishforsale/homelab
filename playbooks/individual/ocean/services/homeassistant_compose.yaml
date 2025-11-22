@@ -10,7 +10,7 @@
     version: stable
     port: 8123
     data: /data01
-    files: files/homeassistant-compose
+    files: ../../../../files/homeassistant-compose
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

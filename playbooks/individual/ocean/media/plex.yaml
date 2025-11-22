@@ -4,7 +4,7 @@
   become: true
   
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: plex
@@ -32,7 +32,7 @@
     meta_manager_image: meisnate12/plex-meta-manager
     meta_manager_version: latest
     data: /data01
-    files: files/ocean-plex
+    files: ../../../../files/ocean-plex
     complete: "{{ data }}/complete"
     plex_home: "{{ data }}/services/{{ service }}"
     meta_manager_home: "{{ data }}/services/{{ meta_manager_service }}"

@@ -9,11 +9,13 @@
 - name: Configure Network Ethtool Settings
   ansible.builtin.import_playbook: individual/core/network/ethtool.yaml
 
-- name: Configure Dell BCM NIC Bonding
-  ansible.builtin.import_playbook: individual/core/network/dell_bcm_bnx2x_bond.yaml
-
-- name: Configure Dell Intel X520-DA2 NIC Bonding
-  ansible.builtin.import_playbook: individual/core/network/dell_intel_x520_da2_bond.yaml
+# NOTE: Network bonding playbooks removed during refactor
+# Uncomment and recreate if needed:
+# - name: Configure Dell BCM NIC Bonding
+#   ansible.builtin.import_playbook: individual/core/network/dell_bcm_bnx2x_bond.yaml
+#
+# - name: Configure Dell Intel X520-DA2 NIC Bonding
+#   ansible.builtin.import_playbook: individual/core/network/dell_intel_x520_da2_bond.yaml
 
 - name: Configure Network QoS (qdisc)
   ansible.builtin.import_playbook: individual/core/network/qdisc.yaml

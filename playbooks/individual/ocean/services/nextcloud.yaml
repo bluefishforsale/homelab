@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: nextcloud
@@ -14,7 +14,7 @@
     port_ext: 8081
     port_int: 80
     data: /data01
-    files: files/nextcloud
+    files: ../../../../files/nextcloud
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

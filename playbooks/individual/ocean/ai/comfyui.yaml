@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vars_comfyui_models.yaml
+    - ../../../../vars/vars_comfyui_models.yaml
 
   vars:
     service: comfyui
@@ -13,7 +13,7 @@
     version: cu126-slim
     port: 8188
     data: /data01
-    files: files/comfyui
+    files: ../../../../files/comfyui
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

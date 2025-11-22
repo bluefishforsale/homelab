@@ -12,7 +12,7 @@
     exporter_version: latest
     exporter_port: 9707
     data: /data01
-    files: files/ocean-radarr
+    files: ../../../../files/ocean-radarr
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"

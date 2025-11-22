@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: grafana
@@ -15,7 +15,7 @@
     port_ext: 8910
     plugins: "marcusolsson-treemap-panel 2.0.0"
     data: /data01
-    files: files/grafana-compose
+    files: ../../../../files/grafana-compose
     home: "{{ data }}/services/{{ service }}"
     user: grafana
     uid: 1001

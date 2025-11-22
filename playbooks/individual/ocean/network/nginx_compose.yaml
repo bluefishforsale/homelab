@@ -11,7 +11,7 @@
     port_http: 80
     port_https: 443
     data: /data01
-    files: files/nginx-compose
+    files: ../../../../files/nginx-compose
     home: "{{ data }}/services/{{ service }}"
     user: root
     uid: 0
