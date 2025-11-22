@@ -31,7 +31,6 @@ graph TB
             DNS[🌐 DNS Server<br/>192.168.1.2]
             PiHole[🕳️ Pi-hole<br/>192.168.1.9] 
             GitLab[🦊 GitLab<br/>192.168.1.5]
-            K8sCluster[⚙️ Kubernetes<br/>501-503, 511]
         end
     end
     
@@ -46,7 +45,6 @@ graph TB
     Router --> DNS
     Router --> PiHole
     Router --> GitLab
-    Router --> K8sCluster
     Router --> CFT
     
     DNS --> PiHole

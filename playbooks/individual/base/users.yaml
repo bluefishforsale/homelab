@@ -1,0 +1,179 @@
+- name: Install and configure zsh and tools for users
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Handle dpkg locks and repair
+      include_tasks: ../../tasks/dpkg_lock.yaml
+      ignore_errors: yes
+
+    - name: Update apt cache if not done in the last 24 hours
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 86400  # 24 hours
+
+    - name: Install common packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - zsh
+        - git
+        - cron
+      ignore_errors: yes
+
+    # Define user details explicitly with correct home directories
+    - name: Set user details
+      set_fact:
+        users:
+          - { user_name: "debian", user_home: "/home/debian" }
+          - { user_name: "root", user_home: "/root" }
+
+    - name: Ensure the user exists
+      ansible.builtin.user:
+        name: "{{ user.user_name }}"
+        state: present
+        create_home: yes
+        shell: /bin/bash
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Add user to sudoers with no password
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ user.user_name }} ALL=.*"
+        line: "{{ user.user_name }} ALL=(ALL) NOPASSWD:ALL"
+        validate: "visudo -cf %s"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Create .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ user.user_name }}/.ssh"
+        state: directory
+        owner: "{{ user.user_name }}"
+        mode: '0700'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Download SSH key from GitHub
+      ansible.builtin.get_url:
+        url: https://github.com/bluefishforsale.keys
+        dest: "{{ user.user_home }}/.ssh/authorized_keys"
+        mode: '0600'
+        owner: "{{ user.user_name }}"
+        timeout: 30
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Download default .zshrc from Oh My Zsh repository
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/templates/zshrc.zsh-template
+        dest: "{{ user.user_home }}/.zshrc"
+        owner: "{{ user.user_name }}"
+        group: "{{ user.user_name }}"
+        mode: '0644'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+
+    - name: Change user shell to zsh
+      ansible.builtin.shell: chsh -s /usr/bin/zsh {{ user.user_name }}
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Download oh-my-zsh installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+        dest: /tmp/oh-my-zsh-installer.sh
+        mode: "0755"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Recursively remove the .oh-my-zsh directory from the user's home
+      ansible.builtin.shell: rm -rf "{{ user.user_home }}/.oh-my-zsh"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Install oh-my-zsh
+      ansible.builtin.shell: ZSH="" /tmp/oh-my-zsh-installer.sh --unattended
+      args:
+        creates: "{{ user.user_home }}/.oh-my-zsh"
+      become_user: "{{ user.user_name }}"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Set ZSH directory in .zshrc
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        regexp: '^ZSH='
+        line: 'ZSH="{{ user.user_home }}/.oh-my-zsh"'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Install Powerlevel10k theme for Oh My Zsh
+      ansible.builtin.git:
+        repo: "https://github.com/romkatv/powerlevel10k.git"
+        dest: "{{ user.user_home }}/.oh-my-zsh/custom/themes/powerlevel10k"
+        depth: 1
+        update: yes
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      become_user: "{{ user.user_name }}"
+      ignore_errors: yes
+
+    - name: Set powerlevel10k theme in .zshrc
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        state: present
+        regexp: '^ZSH_THEME='
+        line: 'ZSH_THEME="powerlevel10k/powerlevel10k"'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Disable powerlevel10k configuration wizard
+      ansible.builtin.lineinfile:
+        path: "{{ user.user_home }}/.zshrc"
+        state: present
+        line: 'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true'
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Copy p10k config file
+      ansible.builtin.copy:
+        src: files/shell/p10k.zsh
+        dest: "{{ user.user_home }}/.p10k.zsh"
+        mode: "0755"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes
+
+    - name: Copy tmux config
+      ansible.builtin.copy:
+        src: files/shell/tmux.conf
+        dest: "{{ user.user_home }}/.tmux.conf"
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      ignore_errors: yes

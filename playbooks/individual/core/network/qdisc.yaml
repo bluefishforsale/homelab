@@ -1,0 +1,48 @@
+- name: Network QoS Tuning
+  hosts: all
+  become: true
+
+  tasks:
+  - name: Register primary network interface
+    ansible.builtin.shell: |
+      ip route | grep default | awk '{print $5}'
+    register: primary_interface
+
+  - name: Check if a non-default qdisc exists
+    ansible.builtin.shell: |
+      /sbin/tc qdisc show dev {{ primary_interface.stdout.strip() }} | grep -q "htb"
+    register: qdisc_exists
+    failed_when: false
+
+  - name: tc qdisc boot oneshot service
+    copy:
+      dest: /etc/systemd/system/net_qdisc.service
+      content: |
+        [Unit]
+        Description=Configure network qdisc for 10Gb interface
+        After=network.target
+
+        [Install]
+        WantedBy=multi-user.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=true
+        ExecStartPre=/bin/echo "Starting qdisc configuration on {{ primary_interface.stdout.strip() }}"
+        ExecStartPre=/usr/bin/logger "Executing tc commands for qdisc configuration"
+        {% if qdisc_exists.rc == 0 %}
+        ExecStart=/sbin/tc qdisc del dev {{ primary_interface.stdout.strip() }} root
+        {% endif %}
+        ExecStart=/sbin/tc qdisc add dev {{ primary_interface.stdout.strip() }} root handle 1: htb default 12
+        ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1: classid 1:1 htb rate 10gbit burst 15k
+        ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1:1 classid 1:12 htb rate 9gbit ceil 10gbit burst 15k
+        ExecStartPost=/bin/echo "Finished qdisc configuration on {{ primary_interface.stdout.strip() }}"
+        ExecStartPost=/usr/bin/logger "Completed tc commands for qdisc configuration"
+    when: primary_interface.stdout.strip() != ""
+
+  - name: Enable and Start service
+    systemd:
+      enabled: yes
+      state: restarted
+      name: net_qdisc.service
+      daemon_reload: true

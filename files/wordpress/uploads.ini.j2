@@ -1,0 +1,20 @@
+; WordPress PHP Upload Configuration
+; Allows large video uploads
+
+; Maximum file upload size
+upload_max_filesize = 2G
+
+; Maximum POST data size (must be >= upload_max_filesize)
+post_max_size = 2G
+
+; PHP memory limit
+memory_limit = 512M
+
+; Maximum execution time (seconds) - useful for large uploads
+max_execution_time = 600
+
+; Maximum input time (seconds)
+max_input_time = 600
+
+; Maximum number of files that can be uploaded at once
+max_file_uploads = 20

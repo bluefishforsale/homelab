@@ -1,0 +1,214 @@
+---
+- name: DNS bind9 named
+  hosts: dns
+  become: true
+  gather_facts: true
+
+  vars:
+    go_version: "1.23.4"
+    go_arch: amd64
+    go_tarball: linux-{{ go_arch }}.tar.gz
+    go_tarball_url: "https://go.dev/dl/go{{ go_version }}.{{ go_tarball }}"
+    go_install_dir: "/usr/local/go"
+    go_profile_path: "/etc/profile.d/go.sh"
+    bind_exporter_version: v0.8.0
+    bind_exporter_repo: "github.com/prometheus-community/bind_exporter"
+    bind_exporter_flags: "--web.listen-address=:9119 --bind.stats-url=http://localhost:8053/json/v1/server_stats"
+
+  tasks:
+  - name: bind and other packages
+    become: yes
+    block:
+
+    # - name: Handle dpkg locks and repair
+    #   include_tasks: subtask_fix_dpkg_lock.yaml
+
+    - name: apt-get update
+      apt: update_cache=yes
+
+    - name: Install required apt packages
+      apt:
+        pkg: [ bind9, bind9utils, dnsutils, build-essential ]
+
+    - name: rndc-key-write
+      ansible.builtin.shell:
+        creates: /etc/bind/rndc.key
+        cmd: rndc-confgen -a -b 512
+
+    - name: Configure BIND9 configs
+      ansible.builtin.template:
+        force: yes
+        src: "{{ playbook_dir }}/../../../../files/bind9/{{ item }}"
+        dest: /etc/bind/{{ item }}
+        owner: bind
+        group: bind
+        mode: '0644'
+      with_items:
+      - named.conf.local
+      - named.conf.options
+
+    # when copying multiple files, ansible will NOT create a missing parent
+    - name: make conf dirs
+      file:
+        path: /var/lib/bind/
+        state: directory
+        owner: bind
+        group: bind
+        mode: 755
+
+    - name: write zone templates
+      copy:
+        force: yes
+        dest: "/var/lib/bind/{{item}}"
+        content: '{{ lookup("template", playbook_dir ~ "/../../../../files/bind9/{{item}}.j2") }}'
+        mode: "0644"
+        owner: bind
+        group: bind
+      with_items:
+      - home.zone
+      - cluster.local.zone
+      - db.rev.1.168.192.in-addr.arpa
+      register: write_zones
+
+    - name: Config Check
+      ansible.builtin.shell: named-checkconf
+      register: config_check
+      changed_when: false
+      failed_when: config_check.rc != 0
+
+    - name: Check home zone
+      ansible.builtin.shell: named-checkzone  home /var/lib/bind/home.zone
+      register: check_home
+      changed_when: false
+      failed_when: check_home.rc != 0
+
+    - name: Check reverse mapping zone
+      ansible.builtin.shell: named-checkzone 1.168.192.in-addr.arpa /var/lib/bind/db.rev.1.168.192.in-addr.arpa
+      register: check_reverse
+      changed_when: false
+      failed_when: check_reverse.rc != 0
+
+    - name: Restart BIND9 if zones are valid
+      ansible.builtin.meta: flush_handlers
+      when: zones_valid | default(false)
+
+    # - name: remove the jnl files before restart
+    #   ansible.builtin.shell: find /var/lib/bind -type f -name "*.jnl" -delete
+
+    # - name: Create systemd override directory for named.service
+    #   file:
+    #     path: /etc/systemd/system/named.service.d
+    #     state: directory
+    #     mode: '0755'
+
+    # when copying a single file, ansible WILL create a missing parent
+    - name: Add systemd override for named.service
+      copy:
+        dest: /etc/systemd/system/named.service.d/override.conf
+        content: |
+          [Service]
+          StandardOutput=journal
+          StandardError=journal
+          RuntimeMaxSec=7d
+          Restart=always
+          StartLimitBurst=0
+          RestartSec=10
+          ExecStartPre=/usr/bin/find /var/lib/bind -type f -name "*.jnl" -delete
+          ExecStart=
+          ExecStart=/usr/sbin/named -f -u bind
+        mode: "0644"
+      notify:
+      - Reload systemd daemon
+      - Restart named service
+
+    # - name: Ensure correct permissions for the override file
+    #   file:
+    #     path: /etc/systemd/system/named.service.d/override.conf
+    #     mode: '0644'
+
+    # - name: Enable and Start service
+    #   systemd:
+    #     enabled: yes
+    #     state: restarted
+    #     name: named
+    #     daemon_reload: true
+
+    # go required for bind-exporter
+    # install go from tarball
+    - name: Remove existing Go installation (if any)
+      ansible.builtin.file:
+        path: "{{ go_install_dir }}"
+        state: absent
+
+    - name: Download Go tarball
+      ansible.builtin.get_url:
+        url: "{{ go_tarball_url }}"
+        dest: "/tmp/go{{ go_version }}.{{ go_tarball }}"
+        mode: "0644"
+
+    - name: Extract Go tarball
+      ansible.builtin.unarchive:
+        src: "/tmp/go{{ go_version }}.{{ go_tarball }}"
+        dest: "/usr/local"
+        remote_src: true
+
+    - name: Create symlink for Go binary
+      ansible.builtin.file:
+        src: "/usr/local/go/bin/go"
+        dest: "/usr/local/bin/go"
+        state: link
+
+    - name: Verify Go installation
+      ansible.builtin.command: go version
+      register: go_version_output
+
+    - name: Display Go version
+      ansible.builtin.debug:
+        msg: "{{ go_version_output.stdout }}"
+
+    # bind9 exporter local installation
+    # https://github.com/prometheus-community/bind_exporter
+    - name: Go install bind-exporter
+      ansible.builtin.shell: |
+        go install {{ bind_exporter_repo }}@{{ bind_exporter_version}}
+    # - name: Build from src Bind Exporter
+    #   ansible.builtin.shell: |
+    #     cd $HOME/go/pkg/mod/github.com/prometheus-community/bind_exporter@{{ bind_exporter_version}}
+    #     make
+
+    # - name: Create systemd service for Bind Exporter
+    #   ansible.builtin.copy:
+    #     dest: /etc/systemd/system/bind_exporter.service
+    #     content: |
+    #       [Unit]
+    #       Description=Prometheus Bind Exporter
+    #       After=network.target
+
+    #       [Service]
+    #       User={{ ansible_user }}
+    #       Environment="PATH=/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin:{{ ansible_env.PATH }}"
+    #       WorkingDirectory={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}
+    #       ExecStart={{ ansible_env.HOME }}/go/src/{{ bind_exporter_repo }}/bind_exporter {{ bind_exporter_flags }}
+    #       Restart=always
+
+    #       [Install]
+    #       WantedBy=multi-user.target
+
+    # - name: Reload systemd daemon
+    #   ansible.builtin.shell: systemctl daemon-reload
+
+    # - name: Enable and start Bind Exporter service
+    #   ansible.builtin.service:
+    #     name: bind_exporter
+    #     enabled: true
+    #     state: started
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart named service
+    ansible.builtin.systemd:
+      name: named.service
+      state: restarted

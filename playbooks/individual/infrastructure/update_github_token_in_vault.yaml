@@ -1,0 +1,232 @@
+---
+# Safe GitHub Runner Token Update in Vault
+#
+# This playbook ONLY updates the GitHub runner registration token in vault/secrets.yaml
+# It does NOT modify any other vault values
+#
+# Safety features:
+#   - Creates backup before modification
+#   - Only touches the specific token field
+#   - Validates vault structure before changes
+#   - Re-encrypts with same password
+#   - Idempotent - safe to run multiple times
+#
+# Prerequisites:
+#   - Vault password (will be prompted)
+#   - GitHub CLI authenticated OR run in GitHub Actions
+#
+# Usage:
+#   ansible-playbook update_github_token_in_vault.yaml --ask-vault-pass
+
+- name: Update GitHub Runner Token in Vault (Safe)
+  hosts: localhost
+  gather_facts: false
+  become: false
+  
+  vars:
+    vault_file: "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    github_api_url: "https://api.github.com"
+    is_github_actions: "{{ lookup('env', 'GITHUB_ACTIONS') | default('false') | bool }}"
+    github_token_env: "{{ lookup('env', 'GITHUB_TOKEN') | default('') }}"
+
+  tasks:
+    # ========================================================================
+    # STEP 1: Generate New Token
+    # ========================================================================
+    
+    - name: Check if GitHub CLI is installed
+      ansible.builtin.shell: /opt/homebrew/bin/gh --version || /usr/local/bin/gh --version || which gh
+      register: gh_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check GitHub CLI authentication
+      ansible.builtin.shell: /opt/homebrew/bin/gh auth status || /usr/local/bin/gh auth status
+      register: gh_auth_status
+      changed_when: false
+      failed_when: false
+      when: gh_check.rc == 0
+
+    - name: Fail if no auth method available
+      ansible.builtin.fail:
+        msg: |
+          ❌ Cannot generate token - no authentication method available.
+          
+          Options:
+            1. Authenticate GitHub CLI: gh auth login
+            2. Run in GitHub Actions (GITHUB_TOKEN available automatically)
+      when:
+        - not (gh_check.rc == 0 and gh_auth_status.rc == 0)
+        - not (is_github_actions and github_token_env | length > 0)
+
+    - name: Generate new token using GitHub CLI
+      ansible.builtin.shell: |
+        if [ -x /opt/homebrew/bin/gh ]; then
+          /opt/homebrew/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/bluefishforsale/homelab/actions/runners/registration-token
+        else
+          /usr/local/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/bluefishforsale/homelab/actions/runners/registration-token
+        fi
+      register: new_token_gh
+      changed_when: false
+      when:
+        - gh_check.rc == 0
+        - gh_auth_status.rc == 0
+      no_log: false
+
+    - name: Generate new token using GitHub Actions token
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/repos/bluefishforsale/homelab/actions/runners/registration-token"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ github_token_env }}"
+          Accept: "application/vnd.github+json"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [200, 201]
+      register: new_token_actions
+      changed_when: false
+      when:
+        - is_github_actions
+        - github_token_env | length > 0
+        - new_token_gh is not defined or new_token_gh is skipped
+      no_log: false
+
+    - name: Parse token from GitHub CLI
+      ansible.builtin.set_fact:
+        token_data: "{{ new_token_gh.stdout | from_json }}"
+      when: new_token_gh is defined and new_token_gh is succeeded
+
+    - name: Parse token from GitHub Actions
+      ansible.builtin.set_fact:
+        token_data: "{{ new_token_actions.json }}"
+      when: 
+        - new_token_actions is defined
+        - new_token_actions is succeeded
+        - token_data is not defined
+
+    - name: Display new token
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          ✓ NEW TOKEN GENERATED
+          ====================================================================
+          
+          Token: {{ token_data.token }}
+          Expires: {{ token_data.expires_at }}
+          
+          Will update vault: {{ vault_file }}
+          ====================================================================
+
+    # ========================================================================
+    # STEP 2: Safely Update Vault (Backup + Targeted Update)
+    # ========================================================================
+
+    - name: Create timestamped backup of vault file
+      ansible.builtin.copy:
+        src: "{{ vault_file }}"
+        dest: "{{ vault_file }}.backup.{{ ansible_date_time.epoch }}"
+        mode: '0600'
+      register: vault_backup
+
+    - name: Load vault secrets (decrypted)
+      ansible.builtin.include_vars:
+        file: "{{ vault_file }}"
+        name: vault_secrets
+
+    - name: Validate vault structure before modification
+      ansible.builtin.assert:
+        that:
+          - vault_secrets.development is defined
+          - vault_secrets.development.github is defined
+        fail_msg: |
+          ❌ Vault structure invalid - missing 'development.github' section
+          Vault file: {{ vault_file }}
+          
+          Expected structure:
+          development:
+            github:
+              vault_github_registration_token: "TOKEN_HERE"
+
+    - name: Display current token (first 10 chars only)
+      ansible.builtin.debug:
+        msg: |
+          Current token in vault: {{ vault_secrets.development.github.vault_github_registration_token | default('NOT_SET') | truncate(10, true, '...') }}
+          New token to set: {{ token_data.token | truncate(10, true, '...') }}
+
+    - name: Update ONLY the GitHub registration token (deep merge)
+      ansible.builtin.set_fact:
+        vault_secrets_updated: >-
+          {{ vault_secrets | combine({
+            'development': vault_secrets.development | combine({
+              'github': vault_secrets.development.github | default({}) | combine({
+                'vault_github_registration_token': token_data.token
+              })
+            })
+          }, recursive=True) }}
+
+    - name: Write updated vault secrets (unencrypted temporarily)
+      ansible.builtin.copy:
+        content: "{{ vault_secrets_updated | to_nice_yaml(indent=2, width=120) }}"
+        dest: "{{ vault_file }}"
+        mode: '0600'
+      register: vault_written
+
+    - name: Re-encrypt vault file with ansible-vault
+      ansible.builtin.command:
+        cmd: ansible-vault encrypt {{ vault_file }}
+      when: vault_written is changed
+
+    # ========================================================================
+    # STEP 3: Verify and Display Summary
+    # ========================================================================
+
+    - name: Verify vault can be decrypted after update
+      ansible.builtin.command:
+        cmd: ansible-vault view {{ vault_file }}
+      register: vault_verify
+      changed_when: false
+      failed_when: vault_verify.rc != 0
+
+    - name: Display success summary
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          ✓✓✓ VAULT UPDATED SUCCESSFULLY ✓✓✓
+          ====================================================================
+          
+          ✅ New token generated: {{ token_data.token }}
+          ✅ Token expires: {{ token_data.expires_at }}
+          ✅ Vault updated: {{ vault_file }}
+          ✅ Backup created: {{ vault_backup.dest }}
+          ✅ Vault re-encrypted and verified
+          
+          ONLY the GitHub registration token was changed.
+          All other vault values remain unchanged.
+          
+          ====================================================================
+          NEXT STEPS
+          ====================================================================
+          
+          Deploy runners with new token:
+          
+            ansible-playbook -i inventories/github_runners/hosts.ini \
+              playbooks/individual/infrastructure/github_docker_runners.yaml \
+              --ask-vault-pass
+          
+          Or restart existing runners:
+          
+            ssh debian@192.168.1.20
+            sudo systemctl restart github-docker-runners
+          
+          ====================================================================
+
+    - name: Verify token is in vault (final check)
+      ansible.builtin.include_vars:
+        file: "{{ vault_file }}"
+        name: final_check
+
+    - name: Assert token was updated correctly
+      ansible.builtin.assert:
+        that:
+          - final_check.development.github.vault_github_registration_token == token_data.token
+        success_msg: "✓ Token verified in vault - matches generated token"
+        fail_msg: "❌ Token mismatch - vault update may have failed"
