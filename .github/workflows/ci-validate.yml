@@ -58,13 +58,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup PATH for pip user installs
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Install Ansible
         run: |
           if ! command -v ansible &> /dev/null; then
             pip3 install --user ansible
+            # Add Python user bin to PATH (works for both Linux and macOS)
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            if [ -d "$HOME/Library/Python/${PYTHON_VERSION}/bin" ]; then
+              echo "$HOME/Library/Python/${PYTHON_VERSION}/bin" >> $GITHUB_PATH
+            fi
+            if [ -d "$HOME/.local/bin" ]; then
+              echo "$HOME/.local/bin" >> $GITHUB_PATH
+            fi
           fi
 
       - name: Check Ansible version
@@ -96,13 +101,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup PATH for pip user installs
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Install Ansible
         run: |
           if ! command -v ansible &> /dev/null; then
             pip3 install --user ansible
+            # Add Python user bin to PATH (works for both Linux and macOS)
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+            if [ -d "$HOME/Library/Python/${PYTHON_VERSION}/bin" ]; then
+              echo "$HOME/Library/Python/${PYTHON_VERSION}/bin" >> $GITHUB_PATH
+            fi
+            if [ -d "$HOME/.local/bin" ]; then
+              echo "$HOME/.local/bin" >> $GITHUB_PATH
+            fi
           fi
 
       - name: Install ansible-lint
