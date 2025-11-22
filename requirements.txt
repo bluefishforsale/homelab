@@ -1,0 +1,14 @@
+# Python dependencies for local homelab development and CI validation
+# Install with: pip3 install -r requirements.txt
+
+# YAML parsing and validation
+pyyaml>=6.0
+
+# Jinja2 template validation
+jinja2>=3.1
+
+# Ansible for playbook syntax checking and execution
+ansible>=2.15
+
+# Optional: Ansible linting (uncomment if needed)
+# ansible-lint>=6.0

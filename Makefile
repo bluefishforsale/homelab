@@ -1,4 +1,4 @@
-.PHONY: validate validate-yaml validate-ansible lint-ansible validate-templates security-scan check-vault clean help
+.PHONY: validate validate-yaml validate-ansible lint-ansible validate-templates security-scan check-vault clean help setup setup-brew setup-python
 
 # Default target
 .DEFAULT_GOAL := help
@@ -13,6 +13,50 @@ RESET := \033[0m
 help: ## Show this help message
 	@echo "$(CYAN)Homelab CI Validation Targets:$(RESET)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
+
+# ============================================================================
+# Setup Targets
+# ============================================================================
+
+setup: setup-brew setup-python ## Setup complete development environment
+	@echo "$(GREEN)✓ Development environment setup complete$(RESET)"
+
+setup-brew: ## Install Homebrew dependencies
+	@echo "$(CYAN)Installing Homebrew dependencies...$(RESET)"
+	@if ! command -v brew &> /dev/null; then \
+		echo "$(RED)ERROR: Homebrew not installed. Install from https://brew.sh$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "Installing ansible..."
+	@brew list ansible &> /dev/null || brew install ansible
+	@echo "$(GREEN)✓ Homebrew dependencies installed$(RESET)"
+
+setup-python: ## Install Python dependencies from requirements.txt
+	@echo "$(CYAN)Installing Python dependencies...$(RESET)"
+	@if [ ! -f requirements.txt ]; then \
+		echo "$(RED)ERROR: requirements.txt not found$(RESET)"; \
+		exit 1; \
+	fi
+	@if command -v pip3 &> /dev/null; then \
+		pip3 install --user --break-system-packages -r requirements.txt || \
+		pip3 install --user -r requirements.txt || \
+		pip3 install -r requirements.txt; \
+	else \
+		echo "$(RED)ERROR: pip3 not found. Install Python 3 first.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✓ Python dependencies installed$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Add to your PATH:$(RESET)"
+	@echo "  export PATH=\"\$$HOME/Library/Python/3.13/bin:\$$PATH\""
+	@echo ""
+	@echo "$(YELLOW)Or permanently:$(RESET)"
+	@echo "  echo 'export PATH=\"\$$HOME/Library/Python/3.13/bin:\$$PATH\"' >> ~/.zshrc"
+	@echo "  source ~/.zshrc"
+
+# ============================================================================
+# Validation Targets
+# ============================================================================
 
 validate: validate-yaml validate-ansible validate-templates security-scan check-vault ## Run all validation checks
 	@echo "$(GREEN)✓ All validation checks passed$(RESET)"
