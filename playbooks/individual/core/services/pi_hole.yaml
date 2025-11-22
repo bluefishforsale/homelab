@@ -50,6 +50,23 @@
         mode: '0644'
       notify: Restart pihole-FTL
 
+    - name: Create /etc/dnsmasq.d directory
+      file:
+        path: /etc/dnsmasq.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Configure dnsmasq to forward .home domain to BIND9
+      copy:
+        src: ../../../../files/pihole/etc/dnsmasq.d/02-local-dns.conf
+        dest: /etc/dnsmasq.d/02-local-dns.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart pihole-FTL
+
     - name: Check if Pi-hole is already installed
       ansible.builtin.stat:
         path: /usr/local/bin/pihole

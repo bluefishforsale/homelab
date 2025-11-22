@@ -38,7 +38,7 @@
     - name: Configure BIND9 configs
       ansible.builtin.template:
         force: yes
-        src: files/bind9/{{ item }}
+        src: "{{ playbook_dir }}/../../../../files/bind9/{{ item }}"
         dest: /etc/bind/{{ item }}
         owner: bind
         group: bind
@@ -60,7 +60,7 @@
       copy:
         force: yes
         dest: "/var/lib/bind/{{item}}"
-        content: '{{ lookup("template", "files/bind9/{{item}}.j2") }}'
+        content: '{{ lookup("template", playbook_dir ~ "/../../../../files/bind9/{{item}}.j2") }}'
         mode: "0644"
         owner: bind
         group: bind
