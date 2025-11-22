@@ -10,10 +10,7 @@ qemu-output/
 *.pem
 
 # ignore unencrypted secrets files (encrypted vault_secrets.yaml is safe to commit)
-homelab_playbooks/vault_secrets_plain.yaml
-homelab_playbooks/vars_secrets.yaml
-homelab_playbooks/vars_cloudflare_secrets.yaml
-homelab_playbooks/vault_secrets.yaml.backup*
+vault/secrets_plain.yaml
 
 # large files from upstreams
 *.iso

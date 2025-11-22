@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  wordpress:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    environment:
+      # Database Configuration
+      - WORDPRESS_DB_HOST=wordpress-db
+      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_PASSWORD={{ cloud_services.wordpress.database_password }}
+      - WORDPRESS_DB_NAME=wordpress
+      # WordPress Configuration
+      - WORDPRESS_TABLE_PREFIX=wp_
+      - WORDPRESS_DEBUG=0
+      # Site Configuration
+      - WORDPRESS_CONFIG_EXTRA=
+          define('WP_HOME', 'https://{{ cloud_services.wordpress.domain }}');
+          define('WP_SITEURL', 'https://{{ cloud_services.wordpress.domain }}');
+          define('FORCE_SSL_ADMIN', true);
+          define('FORCE_SSL_LOGIN', true);
+          if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $$_SERVER['HTTPS'] = 'on';
+          }
+          if (isset($$_SERVER['HTTP_X_FORWARDED_HOST'])) {
+            $$_SERVER['HTTP_HOST'] = $$_SERVER['HTTP_X_FORWARDED_HOST'];
+          }
+      # PHP Configuration
+      - PHP_MEMORY_LIMIT=512M
+      - PHP_UPLOAD_MAX_FILESIZE=100M
+      - PHP_POST_MAX_SIZE=100M
+      - PHP_MAX_EXECUTION_TIME=300
+      # Timezone Configuration
+      - TZ=America/Los_Angeles
+    
+    ports:
+      - "{{ port_ext }}:{{ port_int }}"
+    
+    volumes:
+      # User content directory (themes, plugins, uploads) - PERSISTENT on host
+      # WordPress core files stay in container (ephemeral) and update with image
+      - {{ home }}/wp-content:/var/www/html/wp-content
+      # Custom PHP configuration for large uploads
+      - {{ home }}/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port_int }}/wp-admin/install.php || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # WordPress handles user mapping internally via Apache
+    # No external user mapping needed for WordPress service
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+    
+    # Service dependencies
+    depends_on:
+      - wordpress-db
+    
+    # Network configuration
+    networks:
+      - wordpress_internal
+
+  wordpress-db:
+    image: mysql:8.0
+    container_name: wordpress-db
+    hostname: wordpress-db
+    restart: unless-stopped
+    
+    environment:
+      - MYSQL_ROOT_PASSWORD={{ cloud_services.wordpress.database_root_password }}
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD={{ cloud_services.wordpress.database_password }}
+    
+    volumes:
+      - {{ home }}/mysql-data:/var/lib/mysql
+      - {{ home }}/mysql-logs:/var/log/mysql
+      - {{ home }}/mysql-conf/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u wordpress -p{{ cloud_services.wordpress.database_password }} || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    
+    # User mapping
+    user: "{{ uid }}:{{ gid }}"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+    
+    # Network configuration
+    networks:
+      - wordpress_internal
+
+networks:
+  wordpress_internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16
