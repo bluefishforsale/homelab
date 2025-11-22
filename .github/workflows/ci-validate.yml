@@ -26,6 +26,7 @@ on:
 env:
   ANSIBLE_FORCE_COLOR: "true"
   ANSIBLE_HOST_KEY_CHECKING: "false"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
 
 jobs:
   validate-yaml:
@@ -35,11 +36,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PyYAML
+      - name: Install Python dependencies
         run: |
-          if ! python3 -c "import yaml" 2>/dev/null; then
-            pip3 install --user pyyaml
-          fi
+          python3 -m pip install --user --quiet pyyaml
 
       - name: Validate YAML files
         run: |
@@ -60,23 +59,17 @@ jobs:
 
       - name: Install Ansible
         run: |
-          if ! command -v ansible &> /dev/null; then
-            pip3 install --user ansible
-            # Add Python user bin to PATH (works for both Linux and macOS)
-            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-            if [ -d "$HOME/Library/Python/${PYTHON_VERSION}/bin" ]; then
-              echo "$HOME/Library/Python/${PYTHON_VERSION}/bin" >> $GITHUB_PATH
-            fi
-            if [ -d "$HOME/.local/bin" ]; then
-              echo "$HOME/.local/bin" >> $GITHUB_PATH
-            fi
-          fi
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Check Ansible version
-        run: ansible --version
+      - name: Verify Ansible installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible --version
 
       - name: Validate playbook syntax
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           echo "Validating Ansible playbook syntax..."
           for playbook in playbooks/*.yaml; do
             if [ -f "$playbook" ]; then
@@ -101,28 +94,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Ansible
+      - name: Install Ansible and ansible-lint
         run: |
-          if ! command -v ansible &> /dev/null; then
-            pip3 install --user ansible
-            # Add Python user bin to PATH (works for both Linux and macOS)
-            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-            if [ -d "$HOME/Library/Python/${PYTHON_VERSION}/bin" ]; then
-              echo "$HOME/Library/Python/${PYTHON_VERSION}/bin" >> $GITHUB_PATH
-            fi
-            if [ -d "$HOME/.local/bin" ]; then
-              echo "$HOME/.local/bin" >> $GITHUB_PATH
-            fi
-          fi
-
-      - name: Install ansible-lint
-        run: |
-          if ! command -v ansible-lint &> /dev/null; then
-            pip3 install --user ansible-lint
-          fi
+          python3 -m pip install --user --quiet ansible ansible-lint
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Lint playbooks
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           echo "Linting Ansible playbooks..."
           ansible-lint playbooks/*.yaml || true
           echo "✓ Ansible lint complete"
@@ -137,9 +116,7 @@ jobs:
 
       - name: Install Jinja2
         run: |
-          if ! python3 -c "import jinja2" 2>/dev/null; then
-            pip3 install --user jinja2
-          fi
+          python3 -m pip install --user --quiet jinja2
 
       - name: Check Jinja2 templates
         run: |
