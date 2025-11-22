@@ -58,6 +58,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup PATH for pip user installs
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Install Ansible
         run: |
           if ! command -v ansible &> /dev/null; then
@@ -92,6 +95,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup PATH for pip user installs
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install Ansible
         run: |
