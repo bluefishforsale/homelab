@@ -58,6 +58,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Ansible
+        run: |
+          if ! command -v ansible &> /dev/null; then
+            pip3 install --user ansible
+          fi
+
       - name: Check Ansible version
         run: ansible --version
 
@@ -86,6 +92,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          if ! command -v ansible &> /dev/null; then
+            pip3 install --user ansible
+          fi
 
       - name: Install ansible-lint
         run: |
