@@ -26,24 +26,25 @@ github_scope: "repo"
 # Example: "bluefishforsale/homelab"
 github_repo: "bluefishforsale/homelab"
 
-# GitHub runner registration token
+# GitHub Personal Access Token (PAT)
 # CRITICAL: DO NOT commit this token to version control!
 # 
-# Obtain a registration token from:
-#   Organization: https://github.com/organizations/YOUR-ORG/settings/actions/runners/new
-#   Repository: https://github.com/YOUR-OWNER/YOUR-REPO/settings/actions/runners/new
+# The myoung34/github-runner Docker image requires a GitHub PAT to automatically
+# generate fresh registration tokens as needed. This is better than using
+# registration tokens directly, as those expire after 1 hour.
 #
-# Token expires after 1 hour, so you must:
-#   1. Generate a fresh token before deployment
-#   2. Store it in Ansible Vault, OR
-#   3. Pass it via --extra-vars at runtime
+# Create a PAT at: https://github.com/settings/tokens
+# Required scopes:
+#   - repo (Full control of private repositories)
+#   - workflow (Update GitHub Action workflows)
 #
-# Recommended: Store in vault_secrets.yaml
-github_registration_token: "{{ development.github.vault_github_registration_token }}"
+# Store in Ansible Vault at: development.github.token
+github_pat_token: "{{ development.github.token }}"
 #
-# Or pass at runtime:
-#   ansible-playbook github-docker-runners.yml --extra-vars "github_registration_token=YOUR_TOKEN"
-#github_registration_token: ""  # REQUIRED: Set this before running
+# The runner image will use this PAT to:
+#   1. Automatically generate registration tokens
+#   2. Register runners on startup
+#   3. Re-register after each job (ephemeral mode)
 
 # ============================================================================
 # RUNNER CONFIGURATION

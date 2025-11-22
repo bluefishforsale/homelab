@@ -3,20 +3,22 @@
 # Configures the runner host VM with Docker and deploys ephemeral runner containers
 #
 # Prerequisites:
-# - Runner VM created via 00_create_runner_vm.yaml
+# - Runner VM created via create_runner_vm.yaml
 # - VM added to inventory under [github_runners] group
-# - GitHub registration token provided via Vault or --extra-vars
+# - GitHub PAT stored in Vault at development.github.vault_github_pat
 #
 # Usage:
-#   ansible-playbook github-docker-runners.yml
-#   ansible-playbook github-docker-runners.yml --extra-vars "github_registration_token=YOUR_TOKEN"
+#   ansible-playbook -i inventories/github_runners/hosts.ini \
+#     playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
+#
+# The PAT is used by runner containers to automatically generate registration tokens
 
 - name: Configure GitHub Actions ephemeral Docker runners
   hosts: github_runners
   become: true
   gather_facts: true
   vars_files:
-    - vault_secrets.yaml
+    - ../../../vault/secrets.yaml
   
   roles:
     - github_docker_runners

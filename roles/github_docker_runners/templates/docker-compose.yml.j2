@@ -35,11 +35,11 @@ services:
       REPO_URL: "https://github.com/{{ github_repo }}"
 {% endif %}
       
-      # Registration token - REQUIRED
-      # This token is used to register the runner with GitHub
-      # Obtain from: https://github.com/{{ github_org if github_scope == 'org' else github_repo }}/settings/actions/runners/new
+      # Registration token - loaded from mounted file
+      # Token file: {{ github_runners_base_dir }}/.github_token
+      # To update token: update file and restart service
       # myoung34/github-runner uses ACCESS_TOKEN
-      ACCESS_TOKEN: "{{ github_registration_token }}"
+      ACCESS_TOKEN: "${GITHUB_TOKEN}"
       
       # Runner name - unique per container
       RUNNER_NAME: "{{ ansible_hostname }}-runner-{{ runner_index }}"
@@ -67,9 +67,12 @@ services:
       RUNNER_WORKDIR: "/runner/_work"
     
     volumes:
+      # GitHub token file (shared by all runners, read-only)
+      - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro
+      
       # Runner working directory on host
       # Each runner gets its own directory to avoid conflicts
-      - {{ github_runners_base_dir }}/runner-{{ runner_index }}:/runner/_work
+      - {{ github_runners_base_dir }}/runner-{{ runner_index | string }}:/runner/_work
       
 {% if github_runner_mount_docker_socket %}
       # Docker socket mounting for Docker-on-host
@@ -138,4 +141,4 @@ services:
 #   - Example:
 #       privileged: true
 #       volumes:
-#         - runner-{{ runner_index }}-docker:/var/lib/docker
+#         - runner-{% raw %}{{ runner_index }}{% endraw %}-docker:/var/lib/docker
