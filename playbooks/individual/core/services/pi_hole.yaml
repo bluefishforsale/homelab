@@ -1,6 +1,6 @@
 ---
 - name: Install Pi-hole on Debian 12
-  hosts: pi-hole
+  hosts: pihole
   become: true
   vars:
     pihole_admin_password: "admin"
@@ -43,26 +43,26 @@
 
     - name: Create /etc/pihole/setupVars.conf with specified variables
       template:
-        src: files/pihole/etc/setupVars.conf.j2
+        src: ../../../../files/pihole/etc/setupVars.conf.j2
         dest: /etc/pihole/setupVars.conf
         owner: root
         group: root
         mode: '0644'
+      notify: Restart pihole-FTL
+
+    - name: Check if Pi-hole is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/pihole
+      register: pihole_installed
 
     - name: Install Pi-hole
       ansible.builtin.command: /opt/pi-hole/automated\ install/basic-install.sh --unattended
-
-    - name: Restart DNS and Web services
-      ansible.builtin.service:
-        name: "{{ item }}"
-        state: restarted
-        enabled: true
-      loop:
-        - pihole-FTL
-        - lighttpd
+      when: not pihole_installed.stat.exists
 
     - name: Update Pi-Hole
       ansible.builtin.command: pihole -u
+      failed_when: false
+      changed_when: false
 
     - name: Enable Pi-hole at startup
       ansible.builtin.systemd:
@@ -74,4 +74,10 @@
       environment:
         PIHOLE_SKIP_OS_CHECK: 1
       no_log: true
+
+  handlers:
+    - name: Restart pihole-FTL
+      ansible.builtin.service:
+        name: pihole-FTL
+        state: restarted
 
