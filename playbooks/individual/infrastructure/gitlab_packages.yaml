@@ -5,7 +5,7 @@
   gather_facts: true
   
   vars_files:
-    - vault_secrets.yaml
+    - ../../../vault/secrets.yaml
 
   vars:
     service: gitlab

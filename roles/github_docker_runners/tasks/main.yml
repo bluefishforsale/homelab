@@ -3,13 +3,27 @@
 # Installs Docker, creates runner user/dirs, deploys ephemeral runner containers
 
 # Validation
-- name: Validate GitHub registration token is provided
+- name: Validate GitHub PAT is provided
   ansible.builtin.assert:
     that:
-      - github_registration_token is defined
-      - github_registration_token | length > 0
-    fail_msg: "github_registration_token must be provided via Vault or --extra-vars"
-    success_msg: "GitHub registration token validated"
+      - github_pat_token is defined
+      - github_pat_token | length > 0
+      - "'your-github-personal-access-token' not in github_pat_token"
+      - github_pat_token.startswith('ghp_') or github_pat_token.startswith('github_pat_')
+    fail_msg: |
+      Invalid GitHub PAT detected!
+      
+      The PAT in your vault appears to be a placeholder.
+      Current value: {{ github_pat_token }}
+      
+      Please create a real GitHub PAT:
+        1. Go to: https://github.com/settings/tokens
+        2. Generate new token (classic)
+        3. Scopes: repo + workflow
+        4. Update vault: development.github.token
+      
+      Run: /tmp/update_pat.sh (helper script created)
+    success_msg: "GitHub PAT validated"
 
 - name: Validate GitHub scope configuration
   ansible.builtin.assert:
@@ -19,6 +33,21 @@
         (github_scope == 'repo' and github_repo is defined and github_repo | length > 0)
     fail_msg: "Invalid GitHub scope configuration. Set github_org for 'org' scope or github_repo for 'repo' scope"
     success_msg: "GitHub scope configuration validated"
+
+# Wait for cloud-init and apt to finish
+- name: Wait for cloud-init to finish
+  ansible.builtin.command: cloud-init status --wait
+  changed_when: false
+
+- name: Wait for apt lock to be released
+  ansible.builtin.shell: |
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+      echo "Waiting for apt lock..."
+      sleep 2
+    done
+  changed_when: false
+  args:
+    executable: /bin/bash
 
 # Install Docker
 - name: Install required system packages
@@ -103,6 +132,25 @@
     mode: '0755'
   loop: "{{ range(1, github_runner_count + 1) | list }}"
 
+- name: Write GitHub PAT to file (shared by all runners)
+  ansible.builtin.copy:
+    content: "{{ github_pat_token }}"
+    dest: "{{ github_runners_base_dir }}/.github_token"
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: '0600'
+  no_log: true
+
+- name: Write GitHub PAT as environment variable file
+  ansible.builtin.copy:
+    content: "GITHUB_TOKEN={{ github_pat_token }}"
+    dest: "{{ github_runners_base_dir }}/.github_token_env"
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: '0600'
+  no_log: true
+  notify: Restart github-docker-runners service
+
 - name: Create SSH key directory for runner user
   ansible.builtin.file:
     path: "{{ github_runner_ssh_key_dir }}"
@@ -114,7 +162,7 @@
 
 - name: Check if SSH key exists for runner user
   ansible.builtin.stat:
-    path: "{{ github_runner_ssh_key_dir }}/id_rsa"
+    path: "{{ github_runner_ssh_key_dir }}/id_ed25519"
   register: runner_ssh_key
   when: github_runner_ssh_key_dir is defined and github_runner_ssh_key_dir | length > 0
 
@@ -122,13 +170,15 @@
   ansible.builtin.user:
     name: "{{ github_runner_user }}"
     generate_ssh_key: true
-    ssh_key_bits: 4096
-    ssh_key_file: "{{ github_runner_ssh_key_dir }}/id_rsa"
+    ssh_key_type: ed25519
+    ssh_key_file: "{{ github_runner_ssh_key_dir }}/id_ed25519"
+    ssh_key_comment: "github-runner@{{ ansible_hostname }}"
   when:
     - github_runner_ssh_key_dir is defined
     - github_runner_ssh_key_dir | length > 0
     - runner_ssh_key.stat is defined
     - not runner_ssh_key.stat.exists
+  register: ssh_key_generated
 
 # Deploy Docker Compose configuration
 - name: Template docker-compose.yml for ephemeral runners
@@ -186,3 +236,33 @@
       - "  2. Run one job"
       - "  3. Exit and be restarted by Docker"
       - "  4. Re-register as a fresh runner for the next job"
+
+# Display SSH public key for adding to GitHub
+- name: Read SSH public key
+  ansible.builtin.slurp:
+    src: "{{ github_runner_ssh_key_dir }}/id_ed25519.pub"
+  register: runner_ssh_pub_key
+  when: 
+    - github_runner_ssh_key_dir is defined
+    - github_runner_ssh_key_dir | length > 0
+
+- name: Display SSH public key for GitHub
+  ansible.builtin.debug:
+    msg:
+      - "======================================================================"
+      - "SSH PUBLIC KEY - ADD TO GITHUB"
+      - "======================================================================"
+      - ""
+      - "{{ runner_ssh_pub_key.content | b64decode | trim }}"
+      - ""
+      - "Add this key to: https://github.com/settings/keys"
+      - "Title: github-runner@{{ ansible_hostname }}"
+      - ""
+      - "This allows runners to:"
+      - "  - Clone private repositories"
+      - "  - SSH to homelab hosts (if key is in authorized_keys)"
+      - "  - Run Ansible playbooks against your infrastructure"
+      - "======================================================================"
+  when:
+    - runner_ssh_pub_key is defined
+    - runner_ssh_pub_key.content is defined

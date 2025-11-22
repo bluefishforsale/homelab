@@ -9,7 +9,7 @@
   gather_facts: true
   vars:
     # VM configuration
-    runner_vm_id: 250
+    runner_vm_id: 5000
     runner_vm_name: gh-runner-01
     runner_vm_hostname: gh-runner-01
     runner_vm_cores: 16
@@ -85,13 +85,23 @@
       when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
       changed_when: true
 
-    - name: Wait for runner VM to boot and accept SSH connections
+    - name: Display boot wait message
+      ansible.builtin.debug:
+        msg:
+          - "Starting runner VM and waiting for boot..."
+          - "This typically takes 1-3 minutes for cloud-init and SSH to initialize"
+          - "Maximum wait time: 5 minutes"
+          - "VM IP: {{ runner_vm_ip }}"
+      when: runner_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+
+    - name: Wait for runner VM to boot and accept SSH connections (max 5 minutes)
       ansible.builtin.wait_for:
         host: "{{ runner_vm_ip }}"
         port: 22
         delay: 10
-        timeout: 300
+        timeout: 300  # 5 minutes - VM boot + cloud-init can take 1-3 minutes
         state: started
+        msg: "Waiting for {{ runner_vm_ip }}:22 to become available..."
       when: runner_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
 
     - name: Display runner VM information
