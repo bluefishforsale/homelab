@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: frigate
@@ -16,7 +16,7 @@
     rtsp_port: 8554
     webrtc_port: 8555
     data: /data01
-    files: files/frigate
+    files: ../../../../files/frigate
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

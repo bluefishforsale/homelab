@@ -4,7 +4,7 @@
   become: true
   
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: tautulli
@@ -17,7 +17,7 @@
     exporter_version: latest
     exporter_port: 8913
     data: /data01
-    files: files/ocean-tautulli
+    files: ../../../../files/ocean-tautulli
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"

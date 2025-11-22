@@ -96,11 +96,13 @@
 - name: Deploy Audible Downloader
   ansible.builtin.import_playbook: individual/ocean/services/audible_downloader.yaml
 
-- name: Deploy Navidrome Music Server
-  ansible.builtin.import_playbook: individual/ocean/services/navidrome.yaml
-
-- name: Deploy Spotube Music Streaming
-  ansible.builtin.import_playbook: individual/ocean/services/spotube.yaml
+# NOTE: Music streaming services not yet implemented
+# Uncomment when playbooks are created:
+# - name: Deploy Navidrome Music Server
+#   ansible.builtin.import_playbook: individual/ocean/services/navidrome.yaml
+#
+# - name: Deploy Spotube Music Streaming
+#   ansible.builtin.import_playbook: individual/ocean/services/spotube.yaml
 
 - name: Deploy Frigate NVR
   ansible.builtin.import_playbook: individual/ocean/services/frigate.yaml

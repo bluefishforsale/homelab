@@ -10,7 +10,7 @@
     version: main
     port: 3000
     data: /data01
-    files: files/open-webui
+    files: ../../../../files/open-webui
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

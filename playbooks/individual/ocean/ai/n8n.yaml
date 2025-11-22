@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: n8n
@@ -13,7 +13,7 @@
     version: latest
     port: 5678
     data: /data01
-    files: files/n8n
+    files: ../../../../files/n8n
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

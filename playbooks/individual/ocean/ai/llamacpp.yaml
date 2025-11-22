@@ -10,7 +10,7 @@
     version: server-cuda
     port: 8080
     data: /data01
-    files: files/llamacpp
+    files: ../../../../files/llamacpp
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

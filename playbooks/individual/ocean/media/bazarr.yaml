@@ -9,7 +9,7 @@
     version: latest
     service: bazarr
     data: /data01
-    files: files/ocean-bazarr
+    files: ../../../../files/ocean-bazarr
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
     port: 6767

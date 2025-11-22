@@ -12,7 +12,7 @@
     exporter_version: latest
     exporter_port: 9452
     data: /data01
-    files: files/ocean-nzbget
+    files: ../../../../files/ocean-nzbget
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"

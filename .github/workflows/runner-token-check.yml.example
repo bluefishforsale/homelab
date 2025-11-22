@@ -1,0 +1,80 @@
+---
+# Example GitHub Actions workflow for automated runner token validation
+# 
+# This workflow runs the token check playbook automatically when changes
+# are pushed to runner-related files.
+#
+# To use:
+#   1. Rename to .github/workflows/runner-token-check.yml
+#   2. Adjust paths and triggers as needed
+#   3. Ensure vault secrets are configured (or use repository secrets)
+
+name: GitHub Runner Token Validation
+
+on:
+  push:
+    paths:
+      - 'playbooks/individual/infrastructure/github_runner_token_check.yaml'
+      - 'playbooks/individual/infrastructure/github_docker_runners.yaml'
+      - 'inventories/github_runners/**'
+      - '.github/workflows/runner-token-check.yml'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  validate-token:
+    name: Validate Runner Registration Token
+    runs-on: ubuntu-latest  # Works on Debian-based runners
+    
+    permissions:
+      contents: read
+      actions: write  # Required for generating runner tokens
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+      
+      - name: Verify Ansible installation
+        run: ansible --version
+      
+      - name: Display environment info
+        run: |
+          echo "OS: $(uname -a)"
+          echo "Python: $(python --version)"
+          echo "Ansible: $(ansible --version | head -n1)"
+          echo "GitHub Actions: ${GITHUB_ACTIONS}"
+          echo "Runner OS: ${RUNNER_OS}"
+      
+      - name: Run token validation playbook
+        run: |
+          ansible-playbook \
+            playbooks/individual/infrastructure/github_runner_token_check.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTIONS: 'true'
+      
+      # Optional: Store generated token as job output
+      # Note: Be very careful with token security!
+      - name: Token generation complete
+        run: |
+          echo "Token validation complete"
+          echo "Check playbook output for results"
+      
+      # Optional: Deploy runners if token was generated
+      # - name: Deploy GitHub Runners
+      #   if: success()
+      #   run: |
+      #     ansible-playbook \
+      #       -i inventories/github_runners/hosts.ini \
+      #       playbooks/individual/infrastructure/github_docker_runners.yaml
+      #   env:
+      #     ANSIBLE_HOST_KEY_CHECKING: 'False'

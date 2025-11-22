@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     service: tinacms
@@ -14,7 +14,7 @@
     port_int: 3000
     port_ext: 8084
     data: /data01
-    files: files/tinacms
+    files: ../../../../files/tinacms
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

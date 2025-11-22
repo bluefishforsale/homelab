@@ -5,13 +5,13 @@
   gather_facts: true
   
   vars_files:
-    - vault_secrets.yaml
+    - ../../../../vault/secrets.yaml
 
   vars:
     data01: /data01/services
     service: cloudflare_ddns
     path_home: "{{ data01 }}/{{ service }}"
-    files: files/cloudflare_ddns
+    files: ../../../../files/cloudflare_ddns
     systemd_services:
     - "{{ service }}.timer"
     - "{{ service }}.service"
