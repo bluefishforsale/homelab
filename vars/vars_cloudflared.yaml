@@ -67,6 +67,12 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:8084"
 
+        # Blog services (running on ocean - 192.168.1.143)
+        # Route through nginx for proper X-Forwarded-Proto handling
+        - hostname: "blog.saetnere.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
         # Music services (running on ocean - 192.168.1.143)
         - hostname: "spotube.terrac.com"
           service_type: "http"
