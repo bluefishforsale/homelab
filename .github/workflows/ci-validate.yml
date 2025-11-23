@@ -52,6 +52,7 @@ jobs:
   validate-ansible:
     name: Validate Ansible Playbooks
     runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
     needs: validate-yaml
     steps:
       - name: Checkout repository
@@ -68,6 +69,8 @@ jobs:
           ansible --version
 
       - name: Validate playbook syntax
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "Validating Ansible playbook syntax..."
