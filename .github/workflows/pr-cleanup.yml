@@ -18,17 +18,21 @@ jobs:
     steps:
       - name: Setup SSH key for Proxmox access
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ~/.ssh/proxmox_key
-          chmod 600 ~/.ssh/proxmox_key
-          cat >> ~/.ssh/config <<EOF
+          # Use runner work directory (writable)
+          mkdir -p ${{ runner.temp }}/.ssh
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+          # Create SSH config in temp directory
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
           Host node005.home
             User root
-            IdentityFile ~/.ssh/proxmox_key
+            IdentityFile ${{ runner.temp }}/.ssh/proxmox_key
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           EOF
-          chmod 600 ~/.ssh/config
+          chmod 600 ${{ runner.temp }}/.ssh/config
+          # Use temp SSH config for all SSH commands
+          echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
 
       - name: Calculate VM ID
         id: calc-vmid
@@ -44,7 +48,7 @@ jobs:
       - name: Check if VM exists
         id: check-vm
         run: |
-          if ssh node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
+          if ssh -F $SSH_CONFIG node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "VM ${{ steps.calc-vmid.outputs.vmid }} exists"
           else
@@ -57,10 +61,10 @@ jobs:
         run: |
           VMID="${{ steps.calc-vmid.outputs.vmid }}"
           echo "Stopping VM $VMID..."
-          ssh node005.home "qm stop $VMID" || true
+          ssh -F $SSH_CONFIG node005.home "qm stop $VMID" || true
           sleep 5
           echo "Destroying VM $VMID..."
-          ssh node005.home "qm destroy $VMID"
+          ssh -F $SSH_CONFIG node005.home "qm destroy $VMID"
           echo "✅ VM ${{ steps.calc-vmid.outputs.vmname }} destroyed successfully"
 
       - name: Cleanup temporary files
