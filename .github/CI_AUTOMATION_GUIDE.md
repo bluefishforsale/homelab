@@ -36,9 +36,31 @@ ssh node005.home "qm list | grep 9999"
 
 ### 2. GitHub Secrets
 
+**IMPORTANT:** Both secrets must be in **Repository secrets**, NOT Environment secrets.
+
 **Required secrets for CI workflows:**
 - ❗ `ANSIBLE_VAULT_PASSWORD` - Password for decrypting Ansible vault files
 - ❗ `PROXMOX_SSH_KEY` - SSH private key for root@node005.home (base64-encoded)
+
+**Check your configuration:** Go to **Settings** → **Secrets and variables** → **Actions**
+
+You should see **both secrets** listed under "Repository secrets":
+- ✅ `ANSIBLE_VAULT_PASSWORD` (Repository secrets)
+- ✅ `PROXMOX_SSH_KEY` (Repository secrets)
+
+**If you see secrets in "Environment secrets" instead:** 
+The workflows cannot access Environment secrets without specifying `environment:` in the workflow file. You must copy them to Repository secrets:
+
+1. Open the Environment secret (e.g., `ANSIBLE_VAULT_PASSWORD`)
+2. Copy the value
+3. Go to **Repository secrets** section
+4. Click "New repository secret"
+5. Name: `ANSIBLE_VAULT_PASSWORD`
+6. Value: Paste the copied value
+7. Click "Add secret"
+8. Repeat for any other Environment secrets
+
+After migration, the Environment secrets can be safely deleted if not used elsewhere.
 
 #### Setting up ANSIBLE_VAULT_PASSWORD
 
@@ -57,12 +79,15 @@ cat ~/.vault_pass
 
 **Step 2: Add to GitHub Secrets**
 1. Go to **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `ANSIBLE_VAULT_PASSWORD`
-4. Value: Paste your vault password (plain text, no encoding needed)
-5. Click **Add secret**
+2. Make sure you're in the **"Repository secrets"** section (NOT "Environment secrets")
+3. Click **New repository secret**
+4. Name: `ANSIBLE_VAULT_PASSWORD`
+5. Value: Paste your vault password (plain text, no encoding needed)
+6. Click **Add secret**
 
 **Note:** This is a simple text password, NOT base64-encoded. Just the plain password string.
+
+**Common mistake:** If you see "Environment secrets" in the UI, you're in the wrong place. Repository secrets are available to all workflows without specifying an environment.
 
 #### Setting up PROXMOX_SSH_KEY
 
@@ -93,10 +118,11 @@ cat /path/to/proxmox_key | base64
 
 **Step 3: Add to GitHub Secrets**
 1. Go to **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `PROXMOX_SSH_KEY`
-4. Value: Paste the base64-encoded string (one long line of random characters)
-5. Click **Add secret**
+2. Make sure you're in the **"Repository secrets"** section (NOT "Environment secrets")
+3. Click **New repository secret**
+4. Name: `PROXMOX_SSH_KEY`
+5. Value: Paste the base64-encoded string (one long line of random characters)
+6. Click **Add secret**
 
 **Expected format:** The encoded key will be a single long line like:
 ```
