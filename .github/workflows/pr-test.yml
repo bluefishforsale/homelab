@@ -96,7 +96,8 @@ jobs:
         run: |
           # Use runner work directory (writable)
           mkdir -p ${{ runner.temp }}/.ssh
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          # Write key using printf to avoid any whitespace issues
+          printf '%s\n' '${{ secrets.PROXMOX_SSH_KEY }}' > ${{ runner.temp }}/.ssh/proxmox_key
           chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
           # Create SSH config in temp directory
           cat > ${{ runner.temp }}/.ssh/config <<EOF
@@ -404,7 +405,8 @@ jobs:
         run: |
           # Use runner work directory (writable)
           mkdir -p ${{ runner.temp }}/.ssh
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          # Write key using printf to avoid any whitespace issues
+          printf '%s\n' '${{ secrets.PROXMOX_SSH_KEY }}' > ${{ runner.temp }}/.ssh/proxmox_key
           chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
           # Create SSH config in temp directory
           cat > ${{ runner.temp }}/.ssh/config <<EOF
