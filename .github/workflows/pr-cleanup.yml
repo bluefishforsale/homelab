@@ -16,6 +16,20 @@ jobs:
     name: Cleanup Test VM on PR Close
     runs-on: [self-hosted, homelab, ansible]
     steps:
+      - name: Setup SSH key for Proxmox access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ~/.ssh/proxmox_key
+          chmod 600 ~/.ssh/proxmox_key
+          cat >> ~/.ssh/config <<EOF
+          Host node005.home
+            User root
+            IdentityFile ~/.ssh/proxmox_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ~/.ssh/config
+
       - name: Calculate VM ID
         id: calc-vmid
         run: |
@@ -30,7 +44,7 @@ jobs:
       - name: Check if VM exists
         id: check-vm
         run: |
-          if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null debian@node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
+          if ssh node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "VM ${{ steps.calc-vmid.outputs.vmid }} exists"
           else
@@ -43,10 +57,10 @@ jobs:
         run: |
           VMID="${{ steps.calc-vmid.outputs.vmid }}"
           echo "Stopping VM $VMID..."
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null debian@node005.home "qm stop $VMID" || true
+          ssh node005.home "qm stop $VMID" || true
           sleep 5
           echo "Destroying VM $VMID..."
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null debian@node005.home "qm destroy $VMID"
+          ssh node005.home "qm destroy $VMID"
           echo "✅ VM ${{ steps.calc-vmid.outputs.vmname }} destroyed successfully"
 
       - name: Cleanup temporary files
