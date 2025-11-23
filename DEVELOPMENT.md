@@ -78,6 +78,33 @@ echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
+## Ansible Vault Configuration
+
+For playbooks that use encrypted vault files, you have two options:
+
+### Option 1: Use --ask-vault-pass flag (Recommended for local dev)
+
+```bash
+ansible-playbook --ask-vault-pass playbooks/00_site.yaml
+```
+
+### Option 2: Set environment variable
+
+```bash
+export ANSIBLE_VAULT_PASSWORD="your-vault-password"
+ansible-playbook playbooks/00_site.yaml
+```
+
+Or add to your shell profile:
+
+```bash
+# For zsh
+echo 'export ANSIBLE_VAULT_PASSWORD="your-vault-password"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Note**: `make validate` commands run syntax checks only and don't require vault access.
+
 **Note:** The Python version (3.13) may vary depending on your system. Check with:
 ```bash
 python3 --version
