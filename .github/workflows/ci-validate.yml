@@ -91,6 +91,7 @@ jobs:
   lint-ansible:
     name: Lint Ansible Playbooks
     runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
     needs: validate-ansible
     continue-on-error: true
     steps:
@@ -103,6 +104,9 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Lint playbooks
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ANSIBLE_VAULT_PASSWORD_FILE: ""
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "Linting Ansible playbooks..."
