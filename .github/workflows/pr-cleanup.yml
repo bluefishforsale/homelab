@@ -20,8 +20,8 @@ jobs:
         run: |
           # Use runner work directory (writable)
           mkdir -p ${{ runner.temp }}/.ssh
-          # Write key preserving newlines
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          # Decode base64 secret and write to key file
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" | base64 -d > ${{ runner.temp }}/.ssh/proxmox_key
           chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
           # Create SSH config in temp directory
           cat > ${{ runner.temp }}/.ssh/config <<EOF
