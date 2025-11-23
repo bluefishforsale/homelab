@@ -96,9 +96,16 @@ jobs:
         run: |
           # Use runner work directory (writable)
           mkdir -p ${{ runner.temp }}/.ssh
-          # Write key using printf to avoid any whitespace issues
-          printf '%s\n' '${{ secrets.PROXMOX_SSH_KEY }}' > ${{ runner.temp }}/.ssh/proxmox_key
+          # Decode base64 secret and write to key file
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" | base64 -d > ${{ runner.temp }}/.ssh/proxmox_key
           chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+
+          # Debug: Verify key format
+          echo "Key file size: $(wc -c < ${{ runner.temp }}/.ssh/proxmox_key) bytes"
+          echo "Key file lines: $(wc -l < ${{ runner.temp }}/.ssh/proxmox_key)"
+          echo "First line: $(head -n1 ${{ runner.temp }}/.ssh/proxmox_key)"
+          echo "Last line: $(tail -n1 ${{ runner.temp }}/.ssh/proxmox_key)"
+
           # Create SSH config in temp directory
           cat > ${{ runner.temp }}/.ssh/config <<EOF
           Host node005.home
@@ -405,8 +412,8 @@ jobs:
         run: |
           # Use runner work directory (writable)
           mkdir -p ${{ runner.temp }}/.ssh
-          # Write key using printf to avoid any whitespace issues
-          printf '%s\n' '${{ secrets.PROXMOX_SSH_KEY }}' > ${{ runner.temp }}/.ssh/proxmox_key
+          # Decode base64 secret and write to key file
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" | base64 -d > ${{ runner.temp }}/.ssh/proxmox_key
           chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
           # Create SSH config in temp directory
           cat > ${{ runner.temp }}/.ssh/config <<EOF
