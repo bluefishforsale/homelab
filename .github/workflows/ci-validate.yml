@@ -77,14 +77,14 @@ jobs:
           for playbook in playbooks/*.yaml; do
             if [ -f "$playbook" ]; then
               echo "Checking $playbook"
-              ansible-playbook --syntax-check "$playbook"
+              ansible-playbook --syntax-check -i .github/ci_inventory.ini "$playbook"
             fi
           done
 
           # Also check individual playbooks
           find playbooks/individual -name "*.yaml" | while read playbook; do
             echo "Checking $playbook"
-            ansible-playbook --syntax-check "$playbook"
+            ansible-playbook --syntax-check -i .github/ci_inventory.ini "$playbook"
           done
           echo "✓ All Ansible playbooks have valid syntax"
 
