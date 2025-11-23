@@ -1,0 +1,66 @@
+---
+name: PR - Cleanup Test VM
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+            - master
+
+env:
+    PROXMOX_NODE: "node005"
+
+jobs:
+    cleanup-vm:
+        name: Cleanup Test VM on PR Close
+        runs-on: [self-hosted, homelab, ansible]
+        steps:
+            - name: Calculate VM ID
+              id: calc-vmid
+              run: |
+                  PR_NUMBER=${{ github.event.pull_request.number }}
+                  VMID=$((8000 + (PR_NUMBER % 1000)))
+                  VMNAME="ci-test-pr-${PR_NUMBER}"
+                  echo "vmid=$VMID" >> $GITHUB_OUTPUT
+                  echo "vmname=$VMNAME" >> $GITHUB_OUTPUT
+                  echo "VM ID: $VMID"
+                  echo "VM Name: $VMNAME"
+
+            - name: Check if VM exists
+              id: check-vm
+              run: |
+                  if ssh node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
+                    echo "exists=true" >> $GITHUB_OUTPUT
+                    echo "VM ${{ steps.calc-vmid.outputs.vmid }} exists"
+                  else
+                    echo "exists=false" >> $GITHUB_OUTPUT
+                    echo "VM ${{ steps.calc-vmid.outputs.vmid }} does not exist (already cleaned up)"
+                  fi
+
+            - name: Stop and destroy VM
+              if: steps.check-vm.outputs.exists == 'true'
+              run: |
+                  VMID="${{ steps.calc-vmid.outputs.vmid }}"
+                  echo "Stopping VM $VMID..."
+                  ssh node005.home "qm stop $VMID" || true
+                  sleep 5
+                  echo "Destroying VM $VMID..."
+                  ssh node005.home "qm destroy $VMID"
+                  echo "✅ VM ${{ steps.calc-vmid.outputs.vmname }} destroyed successfully"
+
+            - name: Cleanup temporary files
+              run: |
+                  rm -f /tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini
+                  rm -f /tmp/ci-ssh.keys
+                  rm -f /tmp/test-results.txt
+                  rm -f /tmp/playbook-*.log
+                  echo "✅ Temporary files cleaned up"
+
+            - name: Summary
+              run: |
+                  if [ "${{ steps.check-vm.outputs.exists }}" == "true" ]; then
+                    echo "✅ PR #${{ github.event.pull_request.number }} closed - test VM cleaned up"
+                  else
+                    echo "✅ PR #${{ github.event.pull_request.number }} closed - no VM to clean up"
+                  fi
