@@ -35,8 +35,75 @@ ssh node005.home "qm list | grep 9999"
 ```
 
 ### 2. GitHub Secrets
-Already configured:
-- ✅ `ANSIBLE_VAULT_PASSWORD` (from ci-validate.yml)
+
+**Required secrets for CI workflows:**
+- ❗ `ANSIBLE_VAULT_PASSWORD` - Password for decrypting Ansible vault files
+- ❗ `PROXMOX_SSH_KEY` - SSH private key for root@node005.home (base64-encoded)
+
+#### Setting up ANSIBLE_VAULT_PASSWORD
+
+This secret is used to decrypt vault-encrypted files (like `vault/secrets.yaml`) during playbook execution.
+
+**Step 1: Get your vault password**
+```bash
+# Your vault password is what you use when running:
+# ansible-vault edit vault/secrets.yaml
+
+# If you have it stored in a file (e.g., ~/.vault_pass):
+cat ~/.vault_pass
+
+# Otherwise, you should know this password from memory
+```
+
+**Step 2: Add to GitHub Secrets**
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `ANSIBLE_VAULT_PASSWORD`
+4. Value: Paste your vault password (plain text, no encoding needed)
+5. Click **Add secret**
+
+**Note:** This is a simple text password, NOT base64-encoded. Just the plain password string.
+
+#### Setting up PROXMOX_SSH_KEY
+
+**IMPORTANT:** The SSH key must be base64-encoded before storing as a GitHub secret.
+
+**Step 1: Get the SSH private key from node005.home**
+```bash
+# SSH to node005.home
+ssh root@node005.home
+
+# View the private key (typically id_rsa or id_ed25519)
+cat ~/.ssh/id_rsa
+# OR
+cat ~/.ssh/id_ed25519
+```
+
+**Step 2: Base64-encode the key**
+```bash
+# On macOS (copies to clipboard):
+cat ~/.ssh/id_rsa | base64 | pbcopy
+
+# On Linux (display output to copy manually):
+cat ~/.ssh/id_rsa | base64
+
+# OR if you have the key in a file locally:
+cat /path/to/proxmox_key | base64
+```
+
+**Step 3: Add to GitHub Secrets**
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `PROXMOX_SSH_KEY`
+4. Value: Paste the base64-encoded string (one long line of random characters)
+5. Click **Add secret**
+
+**Expected format:** The encoded key will be a single long line like:
+```
+LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTnphQzFyWlhrdGRqRUFBQUFBQkc1dmJtVUFBQUFFYm05...
+```
+
+**Why base64?** GitHub Actions has issues with multi-line secrets in shell contexts. Base64 encoding ensures the key is stored as a single line, and the workflow decodes it when writing to the SSH key file.
 
 ### 3. Self-Hosted Runners
 Already deployed:
