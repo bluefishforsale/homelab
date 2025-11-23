@@ -94,18 +94,21 @@ jobs:
     steps:
       - name: Setup SSH key for Proxmox access
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ~/.ssh/proxmox_key
-          chmod 600 ~/.ssh/proxmox_key
-          # Add to SSH config for convenience
-          cat >> ~/.ssh/config <<EOF
+          # Use runner work directory (writable)
+          mkdir -p ${{ runner.temp }}/.ssh
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+          # Create SSH config in temp directory
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
           Host node005.home
             User root
-            IdentityFile ~/.ssh/proxmox_key
+            IdentityFile ${{ runner.temp }}/.ssh/proxmox_key
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           EOF
-          chmod 600 ~/.ssh/config
+          chmod 600 ${{ runner.temp }}/.ssh/config
+          # Use temp SSH config for all SSH commands
+          echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
           echo "SSH key configured for Proxmox access"
 
       - name: Calculate VM ID and name
@@ -128,7 +131,7 @@ jobs:
       - name: Check if VM already exists
         id: check-vm
         run: |
-          if ssh node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
+          if ssh -F $SSH_CONFIG node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "VM ${{ steps.calc-vmid.outputs.vmid }} already exists, will destroy and recreate"
           else
@@ -140,39 +143,39 @@ jobs:
         if: steps.check-vm.outputs.exists == 'true'
         run: |
           echo "Stopping existing VM..."
-          ssh node005.home "qm stop ${{ steps.calc-vmid.outputs.vmid }}" || true
+          ssh -F $SSH_CONFIG node005.home "qm stop ${{ steps.calc-vmid.outputs.vmid }}" || true
           sleep 5
           echo "Destroying existing VM..."
-          ssh node005.home "qm destroy ${{ steps.calc-vmid.outputs.vmid }}"
+          ssh -F $SSH_CONFIG node005.home "qm destroy ${{ steps.calc-vmid.outputs.vmid }}"
           echo "Existing VM destroyed"
 
       - name: Clone VM from template
         run: |
           echo "Cloning VM ${{ steps.calc-vmid.outputs.vmid }} from template ${{ env.PROXMOX_TEMPLATE_ID }}..."
-          ssh node005.home "qm clone ${{ env.PROXMOX_TEMPLATE_ID }} ${{ steps.calc-vmid.outputs.vmid }} --name ${{ steps.calc-vmid.outputs.vmname }}"
+          ssh -F $SSH_CONFIG node005.home "qm clone ${{ env.PROXMOX_TEMPLATE_ID }} ${{ steps.calc-vmid.outputs.vmid }} --name ${{ steps.calc-vmid.outputs.vmname }}"
           echo "VM cloned successfully"
 
       - name: Configure VM
         run: |
           echo "Configuring VM resources and network..."
-          ssh node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --cores 4"
-          ssh node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --memory 2048"
-          ssh node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --onboot 0"
-          ssh node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --description 'CI Test VM for PR #${{ github.event.pull_request.number }}'"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --cores 4"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --memory 2048"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --onboot 0"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --description 'CI Test VM for PR #${{ github.event.pull_request.number }}'"
           echo "VM configured"
 
       - name: Set SSH keys
         run: |
           echo "Setting SSH keys..."
-          scp /tmp/ci-ssh.keys node005.home:/tmp/ci-ssh.keys
-          ssh node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --sshkeys /tmp/ci-ssh.keys"
-          ssh node005.home "rm /tmp/ci-ssh.keys"
+          scp -F $SSH_CONFIG /tmp/ci-ssh.keys node005.home:/tmp/ci-ssh.keys
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --sshkeys /tmp/ci-ssh.keys"
+          ssh -F $SSH_CONFIG node005.home "rm /tmp/ci-ssh.keys"
           echo "SSH keys configured"
 
       - name: Start VM
         run: |
           echo "Starting VM..."
-          ssh node005.home "qm start ${{ steps.calc-vmid.outputs.vmid }}"
+          ssh -F $SSH_CONFIG node005.home "qm start ${{ steps.calc-vmid.outputs.vmid }}"
           echo "VM started, waiting for boot..."
 
       - name: Wait for VM to get IP address
@@ -181,7 +184,7 @@ jobs:
           echo "Waiting for VM to boot and get IP address..."
           for i in {1..60}; do
             sleep 5
-            VM_IP=$(ssh node005.home "qm guest cmd ${{ steps.calc-vmid.outputs.vmid }} network-get-interfaces 2>/dev/null" | jq -r '.[] | select(.name == "eth0" or .name == "ens18") | ."ip-addresses"[]? | select(."ip-address-type" == "ipv4") | ."ip-address"' 2>/dev/null | grep -v "^127\." | head -n1 || true)
+            VM_IP=$(ssh -F $SSH_CONFIG node005.home "qm guest cmd ${{ steps.calc-vmid.outputs.vmid }} network-get-interfaces 2>/dev/null" | jq -r '.[] | select(.name == "eth0" or .name == "ens18") | ."ip-addresses"[]? | select(."ip-address-type" == "ipv4") | ."ip-address"' 2>/dev/null | grep -v "^127\." | head -n1 || true)
             if [ -n "$VM_IP" ]; then
               echo "ip=$VM_IP" >> $GITHUB_OUTPUT
               echo "VM IP address: $VM_IP"
@@ -399,26 +402,30 @@ jobs:
     steps:
       - name: Setup SSH key for Proxmox access
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ~/.ssh/proxmox_key
-          chmod 600 ~/.ssh/proxmox_key
-          cat >> ~/.ssh/config <<EOF
+          # Use runner work directory (writable)
+          mkdir -p ${{ runner.temp }}/.ssh
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" > ${{ runner.temp }}/.ssh/proxmox_key
+          chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+          # Create SSH config in temp directory
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
           Host node005.home
             User root
-            IdentityFile ~/.ssh/proxmox_key
+            IdentityFile ${{ runner.temp }}/.ssh/proxmox_key
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           EOF
-          chmod 600 ~/.ssh/config
+          chmod 600 ${{ runner.temp }}/.ssh/config
+          # Use temp SSH config for all SSH commands
+          echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
 
       - name: Stop and destroy VM
         run: |
           VMID="${{ needs.provision-vm.outputs.vm-id }}"
           echo "Stopping VM $VMID..."
-          ssh node005.home "qm stop $VMID" || true
+          ssh -F $SSH_CONFIG node005.home "qm stop $VMID" || true
           sleep 5
           echo "Destroying VM $VMID..."
-          ssh node005.home "qm destroy $VMID"
+          ssh -F $SSH_CONFIG node005.home "qm destroy $VMID"
           echo "✅ VM destroyed successfully"
 
       - name: Cleanup temporary files
