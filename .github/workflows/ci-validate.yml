@@ -73,19 +73,28 @@ jobs:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
+
+          # Create temporary vault password file
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
           echo "Validating Ansible playbook syntax..."
           for playbook in playbooks/*.yaml; do
             if [ -f "$playbook" ]; then
               echo "Checking $playbook"
-              ansible-playbook --syntax-check -i .github/ci_inventory.ini "$playbook"
+              ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
             fi
           done
 
           # Also check individual playbooks
           find playbooks/individual -name "*.yaml" | while read playbook; do
             echo "Checking $playbook"
-            ansible-playbook --syntax-check -i .github/ci_inventory.ini "$playbook"
+            ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
           done
+
+          # Clean up
+          rm -f /tmp/.vault_pass
+
           echo "✓ All Ansible playbooks have valid syntax"
 
   lint-ansible:
