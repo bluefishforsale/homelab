@@ -1,0 +1,514 @@
+---
+# GitHub Runner Registration Token Validator (Automated)
+# 
+# Fully automated token validation and generation playbook.
+# No user interaction required - runs end-to-end automatically.
+# Compatible with both local execution and GitHub Actions CI/CD.
+#
+# What it does:
+#   1. Checks if token is defined in vault
+#   2. Validates token against GitHub API
+#   3. Checks GitHub CLI availability and authentication
+#   4. Automatically generates new token if CLI or GITHUB_TOKEN available
+#   5. Displays results and next steps
+#
+# Prerequisites:
+#   Local execution:
+#     - GitHub CLI (gh) installed: brew install gh (macOS) or apt-get install gh (Linux)
+#     - Authenticated with GitHub: gh auth login
+#   GitHub Actions:
+#     - GITHUB_TOKEN automatically available
+#     - curl installed (standard in most environments)
+#
+# Usage:
+#   Local: ansible-playbook github_runner_token_check.yaml --ask-vault-pass
+#   CI/CD: ansible-playbook github_runner_token_check.yaml
+
+- name: Validate GitHub Runner Registration Token
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../inventories/github_runners/group_vars/github_runners.yml
+  
+  vars:
+    # GitHub API base URL
+    github_api_url: "https://api.github.com"
+    
+    # Token validation - will be set during execution
+    token_is_valid: false
+    token_value: "{{ github_registration_token | default('') }}"
+    
+    # Auto-generate behavior
+    auto_generate_token: true
+    
+    # GitHub Actions detection
+    is_github_actions: "{{ lookup('env', 'GITHUB_ACTIONS') == 'true' }}"
+    github_token: "{{ lookup('env', 'GITHUB_TOKEN') }}"
+    
+  tasks:
+    # ========================================================================
+    # STEP 1: Check if token is defined in vault
+    # ========================================================================
+    
+    - name: Check if registration token is defined
+      ansible.builtin.set_fact:
+        token_is_defined: "{{ token_value | length > 0 }}"
+    
+    - name: Display token status
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          GitHub Runner Registration Token Status
+          ====================================================================
+          Scope: {{ github_scope }}
+          {% if github_scope == 'repo' %}
+          Repository: {{ github_repo }}
+          {% else %}
+          Organization: {{ github_org }}
+          {% endif %}
+          Token Defined: {{ token_is_defined }}
+          Token Length: {{ token_value | length if token_is_defined else 0 }} characters
+          ====================================================================
+    
+    # ========================================================================
+    # STEP 2: Check if GitHub CLI is installed
+    # ========================================================================
+    
+    - name: Check if GitHub CLI (gh) is installed
+      ansible.builtin.shell: /opt/homebrew/bin/gh --version || /usr/local/bin/gh --version || which gh
+      register: gh_check
+      changed_when: false
+      failed_when: false
+    
+    - name: Display GitHub CLI status
+      ansible.builtin.debug:
+        msg: |
+          {% if gh_check.rc == 0 %}
+          ✓ GitHub CLI is installed at: {{ gh_check.stdout }}
+          {% else %}
+          ✗ GitHub CLI is NOT installed
+            Install with: brew install gh (macOS) or see https://cli.github.com
+          {% endif %}
+    
+    - name: Check GitHub CLI authentication
+      ansible.builtin.shell: /opt/homebrew/bin/gh auth status || /usr/local/bin/gh auth status
+      register: gh_auth_status
+      changed_when: false
+      failed_when: false
+      when: gh_check.rc == 0
+    
+    - name: Display GitHub authentication status
+      ansible.builtin.debug:
+        msg: |
+          {% if gh_check.rc == 0 %}
+          {% if gh_auth_status.rc == 0 %}
+          ✓ GitHub CLI is authenticated
+          {% else %}
+          ✗ GitHub CLI is NOT authenticated
+            Authenticate with: gh auth login
+          {% endif %}
+          {% endif %}
+      when: gh_check.rc == 0
+    
+    # ========================================================================
+    # STEP 3: Validate existing token (if defined)
+    # ========================================================================
+    
+    - name: Attempt to validate token with GitHub API (repo scope)
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/repos/{{ github_repo }}/actions/runners"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ token_value }}"
+          Accept: "application/vnd.github+json"
+        status_code: [200, 401, 403, 404]
+      register: token_validation
+      failed_when: false
+      when:
+        - token_is_defined
+        - github_scope == 'repo'
+      no_log: false
+    
+    - name: Attempt to validate token with GitHub API (org scope)
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/orgs/{{ github_org }}/actions/runners"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ token_value }}"
+          Accept: "application/vnd.github+json"
+        status_code: [200, 401, 403, 404]
+      register: token_validation
+      failed_when: false
+      when:
+        - token_is_defined
+        - github_scope == 'org'
+      no_log: false
+    
+    - name: Display token validation results
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          Token Validation Results
+          ====================================================================
+          {% if not token_is_defined %}
+          Status: ✗ Token not defined in vault
+          {% elif token_validation.status == 200 %}
+          Status: ✓ Token appears to be valid (API accessible)
+          Note: Registration tokens are single-use, so this may still fail during runner setup
+          {% elif token_validation.status in [401, 403] %}
+          Status: ✗ Token validation failed ({{ token_validation.status }})
+          Reason: Token is invalid, expired, or lacks permissions
+          {% else %}
+          Status: ⚠ Could not validate token (API returned {{ token_validation.status }})
+          {% endif %}
+          ====================================================================
+      when: token_is_defined
+    
+    # ========================================================================
+    # STEP 4: Determine if we should generate new token
+    # ========================================================================
+    
+    - name: Decide if token generation is needed
+      ansible.builtin.set_fact:
+        should_generate_token: "{{ (not token_is_defined or (token_validation.status | default(0) != 200)) and auto_generate_token }}"
+    
+    - name: Display token generation decision
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          Token Generation Decision
+          ====================================================================
+          Environment: {{ 'GitHub Actions CI/CD' if is_github_actions else 'Local Execution' }}
+          Token defined: {{ token_is_defined }}
+          Token valid: {{ 'Yes' if (token_validation.status | default(0)) == 200 else 'No' }}
+          GitHub CLI available: {{ 'Yes' if (gh_check.rc | default(1)) == 0 else 'No' }}
+          GitHub CLI authenticated: {{ 'Yes' if (gh_auth_status.rc | default(1)) == 0 else 'No' }}
+          GitHub Actions token available: {{ 'Yes' if (is_github_actions and github_token | length > 0) else 'No' }}
+          Auto-generate enabled: {{ auto_generate_token }}
+          
+          {% if should_generate_token %}
+          {% if is_github_actions and github_token | length > 0 %}
+          ✓ Will generate token using GitHub Actions GITHUB_TOKEN
+          {% elif (gh_check.rc | default(1)) == 0 and (gh_auth_status.rc | default(1)) == 0 %}
+          ✓ Will generate token using GitHub CLI (gh)
+          {% else %}
+          ✗ Cannot auto-generate: No auth method available
+          {% endif %}
+          {% else %}
+          ✓ Token appears valid, no generation needed
+          {% endif %}
+          ====================================================================
+    
+    # ========================================================================
+    # STEP 5: Generate new token automatically
+    # ========================================================================
+    
+    - name: Generate new registration token (repo scope)
+      ansible.builtin.shell: |
+        if [ -x /opt/homebrew/bin/gh ]; then
+          /opt/homebrew/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/{{ github_repo }}/actions/runners/registration-token
+        else
+          /usr/local/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/{{ github_repo }}/actions/runners/registration-token
+        fi
+      register: new_token_repo
+      changed_when: false
+      when:
+        - should_generate_token
+        - gh_check.rc == 0
+        - gh_auth_status.rc == 0
+        - github_scope == 'repo'
+      no_log: false
+    
+    - name: Generate new registration token (org scope)
+      ansible.builtin.shell: |
+        if [ -x /opt/homebrew/bin/gh ]; then
+          /opt/homebrew/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /orgs/{{ github_org }}/actions/runners/registration-token
+        else
+          /usr/local/bin/gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /orgs/{{ github_org }}/actions/runners/registration-token
+        fi
+      register: new_token_org
+      changed_when: false
+      when:
+        - should_generate_token
+        - gh_check.rc == 0
+        - gh_auth_status.rc == 0
+        - github_scope == 'org'
+      no_log: false
+    
+    # ========================================================================
+    # STEP 5b: Generate token using curl (GitHub Actions with GITHUB_TOKEN)
+    # ========================================================================
+    
+    - name: Generate new registration token using curl (repo scope, GitHub Actions)
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/repos/{{ github_repo }}/actions/runners/registration-token"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ github_token }}"
+          Accept: "application/vnd.github+json"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [200, 201]
+      register: new_token_repo_curl
+      changed_when: false
+      when:
+        - should_generate_token
+        - is_github_actions
+        - github_token | length > 0
+        - github_scope == 'repo'
+      no_log: false
+    
+    - name: Generate new registration token using curl (org scope, GitHub Actions)
+      ansible.builtin.uri:
+        url: "{{ github_api_url }}/orgs/{{ github_org }}/actions/runners/registration-token"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ github_token }}"
+          Accept: "application/vnd.github+json"
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: [200, 201]
+      register: new_token_org_curl
+      changed_when: false
+      when:
+        - should_generate_token
+        - is_github_actions
+        - github_token | length > 0
+        - github_scope == 'org'
+      no_log: false
+    
+    - name: Parse new token (from gh CLI)
+      ansible.builtin.set_fact:
+        new_token_data: "{{ (new_token_repo.stdout | default(new_token_org.stdout | default('{}'))) | from_json }}"
+      when: (new_token_repo is defined and new_token_repo is succeeded) or (new_token_org is defined and new_token_org is succeeded)
+    
+    - name: Parse new token (from curl/uri)
+      ansible.builtin.set_fact:
+        new_token_data: "{{ new_token_repo_curl.json | default(new_token_org_curl.json | default({})) }}"
+      when: 
+        - (new_token_repo_curl is defined and new_token_repo_curl is succeeded) or (new_token_org_curl is defined and new_token_org_curl is succeeded)
+        - new_token_data is not defined
+    
+    # ========================================================================
+    # STEP 5: Display results and instructions
+    # ========================================================================
+    
+    - name: Display new token information (repo scope)
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          ✓ NEW REGISTRATION TOKEN GENERATED
+          ====================================================================
+          
+          Scope: Repository
+          Repository: {{ github_repo }}
+          
+          Token: {{ new_token_data.token }}
+          
+          Expires At: {{ new_token_data.expires_at }}
+          
+          ====================================================================
+          NEXT STEPS
+          ====================================================================
+          
+          1. Update your vault with the new token:
+             
+             ansible-vault edit vault/secrets.yaml
+             
+             Then set:
+             development:
+               github:
+                 vault_github_registration_token: "{{ new_token_data.token }}"
+          
+          2. Or pass the token at runtime:
+             
+             ansible-playbook -i inventories/github_runners/hosts.ini \
+               playbooks/individual/infrastructure/github_docker_runners.yaml \
+               --extra-vars "github_registration_token={{ new_token_data.token }}"
+          
+          3. Manual registration URL (if needed):
+             https://github.com/{{ github_repo }}/settings/actions/runners/new
+          
+          ====================================================================
+          ⚠ IMPORTANT: This token expires in 1 hour!
+          ====================================================================
+      when:
+        - new_token_repo is defined
+        - new_token_repo is succeeded
+        - new_token_data is defined
+        - new_token_data.token | default('') | length > 0
+    
+    - name: Display new token information (org scope)
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          ✓ NEW REGISTRATION TOKEN GENERATED
+          ====================================================================
+          
+          Scope: Organization
+          Organization: {{ github_org | default('NOT_SET') }}
+          
+          Token: {{ new_token_data.token }}
+          
+          Expires At: {{ new_token_data.expires_at }}
+          
+          ====================================================================
+          NEXT STEPS
+          ====================================================================
+          
+          1. Update your vault with the new token:
+             
+             ansible-vault edit vault/secrets.yaml
+             
+             Then set:
+             development:
+               github:
+                 vault_github_registration_token: "{{ new_token_data.token }}"
+          
+          2. Or pass the token at runtime:
+             
+             ansible-playbook -i inventories/github_runners/hosts.ini \
+               playbooks/individual/infrastructure/github_docker_runners.yaml \
+               --extra-vars "github_registration_token={{ new_token_data.token }}"
+          
+          3. Manual registration URL (if needed):
+             https://github.com/organizations/{{ github_org | default('YOUR_ORG') }}/settings/actions/runners/new
+          
+          ====================================================================
+          ⚠ IMPORTANT: This token expires in 1 hour!
+          ====================================================================
+      when:
+        - new_token_org is defined
+        - new_token_org is succeeded
+        - new_token_data is defined
+        - new_token_data.token | default('') | length > 0
+    
+    - name: Display manual token generation instructions
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          MANUAL TOKEN GENERATION
+          ====================================================================
+          
+          {% if (gh_check.rc | default(1)) != 0 %}
+          GitHub CLI is not installed. Install it first:
+            - macOS: brew install gh
+            - Linux: See https://cli.github.com
+            - Then authenticate: gh auth login
+          
+          {% elif (gh_auth_status.rc | default(1)) != 0 %}
+          GitHub CLI is not authenticated. Run:
+            gh auth login
+          
+          {% endif %}
+          Alternatively, generate a token manually:
+          
+          {% if github_scope == 'repo' %}
+          Repository-level token:
+          1. Visit: https://github.com/{{ github_repo }}/settings/actions/runners/new
+          2. Click "Generate token" or copy the displayed token
+          3. Token expires in 1 hour
+          
+          {% else %}
+          Organization-level token:
+          1. Visit: https://github.com/organizations/{{ github_org }}/settings/actions/runners/new
+          2. Click "Generate token" or copy the displayed token
+          3. Token expires in 1 hour
+          
+          {% endif %}
+          Then update your vault:
+            ansible-vault edit vault/secrets.yaml
+          
+          Or use --extra-vars:
+            --extra-vars "github_registration_token=YOUR_TOKEN"
+          
+          ====================================================================
+      when: >
+        should_generate_token and
+        not (is_github_actions and github_token | length > 0) and
+        ((gh_check.rc | default(1) != 0) or (gh_auth_status.rc | default(1) != 0))
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    
+    - name: Display summary
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          SUMMARY
+          ====================================================================
+          Token in vault: {{ 'Yes' if token_is_defined else 'No' }}
+          GitHub CLI installed: {{ 'Yes' if (gh_check.rc | default(1)) == 0 else 'No' }}
+          GitHub CLI authenticated: {{ 'Yes' if (gh_auth_status.rc | default(1)) == 0 else 'No' }}
+          New token generated: {{ 'Yes' if (new_token_data is defined and new_token_data.token | default('') | length > 0) else 'No' }}
+          
+          {% if new_token_data is defined and new_token_data.token | default('') | length > 0 %}
+          
+          ✓✓✓ SUCCESS: New token generated and ready to use! ✓✓✓
+          
+          Copy the token above and either:
+            1. Update vault: ansible-vault edit vault/secrets.yaml
+            2. Use --extra-vars when deploying runners
+          
+          {% elif token_is_defined and (token_validation.status | default(0)) == 200 %}
+          
+          ✓ SUCCESS: Existing token appears valid
+          
+          Note: Tokens expire after 1 hour, regenerate if deployment fails
+          
+          {% elif should_generate_token and ((gh_check.rc | default(1)) != 0 or (gh_auth_status.rc | default(1)) != 0) %}
+          
+          ⚠ ACTION REQUIRED: Manual token generation needed
+          
+          GitHub CLI not available - follow manual instructions above
+          
+          {% elif not token_is_defined %}
+          
+          ⚠ ACTION REQUIRED: No token available
+          
+          Follow manual instructions above to generate token
+          
+          {% else %}
+          
+          ⚠ Token status unclear - check validation results above
+          
+          {% endif %}
+          ====================================================================
+    # FINAL STATUS
+    # ========================================================================
+    
+    - name: Determine if we have a token
+      ansible.builtin.set_fact:
+        have_valid_token: >
+          {%- if token_is_defined and token_is_valid -%}
+          true
+          {%- elif new_token_data is defined and new_token_data.token | default('') | length > 0 -%}
+          true
+          {%- else -%}
+          false
+          {%- endif -%}
+    
+    - name: Set final status
+      ansible.builtin.set_fact:
+        playbook_success: "{{ have_valid_token }}"
+    
+    - name: Display final status
+      ansible.builtin.debug:
+        msg: |
+          ====================================================================
+          FINAL STATUS: {{ '✓ SUCCESS' if playbook_success else '⚠ ACTION REQUIRED' }}
+          ====================================================================
+          
+          {% if playbook_success %}
+          Token is ready for runner deployment!
+          
+          Next step:
+            ansible-playbook -i inventories/github_runners/hosts.ini \
+              playbooks/individual/infrastructure/github_docker_runners.yaml \
+              --ask-vault-pass
+          {% else %}
+          Manual action needed to obtain registration token.
+          See instructions above.
+          {% endif %}
+          ====================================================================

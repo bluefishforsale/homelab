@@ -1,0 +1,189 @@
+---
+name: Deploy Services
+
+on:
+  workflow_dispatch:
+    inputs:
+      playbook:
+        description: "Playbook to run"
+        required: true
+        type: choice
+        options:
+          - playbooks/00_site.yaml
+          - playbooks/01_base_system.yaml
+          - playbooks/02_core_infrastructure.yaml
+          - playbooks/03_ocean_services.yaml
+      check_mode:
+        description: "Run in check mode (dry-run)"
+        required: false
+        type: boolean
+        default: false
+      tags:
+        description: "Ansible tags to run (optional)"
+        required: false
+        type: string
+      skip_tags:
+        description: "Ansible tags to skip (optional)"
+        required: false
+        type: string
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  validate:
+    name: Validate & Lint
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Validating YAML syntax for ${{ inputs.playbook }}"
+          python3 -c "import yaml; yaml.safe_load(open('${{ inputs.playbook }}'))"
+
+      - name: Validate Ansible syntax
+        run: |
+          echo "Validating Ansible playbook syntax"
+          ansible-playbook --syntax-check ${{ inputs.playbook }}
+
+      - name: Lint playbook
+        run: |
+          if command -v ansible-lint &> /dev/null; then
+            echo "Running ansible-lint"
+            ansible-lint ${{ inputs.playbook }}
+          else
+            echo "⚠️  ansible-lint not found, skipping"
+          fi
+
+  dry-run:
+    name: Dry-Run (Check Mode)
+    needs: validate
+    if: ${{ inputs.check_mode == false }}
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH keys
+        run: ssh-add -l || echo "No SSH keys loaded"
+
+      - name: Run dry-run deployment
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          CMD="ansible-playbook ${{ inputs.playbook }} --check"
+
+          if [ -n "${{ inputs.tags }}" ]; then
+            CMD="$CMD --tags '${{ inputs.tags }}'"
+          fi
+
+          if [ -n "${{ inputs.skip_tags }}" ]; then
+            CMD="$CMD --skip-tags '${{ inputs.skip_tags }}'"
+          fi
+
+          if [ -n "$VAULT_PASSWORD" ]; then
+            echo "$VAULT_PASSWORD" > /tmp/vault_pass
+            CMD="$CMD --vault-password-file=/tmp/vault_pass"
+          fi
+
+          echo "🔍 Running dry-run: $CMD"
+          eval $CMD
+          EXIT_CODE=$?
+
+          rm -f /tmp/vault_pass
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ Dry-run FAILED with exit code $EXIT_CODE"
+            echo "Deployment will NOT proceed"
+            exit $EXIT_CODE
+          fi
+
+          echo "✅ Dry-run PASSED - deployment may proceed"
+
+  deploy:
+    name: Deploy
+    needs: [validate, dry-run]
+    if: ${{ always() && needs.validate.result == 'success' && (inputs.check_mode == true || needs.dry-run.result == 'success') }}
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH keys
+        run: ssh-add -l || echo "No SSH keys loaded"
+
+      - name: Display deployment info
+        run: |
+          echo "📋 Deployment Configuration:"
+          echo "  Playbook: ${{ inputs.playbook }}"
+          echo "  Check mode: ${{ inputs.check_mode }}"
+          echo "  Tags: ${{ inputs.tags || 'none' }}"
+          echo "  Skip tags: ${{ inputs.skip_tags || 'none' }}"
+          echo ""
+          if [ "${{ inputs.check_mode }}" = "true" ]; then
+            echo "⚠️  Running in CHECK MODE (no changes will be made)"
+          else
+            echo "🚀 Running in LIVE MODE (changes will be applied)"
+          fi
+
+      - name: Run Ansible playbook
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e  # Exit immediately on error
+          set -o pipefail  # Catch errors in pipes
+
+          CMD="ansible-playbook ${{ inputs.playbook }}"
+
+          # Add check mode if enabled
+          if [ "${{ inputs.check_mode }}" = "true" ]; then
+            CMD="$CMD --check"
+          fi
+
+          # Add tags if provided
+          if [ -n "${{ inputs.tags }}" ]; then
+            CMD="$CMD --tags '${{ inputs.tags }}'"
+          fi
+
+          # Add skip-tags if provided
+          if [ -n "${{ inputs.skip_tags }}" ]; then
+            CMD="$CMD --skip-tags '${{ inputs.skip_tags }}'"
+          fi
+
+          # Add vault password if secret is set
+          if [ -n "$VAULT_PASSWORD" ]; then
+            echo "$VAULT_PASSWORD" > /tmp/vault_pass
+            CMD="$CMD --vault-password-file=/tmp/vault_pass"
+          fi
+
+          echo "Running: $CMD"
+          eval $CMD
+          EXIT_CODE=$?
+
+          # Cleanup vault password file
+          rm -f /tmp/vault_pass
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ Deployment FAILED with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+          echo "✅ Deployment completed successfully"
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Deployment completed successfully"
+          echo "Playbook: ${{ inputs.playbook }}"
+          echo "Mode: ${{ inputs.check_mode == 'true' && 'Check (dry-run)' || 'Live deployment' }}"
+
+      - name: Deployment failed
+        if: failure()
+        run: |
+          echo "❌ Deployment failed"
+          echo "Playbook: ${{ inputs.playbook }}"
+          echo "Check the logs above for details"
+          exit 1

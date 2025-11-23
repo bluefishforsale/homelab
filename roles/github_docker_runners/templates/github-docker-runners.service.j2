@@ -1,0 +1,40 @@
+[Unit]
+Description=GitHub Actions Ephemeral Docker Runners
+Documentation=https://docs.github.com/en/actions/hosting-your-own-runners
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ github_runners_base_dir }}
+User={{ github_runner_user }}
+Group={{ github_runner_group }}
+
+# Load GitHub token from file and pass to containers
+EnvironmentFile={{ github_runners_base_dir }}/.github_token_env
+
+# Start all runner containers
+ExecStart=/usr/bin/docker compose -f {{ github_runners_compose_file }} up -d --remove-orphans
+
+# Stop all runner containers
+ExecStop=/usr/bin/docker compose -f {{ github_runners_compose_file }} down
+
+# Reload configuration (pull new images and restart)
+ExecReload=/usr/bin/docker compose -f {{ github_runners_compose_file }} pull
+ExecReload=/usr/bin/docker compose -f {{ github_runners_compose_file }} up -d --remove-orphans
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths={{ github_runners_base_dir }}
+
+[Install]
+WantedBy=multi-user.target

@@ -26,8 +26,7 @@ graph TB
     subgraph "Virtualization Layer"
         PM1 --> VM1[Control VMs]
         PM1 --> VM2[Service VMs]
-        PM2 --> VM3[K8s Cluster VMs]
-        PM2 --> VM4[Storage VMs]
+        PM2 --> VM3[Storage VMs]
     end
     
     subgraph "Service Layer"
@@ -40,7 +39,6 @@ graph TB
     
     subgraph "Container Layer"
         DOCKER[Docker Services<br/>Ocean Host]
-        K8S[Kubernetes Cluster<br/>6 Node Cluster]
     end
 ```
 
@@ -49,9 +47,6 @@ graph TB
 | Component | IP Range/Address | Purpose |
 |-----------|------------------|---------|
 | **Management Network** | 192.168.1.0/24 | Host management and services |
-| **Kubernetes Cluster** | 10.0.0.0/16 | Container networking |
-| **Service Network** | 10.0.250.0/20 | Kubernetes services |
-| **API Server VIP** | 192.168.1.99 | HA Kubernetes API endpoint |
 | **DNS Primary** | 192.168.1.2 | BIND DNS server |
 | **Pi-hole** | 192.168.1.9 | Ad-blocking DNS |
 | **Ocean Media Server** | 192.168.1.143 | Docker services host |
@@ -73,8 +68,6 @@ graph TB
 
 ### Container Platforms
 - **Docker** - Single-host containerized services (media stack, AI services)
-- **Kubernetes** - Multi-node cluster for scalable applications
-- **ArgoCD** (Planned) - GitOps deployment for Kubernetes
 
 ### Observability Stack
 - **Grafana** - Metrics visualization and dashboards
@@ -96,12 +89,6 @@ graph TB
 - **Monitoring**: Grafana, Prometheus, cAdvisor
 - **Development**: Portainer, MySQL
 
-### Kubernetes Cluster - Scalable Applications
-- **Namespace Isolation**: Production, staging, development
-- **Ingress**: Traefik or Nginx for HTTP routing
-- **Storage**: Ceph RBD and CephFS integration
-- **GPU Support**: NVIDIA device plugin for AI workloads
-
 ### Control Plane Services
 - **GitLab**: CI/CD, source control, container registry
 - **DNS**: BIND with dynamic DNS updates
@@ -114,7 +101,7 @@ graph TB
 1. **Code Changes** → GitLab repository
 2. **CI Pipeline** → Automated testing and building
 3. **Ansible Playbooks** → Infrastructure provisioning
-4. **Container Deployment** → Docker or Kubernetes
+4. **Container Deployment** → Docker containers
 5. **Health Checks** → Monitoring and alerting
 
 ### Network Traffic Flow
@@ -141,11 +128,10 @@ graph TB
 - Monitoring foundation
 - Cloudflare tunnels
 
-### Phase 3: Advanced Orchestration 🔄
-- Kubernetes cluster deployment
-- ArgoCD GitOps implementation
-- Service mesh integration
+### Phase 3: Advanced Features 🔄
+- Service discovery for Docker
 - Advanced monitoring with Loki
+- Enhanced security controls
 
 ### Phase 4: Enterprise Features 📅
 - Multi-environment isolation
@@ -157,7 +143,7 @@ graph TB
 
 ### Horizontal Scaling
 - **Proxmox Nodes**: Add additional hypervisors to cluster
-- **Kubernetes Workers**: Scale container capacity
+- **Docker Hosts**: Add additional Docker service hosts
 - **Ceph OSDs**: Expand storage capacity
 - **Service Replicas**: Scale individual applications
 
