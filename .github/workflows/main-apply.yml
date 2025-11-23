@@ -1,0 +1,267 @@
+---
+name: Main - Apply Playbooks to Production
+
+on:
+    push:
+        branches:
+            - main
+            - master
+        paths:
+            - "playbooks/**/*.yaml"
+            - "playbooks/**/*.yml"
+            - "files/**"
+            - "roles/**"
+            - "vars/**/*.yaml"
+            - "group_vars/**"
+
+env:
+    ANSIBLE_FORCE_COLOR: "true"
+    ANSIBLE_HOST_KEY_CHECKING: "false"
+    PIP_BREAK_SYSTEM_PACKAGES: "1"
+
+jobs:
+    detect-changes:
+        name: Detect Changed Playbooks
+        runs-on: [self-hosted, homelab, ansible]
+        outputs:
+            playbooks: ${{ steps.find-playbooks.outputs.playbooks }}
+            has-changes: ${{ steps.find-playbooks.outputs.has-changes }}
+            playbook-count: ${{ steps.find-playbooks.outputs.count }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2 # Need previous commit for diff
+
+            - name: Find changed playbooks
+              id: find-playbooks
+              run: |
+                  echo "Detecting changed files in last commit..."
+
+                  # Get all changed files in the push
+                  CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+                  echo "Changed files:"
+                  echo "$CHANGED_FILES"
+                  echo ""
+
+                  # Find directly changed playbooks
+                  PLAYBOOKS=$(echo "$CHANGED_FILES" | grep -E '^playbooks/(individual|tasks)/.*\.ya?ml$|^playbooks/0[0-9]_.*\.ya?ml$' || true)
+
+                  # If shared resources changed, add orchestrator playbooks
+                  if echo "$CHANGED_FILES" | grep -qE '^(roles/|group_vars/|files/|vars/)'; then
+                    echo "Shared resources changed, adding orchestrator playbooks..."
+                    PLAYBOOKS+=$'\n'playbooks/01_base_system.yaml
+                    PLAYBOOKS+=$'\n'playbooks/02_core_infrastructure.yaml
+                    PLAYBOOKS+=$'\n'playbooks/03_ocean_services.yaml
+                  fi
+
+                  # Deduplicate and filter out task playbooks (no hosts directive)
+                  PLAYBOOKS=$(echo "$PLAYBOOKS" | sort -u | grep -v '^playbooks/tasks/' || true)
+
+                  # Convert to JSON array
+                  PLAYBOOK_JSON=$(echo "$PLAYBOOKS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+                  PLAYBOOK_COUNT=$(echo "$PLAYBOOKS" | grep -c . || echo "0")
+
+                  echo "Playbooks to apply:"
+                  echo "$PLAYBOOKS"
+                  echo ""
+                  echo "playbooks=$PLAYBOOK_JSON" >> $GITHUB_OUTPUT
+
+                  if [ "$PLAYBOOK_COUNT" -gt 0 ]; then
+                    echo "has-changes=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "has-changes=false" >> $GITHUB_OUTPUT
+                  fi
+                  echo "count=$PLAYBOOK_COUNT" >> $GITHUB_OUTPUT
+
+                  echo "Found $PLAYBOOK_COUNT playbook(s) to apply"
+
+    apply-playbooks:
+        name: Apply Playbooks to Production
+        needs: detect-changes
+        if: needs.detect-changes.outputs.has-changes == 'true'
+        runs-on: [self-hosted, homelab, ansible]
+        environment: Github Actions CI
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install Ansible
+              run: |
+                  python3 -m pip install --user --quiet ansible
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+            - name: Verify Ansible installation
+              run: |
+                  export PATH="$HOME/.local/bin:$PATH"
+                  ansible --version
+
+            - name: Setup vault password
+              env:
+                  ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+                  chmod 600 /tmp/.vault_pass
+
+            - name: Apply playbooks to production
+              id: apply
+              env:
+                  ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+              run: |
+                  export PATH="$HOME/.local/bin:$PATH"
+
+                  PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
+                  INVENTORY="inventories/production/hosts.ini"
+
+                  echo "================================================"
+                  echo "Applying playbooks to production infrastructure"
+                  echo "================================================"
+                  echo ""
+                  echo "Commit: ${{ github.sha }}"
+                  echo "Author: ${{ github.event.head_commit.author.name }}"
+                  echo "Message: ${{ github.event.head_commit.message }}"
+                  echo ""
+
+                  # Initialize counters
+                  TOTAL=0
+                  PASSED=0
+                  FAILED=0
+                  RESULTS=""
+                  FAILED_PLAYBOOKS=""
+
+                  # Apply each playbook
+                  for PLAYBOOK in $(echo "$PLAYBOOKS" | jq -r '.[]'); do
+                    TOTAL=$((TOTAL + 1))
+                    echo "========================================"
+                    echo "Applying: $PLAYBOOK"
+                    echo "========================================"
+                    
+                    START_TIME=$(date +%s)
+                    
+                    if ansible-playbook \
+                      -i "$INVENTORY" \
+                      --vault-password-file=/tmp/.vault_pass \
+                      "$PLAYBOOK" 2>&1 | tee /tmp/playbook-${TOTAL}.log; then
+                      
+                      END_TIME=$(date +%s)
+                      DURATION=$((END_TIME - START_TIME))
+                      PASSED=$((PASSED + 1))
+                      
+                      # Extract hosts from playbook output
+                      HOSTS=$(grep -E "PLAY \[.*\]" /tmp/playbook-${TOTAL}.log | head -1 | sed 's/PLAY \[//' | sed 's/\].*//' || echo "N/A")
+                      
+                      RESULTS="${RESULTS}| \`$PLAYBOOK\` | ✅ Success | ${DURATION}s | $HOSTS |\n"
+                      echo ""
+                      echo "✅ SUCCESS: $PLAYBOOK (${DURATION}s)"
+                    else
+                      END_TIME=$(date +%s)
+                      DURATION=$((END_TIME - START_TIME))
+                      FAILED=$((FAILED + 1))
+                      FAILED_PLAYBOOKS="${FAILED_PLAYBOOKS}${PLAYBOOK}\n"
+                      
+                      RESULTS="${RESULTS}| \`$PLAYBOOK\` | ❌ Failed | ${DURATION}s | N/A |\n"
+                      echo ""
+                      echo "❌ FAILED: $PLAYBOOK (${DURATION}s)"
+                      echo "Continuing with remaining playbooks..."
+                    fi
+                    echo ""
+                  done
+
+                  # Save results for summary
+                  echo "total=$TOTAL" >> $GITHUB_OUTPUT
+                  echo "passed=$PASSED" >> $GITHUB_OUTPUT
+                  echo "failed=$FAILED" >> $GITHUB_OUTPUT
+                  echo -e "$RESULTS" > /tmp/apply-results.txt
+
+                  if [ -n "$FAILED_PLAYBOOKS" ]; then
+                    echo -e "$FAILED_PLAYBOOKS" > /tmp/failed-playbooks.txt
+                  fi
+
+                  echo "========================================"
+                  echo "Deployment Summary"
+                  echo "========================================"
+                  echo "Total: $TOTAL"
+                  echo "Passed: $PASSED"
+                  echo "Failed: $FAILED"
+                  echo ""
+
+                  # Fail job if any playbook failed
+                  if [ $FAILED -gt 0 ]; then
+                    echo "❌ Some playbooks failed to apply"
+                    exit 1
+                  else
+                    echo "✅ All playbooks applied successfully"
+                  fi
+
+            - name: Cleanup vault password
+              if: always()
+              run: |
+                  rm -f /tmp/.vault_pass
+
+            - name: Generate deployment summary
+              if: always()
+              run: |
+                  TOTAL="${{ steps.apply.outputs.total }}"
+                  PASSED="${{ steps.apply.outputs.passed }}"
+                  FAILED="${{ steps.apply.outputs.failed }}"
+
+                  if [ "$FAILED" -gt 0 ]; then
+                    STATUS="❌ DEPLOYMENT FAILED"
+                  else
+                    STATUS="✅ DEPLOYMENT SUCCESSFUL"
+                  fi
+
+                  cat >> $GITHUB_STEP_SUMMARY <<EOF
+                  # 🚀 Production Deployment
+
+                  ## $STATUS
+
+                  **Commit:** \`${{ github.sha }}\`  
+                  **Author:** ${{ github.event.head_commit.author.name }}  
+                  **Message:** ${{ github.event.head_commit.message }}  
+                  **Playbooks Applied:** $TOTAL  
+                  **Successful:** $PASSED  
+                  **Failed:** $FAILED
+
+                  ## Results
+
+                  | Playbook | Status | Duration | Hosts |
+                  |----------|--------|----------|-------|
+                  $(cat /tmp/apply-results.txt)
+
+                  EOF
+
+                  if [ "$FAILED" -gt 0 ]; then
+                    cat >> $GITHUB_STEP_SUMMARY <<EOF
+
+                  ## ⚠️ Failed Playbooks
+
+                  The following playbooks failed to apply:
+
+                  $(cat /tmp/failed-playbooks.txt | sed 's/^/- /')
+
+                  Please review the workflow logs for details.
+                  EOF
+                  fi
+
+                  cat >> $GITHUB_STEP_SUMMARY <<EOF
+
+                  ---
+
+                  View full logs in the workflow run above.
+                  EOF
+
+            - name: Upload playbook logs
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playbook-logs-${{ github.run_number }}
+                  path: /tmp/playbook-*.log
+                  retention-days: 30
+
+            - name: Cleanup temporary files
+              if: always()
+              run: |
+                  rm -f /tmp/apply-results.txt
+                  rm -f /tmp/failed-playbooks.txt
+                  rm -f /tmp/playbook-*.log
