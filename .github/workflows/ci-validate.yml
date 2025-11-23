@@ -71,7 +71,7 @@ jobs:
       - name: Validate playbook syntax
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          ANSIBLE_VAULT_PASSWORD_FILE: ""
+          ANSIBLE_VAULT_PASSWORD_FILE: "/dev/null"
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "Validating Ansible playbook syntax..."
@@ -107,7 +107,7 @@ jobs:
       - name: Lint playbooks
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          ANSIBLE_VAULT_PASSWORD_FILE: ""
+          ANSIBLE_VAULT_PASSWORD_FILE: "/dev/null"
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "Linting Ansible playbooks..."
