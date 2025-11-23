@@ -1,0 +1,77 @@
+- name: DCHP server
+  hosts: dns
+  become: True
+
+  tasks:
+  - name: Handle dpkg locks and repair
+    include_tasks: ../../../tasks/dpkg_lock.yaml
+
+  - name: packages and config
+    block:
+
+    - name: apt-get update
+      apt: update_cache=yes
+
+    - name: DHCP server
+      apt:
+        pkg:
+          [ isc-dhcp-server ]
+
+    - name: rndc-key-check
+      ansible.builtin.shell: cat /etc/bind/rndc.key
+      register: rndc_keyfile
+
+    - name: Failed rndc check
+      when: rndc_keyfile.stdout | length <= 0
+      fail:
+        msg: "Try running the DNS bind9 setup or checking the /etc/bind/rndc.key on remote"
+
+    - name: make conf dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: bind
+        group: bind
+        mode: 0755
+      with_items:
+        - /etc/dhcp
+        - /etc/dhcp/rndc-keys/
+
+    - name: rndc-key-copy
+      when: rndc_keyfile.stdout | length > 0
+      ansible.builtin.shell: cp /etc/bind/rndc.key /etc/dhcp/rndc-keys/rndc.key
+
+    - name: Config files
+      copy:
+        force: yes
+        src: isc-dhcp-server/{{ item  }}
+        dest: "{{ item  }}"
+        owner: root
+        group: root
+        mode: 0644
+      with_items:
+        - /etc/dhcp/dhcpd.conf
+        - /etc/dhcp/kube-nodes.conf
+        - /etc/default/isc-dhcp-server
+        - /etc/systemd/system/isc-dhcp-server.service
+
+    - name: remove LSB init
+      ignore_errors: True
+      ansible.builtin.shell: rm /etc/init.d/isc-dhcp-server
+
+    - name: Rsyslog ensure local7.* is logged to /var/log/dhcpd.log
+      ansible.builtin.lineinfile:
+        path: /etc/rsyslog.conf  # Replace with the actual path to the file you want to modify
+        line: 'local7.* /var/log/dhcpd.log'
+        state: present
+      ignore_errors: yes
+
+    - name: Enable and Start services
+      systemd:
+        enabled: yes
+        state: restarted
+        name: "{{ item }}"
+        daemon_reload: true
+      with_items:
+      - isc-dhcp-server.service
+      # - rsyslog

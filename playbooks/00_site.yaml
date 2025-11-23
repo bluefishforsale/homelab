@@ -1,0 +1,33 @@
+---
+# Complete Homelab Infrastructure Deployment
+# This is the master playbook that orchestrates all infrastructure components
+#
+# Usage:
+#   ansible-playbook playbooks/00_site.yaml
+#   ansible-playbook playbooks/00_site.yaml --check  # Dry run
+#   ansible-playbook playbooks/00_site.yaml --ask-vault-pass  # With vault
+
+- name: Deploy Complete Homelab Infrastructure
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Display deployment start message
+      ansible.builtin.debug:
+        msg: "Starting complete homelab infrastructure deployment"
+
+- name: Base System Configuration
+  ansible.builtin.import_playbook: 01_base_system.yaml
+
+- name: Core Infrastructure Services
+  ansible.builtin.import_playbook: 02_core_infrastructure.yaml
+
+- name: Ocean Server Application Services
+  ansible.builtin.import_playbook: 03_ocean_services.yaml
+
+- name: Display deployment completion message
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Deployment complete
+      ansible.builtin.debug:
+        msg: "Homelab infrastructure deployment completed successfully"

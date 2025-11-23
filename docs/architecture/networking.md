@@ -55,7 +55,6 @@ iface vmbr0 inet static
 gateway: 192.168.1.1
 dns_primary: 192.168.1.2      # BIND DNS server
 pi_hole: 192.168.1.9          # Ad-blocking DNS
-k8s_api_vip: 192.168.1.99     # Kubernetes API server VIP
 
 # Proxmox Hosts
 proxmox01: 192.168.1.106      # Primary hypervisor
@@ -64,46 +63,11 @@ proxmox02: 192.168.1.107      # Secondary hypervisor
 # Service Hosts
 ocean: 192.168.1.143          # Docker services host
 gitlab: 192.168.1.150         # GitLab server
-
-# Kubernetes Cluster
-k8s-master01: 192.168.1.101
-k8s-master02: 192.168.1.102  
-k8s-master03: 192.168.1.103
-k8s-worker01: 192.168.1.111
-k8s-worker02: 192.168.1.112
-k8s-worker03: 192.168.1.113
 ```
 
 ### Dynamic Ranges
 - **DHCP Pool**: 192.168.1.200-250 (client devices)
 - **Reserved**: 192.168.1.50-99 (future static allocations)
-
-## 🔗 Kubernetes Networking
-
-### Cluster Networking (CNI: Cilium)
-```yaml
-cluster_cidr: "10.0.0.0/16"      # Pod network range
-service_cidr: "10.0.250.0/20"    # Service network range  
-node_cidr_mask_size: 16           # Per-node pod subnet size
-```
-
-### Network Policies
-```yaml
-# Default deny-all ingress
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-```
-
-### LoadBalancer Integration
-- **MetalLB**: For bare-metal load balancer services
-- **BGP Mode**: Integration with network equipment
-- **IP Pool**: 192.168.1.160-180 for external services
 
 ## 🚀 High-Performance Features
 
@@ -145,12 +109,10 @@ graph TB
     
     subgraph "Server VLAN"
         FW --> SVC[Application Services]
-        FW --> K8S[Kubernetes Cluster]
     end
     
     subgraph "Storage VLAN"
         SVC -.-> CEPH[Ceph Cluster]
-        K8S -.-> CEPH
     end
 ```
 
@@ -201,7 +163,6 @@ curl -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$RE
 ### Service Discovery
 - **Internal**: .home domain for all internal services
 - **External**: .terrac.com domain via Cloudflare tunnels
-- **Kubernetes**: .svc.cluster.local for service mesh
 
 ## 📊 Monitoring & Observability
 

@@ -1,0 +1,184 @@
+---
+name: CI - Validate & Lint
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - "playbooks/**/*.yaml"
+      - "playbooks/**/*.yml"
+      - "files/**"
+      - "vars/**/*.yaml"
+      - ".github/workflows/**"
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - "playbooks/**/*.yaml"
+      - "playbooks/**/*.yml"
+      - "files/**"
+      - "vars/**/*.yaml"
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
+
+jobs:
+  validate-yaml:
+    name: Validate YAML Syntax
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --user --quiet pyyaml
+
+      - name: Validate YAML files
+        run: |
+          echo "Validating YAML syntax..."
+          find playbooks -name "*.yaml" -o -name "*.yml" | while read file; do
+            echo "Checking $file"
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
+          done
+          echo "✓ All YAML files are valid"
+
+  validate-ansible:
+    name: Validate Ansible Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    needs: validate-yaml
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify Ansible installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible --version
+
+      - name: Validate playbook syntax
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Create temporary vault password file
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+          echo "Validating Ansible playbook syntax..."
+          for playbook in playbooks/*.yaml; do
+            if [ -f "$playbook" ]; then
+              echo "Checking $playbook"
+              ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
+            fi
+          done
+
+          # Also check individual playbooks
+          find playbooks/individual -name "*.yaml" | while read playbook; do
+            echo "Checking $playbook"
+            ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
+          done
+
+          # Clean up
+          rm -f /tmp/.vault_pass
+
+          echo "✓ All Ansible playbooks have valid syntax"
+
+  lint-ansible:
+    name: Lint Ansible Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    needs: validate-ansible
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible and ansible-lint
+        run: |
+          python3 -m pip install --user --quiet ansible ansible-lint
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Lint playbooks
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "Linting Ansible playbooks..."
+          ansible-lint playbooks/*.yaml || true
+          echo "✓ Ansible lint complete"
+
+  validate-templates:
+    name: Validate Jinja2 Templates
+    runs-on: [self-hosted, homelab, ansible]
+    needs: validate-yaml
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Jinja2
+        run: |
+          python3 -m pip install --user --quiet jinja2
+
+      - name: Check Jinja2 templates
+        run: |
+          echo "Validating Jinja2 templates..."
+          find files -name "*.j2" | while read template; do
+            echo "Checking $template"
+            python3 -c "from jinja2 import Template; Template(open('$template').read())" || exit 1
+          done
+          echo "✓ All Jinja2 templates are valid"
+
+  security-scan:
+    name: Security Scan
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "Scanning for potential hardcoded credentials..."
+          echo "⚠️  Review the following matches (if any):"
+          grep -r -i "password\|secret\|token" playbooks/ files/ --include="*.yaml" --include="*.yml" | \
+            grep -v "vault" | \
+            grep -v "ask-vault-pass" | \
+            grep -v "{{ " || echo "✓ No obvious hardcoded credentials found"
+
+          echo ""
+          echo "Note: All secrets should be in encrypted vault files"
+
+  check-vault:
+    name: Verify Vault Files
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check vault encryption
+        run: |
+          echo "Checking vault files are encrypted..."
+          for vault in vault/*.yaml; do
+            if [ -f "$vault" ] && [ "$vault" != "vault/secrets.yaml.template" ]; then
+              if ! head -n 1 "$vault" | grep -q "ANSIBLE_VAULT"; then
+                echo "ERROR: $vault is not encrypted!"
+                exit 1
+              else
+                echo "✓ $vault is encrypted"
+              fi
+            fi
+          done
+          echo "✓ All vault files are properly encrypted"

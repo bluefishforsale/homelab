@@ -1,0 +1,66 @@
+---
+- name: Configure systemd service for bazarr
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    image: linuxserver/bazarr
+    version: latest
+    service: bazarr
+    data: /data01
+    files: ../../../../files/ocean-bazarr
+    complete: "{{ data }}/complete"
+    home: "{{ data }}/services/{{ service }}"
+    port: 6767
+    user: media
+
+  tasks:
+
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure directory exists with correct ownership and permissions
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - config
+
+  - name: Create config files
+    ansible.builtin.template:
+      src: "{{ files }}/config.ini.j2"
+      dest: "{{ home }}/config/config.ini"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  - name: Create systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - bazarr.service
+    notify:
+    - Reload systemd daemon
+    - Restart service
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart service
+    ansible.builtin.systemd:
+      name: bazarr.service
+      state: restarted

@@ -1,0 +1,120 @@
+---
+# Proxmox VM creation for GitHub Actions runner host
+# Creates a single dedicated VM on node005 for hosting ephemeral Docker-based runners
+# Uses the same patterns as kubeadm_ansible/00_create_vms.yaml
+
+- name: Create GitHub Actions runner VM on Proxmox
+  hosts: node005
+  become: true
+  gather_facts: true
+  vars:
+    # VM configuration
+    runner_vm_id: 5000
+    runner_vm_name: gh-runner-01
+    runner_vm_hostname: gh-runner-01
+    runner_vm_cores: 16
+    runner_vm_memory_mb: 65536  # 64 GB
+    runner_vm_disk_size_increase: "+32G"  # Add storage beyond template default
+    runner_vm_template_id: 9999  # Clone from this template (same as k8s VMs)
+    runner_vm_onboot: 1  # Start on Proxmox host boot
+    
+    # Network configuration (adjust to match your network)
+    # If you use DNS, resolve IP dynamically; otherwise set static IP
+    runner_vm_ip: "{{ lookup('dig', runner_vm_hostname + '.home', errors='ignore') | default('192.168.1.250', true) }}"
+    runner_vm_netmask: 24
+    runner_vm_gateway: 192.168.1.1
+    runner_vm_nameserver: 192.168.1.2
+
+  tasks:
+    - name: Download SSH keys for runner VM
+      ansible.builtin.get_url:
+        url: "https://github.com/bluefishforsale.keys"
+        dest: "/root/ssh.keys"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Check runner VM status
+      ansible.builtin.command: "qm status {{ runner_vm_id }}"
+      register: runner_vm_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Clone template for runner VM
+      ansible.builtin.command: "qm clone {{ runner_vm_template_id }} {{ runner_vm_id }}"
+      when: runner_vm_status.rc != 0
+      register: clone_result
+
+    - name: Set runner VM name and network configuration
+      ansible.builtin.shell: |
+        qm set {{ runner_vm_id }} --name {{ runner_vm_name }}
+        qm set {{ runner_vm_id }} --ipconfig0 ip={{ runner_vm_ip }}/{{ runner_vm_netmask }},gw={{ runner_vm_gateway }}
+        qm set {{ runner_vm_id }} --nameserver {{ runner_vm_nameserver }}
+        qm set {{ runner_vm_id }} --onboot {{ runner_vm_onboot }}
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set SSH keys for runner VM
+      ansible.builtin.shell: "qm set {{ runner_vm_id }} --sshkeys /root/ssh.keys"
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Resize runner VM disk
+      ansible.builtin.shell: "qm resize {{ runner_vm_id }} scsi0 {{ runner_vm_disk_size_increase }}"
+      when: runner_vm_status.rc != 0
+      changed_when: true
+
+    - name: Set runner VM CPU cores
+      ansible.builtin.shell: "qm set {{ runner_vm_id }} --cores {{ runner_vm_cores }}"
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set runner VM memory
+      ansible.builtin.shell: "qm set {{ runner_vm_id }} --memory {{ runner_vm_memory_mb }}"
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set runner VM description
+      ansible.builtin.shell: |
+        qm set {{ runner_vm_id }} --description "GitHub Actions Runner Host - Ephemeral Docker-based runners"
+      when: runner_vm_status.rc != 0
+      changed_when: true
+
+    - name: Start runner VM
+      ansible.builtin.command: "qm start {{ runner_vm_id }}"
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Display boot wait message
+      ansible.builtin.debug:
+        msg:
+          - "Starting runner VM and waiting for boot..."
+          - "This typically takes 1-3 minutes for cloud-init and SSH to initialize"
+          - "Maximum wait time: 5 minutes"
+          - "VM IP: {{ runner_vm_ip }}"
+      when: runner_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+
+    - name: Wait for runner VM to boot and accept SSH connections (max 5 minutes)
+      ansible.builtin.wait_for:
+        host: "{{ runner_vm_ip }}"
+        port: 22
+        delay: 10
+        timeout: 300  # 5 minutes - VM boot + cloud-init can take 1-3 minutes
+        state: started
+        msg: "Waiting for {{ runner_vm_ip }}:22 to become available..."
+      when: runner_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+
+    - name: Display runner VM information
+      ansible.builtin.debug:
+        msg:
+          - "Runner VM created successfully"
+          - "VM ID: {{ runner_vm_id }}"
+          - "VM Name: {{ runner_vm_name }}"
+          - "IP Address: {{ runner_vm_ip }}"
+          - "vCPUs: {{ runner_vm_cores }}"
+          - "Memory: {{ runner_vm_memory_mb }} MB ({{ (runner_vm_memory_mb / 1024) | int }} GB)"
+          - ""
+          - "Next steps:"
+          - "1. Add {{ runner_vm_hostname }} to your inventory under [github_runners] group"
+          - "2. Configure group_vars/github_runners.yml with GitHub token and settings"
+          - "3. Run: ansible-playbook github-docker-runners.yml"

@@ -1,0 +1,42 @@
+[mysqld]
+# Basic Settings
+max_connections = 100
+connect_timeout = 10
+wait_timeout = 600
+max_allowed_packet = 64M
+thread_cache_size = 128
+sort_buffer_size = 4M
+bulk_insert_buffer_size = 16M
+tmp_table_size = 64M
+max_heap_table_size = 64M
+
+# InnoDB Settings (WordPress optimized)
+innodb_buffer_pool_size = 1G
+innodb_buffer_pool_instances = 4
+innodb_log_file_size = 256M
+innodb_log_buffer_size = 16M
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+innodb_file_per_table = 1
+innodb_open_files = 400
+
+# Query Cache (deprecated in MySQL 8.0+)
+# query_cache_type = 1
+# query_cache_limit = 2M
+# query_cache_size = 64M
+
+# Logging
+log_error = /var/log/mysql/error.log
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+
+# Character Set
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+
+# Binary Logging (disabled for better write performance)
+skip_log_bin
+
+# Performance Schema
+performance_schema = ON

@@ -1,0 +1,179 @@
+---
+- name: Plex and companion docker systemd services
+  hosts: ocean
+  become: true
+  
+  vars_files:
+    - ../../../../vault/secrets.yaml
+
+  vars:
+    service: plex
+    image: plexinc/pms-docker
+    version: latest
+    plex_claim: "{{ media_services.plex.claim_token }}"
+    plex_token: "{{ media_services.plex.api_key }}"
+    plex_ports_tcp:
+    - 3005
+    - 8324
+    - 32400
+    - 32469
+    plex_ports_udp:
+    - 32410
+    - "32412-34414"
+    devices:
+    - /dev/nvidia-modeset
+    - /dev/nvidia0
+    - /dev/nvidiactl
+    exporter_service: plex-exporter
+    exporter_image: ghcr.io/axsuul/plex-media-server-exporter
+    exporter_version: latest
+    exporter_port: 9594
+    meta_manager_service: plex-meta-manager
+    meta_manager_image: meisnate12/plex-meta-manager
+    meta_manager_version: latest
+    data: /data01
+    files: ../../../../files/ocean-plex
+    complete: "{{ data }}/complete"
+    plex_home: "{{ data }}/services/{{ service }}"
+    meta_manager_home: "{{ data }}/services/{{ meta_manager_service }}"
+    ramdisk: /mnt/ramdisk
+    user: media
+    uid: 1001
+
+  tasks:
+
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ plex_home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure subdirs exist
+    ansible.builtin.file:
+      path: "{{ plex_home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - "Profiles"
+    - "config/Library/Application Support/Plex Media Server"
+
+  - name: Create preferences file
+    ansible.builtin.template:
+      src: "{{ files }}/config/preferences.xml"
+      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
+
+  - name: Copy all files from Profiles directory
+    ansible.builtin.copy:
+      src: "{{ files }}/Profiles/"
+      dest: "{{ plex_home }}/Profiles/"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      directory_mode: '0755'
+    with_fileglob:
+    - "{{ files }}/Profiles/*"
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
+
+  - name: Create plex systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - plex.service
+    notify:
+    - Reload systemd daemon
+    - Restart plex service
+
+  - name: Create exporter systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - plex-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart exporter service
+
+  - name: Ensure meta-manager basedir exists
+    ansible.builtin.file:
+      path: "{{ meta_manager_home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Create meta_manager_home preferences file
+    ansible.builtin.template:
+      src: "{{ files }}/meta-manager/config.yml"
+      dest: "{{ meta_manager_home }}/config/config.yml"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
+
+  - name: Create meta-manager docker-compose files
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item.src }}"
+      dest: "{{ meta_manager_home }}/{{ item.dest }}"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    with_items:
+    - { src: "plex-meta-manager-compose.yml.j2", dest: "docker-compose.yml" }
+    - { src: "plex-meta-manager.env.j2", dest: ".env" }
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
+
+  - name: Create meta-manager docker-compose systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - plex-meta-manager.service
+    notify:
+    - Reload systemd daemon
+    - Restart meta-manager service
+
+  - name: Enable meta-manager service
+    ansible.builtin.systemd:
+      name: plex-meta-manager.service
+      enabled: true
+      state: started
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart plex service
+    ansible.builtin.systemd:
+      name: plex.service
+      state: restarted
+
+  - name: Restart exporter service
+    ansible.builtin.systemd:
+      name: plex-exporter.service
+      state: restarted
+
+  - name: Restart meta-manager service
+    ansible.builtin.systemd:
+      name: plex-meta-manager.service
+      state: restarted

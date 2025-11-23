@@ -1,0 +1,133 @@
+---
+# Cloudflared tunnel configuration
+cloudflared:
+  tunnels:
+    # Main tunnel for ocean - handles all web apps + ocean SSH
+    main:
+      id: "1808d97e-fc1b-4244-8233-f076ff6f9e8a"
+      credentials_file: "1808d97e-fc1b-4244-8233-f076ff6f9e8a.json"
+      ingress:
+        # Media services (running on ocean - 192.168.1.143)
+        - hostname: "overseerr.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:5055"
+        - hostname: "nzbget.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8901"
+        - hostname: "sonarr.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8902"
+        - hostname: "radarr.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8903"
+        - hostname: "bazarr.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:6767"
+        - hostname: "tautulli.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8905"
+        - hostname: "tdarr.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8265"
+        
+        # Monitoring services (running on ocean - 192.168.1.143)
+        - hostname: "grafana.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8910"
+        - hostname: "prometheus.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:9090"
+        - hostname: "cadvisor.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8912"
+        
+        # LLM services (running on ocean - 192.168.1.143)
+        - hostname: "n8n.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:5678"
+        - hostname: "open-webui.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:3000"
+        - hostname: "comfyui.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8188"
+        
+        # Cloud services (running on ocean - 192.168.1.143)
+        - hostname: "nextcloud.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8081"
+
+        # Surveillance services (running on ocean - 192.168.1.143)
+        - hostname: "frigate.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:5000"
+
+        # CMS services (running on ocean - 192.168.1.143)
+        - hostname: "tina.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8084"
+
+        # Blog services (running on ocean - 192.168.1.143)
+        # Route through nginx for proper X-Forwarded-Proto handling
+        - hostname: "blog.saetnere.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
+        # Music services (running on ocean - 192.168.1.143)
+        - hostname: "spotube.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:3100"
+        - hostname: "navidrome.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:4533"
+
+        # Management services (running on ocean - 192.168.1.143)
+        - hostname: "portainer.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8000"
+        - hostname: "homeassistant.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8123"
+        
+        # SSH Access for all hosts (dynamically generated from inventory)
+        # This section will be populated by the template from Ansible inventory
+        
+        # Special configurations
+        - hostname: "unifi.terrac.com"
+          service_type: "https"
+          service_url: "https://192.168.1.10"
+          origin_request:
+            no_tls_verify: true
+            origin_server_name: "unifi"
+        
+        # Ocean SSH access (local)
+        - hostname: "ssh-ocean.terrac.com"
+          service_url: "ssh://127.0.0.1:22"
+        
+        # Catch-all rule (must be last)
+        - hostname: "*"
+          service_type: "http"
+          port: 80
+
+    # SSH-only tunnels for other hosts (dynamically created)
+    ssh_only:
+      # Tunnel ID will be set dynamically per host via ssh_tunnel_id variable
+      id: ""  # Will be overridden by ssh_tunnel_id fact
+      credentials_file: ""  # Will be overridden by ssh_tunnel_id fact
+      ingress:
+        # SSH access for this specific host
+        - hostname: "ssh-{{ inventory_hostname }}.terrac.com"
+          service_url: "ssh://127.0.0.1:22"
+        
+        # Catch-all rule (required)
+        - hostname: "*"
+          service_type: "http_status:404"
+
+# Cloudflare API configuration
+# Priority: 1. Command line (-e), 2. Environment variables, 3. Local secrets file
+# Supports both API Token (Bearer) and API Key (Email + Key) methods
+cloudflare:
+  api_email: "{{ lookup('env', 'CLOUDFLARE_API_EMAIL') or cloudflare_api_email | default('') }}"
+  api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') or cloudflare_api_key | default('') }}"
+  api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') or cloudflare_api_token | default('') }}"
+  zone_id: "{{ lookup('env', 'CLOUDFLARE_ZONE_ID') or cloudflare_zone_id | default('') }}"

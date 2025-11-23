@@ -1,0 +1,144 @@
+---
+# Docker Compose configuration for ephemeral GitHub Actions runners
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# This compose file creates {{ github_runner_count }} ephemeral runner containers.
+# Each runner:
+#   - Registers as a NEW ephemeral runner on startup
+#   - Runs ONE job
+#   - Exits after the job completes
+#   - Is restarted by Docker (restart: always)
+#   - Re-registers as a fresh ephemeral runner
+#
+# This ensures each job runs on a clean, fresh runner instance.
+
+version: '3.8'
+
+services:
+{% for runner_index in range(1, github_runner_count + 1) %}
+  runner_{{ runner_index }}:
+    image: {{ github_runner_image }}:{{ github_runner_version }}
+    container_name: github-runner-{{ runner_index }}
+    
+    # CRITICAL: restart: always ensures the container restarts after each job
+    # This is what makes ephemeral runners work:
+    #   job completes → runner exits → Docker restarts → new registration
+    restart: always
+    
+    environment:
+      # GitHub repository/organization URL
+      # For myoung34/github-runner image, use REPO_URL for both org and repo scope
+{% if github_scope == 'org' %}
+      REPO_URL: "https://github.com/{{ github_org }}"
+      ORG_NAME: "{{ github_org }}"
+{% else %}
+      REPO_URL: "https://github.com/{{ github_repo }}"
+{% endif %}
+      
+      # Registration token - loaded from mounted file
+      # Token file: {{ github_runners_base_dir }}/.github_token
+      # To update token: update file and restart service
+      # myoung34/github-runner uses ACCESS_TOKEN
+      ACCESS_TOKEN: "${GITHUB_TOKEN}"
+      
+      # Runner name - unique per container
+      RUNNER_NAME: "{{ ansible_hostname }}-runner-{{ runner_index }}"
+      
+      # Runner labels - determines which workflows can use this runner
+      # Workflows target runners using: runs-on: [self-hosted, homelab, ...]
+      LABELS: "{{ github_runner_labels | join(',') }}"
+      
+      # Ephemeral mode configuration
+      # CRITICAL: This setting makes the runner ephemeral (one job then exit)
+{% if github_runner_ephemeral %}
+      # Ephemeral runners automatically de-register after running one job
+      # The container will exit and Docker will restart it (restart: always)
+      EPHEMERAL: "true"
+{% else %}
+      EPHEMERAL: "false"
+{% endif %}
+      
+      # Runner scope (for organization-level runners)
+{% if github_scope == 'org' %}
+      RUNNER_SCOPE: "org"
+{% endif %}
+      
+      # Working directory inside container
+      RUNNER_WORKDIR: "/runner/_work"
+    
+    volumes:
+      # GitHub token file (shared by all runners, read-only)
+      - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro
+      
+      # Runner working directory on host
+      # Each runner gets its own directory to avoid conflicts
+      - {{ github_runners_base_dir }}/runner-{{ runner_index | string }}:/runner/_work
+      
+{% if github_runner_mount_docker_socket %}
+      # Docker socket mounting for Docker-on-host
+      # RECOMMENDED: Mount the host's Docker socket to allow job steps to run Docker commands
+      # This is more efficient than Docker-in-Docker and uses the host's Docker daemon
+      # 
+      # Security note: This gives containers access to the Docker daemon
+      # Ensure only trusted code runs in your workflows
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+{% endif %}
+{% if github_runner_ssh_key_dir is defined and github_runner_ssh_key_dir | length > 0 %}
+      # SSH keys for Ansible access to homelab
+      # Mount the runner user's SSH directory to allow SSH to other hosts
+      # Useful for running Ansible playbooks against your homelab inventory
+      - {{ github_runner_ssh_key_dir }}:/root/.ssh:ro
+      
+{% endif %}
+    
+    # Resource limits (optional)
+{% if github_runner_cpus is defined or github_runner_memory is defined %}
+    deploy:
+      resources:
+        limits:
+{% if github_runner_cpus is defined %}
+          cpus: "{{ github_runner_cpus }}"
+{% endif %}
+{% if github_runner_memory is defined %}
+          memory: "{{ github_runner_memory }}"
+{% endif %}
+{% endif %}
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network mode
+    network_mode: bridge
+
+{% endfor %}
+
+# Notes on Docker-in-Docker (DinD) vs Docker-on-host:
+#
+# Current configuration: Docker-on-host (recommended)
+#   - Mounts /var/run/docker.sock from host
+#   - Job steps use host's Docker daemon
+#   - More efficient, less resource intensive
+#   - Images built in jobs are available on host
+#   - Set github_runner_mount_docker_socket: false to disable
+#
+# Alternative: Full Docker-in-Docker
+#   - Run a separate Docker daemon inside each runner container
+#   - More isolated but heavier
+#   - To enable:
+#     1. Set github_runner_mount_docker_socket: false
+#     2. Add privileged: true to each service
+#     3. Ensure runner image supports DinD (has dockerd)
+#     4. Add volume for Docker data: - /var/lib/docker
+#   - Example:
+#       privileged: true
+#       volumes:
+#         - runner-{% raw %}{{ runner_index }}{% endraw %}-docker:/var/lib/docker

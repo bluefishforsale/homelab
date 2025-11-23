@@ -1,0 +1,100 @@
+---
+- name: Install Pi-hole on Debian 12
+  hosts: pihole
+  become: true
+  vars:
+    pihole_admin_password: "admin"
+
+  tasks:
+    ############  fix dpkg if things went sideways #####################
+    - name: Handle dpkg locks and repair
+      include_tasks: ../../../tasks/dpkg_lock.yaml
+
+    ############  apt install #####################
+    - name: update cache once
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - procps
+        - lsb-release
+        - git
+
+    - name: Git clone Pi-hole
+      ansible.builtin.git:
+        repo: https://github.com/pi-hole/pi-hole.git
+        dest: /opt/pi-hole
+        accept_hostkey: true
+        force: true
+        depth: 1
+    
+    - name: Create /etc/pihole directory
+      file:
+        path: /etc/pihole
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create /etc/pihole/setupVars.conf with specified variables
+      template:
+        src: ../../../../files/pihole/etc/setupVars.conf.j2
+        dest: /etc/pihole/setupVars.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart pihole-FTL
+
+    - name: Create /etc/dnsmasq.d directory
+      file:
+        path: /etc/dnsmasq.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Configure dnsmasq to forward .home domain to BIND9
+      copy:
+        src: ../../../../files/pihole/etc/dnsmasq.d/02-local-dns.conf
+        dest: /etc/dnsmasq.d/02-local-dns.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart pihole-FTL
+
+    - name: Check if Pi-hole is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/pihole
+      register: pihole_installed
+
+    - name: Install Pi-hole
+      ansible.builtin.command: /opt/pi-hole/automated\ install/basic-install.sh --unattended
+      when: not pihole_installed.stat.exists
+
+    - name: Update Pi-Hole
+      ansible.builtin.command: pihole -u
+      failed_when: false
+      changed_when: false
+
+    - name: Enable Pi-hole at startup
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        enabled: true
+
+    - name: Set Pi-hole admin password
+      ansible.builtin.command: pihole -a -p "{{ pihole_admin_password }}"
+      environment:
+        PIHOLE_SKIP_OS_CHECK: 1
+      no_log: true
+
+  handlers:
+    - name: Restart pihole-FTL
+      ansible.builtin.service:
+        name: pihole-FTL
+        state: restarted
+

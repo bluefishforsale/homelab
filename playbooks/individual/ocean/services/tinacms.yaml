@@ -1,0 +1,108 @@
+---
+- name: Deploy TinaCMS Next.js Blog using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+
+  vars:
+    service: tinacms
+    image: bluefishforsale/tinacms-nextjs
+    version: sha-70ff8b7
+    port_int: 3000
+    port_ext: 8084
+    data: /data01
+    files: ../../../../files/tinacms
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Ensure content subdirectory exists for optional persistent storage
+    ansible.builtin.file:
+      path: "{{ home }}/content"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Create Docker Hub token file for systemd service
+    ansible.builtin.copy:
+      content: "{{ development.docker_registry.password }}"
+      dest: "{{ home }}/.dockerhub_token"
+      owner: root
+      group: root
+      mode: '0600'
+    no_log: true
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: docker_compose_config
+    notify:
+    - Force container recreation when ANY configuration changes
+
+  - name: Create tinacms environment file
+    ansible.builtin.template:
+      src: "{{ files }}/tinacms.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: tinacms_env
+    notify:
+    - Force container recreation when ANY configuration changes
+
+  - name: Show what configuration files changed
+    ansible.builtin.debug:
+      msg: "Configuration files have been updated - container will be recreated"
+    when: docker_compose_config.changed or tinacms_env.changed
+
+  - name: Create tinacms systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/tinacms.service.j2"
+      dest: "/etc/systemd/system/tinacms.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart tinacms service
+  
+  - name: Enable tinacms service
+    ansible.builtin.systemd:
+      name: tinacms.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart tinacms service
+    ansible.builtin.systemd:
+      name: tinacms.service
+      state: restarted
+
+  - name: Force container recreation when ANY configuration changes
+    ansible.builtin.shell: |
+      cd {{ home }}
+      echo "Recreating container due to configuration changes..."
+      docker-compose down --timeout 30
+      docker-compose up -d --force-recreate
+      echo "Container recreation completed"

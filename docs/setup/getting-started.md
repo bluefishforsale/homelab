@@ -50,7 +50,6 @@ Before starting your homelab deployment, ensure you have the following prerequis
 1. [Docker Host Setup](#docker-host-setup)
 2. [Media Services Stack](#media-services)
 3. [AI/ML Services](#ai-ml-services)
-4. [Kubernetes Cluster](#kubernetes-cluster)
 
 ### Phase 4: Advanced Services
 1. [Cloudflare Tunnels](#cloudflare-tunnels)
@@ -516,43 +515,6 @@ ansible-playbook -i inventory.ini playbook_ocean_prometheus.yaml         # Monit
 ansible-playbook -i inventory.ini playbook_ocean_grafana.yaml           # Dashboards
 ```
 
-### Kubernetes Cluster
-
-#### 1. Create Kubernetes VMs
-```bash
-# Create 6 VMs for Kubernetes cluster
-for i in {101..103}; do
-  qm clone 9000 $i --name k8s-master0$(($i-100)) --storage local-lvm
-  qm set $i --ipconfig0 ip=192.168.1.$i/24,gw=192.168.1.1
-  qm set $i --memory 4096 --cores 2
-done
-
-for i in {111..113}; do  
-  qm clone 9000 $i --name k8s-worker0$(($i-110)) --storage local-lvm
-  qm set $i --ipconfig0 ip=192.168.1.$i/24,gw=192.168.1.1
-  qm set $i --memory 8192 --cores 4
-done
-
-# Start all Kubernetes VMs
-for i in {101..103} {111..113}; do qm start $i; done
-```
-
-#### 2. Deploy Kubernetes
-```bash
-# Deploy base packages and configuration
-ansible-playbook -i inventory.ini -l k8s playbook_base_packages.yaml
-ansible-playbook -i inventory.ini -l k8s playbook_base_host_settings.yaml
-ansible-playbook -i inventory.ini -l k8s playbook_base_users.yaml
-
-# Deploy Kubernetes step by step
-ansible-playbook -i inventory.ini playbook_kube_00.1_gen_pki.yaml
-ansible-playbook -i inventory.ini playbook_kube_00.2_gen_kubeconfigs.yaml
-# ... continue with remaining kube playbooks in sequence
-
-# Or deploy all at once (not recommended for first deployment)
-ls -1 playbook_kube_* | xargs -n1 -I% ansible-playbook -i inventory.ini %
-```
-
 ---
 
 ## 🌐 Phase 4: Advanced Services  
@@ -606,10 +568,6 @@ curl -f http://192.168.1.143:3000                    # Open WebUI
 # Test DNS resolution
 nslookup gitlab.home 192.168.1.2
 nslookup ocean.home 192.168.1.9
-
-# Test Kubernetes cluster
-kubectl get nodes
-kubectl get pods --all-namespaces
 ```
 
 ### Performance Validation
