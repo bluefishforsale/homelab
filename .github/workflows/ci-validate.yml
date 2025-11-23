@@ -71,6 +71,7 @@ jobs:
       - name: Validate playbook syntax
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ANSIBLE_VAULT_PASSWORD_FILE: ""
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "Validating Ansible playbook syntax..."
