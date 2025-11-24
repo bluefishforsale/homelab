@@ -215,7 +215,7 @@ jobs:
           for i in {1..60}; do
             if nc -zv -w 5 $VM_IP 22 2>/dev/null; then
               echo "SSH is ready on $VM_IP"
-              sleep 10  # Extra time for cloud-init to complete
+              sleep 30  # Extra time for cloud-init to complete
               break
             fi
             if [ $i -eq 60 ]; then
