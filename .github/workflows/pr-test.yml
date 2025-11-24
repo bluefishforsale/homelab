@@ -179,8 +179,10 @@ jobs:
           ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --cores 4"
           ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --memory 2048"
           ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --onboot 0"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --ipconfig0 ip=192.168.1.25/24,gw=192.168.1.1"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --nameserver 192.168.1.2"
           ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --description 'CI Test VM for PR #${{ github.event.pull_request.number }}'"
-          echo "VM configured"
+          echo "VM configured with static IP 192.168.1.25"
 
       - name: Set SSH keys
         run: |
@@ -196,24 +198,15 @@ jobs:
           ssh -F $SSH_CONFIG node005.home "qm start ${{ steps.calc-vmid.outputs.vmid }}"
           echo "VM started, waiting for boot..."
 
-      - name: Wait for VM to get IP address
+      - name: Set VM IP
         id: get-ip
         run: |
-          echo "Waiting for VM to boot and get IP address..."
-          for i in {1..60}; do
-            sleep 5
-            VM_IP=$(ssh -F $SSH_CONFIG node005.home "qm guest cmd ${{ steps.calc-vmid.outputs.vmid }} network-get-interfaces 2>/dev/null" | jq -r '.[] | select(.name == "eth0" or .name == "ens18") | ."ip-addresses"[]? | select(."ip-address-type" == "ipv4") | ."ip-address"' 2>/dev/null | grep -v "^127\." | head -n1 || true)
-            if [ -n "$VM_IP" ]; then
-              echo "ip=$VM_IP" >> $GITHUB_OUTPUT
-              echo "VM IP address: $VM_IP"
-              break
-            fi
-            if [ $i -eq 60 ]; then
-              echo "ERROR: Timeout waiting for VM IP address"
-              exit 1
-            fi
-            echo "Attempt $i/60: No IP yet, waiting..."
-          done
+          # Test VM uses static IP configured via cloud-init
+          VM_IP="192.168.1.25"
+          VM_HOSTNAME="gh-test-vm.home"
+          echo "ip=$VM_IP" >> $GITHUB_OUTPUT
+          echo "hostname=$VM_HOSTNAME" >> $GITHUB_OUTPUT
+          echo "Test VM configured with static IP: $VM_IP ($VM_HOSTNAME)"
 
       - name: Wait for SSH to be ready
         run: |
