@@ -21,10 +21,13 @@ Developer Workflow:
 - **Proxmox Host:** node005.home
 - **Template:** VMID 9999 (same as GitHub runners)
 - **Resources:** 4 cores, 2GB RAM
-- **Network:** 192.168.1.x (flat network, DHCP)
+- **Network:** Static IP 192.168.1.25 (configured via cloud-init)
+- **Hostname:** gh-test-vm.home
+- **DNS Record:** gh-test-vm.home → 192.168.1.25
 - **SSH Keys:** Downloaded from github.com/bluefishforsale.keys
 - **Naming:** `ci-test-pr-{PR_NUMBER}` (e.g., `ci-test-pr-123`)
 - **VMID:** 8000 + (PR_NUMBER % 1000)
+- **Note:** Only one test VM runs at a time (reuses same IP/hostname)
 
 ## Prerequisites
 
