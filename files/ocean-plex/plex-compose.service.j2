@@ -1,0 +1,40 @@
+[Unit]
+Description=Plex Media Server (Docker Compose)
+After=docker.service zfs-mount.service zfs-import.target network-online.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ plex_home }}
+User={{ user }}
+Group={{ user }}
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Start service
+ExecStart=/usr/bin/docker compose -f {{ plex_home }}/docker-compose.yml up -d
+
+# Stop service
+ExecStop=/usr/bin/docker compose -f {{ plex_home }}/docker-compose.yml down
+
+# Reload service
+ExecReload=/usr/bin/docker compose -f {{ plex_home }}/docker-compose.yml restart
+
+# Timeouts
+TimeoutStartSec=600
+TimeoutStopSec=600
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

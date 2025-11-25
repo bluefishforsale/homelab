@@ -1,0 +1,449 @@
+---
+name: PR - Test Playbooks on VM
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - "playbooks/**/*.yaml"
+      - "playbooks/**/*.yml"
+      - "files/**"
+      - "roles/**"
+      - "vars/**/*.yaml"
+      - "group_vars/**"
+      - ".github/workflows/pr-test.yml"
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
+  PROXMOX_NODE: "node005"
+  PROXMOX_TEMPLATE_ID: "9999"
+
+jobs:
+  detect-changes:
+    name: Detect Changed Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      playbooks: ${{ steps.find-playbooks.outputs.playbooks }}
+      has-changes: ${{ steps.find-playbooks.outputs.has-changes }}
+      playbook-count: ${{ steps.find-playbooks.outputs.count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find changed playbooks
+        id: find-playbooks
+        run: |
+          echo "Detecting changed files..."
+
+          # Get all changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+
+          # Find directly changed playbooks
+          PLAYBOOKS=$(echo "$CHANGED_FILES" | grep -E '^playbooks/(individual|tasks)/.*\.ya?ml$|^playbooks/0[0-9]_.*\.ya?ml$' || true)
+
+          # If shared resources changed, add orchestrator playbooks
+          if echo "$CHANGED_FILES" | grep -qE '^(roles/|group_vars/|files/|vars/)'; then
+            echo "Shared resources changed, adding orchestrator playbooks..."
+            PLAYBOOKS+=$'\n'playbooks/01_base_system.yaml
+            PLAYBOOKS+=$'\n'playbooks/02_core_infrastructure.yaml
+            PLAYBOOKS+=$'\n'playbooks/03_ocean_services.yaml
+          fi
+
+          # Deduplicate and filter out task playbooks (no hosts directive)
+          PLAYBOOKS=$(echo "$PLAYBOOKS" | sort -u | grep -v '^playbooks/tasks/' | grep -v '^$' || true)
+
+          # If no playbooks changed, use default test playbook
+          if [ -z "$PLAYBOOKS" ] || [ "$PLAYBOOKS" = "" ]; then
+            echo "No playbooks changed, using default test playbook..."
+            PLAYBOOKS="playbooks/individual/base/packages.yaml"
+          fi
+
+          # Convert to JSON array
+          PLAYBOOK_JSON=$(echo "$PLAYBOOKS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          # Count non-empty lines
+          PLAYBOOK_COUNT=$(echo "$PLAYBOOKS" | wc -l | tr -d ' ')
+
+          echo "Playbooks to test:"
+          echo "$PLAYBOOKS"
+          echo ""
+          echo "playbooks=$PLAYBOOK_JSON" >> $GITHUB_OUTPUT
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "count=$PLAYBOOK_COUNT" >> $GITHUB_OUTPUT
+
+          echo "Found $PLAYBOOK_COUNT playbook(s) to test"
+
+  provision-vm:
+    name: Provision Test VM
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      vm-id: ${{ steps.calc-vmid.outputs.vmid }}
+      vm-ip: ${{ steps.get-ip.outputs.ip }}
+      vm-name: ${{ steps.calc-vmid.outputs.vmname }}
+    steps:
+      - name: Setup SSH key for Proxmox access
+        env:
+          PROXMOX_SSH_KEY: ${{ secrets.PROXMOX_SSH_KEY }}
+        run: |
+          # Use runner work directory (writable)
+          mkdir -p ${{ runner.temp }}/.ssh
+
+          # Debug: Check what we're receiving
+          echo "Secret length: ${#PROXMOX_SSH_KEY}"
+          echo "Secret first 50 chars: ${PROXMOX_SSH_KEY:0:50}"
+
+          # Decode base64 secret and write to key file
+          echo "$PROXMOX_SSH_KEY" | base64 -d > ${{ runner.temp }}/.ssh/proxmox_key
+          chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+
+          # Debug: Verify key format
+          echo "Key file size: $(wc -c < ${{ runner.temp }}/.ssh/proxmox_key) bytes"
+          echo "Key file lines: $(wc -l < ${{ runner.temp }}/.ssh/proxmox_key)"
+          echo "First line: $(head -n1 ${{ runner.temp }}/.ssh/proxmox_key)"
+          echo "Last line: $(tail -n1 ${{ runner.temp }}/.ssh/proxmox_key)"
+
+          # Try to validate the key format with ssh-keygen
+          ssh-keygen -l -f ${{ runner.temp }}/.ssh/proxmox_key 2>&1 || echo "Key validation failed"
+
+          # Create SSH config in temp directory
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
+          Host node005.home
+            User root
+            IdentityFile ${{ runner.temp }}/.ssh/proxmox_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ${{ runner.temp }}/.ssh/config
+          # Use temp SSH config for all SSH commands
+          echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
+          echo "SSH key configured for Proxmox access"
+
+      - name: Calculate VM ID and name
+        id: calc-vmid
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          VMID=$((8000 + (PR_NUMBER % 1000)))
+          VMNAME="ci-test-pr-${PR_NUMBER}"
+          echo "vmid=$VMID" >> $GITHUB_OUTPUT
+          echo "vmname=$VMNAME" >> $GITHUB_OUTPUT
+          echo "VM ID: $VMID"
+          echo "VM Name: $VMNAME"
+
+      - name: Download GitHub SSH keys
+        run: |
+          curl -sS https://github.com/bluefishforsale.keys -o /tmp/ci-ssh.keys
+          chmod 600 /tmp/ci-ssh.keys
+          echo "Downloaded SSH keys from GitHub"
+
+      - name: Check if VM already exists
+        id: check-vm
+        run: |
+          if ssh -F $SSH_CONFIG node005.home "qm status ${{ steps.calc-vmid.outputs.vmid }}" 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "VM ${{ steps.calc-vmid.outputs.vmid }} already exists, will destroy and recreate"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "VM ${{ steps.calc-vmid.outputs.vmid }} does not exist"
+          fi
+
+      - name: Destroy existing VM if present
+        if: steps.check-vm.outputs.exists == 'true'
+        run: |
+          echo "Stopping existing VM..."
+          ssh -F $SSH_CONFIG node005.home "qm stop ${{ steps.calc-vmid.outputs.vmid }}" || true
+          sleep 5
+          echo "Destroying existing VM..."
+          ssh -F $SSH_CONFIG node005.home "qm destroy ${{ steps.calc-vmid.outputs.vmid }}"
+          echo "Existing VM destroyed"
+
+      - name: Clone VM from template
+        run: |
+          echo "Cloning VM ${{ steps.calc-vmid.outputs.vmid }} from template ${{ env.PROXMOX_TEMPLATE_ID }}..."
+          ssh -F $SSH_CONFIG node005.home "qm clone ${{ env.PROXMOX_TEMPLATE_ID }} ${{ steps.calc-vmid.outputs.vmid }} --name ${{ steps.calc-vmid.outputs.vmname }}"
+          echo "VM cloned successfully"
+
+      - name: Configure VM
+        run: |
+          echo "Configuring VM resources and network..."
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --cores 4"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --memory 2048"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --onboot 0"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --ipconfig0 ip=192.168.1.25/24,gw=192.168.1.1"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --nameserver 192.168.1.2"
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --description 'CI Test VM for PR #${{ github.event.pull_request.number }}'"
+          echo "VM configured with static IP 192.168.1.25"
+
+      - name: Set SSH keys
+        run: |
+          echo "Setting SSH keys..."
+          scp -F $SSH_CONFIG /tmp/ci-ssh.keys node005.home:/tmp/ci-ssh.keys
+          ssh -F $SSH_CONFIG node005.home "qm set ${{ steps.calc-vmid.outputs.vmid }} --sshkeys /tmp/ci-ssh.keys"
+          ssh -F $SSH_CONFIG node005.home "rm /tmp/ci-ssh.keys"
+          echo "SSH keys configured"
+
+      - name: Start VM
+        run: |
+          echo "Starting VM..."
+          ssh -F $SSH_CONFIG node005.home "qm start ${{ steps.calc-vmid.outputs.vmid }}"
+          echo "VM started, waiting for boot..."
+
+      - name: Set VM IP
+        id: get-ip
+        run: |
+          # Test VM uses static IP configured via cloud-init
+          VM_IP="192.168.1.25"
+          VM_HOSTNAME="gh-test-vm.home"
+          echo "ip=$VM_IP" >> $GITHUB_OUTPUT
+          echo "hostname=$VM_HOSTNAME" >> $GITHUB_OUTPUT
+          echo "Test VM configured with static IP: $VM_IP ($VM_HOSTNAME)"
+
+      - name: Wait for SSH to be ready
+        run: |
+          VM_IP="${{ steps.get-ip.outputs.ip }}"
+          echo "Waiting for SSH on $VM_IP..."
+          for i in {1..60}; do
+            if nc -zv -w 5 $VM_IP 22 2>/dev/null; then
+              echo "SSH is ready on $VM_IP"
+              sleep 30  # Extra time for cloud-init to complete
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "ERROR: Timeout waiting for SSH"
+              exit 1
+            fi
+            echo "Attempt $i/60: SSH not ready, waiting..."
+            sleep 5
+          done
+
+      - name: Display VM information
+        run: |
+          echo "✅ Test VM provisioned successfully"
+          echo ""
+          echo "VM ID: ${{ steps.calc-vmid.outputs.vmid }}"
+          echo "VM Name: ${{ steps.calc-vmid.outputs.vmname }}"
+          echo "VM IP: ${{ steps.get-ip.outputs.ip }}"
+          echo "Cores: 4"
+          echo "Memory: 2GB"
+          echo ""
+          echo "Playbooks to test: ${{ needs.detect-changes.outputs.playbook-count }}"
+
+  test-playbooks:
+    name: Test Playbooks
+    needs: [detect-changes, provision-vm]
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Create dynamic inventory
+        run: |
+          VM_IP="${{ needs.provision-vm.outputs.vm-ip }}"
+          cat > /tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini <<EOF
+          [ocean]
+          $VM_IP ansible_user=root
+
+          [docker]
+          $VM_IP ansible_user=root
+
+          [github_runners]
+          $VM_IP ansible_user=root
+
+          [baremetal]
+          $VM_IP ansible_user=root
+
+          [dns]
+          $VM_IP ansible_user=root
+
+          [pihole]
+          $VM_IP ansible_user=root
+
+          [node005]
+          $VM_IP ansible_user=root
+
+          [all:vars]
+          ansible_python_interpreter=/usr/bin/python3
+          ansible_host_key_checking=False
+          EOF
+
+          echo "Dynamic inventory created:"
+          cat /tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Test playbooks
+        id: test
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
+          INVENTORY="/tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini"
+
+          echo "Testing playbooks against VM ${{ needs.provision-vm.outputs.vm-ip }}..."
+          echo ""
+
+          # Initialize counters
+          TOTAL=0
+          PASSED=0
+          FAILED=0
+          RESULTS=""
+
+          # Test each playbook
+          for PLAYBOOK in $(echo "$PLAYBOOKS" | jq -r '.[]'); do
+            TOTAL=$((TOTAL + 1))
+            echo "========================================"
+            echo "Testing: $PLAYBOOK"
+            echo "========================================"
+            
+            START_TIME=$(date +%s)
+            
+            if ansible-playbook \
+              -i "$INVENTORY" \
+              --vault-password-file=/tmp/.vault_pass \
+              "$PLAYBOOK" 2>&1 | tee /tmp/playbook-${TOTAL}.log; then
+              
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              PASSED=$((PASSED + 1))
+              RESULTS="${RESULTS}✅ **PASSED** \`$PLAYBOOK\` (${DURATION}s)\n"
+              echo ""
+              echo "✅ PASSED: $PLAYBOOK (${DURATION}s)"
+            else
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              FAILED=$((FAILED + 1))
+              RESULTS="${RESULTS}❌ **FAILED** \`$PLAYBOOK\` (${DURATION}s)\n"
+              echo ""
+              echo "❌ FAILED: $PLAYBOOK (${DURATION}s)"
+            fi
+            echo ""
+          done
+
+          # Save results for PR comment
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo -e "$RESULTS" > /tmp/test-results.txt
+
+          echo "========================================"
+          echo "Test Summary"
+          echo "========================================"
+          echo "Total: $TOTAL"
+          echo "Passed: $PASSED"
+          echo "Failed: $FAILED"
+
+          # Fail job if any playbook failed
+          if [ $FAILED -gt 0 ]; then
+            echo ""
+            echo "❌ Some playbooks failed testing"
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: |
+          rm -f /tmp/.vault_pass
+
+      - name: Post results to PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('/tmp/test-results.txt', 'utf8');
+            const total = '${{ steps.test.outputs.total }}';
+            const passed = '${{ steps.test.outputs.passed }}';
+            const failed = '${{ steps.test.outputs.failed }}';
+
+            const status = failed > 0 ? '❌' : '✅';
+            const conclusion = failed > 0 ? 'FAILED' : 'PASSED';
+
+            const comment = `## ${status} CI Test Results - ${conclusion}
+
+            **Test VM:** \`${{ needs.provision-vm.outputs.vm-name }}\` (\`${{ needs.provision-vm.outputs.vm-ip }}\`)  
+            **Playbooks Tested:** ${total}  
+            **Passed:** ${passed}  
+            **Failed:** ${failed}
+
+            ### Results
+            ${results}
+
+            <details>
+            <summary>View workflow run</summary>
+
+            [Workflow run #${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            </details>
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  cleanup-vm:
+    name: Cleanup Test VM
+    needs: [provision-vm, test-playbooks]
+    if: always() && needs.provision-vm.outputs.vm-id != ''
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Setup SSH key for Proxmox access
+        run: |
+          # Use runner work directory (writable)
+          mkdir -p ${{ runner.temp }}/.ssh
+          # Decode base64 secret and write to key file
+          echo "${{ secrets.PROXMOX_SSH_KEY }}" | base64 -d > ${{ runner.temp }}/.ssh/proxmox_key
+          chmod 600 ${{ runner.temp }}/.ssh/proxmox_key
+          # Create SSH config in temp directory
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
+          Host node005.home
+            User root
+            IdentityFile ${{ runner.temp }}/.ssh/proxmox_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ${{ runner.temp }}/.ssh/config
+          # Use temp SSH config for all SSH commands
+          echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
+
+      - name: Stop and destroy VM
+        run: |
+          VMID="${{ needs.provision-vm.outputs.vm-id }}"
+          echo "Stopping VM $VMID..."
+          ssh -F $SSH_CONFIG node005.home "qm stop $VMID" || true
+          sleep 5
+          echo "Destroying VM $VMID..."
+          ssh -F $SSH_CONFIG node005.home "qm destroy $VMID"
+          echo "✅ VM destroyed successfully"
+
+      - name: Cleanup temporary files
+        run: |
+          rm -f /tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini
+          rm -f /tmp/ci-ssh.keys
+          rm -f /tmp/test-results.txt
+          rm -f /tmp/playbook-*.log
+          echo "✅ Temporary files cleaned up"

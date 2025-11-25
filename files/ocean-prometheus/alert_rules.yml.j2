@@ -31,9 +31,9 @@ groups:
       summary: "High disk usage on {{ "{{ $labels.instance }}" }}"
       description: "Disk usage is above 90% on filesystem {{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }}"
 
-  # Service down alert
+  # Service down alert (excluding all blackbox probes)
   - alert: ServiceDown
-    expr: up == 0
+    expr: up{job!~"blackbox-.*"} == 0
     for: 1m
     labels:
       severity: critical

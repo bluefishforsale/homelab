@@ -1,6 +1,8 @@
 - name: Install and configure zsh and tools for users
   hosts: all
   become: true
+  vars_files:
+    - ../../../vault/secrets.yaml
 
   tasks:
     - name: Handle dpkg locks and repair
@@ -22,16 +24,32 @@
         - cron
       ignore_errors: yes
 
-    # Define user details explicitly with correct home directories
+    # Define user details with centralized uid/gid from vault
     - name: Set user details
       set_fact:
         users:
-          - { user_name: "debian", user_home: "/home/debian" }
+          - { user_name: "media", user_home: "/home/media", uid: "{{ system_users.media.uid }}", gid: "{{ system_users.media.gid }}" }
+          - { user_name: "terrac", user_home: "/home/terrac", uid: "{{ system_users.terrac.uid }}", gid: "{{ system_users.terrac.gid }}" }
+          - { user_name: "debian", user_home: "/home/debian", uid: "{{ system_users.debian.uid }}", gid: "{{ system_users.debian.gid }}" }
           - { user_name: "root", user_home: "/root" }
 
-    - name: Ensure the user exists
+    - name: Ensure user groups exist with specified GIDs
+      ansible.builtin.group:
+        name: "{{ user.user_name }}"
+        gid: "{{ user.gid | default(omit) }}"
+        state: present
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      when: user.gid is defined
+
+    - name: Ensure the user exists with specified UIDs/GIDs
       ansible.builtin.user:
         name: "{{ user.user_name }}"
+        uid: "{{ user.uid | default(omit) }}"
+        group: "{{ user.user_name if user.gid is defined else omit }}"
+        groups: "{{ 'sudo,docker' if user.user_name != 'root' else omit }}"
+        append: yes
         state: present
         create_home: yes
         shell: /bin/bash
@@ -161,7 +179,7 @@
 
     - name: Copy p10k config file
       ansible.builtin.copy:
-        src: files/shell/p10k.zsh
+        src: ../../../files/shell/p10k.zsh
         dest: "{{ user.user_home }}/.p10k.zsh"
         mode: "0755"
       loop: "{{ users }}"
@@ -171,7 +189,7 @@
 
     - name: Copy tmux config
       ansible.builtin.copy:
-        src: files/shell/tmux.conf
+        src: ../../../files/shell/tmux.conf
         dest: "{{ user.user_home }}/.tmux.conf"
       loop: "{{ users }}"
       loop_control:

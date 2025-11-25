@@ -44,7 +44,7 @@
 
   - name: Create tdarr config files
     ansible.builtin.template:
-      src: "files/ocean-tdarr/conf/{{ item }}.j2"
+      src: "../../../../files/ocean-tdarr/conf/{{ item }}.j2"
       dest: "{{ path_home }}/conf/{{ item }}"
       mode: '0644'
     with_items:
@@ -63,7 +63,7 @@
 
   - name: Create tdarr service
     ansible.builtin.template:
-      src: "files/ocean-tdarr/{{ item }}.j2"
+      src: "../../../../files/ocean-tdarr/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
