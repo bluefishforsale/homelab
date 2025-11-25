@@ -182,6 +182,14 @@
         mode: '0644'
       notify: Restart pihole-FTL
 
+    - name: Enable custom dnsmasq.d configurations in pihole.toml
+      ansible.builtin.lineinfile:
+        path: /etc/pihole/pihole.toml
+        regexp: '^\s*etc_dnsmasq_d\s*=.*'
+        line: '  etc_dnsmasq_d = true'
+        state: present
+      notify: Restart pihole-FTL
+
     - name: Check if Pi-hole is already installed
       ansible.builtin.stat:
         path: /usr/local/bin/pihole
