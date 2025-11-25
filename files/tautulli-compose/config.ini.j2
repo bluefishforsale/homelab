@@ -9,6 +9,12 @@ http_host = 0.0.0.0
 http_root = 
 http_base_url = 
 enable_https = 0
+http_username = 
+http_password = 
+http_hashed_password = 0
+http_hash_password = 0
+http_basic_auth = 0
+http_plex_admin = 0
 
 [Advanced]
 update_db_interval = 1
@@ -20,13 +26,13 @@ grouping_global_history = 0
 grouping_user_history = 0
 grouping_charts = 0
 
-[Plex]
-pms_identifier = 
-pms_ip = 192.168.1.143
+[PMS]
+pms_identifier = {{ media_services.plex.pms_identifier }}
+pms_ip = {{ media_services.plex.pms_ip }}
 pms_port = 32400
 pms_is_remote = 0
 pms_ssl = 0
-pms_url = 
+pms_url = http://{{ media_services.plex.pms_ip }}:32400
 pms_token = {{ media_services.plex.api_key }}
 pms_name = Plex Media Server
 pms_use_bif = 0

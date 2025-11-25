@@ -34,7 +34,7 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Use default bridge network mode (same as existing containers)
+    # Use bridge networking
     network_mode: bridge
 
     # Resource limits
@@ -66,7 +66,7 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Use default bridge network mode
+    # Use bridge networking
     network_mode: bridge
 
     # Service dependencies - wait for Tautulli to be healthy
