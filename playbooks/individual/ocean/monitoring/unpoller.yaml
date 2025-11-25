@@ -61,12 +61,12 @@
       msg: "UnPoller configuration files have been updated - containers will be recreated"
     when: unpoller_docker_compose_config.changed or unpoller_env_config.changed
 
-  - name: Force unpoller container recreation when configs change
+  - name: Recreate unpoller containers if config changed
     ansible.builtin.shell: |
       cd {{ unpoller_home }}
       echo "Recreating UnPoller containers due to configuration changes..."
-      docker-compose down --timeout 30
-      docker-compose up -d --force-recreate
+      docker compose down --timeout 30
+      docker compose up -d --force-recreate
       echo "UnPoller container recreation completed"
     when: unpoller_docker_compose_config.changed or unpoller_env_config.changed
 

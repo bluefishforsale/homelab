@@ -1,0 +1,103 @@
+---
+- name: Configure VM network multiqueue settings in Proxmox
+  hosts: proxmox_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    # Default multiqueue setting for VM network interfaces
+    vm_network_queues: 128
+    
+    # VM IDs to configure (can be overridden via command line)
+    vm_ids:
+      - 5000  # ocean server
+      # Add more VM IDs as needed
+
+  tasks:
+    - name: Check if qm command exists (Proxmox)
+      ansible.builtin.command: "which qm"
+      register: qm_path
+      changed_when: false
+      failed_when: false
+
+    - name: Verify this is a Proxmox host
+      ansible.builtin.fail:
+        msg: "This playbook must be run on Proxmox hosts with qm command available"
+      when: qm_path.rc != 0
+
+    - name: Get list of all VMs if none specified
+      ansible.builtin.shell: "qm list | awk 'NR>1 {print $1}'"
+      register: all_vms
+      when: vm_ids is not defined or vm_ids | length == 0
+      changed_when: false
+
+    - name: Set VM list to all VMs if none specified
+      ansible.builtin.set_fact:
+        vm_ids: "{{ all_vms.stdout_lines | map('int') | list }}"
+      when: all_vms is defined and all_vms.stdout_lines is defined
+
+    - name: Get current VM network configuration
+      ansible.builtin.shell: "qm config {{ item }} | grep -E '^net[0-9]+:'"
+      loop: "{{ vm_ids }}"
+      register: vm_net_configs
+      changed_when: false
+      failed_when: false
+
+    - name: Display current network configurations
+      ansible.builtin.debug:
+        msg: "VM {{ item.item }} networks: {{ item.stdout_lines }}"
+      loop: "{{ vm_net_configs.results }}"
+      when: item.stdout_lines is defined
+
+    - name: Update VM network interfaces with multiqueue
+      ansible.builtin.shell: |
+        # Get current network config for VM {{ item }}
+        for net_line in $(qm config {{ item }} | grep -E '^net[0-9]+:'); do
+          net_id=$(echo "$net_line" | cut -d':' -f1)
+          net_config=$(echo "$net_line" | cut -d':' -f2- | sed 's/^ *//')
+          
+          # Check if queues is already set
+          if echo "$net_config" | grep -q "queues="; then
+            # Update existing queues value
+            new_config=$(echo "$net_config" | sed 's/queues=[0-9]*/queues={{ vm_network_queues }}/')
+          else
+            # Add queues parameter
+            new_config="${net_config},queues={{ vm_network_queues }}"
+          fi
+          
+          # Apply the configuration
+          echo "Setting VM {{ item }} $net_id: $new_config"
+          qm set {{ item }} --$net_id "$new_config"
+        done
+      loop: "{{ vm_ids }}"
+      register: vm_queue_updates
+      when: 
+        - vm_net_configs.results is defined
+        - vm_net_configs.results | selectattr('item', 'equalto', item) | selectattr('stdout_lines', 'defined') | list | length > 0
+
+    - name: Verify updated VM network configurations
+      ansible.builtin.shell: "qm config {{ item }} | grep -E '^net[0-9]+:'"
+      loop: "{{ vm_ids }}"
+      register: updated_vm_net_configs
+      changed_when: false
+
+    - name: Display updated network configurations
+      ansible.builtin.debug:
+        msg: "VM {{ item.item }} updated networks: {{ item.stdout_lines }}"
+      loop: "{{ updated_vm_net_configs.results }}"
+      when: item.stdout_lines is defined
+
+    - name: Summary of changes
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          VM Multiqueue Configuration Complete
+          ========================================
+          VMs Updated: {{ vm_ids | join(', ') }}
+          Queue Setting: {{ vm_network_queues }}
+          
+          IMPORTANT NOTES:
+          - VMs may need to be restarted for changes to take effect
+          - Guest OS must support virtio multiqueue
+          - Verify with: ethtool -L <interface> combined 128 (inside VM)
+          - Check queues: grep virtio /proc/interrupts (inside VM)

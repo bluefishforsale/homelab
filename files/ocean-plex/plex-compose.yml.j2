@@ -1,0 +1,98 @@
+services:
+  plex:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: always
+    runtime: nvidia
+    environment:
+      TZ: America/Los_Angeles
+      VERSION: {{ version }}
+      PLEX_CLAIM: "{{ plex_claim }}"
+      ADVERTISE_IP: "https://{{ ansible_default_ipv4.address }}:32400/"
+      PLEX_UID: "{{ uid }}"
+      PLEX_GID: "{{ uid }}"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    devices:
+{% for dev in devices %}
+      - {{ dev }}:{{ dev }}
+{% endfor %}
+    ports:
+{% for port in plex_ports_tcp %}
+      - "{{ port }}:{{ port }}/tcp"
+{% endfor %}
+{% for port in plex_ports_udp %}
+      - "{{ port }}:{{ port }}/udp"
+{% endfor %}
+    volumes:
+      - /etc/letsencrypt/archive/home.terrac.com:/certs:ro
+      - {{ plex_home }}/config:/config
+      - {{ plex_home }}/Profiles/Chromecast.xml:/usr/lib/plexmediaserver/Resources/Profiles/Chromecast.xml:ro
+      - {{ complete }}/tv:/tv
+      - {{ complete }}/music:/music
+      - {{ complete }}/movies:/movies
+      - {{ ramdisk }}:/transcode
+      - {{ data }}:/data01
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video, utility, compute]
+        limits:
+          cpus: '16'
+          memory: 16G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32400/web/index.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  plex-exporter:
+    image: {{ exporter_image }}:{{ exporter_version }}
+    container_name: {{ exporter_service }}
+    hostname: {{ exporter_service }}
+    restart: always
+    environment:
+      PLEX_SERVER: http://plex:32400
+      PLEX_TOKEN: "{{ plex_token }}"
+    ports:
+      - "{{ exporter_port }}:{{ exporter_port }}"
+    depends_on:
+      - plex
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:{{ exporter_port }}/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+networks:
+  default:
+    name: plex_network
+    driver: bridge

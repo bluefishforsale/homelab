@@ -4,6 +4,69 @@ This directory contains GitHub Actions workflows for CI/CD automation of the hom
 
 ## Available Workflows
 
+### PR - Test Playbooks on VM (`pr-test.yml`) **NEW**
+**Triggers**: Pull Requests to main/master
+
+Automatically tests changed playbooks on ephemeral VMs:
+
+**What It Does:**
+1. 🔍 **Detects changed playbooks** by comparing PR against base branch
+2. 🖥️ **Provisions test VM** on Proxmox (4 cores, 2GB RAM)
+3. 🧪 **Runs playbooks** against test VM to validate functionality
+4. 💬 **Posts results** as PR comment
+5. 🗑️ **Destroys VM** automatically after testing
+
+**Safety Features:**
+- ✅ Isolated test environment (no production impact)
+- ✅ Ephemeral VMs (created/destroyed per PR)
+- ✅ Exit code validation
+- ✅ Automatic cleanup even on failure
+- ✅ Concurrent PR support (unique VM per PR)
+
+**Workflow Flow:**
+```
+PR Opened → Detect Changes → Provision VM → Test Playbooks → Post Results → Destroy VM
+```
+
+### PR - Cleanup Test VM (`pr-cleanup.yml`) **NEW**
+**Triggers**: Pull Request closed (merged or not)
+
+Safety net to ensure test VMs are destroyed:
+- 🧹 Destroys test VM when PR closes
+- 🔄 Handles orphaned VMs from crashed workflows
+- 📁 Cleans up temporary files
+
+### Main - Apply Playbooks to Production (`main-apply.yml`) **NEW**
+**Triggers**: Push to main/master branch
+
+**FULLY AUTOMATED** deployment after PR merge:
+
+**What It Does:**
+1. 🔍 **Detects changed playbooks** from merged commit
+2. 🚀 **Applies to production** using real inventory
+3. 📊 **Generates summary** with results table
+4. 📦 **Uploads logs** as artifacts (30-day retention)
+
+**Safety Features:**
+- ✅ Only runs after PR merge (already tested on PR test VM)
+- ✅ Playbooks declare their own targets (`hosts:` directive)
+- ✅ Full trust in test VM validation
+- ✅ Detailed logging and artifacts
+- ✅ Idempotent playbooks (safe to re-run)
+
+**Workflow Flow:**
+```
+Merge to Main → Detect Changes → Apply to Production → Generate Summary → Upload Logs
+```
+
+**Example Summary:**
+```
+| Playbook | Status | Duration | Hosts |
+|----------|--------|----------|-------|
+| playbooks/individual/ocean/network/nginx_compose.yaml | ✅ Success | 45s | ocean |
+| playbooks/individual/base/packages.yaml | ✅ Success | 32s | ocean |
+```
+
 ### CI - Validate & Lint (`ci-validate.yml`)
 **Triggers**: Push to main/master/develop, Pull Requests
 
@@ -159,6 +222,57 @@ Ensure the repository has:
 - ✅ Required status checks for PRs (optional)
 
 ## Usage Examples
+
+### Automated PR Testing (New!)
+When you open a PR with playbook changes:
+
+```bash
+# Make changes to a playbook
+vim playbooks/individual/base/packages.yaml
+
+# Commit and push to branch
+git checkout -b update-packages
+git add playbooks/individual/base/packages.yaml
+git commit -m "Update base packages"
+git push origin update-packages
+
+# Open PR on GitHub
+# → pr-test.yml workflow automatically triggers
+# → Provisions test VM on node005
+# → Runs packages.yaml against test VM
+# → Posts results to PR comment
+# → Destroys test VM
+```
+
+**Expected PR Comment:**
+```markdown
+## ✅ CI Test Results - PASSED
+
+**Test VM:** `ci-test-pr-123` (`192.168.1.X`)
+**Playbooks Tested:** 1
+**Passed:** 1
+**Failed:** 0
+
+### Results
+✅ **PASSED** `playbooks/individual/base/packages.yaml` (45s)
+```
+
+### Automated Production Deployment (New!)
+When you merge the PR to main:
+
+```bash
+# Merge PR on GitHub
+# → main-apply.yml workflow automatically triggers
+# → Detects changed playbooks
+# → Applies to production inventory
+# → Posts summary to GitHub Actions
+```
+
+**No manual intervention needed!** The workflow:
+1. Detects `playbooks/individual/base/packages.yaml` changed
+2. Runs it against production inventory
+3. Playbook's `hosts: ocean` determines target
+4. Generates deployment summary
 
 ### Automatic Validation (on Push/PR)
 Workflows run automatically when you:

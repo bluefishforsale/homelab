@@ -12,16 +12,16 @@ EnvironmentFile={{ karma_home }}/.env
 Environment="COMPOSE_HTTP_TIMEOUT=180"
 
 # Stop running instance
-ExecStartPre=-docker-compose down --timeout 30
+ExecStartPre=-docker compose down --timeout 30
 
 # Start services
-ExecStart=docker-compose up -d --quiet-pull
+ExecStart=docker compose up -d --quiet-pull
 
 # Stop services
-ExecStop=docker-compose down --timeout 30
+ExecStop=docker compose down --timeout 30
 
 # Cleanup
-ExecReload=docker-compose restart
+ExecReload=docker compose restart
 
 TimeoutStartSec=300
 TimeoutStopSec=120

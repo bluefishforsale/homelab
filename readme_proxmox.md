@@ -252,31 +252,27 @@ find /var/lib/ceph/ -mindepth 2 -delete
 ### Make VM temaplate
 ## get SSH keys
 
+wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 curl https://github.com/bluefishforsale.keys > rsa.keys
 
 ```bash
 qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
-qm importdisk 9999 debian-12-generic-amd64.qcow2 vm-boot-lvm-thin
-qm set 9999 --scsihw virtio-scsi-pci --scsi0 vm-boot-lvm-thin:vm-9999-disk-0
+qm importdisk 9999 debian-12-generic-amd64.qcow2 local-lvm
+qm set 9999 --net0 virtio,bridge=vmbr0,queues=64
+qm set 9999 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9999-disk-0
 qm set 9999 --bios ovmf
 qm set 9999 --machine q35
-qm set 9999 --efidisk0 vm-boot-lvm-thin:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
+qm set 9999 --efidisk0 local-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
 qm set 9999 --boot order=scsi0
-qm set 9999 --ide2 vm-boot-lvm-thin:cloudinit
+qm set 9999 --ide2 local-lvm:cloudinit
 qm set 9999 --serial0 socket --vga serial0
 qm set 9999 --sshkeys rsa.keys
-qm set 9999 --hotplug network,disk
 qm set 9999 --cores 2
 qm set 9999 --memory 4096
 qm set 9999 --agent enabled=1
+qm set 9999 --hotplug network,disk
 qm template 9999
 ```
-
-#  just in case a root account is needed and keys don't work
-qm set 9999 --ciuser debian
-qm set 9999 --cipassword admin
-
-
 
 ### dns01 VM
 
@@ -313,16 +309,123 @@ qm start 4000
 
 # OCEAN VM
 ## passes through specific PCIE addresses for GPU and SAS controller
+
+### Pre-requisite: Enable IOMMU and VFIO on Proxmox Host
+
+Before creating the VM, configure hardware passthrough:
+
+```bash
+# 1. Enable IOMMU in GRUB
+ nano /etc/default/grub
+# Change: GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+# To:     GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"
+ update-grub
+
+# 2. Load VFIO modules
+ tee -a /etc/modules <<EOF
+vfio
+vfio_iommu_type1
+vfio_pci
+vfio_virqfd
+EOF
+
+# 3. Blacklist drivers
+echo "blacklist nouveau" |  tee /etc/modprobe.d/blacklist-nouveau.conf
+echo "blacklist mpt3sas" |  tee /etc/modprobe.d/blacklist-mpt3sas.conf
+
+# 4. Get PCI IDs and configure VFIO
+lspci -nn -s 42:00  # RTX 3090 GPU + Audio
+lspci -nn -s 02:00  # SAS controller
+lspci -nn -s 05:00  # NVMe SSD
+
+# Find NVMe PCI address (if needed)
+lspci | grep -i nvme
+ls -la /sys/block/nvme0n1  # Shows PCI path in symlink
+
+# Configure VFIO to claim devices (use actual IDs from lspci -nn output)
+# RTX 3090: 10de:2204 (GPU) + 10de:1aef (Audio)
+# SAS2308: 1000:0087
+# Intel NVMe 660P: 8086:f1a8 (NOTE: Has MSI-X passthrough issues, skip for now)
+echo "options vfio-pci ids=10de:2204,10de:1aef,1000:0087" |  tee /etc/modprobe.d/vfio.conf
+echo "softdep mpt3sas pre: vfio-pci" |  tee -a /etc/modprobe.d/vfio.conf
+# NOTE: NVMe passthrough disabled due to MSI-X capability errors
+# echo "softdep nvme pre: vfio-pci" |  tee -a /etc/modprobe.d/vfio.conf
+
+# 5. Update initramfs and reboot
+ update-initramfs -u
+ reboot
+```
+
+### Verify VFIO Configuration (After Reboot)
+
+```bash
+# Verify IOMMU enabled
+dmesg | grep -e DMAR -e IOMMU
+
+# Verify VFIO claimed GPU and SAS controller
+lspci -k -s 42:00.0 | grep "Kernel driver"  # Should show: vfio-pci
+lspci -k -s 42:00.1 | grep "Kernel driver"  # Should show: vfio-pci
+lspci -k -s 02:00.0 | grep "Kernel driver"  # Should show: vfio-pci (NOT mpt3sas)
+
+# NVMe should still use nvme driver (not passed through)
+lspci -k -s 05:00.0 | grep "Kernel driver"  # Should show: nvme
+
+# Check VFIO devices available
+ls -la /dev/vfio/
+
+# Note: After VFIO claims devices, they will NOT be visible to Proxmox:
+# - ZFS disks (sda-sdh) will disappear from host - only in ocean VM
+# - NVMe (nvme0n1) remains on Proxmox host (not passed through due to MSI-X issues)
+```
+
+### Create Ocean VM
+
 ```bash
 qm clone 9999 5000
 qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
-qm resize 5000 scsi0 +126G  # 10G
-qm set 5000 --cores 40
-qm set 5000 --memory 512000  # 512GB
-qm set 5000 --hostpci0=42:00,pcie=1
-qm set 5000 --hostpci1=02:00,pcie=1
+qm resize 5000 scsi0 +126G  # 128GB total boot disk
+qm set 5000 --cores 30      # 30 cores for VM
+qm set 5000 --memory 262144 # 256GB RAM
+qm set 5000 --hostpci0=42:00,pcie=1,x-vga=1  # RTX 3090 GPU (includes audio)
+qm set 5000 --hostpci1=02:00,pcie=1          # SAS Controller + 8 ZFS disks (sda-sdh)
+# NOTE: NVMe passthrough has MSI-X capability issues - skip for now
+# qm set 5000 --hostpci2=05:00,pcie=1,rombar=0  # Intel NVMe 660P (1.9TB) - FAILS
+qm start 5000
 ```
 
+### Post-Install: Import ZFS Pool in VM
+
+```bash
+# SSH to ocean VM
+ssh terrac@192.168.1.143
+
+# Enable contrib and non-free repos for ZFS (Debian 12 DEB822 format)
+sudo sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
+
+# Update and install ZFS utilities
+sudo apt update
+sudo apt install -y zfsutils-linux
+
+# Load ZFS kernel module
+sudo modprobe zfs
+
+# Verify module loaded
+lsmod | grep zfs
+
+# Import ZFS pool
+sudo zpool import -f data01
+
+# Verify pool status
+zpool status data01
+
+# Check resilver progress (if applicable)
+watch -n 10 'zpool status data01 | grep -A 3 scan'
+
+# Verify all disks are visible
+lsblk
+# Should show: 8x 10.9TB ZFS disks (sda-sdh) + 128GB boot disk
+# Note: NVMe (nvme0n1) is NOT passed through due to MSI-X issues
+```
 
 ## make six kube VMs from the template
 

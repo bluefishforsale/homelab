@@ -1,7 +1,122 @@
 ---
+- name: Create Pi-hole VM on Proxmox
+  hosts: pihole
+  gather_facts: false
+  vars:
+    vm_id: 3000
+    template_id: 9999
+    vm_cores: 1
+    vm_memory: 1024
+    vm_disk_size: "+8G"
+  tasks:
+    - name: Check if running on a VM with bare_metal_host defined
+      set_fact:
+        is_proxmox_vm: "{{ bare_metal_host is defined }}"
+      tags: ['always']
+
+    - name: VM creation tasks
+      when: is_proxmox_vm | bool
+      delegate_to: "{{ bare_metal_host }}"
+      become: true
+      block:
+        - name: Check if VM already exists
+          ansible.builtin.shell: "qm status {{ vm_id }} 2>/dev/null || echo 'not_found'"
+          register: vm_status
+          changed_when: false
+          failed_when: false
+          tags: ['always']
+
+        - name: Destroy existing VM if force tag is set
+          when:
+            - "'force' in ansible_run_tags"
+            - vm_status.stdout != 'not_found'
+          tags: ['force']
+          block:
+            - name: Stop VM if running
+              ansible.builtin.command: "qm stop {{ vm_id }}"
+              failed_when: false
+              
+            - name: Unlock VM if locked
+              ansible.builtin.command: "qm unlock {{ vm_id }}"
+              failed_when: false
+              
+            - name: Destroy VM with purge to remove all volumes
+              ansible.builtin.command: "qm destroy {{ vm_id }} --purge"
+              
+            - name: Wait for VM to be fully destroyed
+              ansible.builtin.pause:
+                seconds: 5
+
+        - name: Create VM from template
+          when: vm_status.stdout == 'not_found' or 'force' in ansible_run_tags
+          tags: ['force', 'install']
+          block:
+            - name: Clean up orphaned LVM volumes if they exist
+              ansible.builtin.shell: |
+                set +e
+                for vol in $(lvs --noheadings -o lv_name pve 2>/dev/null | awk '{print $1}' | grep "^vm-{{ vm_id }}"); do
+                  echo "Removing orphaned volume: pve/$vol"
+                  lvremove -f pve/$vol
+                done
+                exit 0
+              register: cleanup_result
+              changed_when: cleanup_result.stdout | length > 0
+              
+            - name: Display cleanup results
+              ansible.builtin.debug:
+                msg: "{{ cleanup_result.stdout_lines }}"
+              when: cleanup_result.stdout | length > 0
+              
+            - name: Clone VM from template
+              ansible.builtin.command: "qm clone {{ template_id }} {{ vm_id }}"
+              
+            - name: Set VM name
+              ansible.builtin.command: "qm set {{ vm_id }} --name {{ inventory_hostname }}"
+              
+            - name: Configure network with multiqueue
+              ansible.builtin.command: "qm set {{ vm_id }} --net0 virtio,bridge=vmbr0,queues=64"
+              
+            - name: Configure IP address
+              ansible.builtin.command: "qm set {{ vm_id }} --ipconfig0 ip={{ ansible_ssh_host }}/24,gw={{ gateway }}"
+              
+            - name: Set nameserver
+              ansible.builtin.command: "qm set {{ vm_id }} --nameserver={{ nameserver }}"
+              
+            - name: Enable onboot
+              ansible.builtin.command: "qm set {{ vm_id }} --onboot 1"
+              
+            - name: Set CPU cores
+              ansible.builtin.command: "qm set {{ vm_id }} --cores {{ vm_cores }}"
+              
+            - name: Set memory
+              ansible.builtin.command: "qm set {{ vm_id }} --memory {{ vm_memory }}"
+              
+            - name: Resize disk
+              ansible.builtin.command: "qm resize {{ vm_id }} scsi0 {{ vm_disk_size }}"
+              
+            - name: Start VM
+              ansible.builtin.command: "qm start {{ vm_id }}"
+              
+            - name: Wait for VM to boot and SSH to become available
+              ansible.builtin.wait_for:
+                host: "{{ ansible_ssh_host }}"
+                port: 22
+                delay: 10
+                timeout: 300
+                state: started
+              delegate_to: localhost
+              become: false
+              
+            - name: Wait for SSH to be fully ready
+              ansible.builtin.pause:
+                seconds: 10
+
 - name: Install Pi-hole on Debian 12
   hosts: pihole
   become: true
+  tags: ['force', 'install']
+  vars_files:
+    - ../../../vault/secrets.yaml
   vars:
     pihole_admin_password: "admin"
 
@@ -86,11 +201,42 @@
         name: pihole-FTL
         enabled: true
 
-    - name: Set Pi-hole admin password
-      ansible.builtin.command: pihole -a -p "{{ pihole_admin_password }}"
-      environment:
-        PIHOLE_SKIP_OS_CHECK: 1
+    - name: Start Pi-hole service
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        state: started
+
+    - name: Set Pi-hole admin password from vault
+      ansible.builtin.command: pihole setpassword "{{ pihole.password }}"
       no_log: true
+      changed_when: true
+      retries: 3
+      delay: 2
+      register: password_result
+      until: password_result.rc == 0
+
+    ############  DNS validation #####################
+    - name: Wait for DNS service to be fully ready
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Test local DNS resolution (ocean.home)
+      ansible.builtin.command: dig +short @127.0.0.1 ocean.home
+      register: local_dns_result
+      changed_when: false
+      failed_when: local_dns_result.stdout != '192.168.1.143'
+
+    - name: Test external DNS resolution (google.com)
+      ansible.builtin.command: dig +short @127.0.0.1 google.com
+      register: external_dns_result
+      changed_when: false
+      failed_when: external_dns_result.stdout == ''
+
+    - name: Display DNS validation results
+      ansible.builtin.debug:
+        msg:
+          - "✓ Local DNS working - ocean.home resolves to: {{ local_dns_result.stdout }}"
+          - "✓ External DNS working - google.com resolves to: {{ external_dns_result.stdout_lines[0] }}"
 
   handlers:
     - name: Restart pihole-FTL

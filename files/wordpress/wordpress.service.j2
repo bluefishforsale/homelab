@@ -16,19 +16,20 @@ WorkingDirectory={{ home }}
 # Environment
 Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
+Environment=DOCKER_CONFIG=/home/{{ user }}/.docker
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker-compose -f {{ home }}/docker-compose.yml pull --quiet
+ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
 
 # Start command
-ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
+ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
 
 # Stop command  
-ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
 
 # Reload command
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml restart
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml restart
 
 # Service behavior
 Restart=on-failure
@@ -40,8 +41,9 @@ TimeoutStopSec=60
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+#ProtectHome=true
 ReadWritePaths={{ home }}
+ReadWritePaths=/home/{{ user }}/.docker
 ReadOnlyPaths=/var/run/docker.sock
 
 # Logging
