@@ -62,10 +62,15 @@
     - "Profiles"
     - "config/Library/Application Support/Plex Media Server"
 
+  - name: Remove old lowercase preferences file if it exists
+    ansible.builtin.file:
+      path: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      state: absent
+
   - name: Create preferences file
     ansible.builtin.template:
       src: "{{ files }}/config/preferences.xml"
-      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/Preferences.xml"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
