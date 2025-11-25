@@ -109,8 +109,6 @@ qm set 9999 --serial0 socket --vga serial0
 
 # Configure cloud-init
 qm set 9999 --sshkeys rsa.keys
-qm set 9999 --ciuser terrac
-qm set 9999 --cipassword 2brak4u2
 qm set 9999 --hotplug network,disk
 qm set 9999 --cores 2
 qm set 9999 --memory 4096
@@ -212,10 +210,6 @@ qm start 5000
 # Monitor boot progress
 qm status 5000
 # Wait ~30-60 seconds for cloud-init to complete
-
-# SSH to ocean VM (now on production IP 192.168.1.143)
-ssh terrac@192.168.1.143
-# Password: 2brak4u2 (if keys don't work initially)
 
 # Verify GPU is visible in VM
 lspci | grep -i nvidia
@@ -443,7 +437,7 @@ qm set 9999 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9999-disk-0
 qm set 9999 --bios ovmf --machine q35
 qm set 9999 --efidisk0 local-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
 qm set 9999 --boot order=scsi0 --ide2 local-lvm:cloudinit --serial0 socket --vga serial0
-qm set 9999 --sshkeys rsa.keys --ciuser terrac --cipassword 2brak4u2
+qm set 9999 --sshkeys rsa.keys
 qm set 9999 --cores 2 --memory 4096 --agent enabled=1 --hotplug network,disk
 qm template 9999
 ```

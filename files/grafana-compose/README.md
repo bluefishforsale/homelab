@@ -52,8 +52,6 @@ The Grafana container automatically joins the `n8n_n8n_network` Docker network, 
 
 ### Access Credentials
 - **URL**: http://grafana.home (via nginx proxy)
-- **Username**: admin
-- **Password**: 2brak4u2 (configured in grafana.ini)
 - **Direct Access**: http://192.168.1.143:8910
 
 ### Key Configuration Features

@@ -258,6 +258,7 @@ curl https://github.com/bluefishforsale.keys > rsa.keys
 ```bash
 qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
 qm importdisk 9999 debian-12-generic-amd64.qcow2 local-lvm
+qm set 9999 --net0 virtio,bridge=vmbr0,queues=64
 qm set 9999 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9999-disk-0
 qm set 9999 --bios ovmf
 qm set 9999 --machine q35
@@ -266,20 +267,12 @@ qm set 9999 --boot order=scsi0
 qm set 9999 --ide2 local-lvm:cloudinit
 qm set 9999 --serial0 socket --vga serial0
 qm set 9999 --sshkeys rsa.keys
-qm set 9999 --ciuser terrac
-qm set 9999 --cipassword 2brak4u2
 qm set 9999 --cores 2
 qm set 9999 --memory 4096
 qm set 9999 --agent enabled=1
 qm set 9999 --hotplug network,disk
 qm template 9999
 ```
-
-#  just in case a root account is needed and keys don't work
-qm set 9999 --ciuser debian
-qm set 9999 --cipassword admin
-
-
 
 ### dns01 VM
 
