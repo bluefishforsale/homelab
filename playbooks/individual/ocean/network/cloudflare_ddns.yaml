@@ -16,7 +16,7 @@
     - "{{ service }}.timer"
     - "{{ service }}.service"
     cf_api_key: "{{ external_apis.ddns.cloudflare_token }}"
-    cf_zone_id: "{{ cloudflare.zone_id }}"
+    cf_zone_id: "{{ cloudflare.terrac_com }}"
     cf_records:
     - dns: terrac.com
       api_key: "{{ cf_api_key }}"

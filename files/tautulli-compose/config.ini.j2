@@ -1,0 +1,45 @@
+[General]
+api_enabled = 1
+api_key = {{ tautulli_api_key }}
+check_github = 1
+first_run_complete = 1
+launch_browser = 0
+http_port = 8181
+http_host = 0.0.0.0
+http_root = 
+http_base_url = 
+enable_https = 0
+
+[Advanced]
+update_db_interval = 1
+monitoring_interval = 60
+refresh_users_interval = 12
+refresh_libraries_interval = 12
+ip_logging_enable = 1
+grouping_global_history = 0
+grouping_user_history = 0
+grouping_charts = 0
+
+[Plex]
+pms_identifier = 
+pms_ip = 192.168.1.143
+pms_port = 32400
+pms_is_remote = 0
+pms_ssl = 0
+pms_url = 
+pms_token = {{ media_services.plex.api_key }}
+pms_name = Plex Media Server
+pms_use_bif = 0
+
+[Monitoring]
+refresh_users_on_startup = 1
+refresh_libraries_on_startup = 1
+monitoring_use_websocket = 1
+
+[Logging]
+log_dir = /config/logs
+log_level = INFO
+
+[Notifications]
+notify_consecutive = 1
+notify_upload_posters = 1

@@ -11,7 +11,8 @@
     image: plexinc/pms-docker
     version: latest
     plex_claim: "{{ media_services.plex.claim_token }}"
-    plex_token: "{{ media_services.plex.api_key }}"
+    plex_api_key: "{{ media_services.plex.api_key }}"
+    plex_token: "{{ media_services.plex.plex_token }}"
     plex_ports_tcp:
     - 3005
     - 8324
@@ -86,27 +87,28 @@
     - Reload systemd daemon
     - Restart plex service
 
-  - name: Create plex systemd service
+  - name: Create plex docker-compose files
     ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ files }}/{{ item.src }}"
+      dest: "{{ plex_home }}/{{ item.dest }}"
       mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
     with_items:
-    - plex.service
+    - { src: "plex-compose.yml.j2", dest: "docker-compose.yml" }
+    - { src: "plex-compose.env.j2", dest: ".env" }
     notify:
     - Reload systemd daemon
     - Restart plex service
 
-  - name: Create exporter systemd service
+  - name: Create plex docker-compose systemd service
     ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ files }}/plex-compose.service.j2"
+      dest: "/etc/systemd/system/plex.service"
       mode: '0644'
-    with_items:
-    - plex-exporter.service
     notify:
     - Reload systemd daemon
-    - Restart exporter service
+    - Restart plex service
 
   - name: Ensure meta-manager basedir exists
     ansible.builtin.file:
@@ -166,11 +168,6 @@
   - name: Restart plex service
     ansible.builtin.systemd:
       name: plex.service
-      state: restarted
-
-  - name: Restart exporter service
-    ansible.builtin.systemd:
-      name: plex-exporter.service
       state: restarted
 
   - name: Restart meta-manager service

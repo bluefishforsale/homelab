@@ -22,15 +22,26 @@
       register: interface_speeds
       changed_when: false
 
-    - name: Set ethtool commands for interfaces with known speeds
+    - name: Check current combined channels for each interface
+      ansible.builtin.shell: "{{ ethtool_path.stdout }} -l {{ item }} | grep -i combined | tail -1 | awk '{print $2}' || echo 0"
+      loop: "{{ network_interfaces.stdout_lines }}"
+      register: interface_combined_channels
+      changed_when: false
+      failed_when: false
+
+    - name: Set ethtool commands for interfaces with known speeds and multiqueue
       ansible.builtin.set_fact:
-        ethtool_commands: "{{ ethtool_commands | default([]) + ['ExecStart=' + ethtool_path.stdout + ' -s ' + item.item + ' autoneg off speed ' + item.stdout + ' duplex full'] }}"
+        ethtool_commands: "{{ ethtool_commands | default([]) + command_list }}"
+      vars:
+        command_list:
+          - "ExecStart={{ ethtool_path.stdout }} -s {{ item.item }} autoneg off speed {{ item.stdout }} duplex full"
+          - "ExecStart={{ ethtool_path.stdout }} -L {{ item.item }} combined 128"
       loop: "{{ interface_speeds.results }}"
       when: item.stdout != "unknown"
 
     - name: Create systemd service file for ethtool settings
       ansible.builtin.template:
-        src: files/ethtool/ethtool-settings.service.j2
+        src: ../../../../files/ethtool/ethtool-settings.service.j2
         dest: /etc/systemd/system/ethtool-settings.service
         mode: '0644'
 

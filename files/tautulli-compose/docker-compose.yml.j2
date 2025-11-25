@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  tautulli:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    
+    # LinuxServer images handle user switching internally via PUID/PGID
+    # Do not use user: directive with these images
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID={{ uid }}
+      - PGID={{ gid }}
+      
+    ports:
+      - "{{ tautulli_port }}:8181"
+    
+    volumes:
+      - {{ home }}/config:/config
+      - {{ plex_logs }}:/logs:ro
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Health check - verify Tautulli web interface is responding
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8181/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Use default bridge network mode (same as existing containers)
+    network_mode: bridge
+
+    # Resource limits
+    cpus: '4.0'
+    mem_limit: 2048m
+
+  tautulli-exporter:
+    image: {{ exporter_image }}:{{ exporter_version }}
+    container_name: {{ exporter_service }}
+    hostname: {{ exporter_service }}
+    restart: unless-stopped
+    
+    environment:
+      - TZ=America/Los_Angeles
+      - TAUTULLI_API_KEY={{ tautulli_api_key }}
+      - TAUTULLI_URI=http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ tautulli_port }}
+      - TAUTULLI_TIMEOUT=60s
+      
+    ports:
+      - "{{ exporter_port }}:9487"
+    
+    # Health check disabled - container built from scratch with no shell/tools
+    # Metrics are working, container restart policy will handle failures
+    # External monitoring via Prometheus can track actual health
+    healthcheck:
+      disable: true
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Use default bridge network mode
+    network_mode: bridge
+
+    # Service dependencies - wait for Tautulli to be healthy
+    depends_on:
+      tautulli:
+        condition: service_healthy
+
+    # Resource limits
+    cpus: '0.5'
+    mem_limit: 256m
+
+# No custom networks needed - using default bridge

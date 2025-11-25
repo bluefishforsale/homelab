@@ -58,7 +58,9 @@ scrape_configs:
   - job_name: 'cadvisor'
     relabel_configs: *dropPortNumber
     static_configs:
-    - targets: ['ocean.home:8912']
+{% for host in groups['all'] %}
+    - targets: ['{{ host }}.home:8912']
+{% endfor %}
 
   - job_name: 'nvidia-exporter'
     relabel_configs: *dropPortNumber

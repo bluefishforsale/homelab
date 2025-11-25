@@ -13,7 +13,7 @@
     prom_config: prometheus.yml
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
-    prometheus_files: "files/ocean-prometheus"
+    prometheus_files: "../../../../files/ocean-prometheus"
     uid: 1026  # Ocean user ID
     gid: 100   # Users group ID
     blackbox_exporter_service: blackbox-exporter
@@ -30,14 +30,14 @@
     alertmanager_version: latest
     alertmanager_port: 9093
     alertmanager_home: "{{ path_data01 }}/{{ alertmanager_service }}"
-    alertmanager_files: "files/ocean-prometheus"
+    alertmanager_files: "../../../../files/ocean-prometheus"
     # Karma (Alertmanager Dashboard)
     karma_service: karma
     karma_image: ghcr.io/prymitive/karma
     karma_version: latest
     karma_port: 8181
     karma_home: "{{ path_data01 }}/{{ karma_service }}"
-    karma_files: "files/ocean-prometheus"
+    karma_files: "../../../../files/ocean-prometheus"
 
   tasks:
 
@@ -62,7 +62,7 @@
 
   - name: Create prometheus config file
     ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}.j2"
+      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "{{ path_home }}/config/{{ item }}"
       owner: nobody
       group: nogroup
@@ -97,18 +97,18 @@
       msg: "Prometheus configuration files have been updated - containers will be recreated"
     when: prometheus_docker_compose_config.changed or prometheus_env_config.changed
 
-  - name: Force prometheus container recreation when configs change
+  - name: Recreate prometheus containers if config changed
     ansible.builtin.shell: |
       cd {{ path_home }}
       echo "Recreating Prometheus containers due to configuration changes..."
-      docker-compose down --timeout 30
-      docker-compose up -d --force-recreate
+      docker compose down --timeout 30
+      docker compose up -d --force-recreate
       echo "Prometheus container recreation completed"
     when: prometheus_docker_compose_config.changed or prometheus_env_config.changed
 
   - name: Create prometheus systemd service
     ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}.j2"
+      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
@@ -131,7 +131,7 @@
 
   - name: Create alertmanager configuration
     ansible.builtin.template:
-      src: "files/ocean-prometheus/alertmanager.yml.j2"
+      src: "../../../../files/ocean-prometheus/alertmanager.yml.j2"
       dest: "{{ alertmanager_home }}/config/alertmanager.yml"
       owner: "{{ uid }}"
       group: "{{ gid }}"
@@ -162,12 +162,12 @@
       msg: "Alertmanager configuration files have been updated - containers will be recreated"
     when: alertmanager_docker_compose_config.changed or alertmanager_env_config.changed
 
-  - name: Force alertmanager container recreation when configs change
+  - name: Recreate alertmanager containers if config changed
     ansible.builtin.shell: |
       cd {{ alertmanager_home }}
       echo "Recreating Alertmanager containers due to configuration changes..."
-      docker-compose down --timeout 30
-      docker-compose up -d --force-recreate
+      docker compose down --timeout 30
+      docker compose up -d --force-recreate --build
       echo "Alertmanager container recreation completed"
     when: alertmanager_docker_compose_config.changed or alertmanager_env_config.changed
 
@@ -193,7 +193,7 @@
 
   - name: Create karma configuration
     ansible.builtin.template:
-      src: "files/ocean-prometheus/karma.yml.j2"
+      src: "../../../../files/ocean-prometheus/karma.yml.j2"
       dest: "{{ karma_home }}/config/karma.yml"
       owner: "{{ uid }}"
       group: "{{ gid }}"
@@ -224,12 +224,12 @@
       msg: "Karma configuration files have been updated - containers will be recreated"
     when: karma_docker_compose_config.changed or karma_env_config.changed
 
-  - name: Force karma container recreation when configs change
+  - name: Recreate karma containers if config changed
     ansible.builtin.shell: |
       cd {{ karma_home }}
       echo "Recreating Karma containers due to configuration changes..."
-      docker-compose down --timeout 30
-      docker-compose up -d --force-recreate
+      docker compose down --timeout 30
+      docker compose up -d --force-recreate --build
       echo "Karma container recreation completed"
     when: karma_docker_compose_config.changed or karma_env_config.changed
 
@@ -244,7 +244,7 @@
 
   - name: Create blackbox-exporter.service
     ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}.j2"
+      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
@@ -255,7 +255,7 @@
 
   - name: Create systemd ndt-exporter.service
     ansible.builtin.template:
-      src: "files/ocean-prometheus/{{ item }}.j2"
+      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:

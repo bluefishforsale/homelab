@@ -18,17 +18,17 @@ Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker-compose -f {{ home }}/docker-compose.yml pull --quiet
+ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
 
 # Start command
-ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
+ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
 
 # Stop command
-ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
 
 # Reload command
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml restart
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml restart
 
 # Service behavior
 Restart=on-failure

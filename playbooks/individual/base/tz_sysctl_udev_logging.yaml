@@ -21,7 +21,7 @@
   - name: Copy ntpdate cron job
     ansible.builtin.copy:
       force: true
-      src: files/crons/ntpdate
+      src: ../../../files/crons/ntpdate
       dest: /etc/cron.d/ntpdate
       owner: root
       group: root
