@@ -1,0 +1,30 @@
+---
+services:
+  gpu-test:
+    image: nvidia/cuda:12.2.0-base-ubuntu22.04
+    container_name: gpu-test
+    runtime: nvidia
+    
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    
+    devices:
+{% for dev in devices %}
+      - {{ dev }}:{{ dev }}
+{% endfor %}
+      - /dev/dri:/dev/dri
+    
+    group_add:
+      - "104"  # render group for DRI device access
+    
+    # Keep container running for testing
+    command: sleep infinity
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
