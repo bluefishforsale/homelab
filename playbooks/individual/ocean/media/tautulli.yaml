@@ -52,7 +52,7 @@
       owner: "{{ uid }}"
       group: "{{ gid }}"
       mode: '0644'
-      force: no
+      force: yes
     register: tautulli_config
 
   - name: Create docker-compose.yml
@@ -119,6 +119,50 @@
       docker compose up -d --force-recreate
       echo "Container recreation completed"
     when: docker_compose_config.changed or tautulli_env.changed or tautulli_config.changed
+
+  - name: Wait for Tautulli to be ready after config change
+    ansible.builtin.wait_for:
+      host: "{{ ansible_default_ipv4.address }}"
+      port: "{{ tautulli_port }}"
+      delay: 5
+      timeout: 60
+    when: docker_compose_config.changed or tautulli_env.changed or tautulli_config.changed
+
+  - name: Restart Tautulli container to reload config properly
+    ansible.builtin.shell: |
+      cd {{ home }}
+      docker compose restart tautulli
+      echo "Tautulli restarted to apply Plex server configuration"
+    when: tautulli_config.changed
+
+  - name: Wait for Tautulli to fully initialize and write its config
+    ansible.builtin.pause:
+      seconds: 10
+    when: tautulli_config.changed
+
+  - name: Stop Tautulli before config rewrite
+    ansible.builtin.shell: |
+      cd {{ home }}
+      docker compose stop tautulli
+      echo "Tautulli stopped for config rewrite"
+    when: tautulli_config.changed
+
+  - name: Rewrite config.ini to override Tautulli defaults
+    ansible.builtin.template:
+      src: "{{ files }}/config.ini.j2"
+      dest: "{{ home }}/config/config.ini"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+      force: yes
+    when: tautulli_config.changed
+
+  - name: Start Tautulli with corrected configuration
+    ansible.builtin.shell: |
+      cd {{ home }}
+      docker compose start tautulli
+      echo "Tautulli started with correct Plex configuration"
+    when: tautulli_config.changed
 
   handlers:
   - name: Reload systemd daemon
