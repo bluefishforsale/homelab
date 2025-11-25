@@ -86,11 +86,15 @@
         name: pihole-FTL
         enabled: true
 
-    - name: Set Pi-hole admin password
-      ansible.builtin.command: pihole -a -p "{{ pihole_admin_password }}"
-      environment:
-        PIHOLE_SKIP_OS_CHECK: 1
+    - name: Start Pi-hole service
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        state: started
+
+    - name: Set Pi-hole admin password from vault
+      ansible.builtin.command: pihole setpassword "{{ pihole.password }}"
       no_log: true
+      changed_when: true
 
   handlers:
     - name: Restart pihole-FTL
