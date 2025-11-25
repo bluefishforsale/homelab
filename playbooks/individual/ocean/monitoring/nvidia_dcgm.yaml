@@ -18,7 +18,7 @@
 
     - name: Copy docker-compose template
       template:
-        src: "files/ocean-nvidia/docker-compose.yml.j2"
+        src: "../../../../files/ocean-nvidia/docker-compose.yml.j2"
         dest: "{{ home }}/{{ service_name }}/docker-compose.yml"
         owner: "{{ user }}"
         group: "{{ user }}"
@@ -27,7 +27,7 @@
 
     - name: Copy systemd service file
       template:
-        src: "files/ocean-nvidia/dcgm-exporter.service.j2"
+        src: "../../../../files/ocean-nvidia/dcgm-exporter.service.j2"
         dest: "/etc/systemd/system/{{ service_name }}.service"
         owner: root
         group: root

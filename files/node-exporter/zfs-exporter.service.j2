@@ -11,16 +11,16 @@ WorkingDirectory={{ zfs_exporter_home }}
 EnvironmentFile={{ zfs_exporter_home }}/.env
 
 # Stop running instance
-ExecStartPre=-docker-compose down --timeout 30
+ExecStartPre=-docker compose down --timeout 30
 
 # Start services
-ExecStart=docker-compose up -d --quiet-pull
+ExecStart=docker compose up -d --quiet-pull
 
 # Stop services
-ExecStop=docker-compose down --timeout 30
+ExecStop=docker compose down --timeout 30
 
 # Cleanup
-ExecReload=docker-compose restart
+ExecReload=docker compose restart
 
 TimeoutStartSec=300
 TimeoutStopSec=120

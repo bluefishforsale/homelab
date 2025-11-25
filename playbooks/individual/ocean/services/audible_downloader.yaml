@@ -33,7 +33,7 @@
 
     - name: Patched version of AAXtoMP3
       ansible.builtin.copy:
-        src: "files/audible-downloader/AAXtoMP3"
+        src: "../../../../files/audible-downloader/AAXtoMP3"
         dest: "/data01/services/audible-downloader/AAXtoMP3"
         owner: media
         group: media
@@ -41,7 +41,7 @@
 
     - name: Copy additional scripts to remote machine
       ansible.builtin.copy:
-        src: "files/audible-downloader/{{ item }}"
+        src: "../../../../files/audible-downloader/{{ item }}"
         dest: "/data01/services/audible-downloader/{{ item }}"
         owner: media
         group: media
@@ -61,7 +61,7 @@
 
     - name: Copy audible-cli config files
       ansible.builtin.copy:
-        src: "files/audible-downloader/.audible/{{ item }}"
+        src: "../../../../files/audible-downloader/.audible/{{ item }}"
         dest: "/root/.audible/{{ item }}"
         owner: root
         group: root
@@ -72,7 +72,7 @@
 
     - name: Create systemd service and timer
       ansible.builtin.template:
-        src: "files/audible-downloader/{{ item }}.j2"
+        src: "../../../../files/audible-downloader/{{ item }}.j2"
         dest: "/etc/systemd/system/{{ item }}"
         mode: '0644'
       loop: "{{ services }}"

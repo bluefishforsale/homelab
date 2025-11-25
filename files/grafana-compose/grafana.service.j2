@@ -18,18 +18,18 @@ Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker-compose -f {{ home }}/docker-compose.yml pull --quiet
+ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
 
 # Start command
-ExecStart=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d
+ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
 
 # Stop command  
-ExecStop=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
 
 # Reload command - force recreation to pick up new config files
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml down
-ExecReload=/usr/bin/docker-compose -f {{ home }}/docker-compose.yml up -d --force-recreate
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d --force-recreate
 
 # Service behavior
 Restart=on-failure
