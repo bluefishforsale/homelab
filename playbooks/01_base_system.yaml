@@ -21,5 +21,8 @@
 - name: Configure Unattended Security Upgrades
   ansible.builtin.import_playbook: individual/base/unattended_upgrade.yaml
 
+- name: Configure fail2ban for SSH Protection
+  ansible.builtin.import_playbook: individual/base/fail2ban.yaml
+
 - name: Configure RAM Disk (if applicable)
   ansible.builtin.import_playbook: individual/base/ramdisk.yaml

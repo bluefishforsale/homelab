@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  fail2ban-exporter:
+    image: {{ fail2ban_exporter_image }}:{{ fail2ban_exporter_version }}
+    container_name: {{ fail2ban_exporter_service }}
+    hostname: {{ inventory_hostname }}
+    restart: unless-stopped
+    
+    # Bridge network with exposed port
+    networks:
+      - fail2ban_net
+    ports:
+      - "{{ fail2ban_exporter_port }}:9191"
+    
+    # Mount fail2ban socket directory (not file, as socket is recreated on restart)
+    volumes:
+      - /var/run/fail2ban:/var/run/fail2ban:ro
+    
+    # Environment variables
+    environment:
+      - TZ=America/Los_Angeles
+    
+    # Health Check
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9191/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # Needs write for temp files
+    tmpfs:
+      - /tmp
+    
+    # Resource Limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          memory: 64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  fail2ban_net:
+    driver: bridge

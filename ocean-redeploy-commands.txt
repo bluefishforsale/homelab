@@ -117,11 +117,6 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 # Frigate NVR (if deployed)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/frigate.yaml
 
-# Navidrome (music streaming - if deployed)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/navidrome.yaml
-
-# Spotube (if deployed)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/spotube.yaml
 
 # ==============================================================================
 # VERIFICATION COMMANDS
