@@ -66,12 +66,16 @@ services:
     hostname: {{ exporter_service }}
     restart: always
     environment:
-      PLEX_SERVER: http://plex:32400
-      PLEX_TOKEN: "{{ plex_token }}"
+      PLEX_ADDR: http://plex:32400
+      PLEX_TOKEN: "{{ media_services.plex.api_key }}"
+      PLEX_TIMEOUT: "300"
+      PLEX_RETRIES_COUNT: "3"
+      PLEX_SSL_VERIFY: "false"
     ports:
       - "{{ exporter_port }}:{{ exporter_port }}"
     depends_on:
-      - plex
+      plex:
+        condition: service_healthy
     deploy:
       resources:
         limits:
