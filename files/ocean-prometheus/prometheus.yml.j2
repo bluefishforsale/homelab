@@ -62,6 +62,13 @@ scrape_configs:
     - targets: ['{{ host }}.home:8912']
 {% endfor %}
 
+  - job_name: 'fail2ban-exporter'
+    relabel_configs: *dropPortNumber
+    static_configs:
+{% for host in groups['all'] %}
+    - targets: ['{{ host }}.home:9191']
+{% endfor %}
+
   - job_name: 'nvidia-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
