@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   llamacpp:
     image: {{ image }}:{{ version }}
@@ -22,20 +20,25 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # Start server with Phi-3.5 model pre-loaded and GPU acceleration
-    # Try fewer GPU layers to avoid memory buffer issues
+    # RTX 3090 Optimized: 32B Qwen3 abliterated reasoning model with maximum GPU acceleration  
     command: 
       - "--host"
       - "0.0.0.0"
       - "--port" 
       - "{{ port }}"
       - "--model"
-      #- "/models/Phi-3.5-mini-instruct-Q4_K_M.gguf"
-      - "/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+      - "/models/qwen3-32b-abliterated-q4_k_m.gguf"
       - "--gpu-layers"
       - "9999"
       - "--ctx-size"
-      - "16384"
+      - "32768"
+      - "--n-parallel" 
+      - "4"
+      - "--batch-size"
+      - "2048"
+      - "--ubatch-size" 
+      - "512"
+      - "--flash-attn"
       - "--api-key"
       - "{{ api_key | default('llamacpp-homelab-key') }}"
       - "--verbose"
