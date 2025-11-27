@@ -1,0 +1,205 @@
+# log pipeline planning document
+
+Status: ⬜ Not Started | ✅ Complete
+
+goals:
+  - watch a real-time stream of logs from multiple devices
+  - tokenize logs and pattern match to detect anomalies
+  - produce a list of anomalies
+  - generate an alert for log anomalies without needing to declare what an anomaly is
+
+## Architecture Overview
+
+```
+Log Sources → Log Collector → Stream Processor → Anomaly Detector → Alert Manager
+                ↓                    ↓                  ↓                 ↓
+            Storage DB          Pattern DB         Grafana/API         n8n
+```
+
+## Components
+
+### 1. Log Collection Layer
+Tool: Promtail (Grafana Labs)
+- Lightweight, high-performance log collector
+- Deployed on each host via Ansible
+- Supports multiple input sources (syslog, journald, Docker logs)
+- Buffers and ships to central processor
+
+Log Source Collection Methods:
+
+a) systemd-journald
+   - Promtail reads directly from journald using systemd journal API
+   - Most comprehensive source (captures everything journald sees)
+   - Includes Docker container logs (if using journald log driver)
+   - Native systemd integration via /var/log/journal
+   - Captures host-level logs, service logs, kernel messages
+
+b) Docker Logs
+   Two approaches:
+   - Option A (Recommended): Via journald
+     * Docker logs to journald by default on most systems
+     * Promtail reads from journald, gets Docker logs automatically
+     * Logs include container metadata (labels, names, image)
+   - Option B: Direct Docker API
+     * Promtail connects to Docker socket (/var/run/docker.sock)
+     * Read container logs directly via Docker API
+     * Better for detailed container-specific parsing and metadata
+
+c) Syslog
+   - For devices that can't run Promtail (network devices, IoT)
+   - Promtail acts as syslog server (UDP/TCP listener on port 1514)
+   - Receives remote syslog messages
+   - Deployed on ocean server as central receiver
+
+Deployment Strategy:
+- Per-host Promtail agents (ocean, dns01, node005, node006):
+  * Collect journald + Docker logs locally
+  * Push to central Loki on ocean
+  * Lightweight systemd service
+- Central Promtail (ocean only):
+  * Syslog listener for remote devices
+  * Receives from network devices, IoT, etc.
+
+### 2. Stream Processing & Storage
+Tool: Loki (integrates with existing Grafana)
+- Time-series log aggregation
+- Efficient storage with compression
+- Native Grafana integration
+- Query language (LogQL) for pattern matching
+
+### 3. Anomaly Detection Engine
+Two-tier approach:
+
+Tier 1: Pattern-based (Fast)
+- Grok patterns for known log formats
+- Statistical analysis: frequency, rate-of-change detection
+- Rule-less detection: entropy analysis, Levenshtein distance
+- Runs continuously, low latency
+
+Tier 2: ML-based (Deep analysis)
+- Tokenization: Word2Vec or similar for log embeddings
+- Clustering: DBSCAN or Isolation Forest for outlier detection
+- LLM Integration: Use llamacpp for semantic understanding
+- Periodic batch analysis (every 5-15 min)
+
+### 4. Alerting Layer
+Tool: n8n (existing service)
+- Webhook receiver from anomaly detector
+- Intelligent routing based on severity
+- Deduplication and rate limiting
+- Multiple channels (email, Slack, PagerDuty)
+
+## Recommended Tech Stack - Option A (Lightweight)
+
+Components:
+  - Log Collector: Promtail (Grafana Labs)
+  - Storage: Loki
+  - Processor: Python service with scikit-learn
+  - ML Engine: llamacpp for embeddings + custom anomaly logic
+  - Alerts: n8n workflows
+  - UI: Grafana dashboards
+
+## Implementation Phases
+
+### Phase 1: Foundation
+⬜ 1. Deploy Loki + Promtail stack
+⬜ 2. Configure log collection from key services (ocean, dns01, node005, node006)
+⬜ 3. Create Grafana dashboards for log visualization
+⬜ 4. Set up basic pattern matching queries
+
+### Phase 2: Anomaly Detection Service
+⬜ 1. Build Python service for anomaly detection:
+   ⬜ Statistical baseline creation
+   ⬜ Frequency/rate analysis
+   ⬜ Pattern clustering
+⬜ 2. Deploy as Docker Compose service on ocean
+⬜ 3. Store baselines in PostgreSQL or Redis
+
+### Phase 3: ML Enhancement
+⬜ 1. Integrate llamacpp for log embeddings
+⬜ 2. Build unsupervised clustering pipeline
+⬜ 3. Implement feedback loop for false positives
+⬜ 4. Add semantic similarity detection
+
+### Phase 4: Alerting & Refinement
+⬜ 1. Create n8n workflows for alert routing
+⬜ 2. Add severity classification
+⬜ 3. Implement alert suppression logic
+⬜ 4. Set up notification channels
+
+## Key Algorithms for Rule-less Detection
+
+1. Frequency Analysis: Flag logs appearing outside 3-sigma from baseline
+2. Entropy Scoring: High entropy = unusual patterns
+3. Time-series Anomalies: Seasonal decomposition for trends
+4. Clustering: Group similar logs, flag outliers (DBSCAN/Isolation Forest)
+5. Embedding Distance: Vector similarity for semantic anomalies
+
+## Required Files
+
+Ansible Playbooks:
+⬜ playbook_ocean_loki.yaml - Loki + Promtail deployment
+⬜ playbook_log_anomaly_detector.yaml - Python anomaly detection service
+⬜ playbooks/tasks/promtail_agent.yaml - Agent deployment for all hosts
+
+Service Files:
+⬜ files/loki/docker-compose.yml.j2
+⬜ files/loki/loki-config.yaml.j2
+⬜ files/promtail/promtail-config.yaml.j2
+⬜ files/log-anomaly/docker-compose.yml.j2
+⬜ files/log-anomaly/anomaly-detector.py
+⬜ files/log-anomaly/requirements.txt
+
+Configuration:
+⬜ vars_log_anomaly.yaml - Sources, thresholds, model config
+⬜ files/n8n/workflows/log-anomaly-alerts.json - Alert workflow
+
+Integration:
+⬜ Update nginx proxy for Loki API access
+⬜ Add Loki datasource to Grafana
+⬜ Configure n8n webhook endpoint
+
+## Resource Requirements
+
+Loki:
+- CPU: 1-2 cores
+- RAM: 1-2GB
+- Storage: 50-100GB (configurable retention)
+
+Anomaly Detector:
+- CPU: 2-4 cores
+- RAM: 2-4GB (ML models)
+- Storage: 10GB (models + baselines)
+
+Promtail (per host):
+- CPU: 0.1-0.5 cores
+- RAM: 128-256MB
+
+## Network Architecture
+
+All services on ocean server (192.168.1.143):
+- Loki: Port 3100 (internal)
+- Anomaly Detector: Port 8085 (internal)
+- Promtail agents: Push to Loki 3100
+- n8n webhook: Existing port 5678
+- Grafana: Existing port 8910 (add Loki datasource)
+
+## Implementation Notes
+
+### Logging Infrastructure Refactor (Completed)
+✅ Split logging configuration into dedicated playbook
+✅ Created: playbooks/individual/base/logging.yaml
+✅ Contains: rsyslog, journald, logrotate, APT cache cleanup
+✅ Updated: playbooks/01_base_system.yaml to import new logging playbook
+✅ Refactored: playbooks/individual/base/tz_sysctl_udev.yaml (removed logging tasks)
+✅ Purpose: Prepare for adding Promtail/Loki log collection to existing logging infrastructure
+
+## Next Steps
+
+⬜ 1. Review design and approve approach
+⬜ 2. Create playbook_ocean_loki.yaml for Loki deployment
+⬜ 3. Create playbook_log_anomaly_detector.yaml for detection service
+⬜ 4. Build anomaly detection Python service
+⬜ 5. Deploy Promtail agents to all hosts
+⬜ 6. Configure Grafana dashboards
+⬜ 7. Set up n8n alert workflows

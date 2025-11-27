@@ -1,10 +1,8 @@
 ---
-- name: TZ systemctl udev systemd and journald logging
+- name: Configure TZ, Sysctl, and Udev
   become: true
   hosts: all
   strategy: free
-  vars:
-    SYSLOG: "192.168.1.65"
   tasks:
   ########### Date and Time
   - name: Set the Host TZ and hwclock to UTC
@@ -29,41 +27,6 @@
 
   - name: Set time and date from NTP upstream
     ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
-
-  ########### Syslog
-  - name: Install rsyslog
-    apt:
-      name: rsyslog
-      state: latest
-      update_cache: no
-
-  - name: Create /etc/rsyslog.d/ directory
-    ansible.builtin.file:
-      path: /etc/rsyslog.d/
-      state: directory
-
-  - name: Rsyslog drop IPVS no route messages
-    ansible.builtin.copy:
-      force: true
-      dest: "/etc/rsyslog.d/0-drop-ipvs-spam.conf"
-      content: |
-        :msg, regex, ".*IPVS.*no destination available" ~
-    notify:
-    - Restart rsyslogd
-
-  - name: Rsyslog remote server configuration
-    ansible.builtin.copy:
-      force: true
-      dest: "/etc/rsyslog.d/99-remote-syslog.conf"
-      content: |
-        # This file is managed by ansible
-
-        module(load="omprog")
-        module(load="mmutf8fix")
-        action(type="mmutf8fix" replacementChar="?")
-        action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
-    notify:
-    - Restart rsyslogd
 
   ########### Sysctl, modules, swap
   - name: Disable swap in /etc/fstab
@@ -141,28 +104,6 @@
     notify:
     - Reload systemd daemon
 
-  ########### systemd-journald
-  - name: Write journald config
-    ansible.builtin.copy:
-      force: true
-      dest: "/etc/systemd/journald.conf"
-      content: |
-        # This file is managed by ansible
-
-        [Journal]
-        Storage=volatile
-        StandardOutput=journal
-        StandardError=journal
-        Compress=true
-        LineMax=10K
-        SystemMaxUse=500M
-        SystemMaxFileSize=100M
-        SystemMaxFiles=5
-        MaxRetentionSec=2week
-        ForwardToSyslog=false
-    notify:
-    - Restart systemd-journald
-
   ########### interfaces are consistently named and have persistent MAC addresses
   - name: Configure systemd-udev MAC link
     ansible.builtin.copy:
@@ -177,64 +118,6 @@
     notify:
     - Restart systemd-udevd
 
-  ########### System log rotation
-  - name: Configure logrotate for system logs
-    ansible.builtin.copy:
-      dest: /etc/logrotate.d/rsyslog
-      content: |
-        # Custom logrotate config for homelab
-        /var/log/syslog {
-            daily
-            rotate 7
-            missingok
-            notifempty
-            compress
-            delaycompress
-            sharedscripts
-            postrotate
-                /usr/lib/rsyslog/rsyslog-rotate
-            endscript
-        }
-        
-        /var/log/kern.log {
-            daily
-            rotate 7
-            missingok
-            notifempty
-            compress
-            delaycompress
-        }
-        
-        /var/log/auth.log {
-            daily
-            rotate 14
-            missingok
-            notifempty
-            compress
-            delaycompress
-        }
-        
-        /var/log/daemon.log {
-            daily
-            rotate 7
-            missingok
-            notifempty
-            compress
-            delaycompress
-        }
-      mode: '0644'
-
-  - name: Configure APT to clean cache automatically
-    ansible.builtin.copy:
-      dest: /etc/apt/apt.conf.d/99-clean-cache
-      content: |
-        APT::Periodic::Download-Upgradeable-Packages "0";
-        APT::Periodic::AutocleanInterval "7";
-        APT::Archives::MaxAge "30";
-        APT::Archives::MinAge "2";
-        APT::Archives::MaxSize "500";
-      mode: '0644'
-
   handlers:
   - name: Reload systemd daemon
     become: true
@@ -245,20 +128,6 @@
     ansible.builtin.service:
       name: systemd-networkd
       state: restarted
-
-  - name: Restart rsyslogd
-    ansible.builtin.systemd:
-      daemon_reload: yes
-      state: restarted
-      enabled: true
-      name: rsyslog.service
-
-  - name: Restart systemd-journald
-    ansible.builtin.systemd:
-      daemon_reload: yes
-      state: restarted
-      enabled: true
-      name: systemd-journald.service
 
   - name: Restart systemd-udevd
     ansible.builtin.service:
