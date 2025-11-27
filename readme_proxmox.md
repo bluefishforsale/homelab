@@ -307,6 +307,18 @@ qm resize 4000 scsi0 +28G
 qm start 4000
 ```
 
+### Metrics VM
+# prometheus, loki, grafana, promtail, log-anomaly-detector
+
+```bash
+qm clone 9999 6000
+qm set 6000 --name metrics --ipconfig0 ip=192.168.1.30/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 6000 --cores 16
+qm set 6000 --memory 16384
+qm resize 6000 scsi0 +100G
+qm start 6000
+```
+
 # OCEAN VM
 ## passes through specific PCIE addresses for GPU and SAS controller
 
