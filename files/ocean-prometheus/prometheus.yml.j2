@@ -153,6 +153,13 @@ scrape_configs:
     - targets: ['node006.home:9080'] 
     - targets: ['dns01.home:9080']
 
+  - job_name: 'log-anomaly-detector'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    static_configs:
+    - targets: ['ocean.home:8086']
+
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
     metrics_path: /probe
@@ -165,12 +172,10 @@ scrape_configs:
         - https://google.com
         - https://cloudflare.com
         - https://github.com
-        - https://stackoverflow.com
         - https://reddit.com
         - https://youtube.com
         - https://wikipedia.org
         - https://aws.amazon.com
-        - https://microsoft.com
         - https://docker.com
         labels:
           probe_type: "http"
@@ -179,8 +184,6 @@ scrape_configs:
         # Cloud providers
         - https://console.aws.amazon.com
         - https://portal.azure.com
-        - https://console.cloud.google.com
-        - https://dashboard.heroku.com
         - https://app.netlify.com
         - https://vercel.com
         - https://digitalocean.com
@@ -212,6 +215,7 @@ scrape_configs:
       - targets:
         # Personal/Project sites
         - https://terrac.com
+        - https://blog.saetnere.com
         - https://quizlet.com
         - https://el.quizlet.com
         labels:
@@ -281,9 +285,7 @@ scrape_configs:
       - targets:
         # Major internet infrastructure
         - nexthop.anarc.at
-        - www.telefonica.de
         - cixp.web.cern.ch
-        - www.sbb.ch
         - cam.ac.uk
         - web.mit.edu
         labels:
@@ -351,17 +353,9 @@ scrape_configs:
       - targets:
         # SMTP services  
         - smtp.gmail.com:587
-        - smtp.outlook.com:587
         labels:
           probe_type: "tcp"
           category: "smtp"
-      - targets:
-        # Database ports (external)
-        - db.example.com:5432
-        - redis.example.com:6379
-        labels:
-          probe_type: "tcp"
-          category: "databases"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -430,6 +424,7 @@ scrape_configs:
         - http://192.168.1.143:5678    # n8n
         - http://192.168.1.143:8910    # Grafana
         - http://192.168.1.143:9090    # Prometheus
+        - http://192.168.1.143:8086    # Log Anomaly Detector
         labels:
           probe_type: "http"
           category: "internal_services"
