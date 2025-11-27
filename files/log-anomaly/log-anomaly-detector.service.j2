@@ -1,0 +1,53 @@
+[Unit]
+Description=Log Anomaly Detector Service
+Documentation=https://github.com/bluefishforsale/homelab
+After=docker.service loki.service
+Requires=docker.service
+Wants=loki.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+WorkingDirectory={{ basedir }}
+Environment=COMPOSE_PROJECT_NAME=log-anomaly-detector
+Environment=HOME={{ basedir }}
+Environment=DOCKER_CONFIG={{ basedir }}/.docker
+
+# Pre-start commands (idempotent) 
+ExecStartPre=-/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml pull --quiet
+ExecStartPre=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml build
+
+# Start command
+ExecStart=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml up -d --wait --timeout 120
+
+# Stop command
+ExecStop=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml down --timeout 30
+
+# Reload command
+ExecReload=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml restart log-anomaly-detector
+
+# Health check
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do if curl -sf http://localhost:8086/health >/dev/null; then exit 0; fi; sleep 2; done; exit 1'
+
+# Security and resource management
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ basedir }}
+NoNewPrivileges=true
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Resource limits
+MemoryMax=2G
+TasksMax=100
+
+[Install]
+WantedBy=multi-user.target

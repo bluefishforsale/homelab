@@ -1,0 +1,336 @@
+{
+  "name": "Log Anomaly Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "log-anomaly",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Log Anomaly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "log-anomaly-detector"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equal",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "id": "critical-filter",
+      "name": "Critical Severity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equal", 
+              "value2": "high"
+            }
+          ]
+        }
+      },
+      "id": "high-filter",
+      "name": "High Severity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "subject": "🚨 CRITICAL LOG ANOMALY: {{ $json.host }}/{{ $json.service }}",
+        "message": "CRITICAL ANOMALY DETECTED\n\n**Host:** {{ $json.host }}\n**Service:** {{ $json.service }}\n**Severity:** {{ $json.severity }}\n**Score:** {{ $json.score }}\n**Type:** {{ $json.anomaly_type }}\n\n**Description:** {{ $json.description }}\n\n**Log Message:**\n```\n{{ $json.log_message }}\n```\n\n**Timestamp:** {{ $json.timestamp }}\n\n**Statistical Scores:**\n{{ JSON.stringify($json.statistical_scores, null, 2) }}\n\nTake immediate action to investigate this critical anomaly.",
+        "options": {
+          "ccList": "",
+          "bccList": ""
+        }
+      },
+      "id": "critical-email",
+      "name": "Send Critical Alert Email",
+      "type": "n8n-nodes-base.emailSend", 
+      "typeVersion": 2,
+      "position": [680, 200],
+      "credentials": {
+        "smtp": {
+          "id": "homelab-smtp",
+          "name": "Homelab SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "subject": "⚠️ HIGH LOG ANOMALY: {{ $json.host }}/{{ $json.service }}",
+        "message": "HIGH PRIORITY ANOMALY DETECTED\n\n**Host:** {{ $json.host }}\n**Service:** {{ $json.service }}\n**Severity:** {{ $json.severity }}\n**Score:** {{ $json.score }}\n**Type:** {{ $json.anomaly_type }}\n\n**Description:** {{ $json.description }}\n\n**Log Message:**\n```\n{{ $json.log_message }}\n```\n\n**Timestamp:** {{ $json.timestamp }}\n\n**Statistical Scores:**\n{{ JSON.stringify($json.statistical_scores, null, 2) }}\n\nReview this anomaly when convenient.",
+        "options": {
+          "ccList": "",
+          "bccList": ""
+        }
+      },
+      "id": "high-email",
+      "name": "Send High Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2, 
+      "position": [680, 400],
+      "credentials": {
+        "smtp": {
+          "id": "homelab-smtp",
+          "name": "Homelab SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Store alert in memory to prevent spam\nconst alertKey = `${items[0].json.host}-${items[0].json.service}-${items[0].json.anomaly_type}`;\nconst now = Date.now();\nconst cooldownPeriod = 5 * 60 * 1000; // 5 minutes\n\n// Get stored alerts from workflow static data\nconst storedAlerts = $workflow.staticData || {};\n\n// Check if we've recently sent an alert for this pattern\nconst lastAlertTime = storedAlerts[alertKey] || 0;\nconst timeSinceLastAlert = now - lastAlertTime;\n\nif (timeSinceLastAlert < cooldownPeriod) {\n  // Skip sending alert - too recent\n  return [];\n}\n\n// Update last alert time\nstoredAlerts[alertKey] = now;\n$workflow.staticData = storedAlerts;\n\n// Return the item to continue processing\nreturn items;"
+      },
+      "id": "rate-limiter",
+      "name": "Rate Limiter",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "mode": "webhook",
+        "webhook": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+        "channel": "#alerts",
+        "username": "Log Anomaly Bot",
+        "text": "",
+        "attachments": [
+          {
+            "color": "{{ $json.severity === 'critical' ? 'danger' : $json.severity === 'high' ? 'warning' : 'good' }}",
+            "title": "Log Anomaly Detected: {{ $json.host }}/{{ $json.service }}",
+            "title_link": "http://192.168.1.143:3100",
+            "fields": [
+              {
+                "title": "Severity",
+                "value": "{{ $json.severity }}",
+                "short": true
+              },
+              {
+                "title": "Score", 
+                "value": "{{ $json.score }}",
+                "short": true
+              },
+              {
+                "title": "Type",
+                "value": "{{ $json.anomaly_type }}",
+                "short": true
+              },
+              {
+                "title": "Timestamp",
+                "value": "{{ $json.timestamp }}",
+                "short": true
+              },
+              {
+                "title": "Description",
+                "value": "{{ $json.description }}",
+                "short": false
+              },
+              {
+                "title": "Log Message",
+                "value": "```{{ $json.log_message }}```",
+                "short": false
+              }
+            ]
+          }
+        ]
+      },
+      "id": "slack-alert",
+      "name": "Send Slack Alert", 
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://192.168.1.143:8910/api/annotations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "{\n  \"time\": {{ Date.parse($json.timestamp) }},\n  \"timeEnd\": {{ Date.parse($json.timestamp) + 60000 }},\n  \"tags\": [\"anomaly\", \"{{ $json.severity }}\", \"{{ $json.host }}\", \"{{ $json.service }}\"],\n  \"text\": \"{{ $json.description }}\"\n}"
+      },
+      "id": "grafana-annotation",
+      "name": "Create Grafana Annotation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [900, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "grafana-api-key",
+          "name": "Grafana API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://192.168.1.143:9093/api/v1/alerts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type", 
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "[\n  {\n    \"labels\": {\n      \"alertname\": \"LogAnomaly\",\n      \"severity\": \"{{ $json.severity }}\",\n      \"host\": \"{{ $json.host }}\", \n      \"service\": \"{{ $json.service }}\",\n      \"anomaly_type\": \"{{ $json.anomaly_type }}\"\n    },\n    \"annotations\": {\n      \"summary\": \"{{ $json.description }}\",\n      \"description\": \"{{ $json.log_message }}\",\n      \"score\": \"{{ $json.score }}\"\n    },\n    \"startsAt\": \"{{ $json.timestamp }}\",\n    \"endsAt\": \"{{ new Date(Date.parse($json.timestamp) + 300000).toISOString() }}\" \n  }\n]"
+      },
+      "id": "alertmanager",
+      "name": "Send to AlertManager",
+      "type": "n8n-nodes-base.httpRequest", 
+      "typeVersion": 3,
+      "position": [900, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equal",
+              "value2": "medium"
+            },
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equal",
+              "value2": "low"
+            }
+          ],
+          "combineOperation": "any"
+        }
+      },
+      "id": "medium-low-filter",
+      "name": "Medium/Low Severity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 700]
+    }
+  ],
+  "connections": {
+    "Log Anomaly Webhook": {
+      "main": [
+        [
+          {
+            "node": "Critical Severity?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "High Severity?", 
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Medium/Low Severity?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critical Severity?": {
+      "main": [
+        [
+          {
+            "node": "Send Critical Alert Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Slack Alert",
+            "type": "main", 
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Severity?": {
+      "main": [
+        [
+          {
+            "node": "Send High Alert Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Slack Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medium/Low Severity?": {
+      "main": [
+        [
+          {
+            "node": "Rate Limiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limiter": {
+      "main": [
+        [
+          {
+            "node": "Create Grafana Annotation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send to AlertManager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "timezone": "America/Los_Angeles"
+  },
+  "createdAt": "2024-11-27T15:43:00.000Z",
+  "updatedAt": "2024-11-27T15:43:00.000Z",
+  "id": "log-anomaly-alerts",
+  "tags": [
+    {
+      "name": "alerts",
+      "id": "alerts"
+    },
+    {
+      "name": "logging",
+      "id": "logging" 
+    }
+  ]
+}

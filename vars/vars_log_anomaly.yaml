@@ -1,0 +1,133 @@
+---
+# Log Anomaly Detection Configuration
+# This file defines patterns, thresholds, and settings for the log anomaly detection system
+
+# Core service configuration
+log_anomaly:
+  service_name: log-anomaly-detector
+  port: 8085
+  loki_url: "http://192.168.1.143:3100"
+  check_interval: 30  # seconds between anomaly checks
+  batch_size: 1000    # logs to process per batch
+  
+  # Statistical thresholds
+  thresholds:
+    frequency_sigma: 3.0      # Standard deviations for frequency anomalies
+    rate_change_threshold: 5.0 # Rate change multiplier threshold
+    entropy_threshold: 4.5     # Entropy score threshold
+    levenshtein_threshold: 0.7 # String similarity threshold (0-1)
+    
+  # Pattern matching configuration
+  patterns:
+    enable_grok: true
+    enable_regex: true
+    enable_statistical: true
+    enable_ruleless: true
+    
+    # Time windows for analysis
+    baseline_window: "24h"    # How far back to establish baselines
+    analysis_window: "5m"     # Current window to analyze
+    
+  # Alert configuration  
+  alerts:
+    enable_alerts: true
+    webhook_url: "http://192.168.1.143:5678/webhook/log-anomaly"
+    severity_levels:
+      - low
+      - medium  
+      - high
+      - critical
+    
+    # Alert thresholds
+    low_threshold: 1          # Single anomaly
+    medium_threshold: 3       # Multiple anomalies in window
+    high_threshold: 10        # Many anomalies or critical patterns
+    critical_threshold: 25    # System-level issues
+    
+  # Retention settings
+  retention:
+    baseline_data: "7d"       # How long to keep statistical baselines
+    anomaly_history: "30d"    # How long to keep detected anomalies
+    pattern_cache: "1d"       # How long to cache compiled patterns
+
+# Pattern categories and their associated files
+pattern_categories:
+  system:
+    description: "System-level logs (kernel, systemd, hardware)"
+    patterns_file: "system.patterns"
+    severity_boost: 1.2
+    
+  security:
+    description: "Authentication, authorization, security events"
+    patterns_file: "security.patterns" 
+    severity_boost: 2.0
+    
+  application:
+    description: "Application-specific logs"
+    patterns_file: "application.patterns"
+    severity_boost: 1.0
+    
+  network:
+    description: "Network-related logs (SSH, HTTP, DNS)"
+    patterns_file: "network.patterns"
+    severity_boost: 1.5
+    
+  docker:
+    description: "Docker container logs"
+    patterns_file: "docker.patterns"
+    severity_boost: 1.1
+    
+  media:
+    description: "Media stack logs (Plex, Sonarr, etc.)"
+    patterns_file: "media.patterns"
+    severity_boost: 1.0
+
+# Known log sources in the homelab
+log_sources:
+  hosts:
+    - ocean
+    - dns01
+    - node005
+    - node006
+    
+  services:
+    # Media stack
+    - plex
+    - sonarr
+    - radarr
+    - bazarr
+    - nzbget
+    - prowlarr
+    - tautulli
+    - overseerr
+    
+    # Infrastructure
+    - nginx
+    - mysql
+    - postgresql
+    - grafana
+    - prometheus
+    - loki
+    - promtail
+    
+    # AI/ML
+    - comfyui
+    - llamacpp
+    - open-webui
+    - n8n
+    
+    # Cloud services
+    - nextcloud
+    - cloudflared
+    - cloudflare-ddns
+
+# Ignore patterns - logs to skip during analysis
+ignore_patterns:
+  - pattern: ".*health check.*"
+    reason: "Routine health checks create noise"
+  - pattern: ".*GET /metrics HTTP/1.1.*200.*"
+    reason: "Prometheus scraping is expected"
+  - pattern: ".*logrotate.*"
+    reason: "Log rotation is routine maintenance"
+  - pattern: ".*CRON.*"
+    reason: "Scheduled cron jobs are expected"

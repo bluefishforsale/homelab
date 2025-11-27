@@ -1,0 +1,68 @@
+# Security Log Patterns for Anomaly Detection
+# Format: PATTERN_NAME GROK_PATTERN [anomaly_score] [description]
+
+# Authentication events
+AUTH_SUCCESS (?i)(accepted|authenticated|login successful).*for.*user 0.5 Successful authentication
+AUTH_FAILURE (?i)(failed|invalid|denied).*password.*for.*user 2.0 Authentication failure
+AUTH_ROOT_LOGIN (?i)(accepted|authenticated).*for.*root 1.5 Root login (monitor)
+AUTH_INVALID_USER (?i)invalid user.*from 3.0 Invalid username attempts
+
+# SSH security events
+SSH_CONNECTION_OPEN (?i)sshd.*connection.*from.*port 0.3 SSH connection opened
+SSH_CONNECTION_CLOSE (?i)sshd.*connection.*closed 0.2 SSH connection closed
+SSH_BRUTE_FORCE (?i)sshd.*repeated.*authentication.*failures 4.5 SSH brute force attack
+SSH_PORT_SCAN (?i)sshd.*did not receive identification string 2.5 SSH port scanning
+SSH_KEY_MISMATCH (?i)sshd.*host key.*changed|key fingerprint 3.5 SSH key mismatch
+
+# Sudo and privilege escalation
+SUDO_SUCCESS (?i)sudo:.*command 0.8 Sudo command execution
+SUDO_FAILURE (?i)sudo:.*incorrect password|not in sudoers 3.0 Sudo access denied
+SUDO_SESSION (?i)sudo:.*session opened|session closed 0.5 Sudo session activity
+ROOT_SHELL_ACCESS (?i)su:.*session opened.*for user root 2.0 Root shell access
+
+# PAM authentication
+PAM_SUCCESS (?i)pam.*session opened 0.3 PAM session opened
+PAM_FAILURE (?i)pam.*authentication failure|access denied 2.5 PAM authentication failure
+PAM_UNUSUAL (?i)pam.*unusual.*activity 3.0 Unusual PAM activity
+
+# Security module activity  
+SELINUX_DENIAL (?i)selinux.*denied|avc.*denied 2.0 SELinux access denied
+APPARMOR_DENIAL (?i)apparmor.*denied|profile.*denied 2.0 AppArmor access denied
+
+# Account management
+USER_ADDED (?i)useradd.*new user|user.*created 1.5 New user account created
+USER_DELETED (?i)userdel.*delete user|user.*removed 2.0 User account deleted
+GROUP_MODIFIED (?i)group.*added|group.*modified 1.5 Group membership changed
+PASSWORD_CHANGE (?i)password.*changed|passwd.*updated 1.0 Password change
+
+# Service access control
+SERVICE_START_ROOT (?i)systemd.*started.*as root 1.0 Service started as root
+SERVICE_PERMISSION (?i)permission denied.*service 2.5 Service permission denied
+
+# Network security events
+FIREWALL_DROP (?i)iptables.*drop|firewall.*blocked 1.0 Firewall blocked connection
+UNUSUAL_NETWORK (?i)connection.*from.*unusual.*port 2.0 Connection from unusual port
+PORT_SCAN_DETECTED (?i)possible port scan|scan attempt 3.0 Port scan detection
+
+# File system security
+FILE_PERMISSION_DENIED (?i)permission denied.*file|access denied.*file 1.5 File access denied
+SENSITIVE_FILE_ACCESS (?i)/etc/passwd|/etc/shadow|/etc/sudoers 2.5 Sensitive file access
+SETUID_EXECUTION (?i)setuid.*executed|suid.*program 2.0 SETUID program execution
+
+# Failed service access
+SERVICE_AUTH_FAIL (?i)service.*authentication.*failed 2.5 Service authentication failure
+WEB_AUTH_FAIL (?i)http.*401|unauthorized.*access 1.5 Web authentication failure
+
+# Anomaly patterns for security
+MULTIPLE_FAIL_USER (?i)(failed|denied).*user.*\b(\w+)\b.*\1.*\1 4.0 Multiple failures same user
+MULTIPLE_FAIL_IP (?i)(failed|denied).*from.*(\d+\.\d+\.\d+\.\d+).*\2.*\2 4.0 Multiple failures same IP
+UNUSUAL_TIME_AUTH (?i)(login|auth|ssh).*([01]?[0-9]|2[0-3]):([0-5][0-9]) 1.5 Authentication at unusual hours
+HIGH_FREQ_AUTH_FAIL (?i)(failed|invalid|denied).*password 3.0 High frequency auth failures
+
+# Privilege escalation attempts
+PRIV_ESC_ATTEMPT (?i)(exploit|escalat|privilege|admin|root).*attempt 4.0 Privilege escalation attempt
+SUSPICIOUS_COMMANDS (?i)(nc|netcat|wget|curl).*shell|bash.*-i 3.5 Suspicious command execution
+
+# Account lockout and security responses
+ACCOUNT_LOCKED (?i)account.*locked|user.*disabled 3.0 Account locked due to security
+SECURITY_ALERT (?i)security.*alert|intrusion.*detected 4.5 Security system alert
