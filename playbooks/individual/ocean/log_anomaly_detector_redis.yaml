@@ -1,0 +1,104 @@
+---
+- name: Deploy Log Anomaly Detection Service with Redis
+  become: true
+  hosts: ocean
+  vars:
+    service_name: log-anomaly-detector
+    basedir: /data01/services/{{ service_name }}
+    user: media
+    group: media
+  tasks:
+  - name: Create log anomaly detector service directories
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0755'
+    loop:
+      - "{{ basedir }}"
+      - "{{ basedir }}/data"
+      - "{{ basedir }}/go"
+      - "{{ basedir }}/patterns"
+      - "{{ basedir }}/redis-data"
+      - "{{ basedir }}/.docker"
+
+  - name: Set Redis data directory permissions
+    ansible.builtin.file:
+      path: "{{ basedir }}/redis-data"
+      state: directory
+      owner: "999"  # Redis user
+      group: "999"  # Redis group
+      mode: '0755'
+
+  - name: Copy Go source code files
+    ansible.builtin.copy:
+      src: ../../../files/log-anomaly/go/
+      dest: "{{ basedir }}/go/"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart log-anomaly-detector
+
+  - name: Copy log pattern files
+    ansible.builtin.copy:
+      src: ../../../files/log-anomaly/patterns/
+      dest: "{{ basedir }}/patterns/"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart log-anomaly-detector
+
+  - name: Deploy log anomaly detector docker-compose file (Redis version)
+    ansible.builtin.template:
+      src: ../../../files/log-anomaly/docker-compose-redis.yml.j2
+      dest: "{{ basedir }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart log-anomaly-detector
+
+  - name: Deploy log anomaly detector environment file
+    ansible.builtin.template:
+      src: ../../../files/log-anomaly/log-anomaly-detector.env.j2
+      dest: "{{ basedir }}/.env"
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Restart log-anomaly-detector
+
+  - name: Deploy log anomaly detector systemd service
+    ansible.builtin.template:
+      src: ../../../files/log-anomaly/log-anomaly-detector.service.j2
+      dest: /etc/systemd/system/log-anomaly-detector.service
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Restart log-anomaly-detector
+
+  - name: Stop previous versions if running
+    ansible.builtin.systemd:
+      name: log-anomaly-detector
+      state: stopped
+    ignore_errors: yes
+
+  - name: Build Go binary with Redis support
+    ansible.builtin.shell: |
+      cd {{ basedir }}
+      docker compose build --no-cache log-anomaly-detector
+    become_user: "{{ user }}"
+    when: true  # Always rebuild to get latest version
+
+  - name: Enable and start log anomaly detector service with Redis
+    ansible.builtin.systemd:
+      name: log-anomaly-detector
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
+  handlers:
+  - name: Restart log-anomaly-detector
+    ansible.builtin.systemd:
+      name: log-anomaly-detector
+      state: restarted
+      daemon_reload: yes

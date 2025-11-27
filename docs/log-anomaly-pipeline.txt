@@ -27,23 +27,17 @@ Tool: Promtail (Grafana Labs)
 
 Log Source Collection Methods:
 
-a) systemd-journald
+✅ systemd-journald
    - Promtail reads directly from journald using systemd journal API
    - Most comprehensive source (captures everything journald sees)
    - Includes Docker container logs (if using journald log driver)
    - Native systemd integration via /var/log/journal
    - Captures host-level logs, service logs, kernel messages
 
-b) Docker Logs
-   Two approaches:
-   - Option A (Recommended): Via journald
+✅ Docker Logs Via journald
      * Docker logs to journald by default on most systems
      * Promtail reads from journald, gets Docker logs automatically
      * Logs include container metadata (labels, names, image)
-   - Option B: Direct Docker API
-     * Promtail connects to Docker socket (/var/run/docker.sock)
-     * Read container logs directly via Docker API
-     * Better for detailed container-specific parsing and metadata
 
 c) Syslog
    - For devices that can't run Promtail (network devices, IoT)
@@ -51,26 +45,26 @@ c) Syslog
    - Receives remote syslog messages
    - Deployed on ocean server as central receiver
 
-Deployment Strategy:
-- Per-host Promtail agents (ocean, dns01, node005, node006):
-  * Collect journald + Docker logs locally
-  * Push to central Loki on ocean
-  * Lightweight systemd service
-- Central Promtail (ocean only):
-  * Syslog listener for remote devices
-  * Receives from network devices, IoT, etc.
+✅ Deployment Strategy:
+    - Per-host Promtail agents (ocean, dns01, node005, node006):
+        * Collect journald + Docker logs locally
+        * Push to central Loki on ocean
+    * Lightweight systemd service
+    - Central Promtail (ocean only):
+        * Syslog listener for remote devices
+        * Receives from network devices, IoT, etc.
 
 ### 2. Stream Processing & Storage
-Tool: Loki (integrates with existing Grafana)
-- Time-series log aggregation
-- Efficient storage with compression
-- Native Grafana integration
-- Query language (LogQL) for pattern matching
+✅ Tool: Loki
+    - Time-series log aggregation
+    - Efficient storage with compression
+    - Native Grafana integration
+    - Query language (LogQL) for pattern matching
 
 ### 3. Anomaly Detection Engine
 Two-tier approach:
 
-Tier 1: Pattern-based (Fast)
+✅ Tier 1: Pattern-based (Fast)
 - Grok patterns for known log formats
 - Statistical analysis: frequency, rate-of-change detection
 - Rule-less detection: entropy analysis, Levenshtein distance

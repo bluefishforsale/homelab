@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  log-anomaly-detector:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    container_name: log-anomaly-detector
+    restart: unless-stopped
+    user: "1001:1001"  # media user
+    ports:
+      - "8085:8085"
+    volumes:
+      - {{ basedir }}/data:/app/data
+      - {{ basedir }}/patterns:/app/patterns:ro
+    environment:
+      - TZ=America/Los_Angeles
+      - LOKI_URL={{ loki_url | default('http://192.168.1.143:3100') }}
+      - CHECK_INTERVAL={{ check_interval | default('30') }}
+      - BATCH_SIZE={{ batch_size | default('1000') }}
+      - WEBHOOK_URL={{ webhook_url | default('http://192.168.1.143:5678/webhook/log-anomaly') }}
+      - FREQUENCY_SIGMA={{ frequency_sigma | default('3.0') }}
+      - RATE_CHANGE_THRESHOLD={{ rate_change_threshold | default('5.0') }}
+      - ENTROPY_THRESHOLD={{ entropy_threshold | default('4.5') }}
+      - LEVENSHTEIN_THRESHOLD={{ levenshtein_threshold | default('0.7') }}
+      - PATTERNS_DIR=/app/patterns
+      - DB_PATH=/app/data/anomaly_stats.db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    networks:
+      - log_anomaly_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  log_anomaly_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16
+          gateway: 172.26.0.1
