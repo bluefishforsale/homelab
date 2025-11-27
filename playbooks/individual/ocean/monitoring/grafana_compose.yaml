@@ -47,6 +47,7 @@
     - mysql-conf
     - provisioning
     - provisioning/users
+    - provisioning/datasources
 
   - name: Check if MySQL database is already initialized
     ansible.builtin.find:
@@ -100,6 +101,31 @@
       mode: '0644'
     register: grafana_users_config
 
+  - name: Create Loki datasource provisioning configuration
+    ansible.builtin.copy:
+      dest: "{{ home }}/provisioning/datasources/loki.yml"
+      content: |
+        apiVersion: 1
+        
+        datasources:
+          - name: Loki
+            type: loki
+            access: proxy
+            url: http://192.168.1.143:3100
+            jsonData:
+              maxLines: 1000
+              derivedFields:
+                - datasourceUid: loki
+                  matcherRegex: "traceID=(\\w+)"
+                  name: TraceID
+                  url: "$${__value.raw}"
+            isDefault: false
+            editable: true
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: grafana_loki_datasource
+
   - name: Create grafana configuration file with integrated MySQL
     ansible.builtin.template:
       src: "{{ files }}/grafana-mysql-container.ini.j2"
@@ -130,7 +156,7 @@
   - name: Show what configuration files changed
     ansible.builtin.debug:
       msg: "Configuration files have been updated - containers will be recreated"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed
 
   - name: Create grafana systemd service
     ansible.builtin.template:
@@ -154,7 +180,7 @@
       docker compose down --timeout 30
       docker compose up -d --force-recreate
       echo "Container recreation completed"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed
 
   handlers:
   - name: Reload systemd daemon
