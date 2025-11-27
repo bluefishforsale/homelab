@@ -1,9 +1,7 @@
 {
-    "log-driver": "json-file",
+    "log-driver": "journald",
     "log-opts": {
-        "max-size": "10m",
-        "max-file": "3",
-        "compress": "true"
+        "tag": "{{ '{{.Name}}' }}"
     },
     "live-restore": true,
     "storage-driver": "overlay2"
