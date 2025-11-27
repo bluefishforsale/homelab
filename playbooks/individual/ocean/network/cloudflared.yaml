@@ -18,8 +18,8 @@
     # Ocean gets the main tunnel (web apps + SSH), others get SSH-only
     tunnel_name: "{{ 'main' if inventory_hostname == 'ocean' else 'ssh_only' }}"
     # Dynamically set based on host - will be overridden by set_fact for non-ocean hosts
-    cred_file: "{{ path_home }}/{{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}.json"
-    tunnel: "{{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}"
+    cred_file: "{{ path_home }}/{{ ssh_tunnel_id | default(cloudflare.tunnel_ids[tunnel_name]) }}.json"
+    tunnel: "{{ ssh_tunnel_id | default(cloudflare.tunnel_ids[tunnel_name]) }}"
 
   tasks:
 
@@ -505,7 +505,7 @@
       body:
         type: "CNAME"
         name: "{{ item.name }}"
-        content: "{{ cloudflared.tunnels[tunnel_name].id }}.cfargotunnel.com"
+        content: "{{ cloudflare.tunnel_ids[tunnel_name] }}.cfargotunnel.com"
         ttl: 1
         proxied: true
         comment: "Cloudflare Tunnel for {{ item.domain }}"
@@ -535,7 +535,7 @@
       body:
         type: "CNAME"
         name: "ssh-ocean"
-        content: "{{ cloudflared.tunnels[tunnel_name].id }}.cfargotunnel.com"
+        content: "{{ cloudflare.tunnel_ids[tunnel_name] }}.cfargotunnel.com"
         ttl: 1
         proxied: true
         comment: "SSH tunnel for ocean"
@@ -846,14 +846,34 @@
       name: cloudflared
       state: present
 
-  - name: Copy cert and tunnel credentials
+  - name: Copy Cloudflare certificate
     ansible.builtin.copy:
-      src: "{{ files }}/{{ item }}"
-      dest: "{{ path_home }}/"
+      src: "{{ files }}/cert.pem"
+      dest: "{{ path_home }}/cert.pem"
       mode: '0600'
-    loop:
-      - "{{ ssh_tunnel_id if inventory_hostname != 'ocean' else cloudflared.tunnels[tunnel_name].id }}.json"
-      - cert.pem
+    notify:
+      - Reload systemd daemon
+      - Restart service
+
+  - name: Create tunnel credentials JSON from vault (ocean main tunnel)
+    ansible.builtin.copy:
+      content: |
+        {"AccountTag":"{{ cloudflare.tunnel_credentials[tunnel_name].account_tag }}","TunnelSecret":"{{ cloudflare.tunnel_credentials[tunnel_name].tunnel_secret }}","TunnelID":"{{ cloudflare.tunnel_credentials[tunnel_name].tunnel_id }}"}
+      dest: "{{ path_home }}/{{ cloudflare.tunnel_ids[tunnel_name] }}.json"
+      mode: '0600'
+    when: inventory_hostname == 'ocean'
+    notify:
+      - Reload systemd daemon
+      - Restart service
+
+  - name: Copy SSH tunnel credentials for non-ocean hosts
+    ansible.builtin.copy:
+      src: "{{ files }}/{{ ssh_tunnel_id }}.json"
+      dest: "{{ path_home }}/{{ ssh_tunnel_id }}.json"
+      mode: '0600'
+    when: 
+      - inventory_hostname != 'ocean'
+      - ssh_tunnel_id is defined
     notify:
       - Reload systemd daemon
       - Restart service

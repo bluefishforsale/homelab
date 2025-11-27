@@ -4,8 +4,6 @@ cloudflared:
   tunnels:
     # Main tunnel for ocean - handles all web apps + ocean SSH
     main:
-      id: "1808d97e-fc1b-4244-8233-f076ff6f9e8a"
-      credentials_file: "1808d97e-fc1b-4244-8233-f076ff6f9e8a.json"
       ingress:
         # Media services (running on ocean - 192.168.1.143)
         - hostname: "overseerr.terrac.com"
