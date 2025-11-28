@@ -254,6 +254,13 @@
       register: nvidia_upgrade_result
       changed_when: "'nvidia' in nvidia_upgrade_result.stdout"
 
+    - name: Install NVIDIA cuda-drivers package (includes nvidia-smi)
+      ansible.builtin.apt:
+        name: cuda-drivers
+        state: present
+        update_cache: yes
+      register: cuda_drivers_install
+
     - name: Blacklist Nouveau driver
       ansible.builtin.copy:
         dest: /etc/modprobe.d/blacklist-nouveau.conf
