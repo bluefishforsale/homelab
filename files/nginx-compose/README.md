@@ -4,7 +4,7 @@ This deployment configures nginx as a reverse proxy using Docker Compose, replac
 
 ## Key Benefits
 
-- **Network Integration**: Automatically connects to `n8n_n8n_network` for seamless container-to-container communication
+- **Network Integration**: Creates and manages the `web_proxy` network for seamless reverse proxy communication
 - **Idempotent Deployment**: Safe to run multiple times without side effects
 - **Health Monitoring**: Built-in health checks for service monitoring
 - **Resource Management**: CPU and memory limits for stable operation
@@ -15,7 +15,7 @@ This deployment configures nginx as a reverse proxy using Docker Compose, replac
 ### Service Configuration
 - **Image**: nginx:1.27.3-alpine
 - **Ports**: 80 (HTTP), 443 (HTTPS)
-- **Network**: n8n_n8n_network (shared with other services)
+- **Network**: web_proxy (created and managed by nginx)
 - **Health Check**: Built-in nginx configuration test
 - **Resources**: 2 CPU cores, 512MB memory limit
 
@@ -31,7 +31,7 @@ This deployment configures nginx as a reverse proxy using Docker Compose, replac
 ```
 
 ### Network Integration
-The nginx container automatically joins the `n8n_n8n_network` Docker network, enabling:
+The nginx container creates and manages the `web_proxy` Docker network, enabling:
 - **Container Name Resolution**: Access services via container names (e.g., `http://comfyui:8188`)
 - **Internal Communication**: Direct container-to-container traffic without external routing
 - **Service Discovery**: Automatic discovery of other services on the same network
@@ -70,7 +70,7 @@ server {
 ### Prerequisites
 1. Docker and Docker Compose installed
 2. ZFS mounts available at `/data01`
-3. n8n_n8n_network Docker network (created automatically)
+3. web_proxy Docker network (created by nginx deployment)
 
 ### Deploy
 ```bash
@@ -111,7 +111,7 @@ docker-compose -f /data01/services/nginx/docker-compose.yml logs -f
    - Check proxy configuration in `conf.d/proxy_hostname.conf`
 
 2. **Container Name Resolution Failed**
-   - Ensure services are on the same Docker network: `docker network inspect n8n_n8n_network`
+   - Ensure services are on the same Docker network: `docker network inspect web_proxy`
    - Verify container names match proxy configuration
 
 3. **Permission Denied**
@@ -122,9 +122,6 @@ docker-compose -f /data01/services/nginx/docker-compose.yml logs -f
 ```bash
 # List Docker networks
 docker network ls
-
-# Inspect network members
-docker network inspect n8n_n8n_network
 
 # Test container connectivity from nginx
 docker exec nginx curl -I http://comfyui:8188

@@ -29,7 +29,6 @@ graph TB
         subgraph "AI/ML Services"
             LlamaCpp[🧠 llama.cpp<br/>:8080<br/>GPU Accelerated]
             OpenWebUI[💬 Open WebUI<br/>:3000]
-            N8N[🔄 n8n<br/>:5678<br/>PostgreSQL Backend]
             ComfyUI[🎨 ComfyUI<br/>:8188<br/>GPU Accelerated]
         end
         
@@ -52,9 +51,6 @@ graph TB
     Cloudflared --> Nginx
     Nginx --> Plex
     Nginx --> OpenWebUI
-    Nginx --> N8N
-    
-    MySQL --> N8N
     MySQL --> Grafana
     
     Prowlarr --> Sonarr

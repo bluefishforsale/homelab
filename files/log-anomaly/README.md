@@ -51,7 +51,6 @@ The service implements a **Tier 1: Pattern-based** anomaly detection approach wi
 | `LOKI_URL` | `http://192.168.1.143:3100` | Loki API endpoint |
 | `CHECK_INTERVAL` | `30` | Seconds between anomaly checks |
 | `BATCH_SIZE` | `1000` | Max logs processed per batch |
-| `WEBHOOK_URL` | `http://192.168.1.143:5678/webhook/log-anomaly` | n8n webhook for alerts |
 | `FREQUENCY_SIGMA` | `3.0` | Z-score threshold for frequency anomalies |
 | `RATE_CHANGE_THRESHOLD` | `5.0` | Rate change multiplier threshold |
 | `ENTROPY_THRESHOLD` | `4.5` | Entropy score threshold |
@@ -121,32 +120,6 @@ cd /data01/services/log-anomaly-detector
 docker compose up -d
 ```
 
-## Integration with n8n
-
-The service sends webhook alerts to n8n with this payload:
-
-```json
-{
-  "timestamp": "2024-11-27T15:43:00.123Z",
-  "host": "ocean",
-  "service": "nginx",
-  "severity": "high", 
-  "anomaly_type": "pattern_based",
-  "score": 4.2,
-  "description": "Pattern NGINX_ERROR: Nginx error",
-  "log_message": "2024/11/27 15:43:00 [error] nginx: connection failed",
-  "pattern_matches": [...],
-  "statistical_scores": {...}
-}
-```
-
-### n8n Workflow Setup
-
-1. Create HTTP webhook trigger: `POST /webhook/log-anomaly`
-2. Add conditional routing based on severity
-3. Configure notification channels (email, Slack, etc.)
-4. Implement alert suppression logic
-
 ## Monitoring and Maintenance
 
 ### Log Files
@@ -211,4 +184,3 @@ curl http://192.168.1.143:3100/ready
 - No privileged access required
 - Read-only access to pattern files
 - Database stored on persistent volume
-- Webhook authentication via n8n configuration

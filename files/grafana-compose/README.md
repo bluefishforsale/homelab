@@ -4,7 +4,6 @@ This deployment configures Grafana as a monitoring and visualization platform us
 
 ## Key Benefits
 
-- **Network Integration**: Automatically connects to `n8n_n8n_network` for seamless container-to-container communication
 - **Idempotent Deployment**: Safe to run multiple times without side effects
 - **Health Monitoring**: Built-in health checks for service monitoring
 - **Resource Management**: CPU and memory limits for stable operation
@@ -15,7 +14,6 @@ This deployment configures Grafana as a monitoring and visualization platform us
 ### Service Configuration
 - **Image**: grafana/grafana:11.5.4
 - **Port**: 8910:3000 (external:internal)
-- **Network**: n8n_n8n_network (shared with other services)
 - **Database**: MySQL at 192.168.1.143:3306
 - **Health Check**: Built-in API health endpoint
 - **Resources**: 1 CPU core, 1GB memory limit
@@ -43,7 +41,7 @@ Grafana uses MySQL database for persistent storage:
 
 ## Network Integration
 
-The Grafana container automatically joins the `n8n_n8n_network` Docker network, enabling:
+The Grafana container automatically joins the `web_proxy` Docker network, enabling:
 - **Container Name Resolution**: nginx can access via `http://grafana:3000`
 - **Internal Communication**: Direct container-to-container traffic
 - **Service Discovery**: Automatic discovery by other services on the same network
@@ -66,7 +64,7 @@ The Grafana container automatically joins the `n8n_n8n_network` Docker network, 
 1. Docker and Docker Compose installed
 2. ZFS mounts available at `/data01`
 3. MySQL database accessible at `192.168.1.143:3306`
-4. n8n_n8n_network Docker network (created automatically)
+4. web_proxy Docker network (created by nginx)
 
 ### Deploy
 ```bash
@@ -111,7 +109,7 @@ docker-compose -f /data01/services/grafana/docker-compose.yml logs -f
    - Manually install: `docker exec grafana grafana-cli plugins install marcusolsson-treemap-panel`
 
 3. **Container Network Issues**
-   - Verify network membership: `docker network inspect n8n_n8n_network`
+   - Verify network membership: `docker network inspect web_proxy`
    - Test nginx connectivity: `docker exec nginx curl -I http://grafana:3000`
 
 ### Network Debugging
@@ -120,7 +118,7 @@ docker-compose -f /data01/services/grafana/docker-compose.yml logs -f
 docker network ls
 
 # Inspect network members  
-docker network inspect n8n_n8n_network
+docker network inspect web_proxy
 
 # Test container connectivity from nginx
 docker exec nginx curl -I http://grafana:3000/api/health
@@ -150,7 +148,7 @@ If migrating from the previous systemd-based deployment:
 ### Prometheus Data Source
 Grafana is pre-configured to connect to Prometheus for metrics visualization:
 - **URL**: http://prometheus:9090 (container name resolution)
-- **Network**: Shared n8n_n8n_network enables direct communication
+- **Network**: Shared web_proxy network enables direct communication
 
 ### Dashboard Management
 - **Default Dashboards**: Import monitoring dashboards for infrastructure services

@@ -22,7 +22,6 @@ flowchart TD
     MediaEnhance --> Phase4{Phase 4<br/>AI/ML Services}
     Phase4 --> LlamaAPI[playbook_ocean_llamacpp.yaml<br/>🧠 LLM API Server]
     LlamaAPI --> WebUI[playbook_ocean_open_webui.yaml<br/>💬 Web Interface]
-    WebUI --> N8N[playbook_ocean_n8n.yaml<br/>🔄 Workflow Automation]
     N8N --> ComfyUI[playbook_ocean_comfyui.yaml<br/>🎨 AI Image Generation]
     
     ComfyUI --> Phase5{Phase 5<br/>Optional Services}

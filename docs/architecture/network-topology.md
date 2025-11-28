@@ -19,7 +19,7 @@ graph TB
             end
             
             subgraph "AI Network" 
-                AIServices[🧠 AI/ML Stack<br/>LLMs, ComfyUI, n8n]
+                AIServices[🧠 AI/ML Stack<br/>LLMs, ComfyUI]
             end
             
             subgraph "Data Network"

@@ -13,7 +13,7 @@ goals:
 ```
 Log Sources → Log Collector → Stream Processor → Anomaly Detector → Alert Manager
                 ↓                    ↓                  ↓                 ↓
-            Storage DB          Pattern DB         Grafana/API         n8n
+            Storage DB          Pattern DB         Grafana/API         log-anomaly-ml-processor
 ```
 
 ## Components
@@ -70,14 +70,14 @@ Two-tier approach:
 - Rule-less detection: entropy analysis, Levenshtein distance
 - Runs continuously, low latency
 
-Tier 2: ML-based (Deep analysis)
+Tier 2: log-anomaly-ml-processor + llamacpp ML-based (Deep analysis)
 - Tokenization: Word2Vec or similar for log embeddings
 - Clustering: DBSCAN or Isolation Forest for outlier detection
 - LLM Integration: Use llamacpp for semantic understanding
 - Periodic batch analysis (every 5-15 min)
 
 ### 4. Alerting Layer
-Tool: n8n (existing service)
+Tool: new service log-anomaly-ml-processor
 - Webhook receiver from anomaly detector
 - Intelligent routing based on severity
 - Deduplication and rate limiting
@@ -90,7 +90,7 @@ Components:
   - Storage: Loki
   - Processor: Python service with scikit-learn
   - ML Engine: llamacpp for embeddings + custom anomaly logic
-  - Alerts: n8n workflows
+  - Alerts: log-anomaly-ml-processor workflows
   - UI: Grafana dashboards
 
 ## Implementation Phases
@@ -116,7 +116,7 @@ Components:
 ⬜ 4. Add semantic similarity detection
 
 ### Phase 4: Alerting & Refinement
-⬜ 1. Create n8n workflows for alert routing
+⬜ 1. log-anomaly-ml-processor
 ⬜ 2. Add severity classification
 ⬜ 3. Implement alert suppression logic
 ⬜ 4. Set up notification channels
@@ -146,12 +146,10 @@ Service Files:
 
 Configuration:
 ⬜ vars_log_anomaly.yaml - Sources, thresholds, model config
-⬜ files/n8n/workflows/log-anomaly-alerts.json - Alert workflow
 
 Integration:
 ⬜ Update nginx proxy for Loki API access
 ⬜ Add Loki datasource to Grafana
-⬜ Configure n8n webhook endpoint
 
 ## Resource Requirements
 
@@ -175,7 +173,7 @@ All services on ocean server (192.168.1.143):
 - Loki: Port 3100 (internal)
 - Anomaly Detector: Port 8085 (internal)
 - Promtail agents: Push to Loki 3100
-- n8n webhook: Existing port 5678
+- log-anomaly-ml-processor: Existing port (need to pick a port)
 - Grafana: Existing port 8910 (add Loki datasource)
 
 ## Implementation Notes
@@ -196,4 +194,4 @@ All services on ocean server (192.168.1.143):
 ⬜ 4. Build anomaly detection Python service
 ⬜ 5. Deploy Promtail agents to all hosts
 ⬜ 6. Configure Grafana dashboards
-⬜ 7. Set up n8n alert workflows
+⬜ 7. log-anomaly-ml-processor

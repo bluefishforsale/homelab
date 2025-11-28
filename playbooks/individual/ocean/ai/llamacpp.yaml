@@ -4,6 +4,10 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_llamacpp_models.yaml
+
   vars:
     service: llamacpp
     image: ghcr.io/ggerganov/llama.cpp
@@ -16,6 +20,8 @@
     uid: 1001
     gid: 1001
     api_key: llamacpp-homelab-key
+    # RTX 3090 optimized profile  
+    selected_profile: max_performance
 
   tasks:
 
@@ -38,6 +44,61 @@
     - models
     - config
     - logs
+
+  - name: Debug HuggingFace token availability
+    ansible.builtin.debug:
+      msg: "HF Token available: {{ 'Yes' if (ai_services.huggingface.token is defined and ai_services.huggingface.token != '') else 'No' }}"
+    tags:
+      - models
+      - debug
+
+  - name: Download authenticated HuggingFace models (QwQ-32B) 
+    ansible.builtin.get_url:
+      url: "https://huggingface.co/{{ item.1.repo_id }}/resolve/main/{{ item.1.filename }}"
+      dest: "{{ home }}/models/{{ item.1.name }}"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      timeout: "{{ item.1.timeout | default(3600) }}"
+      force: false
+      headers:
+        Authorization: "Bearer {{ ai_services.huggingface.token }}"
+    with_subelements:
+      - "{{ llamacpp_models | dict2items }}"
+      - value
+    when: 
+      - item.1.requires_auth | default(false)
+      - item.1.priority <= 2
+      - ai_services.huggingface.token is defined
+      - ai_services.huggingface.token != ''
+    tags: 
+      - models
+      - download
+      - auth
+    retries: 3
+    delay: 10
+    register: hf_download_result
+
+  - name: Download public models (fallback and others)
+    ansible.builtin.get_url:
+      url: "{{ item.1.url }}"
+      dest: "{{ home }}/models/{{ item.1.name }}"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      timeout: "{{ item.1.timeout | default(3600) }}"
+      force: false
+    with_subelements:
+      - "{{ llamacpp_models | dict2items }}"
+      - value
+    when: 
+      - not (item.1.requires_auth | default(false))
+      - item.1.priority <= 2
+    tags: 
+      - models
+      - download
+    retries: 3
+    delay: 10
 
   - name: Create docker-compose.yml
     ansible.builtin.template:

@@ -29,7 +29,6 @@ A bare-bones, semi-production like homelab built on FOSS principles with automat
 |---------|---------|---------|
 | **Plex** | Media streaming server | https://plex.home |
 | **Grafana** | Monitoring dashboards | https://grafana.home |
-| **N8N** | Workflow automation | https://n8n.home |
 | **Open WebUI** | AI chat interface | https://open-webui.home|
 | **GitLab** | CI/CD and source control | http://gitlab.home |
 | **Pi-hole** | Network ad-blocking | http://pihole.home/admin |
@@ -125,7 +124,7 @@ See [Playbooks README](playbooks/README.md) for complete usage guide.
 
 ### Container Services (Ocean Host)
 - **Media Stack**: Plex, Sonarr, Radarr, Tautulli, NZBGet, Overseerr
-- **AI/ML Services**: N8N, Open WebUI, ComfyUI, llama.cpp
+- **AI/ML Services**: Open WebUI, ComfyUI, llama.cpp
 - **Monitoring**: Grafana, Prometheus, cAdvisor
 - **Development**: Portainer, MySQL
 

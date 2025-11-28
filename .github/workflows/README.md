@@ -103,7 +103,7 @@ Deploys individual **non-critical** services on the ocean server:
 **Media Services:** sonarr, radarr, prowlarr, bazarr, nzbget, tautulli, overseerr, plex-meta-manager, tdarr, audible-downloader
 *(Note: Plex excluded - use deploy-critical-service.yml)*
 
-**AI/ML Services:** llamacpp, open-webui, n8n, comfyui
+**AI/ML Services:** llamacpp, open-webui, comfyui
 
 **Cloud Services:** nextcloud, payloadcms, strapi, tinacms
 
@@ -330,7 +330,6 @@ The CI workflow will validate all changes before merging.
 📦 Ocean Services to Deploy:
   - sonarr
   - radarr
-  - n8n
 
 🔴 Critical Services Detected:
   - plex
@@ -338,7 +337,6 @@ The CI workflow will validate all changes before merging.
 
 ✅ Deploying sonarr... SUCCESS
 ✅ Deploying radarr... SUCCESS
-✅ Deploying n8n... SUCCESS
 ```
 
 ### Example: Critical Service Deployment

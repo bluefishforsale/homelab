@@ -486,22 +486,6 @@ docker exec plex tail -f /config/Library/Application\ Support/Plex\ Media\ Serve
 # Plex Settings > Server > Transcoder > Use hardware acceleration
 ```
 
-### N8N Workflow Issues
-
-#### Database Connection Problems
-```bash
-# Check PostgreSQL status
-docker ps | grep n8n-db
-docker logs n8n-db
-
-# Check N8N database connectivity
-docker exec n8n-db pg_isready -U n8n
-
-# Reset database connection
-docker restart n8n
-docker restart n8n-db
-```
-
 ## 📊 Monitoring & Alerting Issues
 
 ### Grafana Access Problems
