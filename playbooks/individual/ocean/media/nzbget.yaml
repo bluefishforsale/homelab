@@ -117,3 +117,4 @@
     ansible.builtin.systemd:
       name: nzbget-exporter.service
       state: restarted
+      enabled: true

@@ -2,254 +2,252 @@
 name: Deploy Ocean Service
 
 on:
-    workflow_dispatch:
-        inputs:
-            service:
-                description: "Service to deploy (EXCLUDES critical: DNS, DHCP, Plex)"
-                required: true
-                type: choice
-                options:
-                    # Network Services
-                    - nginx
-                    - cloudflared
-                    - cloudflare_ddns
-                    # Media Services (Plex excluded - use deploy-critical-service.yml)
-                    - sonarr
-                    - radarr
-                    - prowlarr
-                    - bazarr
-                    - nzbget
-                    - tautulli
-                    - overseerr
-                    - plex-meta-manager
-                    - tdarr
-                    - audible-downloader
-                    # AI/ML Services
-                    - llamacpp
-                    - open-webui
-                    - n8n
-                    - comfyui
-                    # Cloud Services
-                    - nextcloud
-                    - payloadcms
-                    - strapi
-                    - tinacms
-                    # Monitoring
-                    - prometheus
-                    - grafana
-            skip_models:
-                description: "Skip model downloads (ComfyUI only)"
-                required: false
-                type: boolean
-                default: false
-            check_mode:
-                description: "Run in check mode (dry-run)"
-                required: false
-                type: boolean
-                default: false
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy (EXCLUDES critical: DNS, DHCP, Plex)"
+        required: true
+        type: choice
+        options:
+          # Network Services
+          - nginx
+          - cloudflared
+          - cloudflare_ddns
+          # Media Services (Plex excluded - use deploy-critical-service.yml)
+          - sonarr
+          - radarr
+          - prowlarr
+          - bazarr
+          - nzbget
+          - tautulli
+          - overseerr
+          - plex-meta-manager
+          - tdarr
+          - audible-downloader
+          # AI/ML Services
+          - llamacpp
+          - open-webui
+          - comfyui
+          # Cloud Services
+          - nextcloud
+          - payloadcms
+          - strapi
+          - tinacms
+          # Monitoring
+          - prometheus
+          - grafana
+      skip_models:
+        description: "Skip model downloads (ComfyUI only)"
+        required: false
+        type: boolean
+        default: false
+      check_mode:
+        description: "Run in check mode (dry-run)"
+        required: false
+        type: boolean
+        default: false
 
 env:
-    ANSIBLE_FORCE_COLOR: "true"
-    ANSIBLE_HOST_KEY_CHECKING: "false"
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
 
 jobs:
-    determine-playbook:
-        name: Determine Playbook
-        runs-on: [self-hosted, homelab, ansible]
-        outputs:
-            playbook: ${{ steps.map.outputs.playbook }}
-        steps:
-            - name: Map service to playbook
-              id: map
-              run: |
-                  SERVICE="${{ inputs.service }}"
+  determine-playbook:
+    name: Determine Playbook
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      playbook: ${{ steps.map.outputs.playbook }}
+    steps:
+      - name: Map service to playbook
+        id: map
+        run: |
+          SERVICE="${{ inputs.service }}"
 
-                  case "$SERVICE" in
-                    # Network
-                    nginx) PLAYBOOK="playbooks/individual/ocean/network/nginx_compose.yaml" ;;
-                    cloudflared) PLAYBOOK="playbooks/individual/ocean/network/cloudflared.yaml" ;;
-                    cloudflare_ddns) PLAYBOOK="playbooks/individual/ocean/network/cloudflare_ddns.yaml" ;;
-                    
-                    # Media (Plex excluded - use deploy-critical-service.yml)
-                    sonarr) PLAYBOOK="playbooks/individual/ocean/media/sonarr.yaml" ;;
-                    radarr) PLAYBOOK="playbooks/individual/ocean/media/radarr.yaml" ;;
-                    prowlarr) PLAYBOOK="playbooks/individual/ocean/media/prowlarr.yaml" ;;
-                    bazarr) PLAYBOOK="playbooks/individual/ocean/media/bazarr.yaml" ;;
-                    nzbget) PLAYBOOK="playbooks/individual/ocean/media/nzbget.yaml" ;;
-                    tautulli) PLAYBOOK="playbooks/individual/ocean/media/tautulli.yaml" ;;
-                    overseerr) PLAYBOOK="playbooks/individual/ocean/media/overseerr.yaml" ;;
-                    plex-meta-manager) PLAYBOOK="playbooks/individual/ocean/media/plex-meta-manager.yaml" ;;
-                    tdarr) PLAYBOOK="playbooks/individual/ocean/media/tdarr.yaml" ;;
-                    audible-downloader) PLAYBOOK="playbooks/individual/ocean/media/audible-downloader.yaml" ;;
-                    
-                    # AI/ML
-                    llamacpp) PLAYBOOK="playbooks/individual/ocean/ai/llamacpp.yaml" ;;
-                    open-webui) PLAYBOOK="playbooks/individual/ocean/ai/open-webui.yaml" ;;
-                    n8n) PLAYBOOK="playbooks/individual/ocean/ai/n8n.yaml" ;;
-                    comfyui) PLAYBOOK="playbooks/individual/ocean/ai/comfyui.yaml" ;;
-                    
-                    # Cloud
-                    nextcloud) PLAYBOOK="playbooks/individual/ocean/services/nextcloud.yaml" ;;
-                    payloadcms) PLAYBOOK="playbooks/individual/ocean/services/payloadcms.yaml" ;;
-                    strapi) PLAYBOOK="playbooks/individual/ocean/services/strapi.yaml" ;;
-                    tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
-                    
-                    # Monitoring
-                    prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;
-                    grafana) PLAYBOOK="playbooks/individual/ocean/monitoring/grafana_compose.yaml" ;;
-                    
-                    *) echo "❌ Unknown service: $SERVICE"; exit 1 ;;
-                  esac
+          case "$SERVICE" in
+            # Network
+            nginx) PLAYBOOK="playbooks/individual/ocean/network/nginx_compose.yaml" ;;
+            cloudflared) PLAYBOOK="playbooks/individual/ocean/network/cloudflared.yaml" ;;
+            cloudflare_ddns) PLAYBOOK="playbooks/individual/ocean/network/cloudflare_ddns.yaml" ;;
+            
+            # Media (Plex excluded - use deploy-critical-service.yml)
+            sonarr) PLAYBOOK="playbooks/individual/ocean/media/sonarr.yaml" ;;
+            radarr) PLAYBOOK="playbooks/individual/ocean/media/radarr.yaml" ;;
+            prowlarr) PLAYBOOK="playbooks/individual/ocean/media/prowlarr.yaml" ;;
+            bazarr) PLAYBOOK="playbooks/individual/ocean/media/bazarr.yaml" ;;
+            nzbget) PLAYBOOK="playbooks/individual/ocean/media/nzbget.yaml" ;;
+            tautulli) PLAYBOOK="playbooks/individual/ocean/media/tautulli.yaml" ;;
+            overseerr) PLAYBOOK="playbooks/individual/ocean/media/overseerr.yaml" ;;
+            plex-meta-manager) PLAYBOOK="playbooks/individual/ocean/media/plex-meta-manager.yaml" ;;
+            tdarr) PLAYBOOK="playbooks/individual/ocean/media/tdarr.yaml" ;;
+            audible-downloader) PLAYBOOK="playbooks/individual/ocean/media/audible-downloader.yaml" ;;
+            
+            # AI/ML
+            llamacpp) PLAYBOOK="playbooks/individual/ocean/ai/llamacpp.yaml" ;;
+            open-webui) PLAYBOOK="playbooks/individual/ocean/ai/open-webui.yaml" ;;
+            comfyui) PLAYBOOK="playbooks/individual/ocean/ai/comfyui.yaml" ;;
+            
+            # Cloud
+            nextcloud) PLAYBOOK="playbooks/individual/ocean/services/nextcloud.yaml" ;;
+            payloadcms) PLAYBOOK="playbooks/individual/ocean/services/payloadcms.yaml" ;;
+            strapi) PLAYBOOK="playbooks/individual/ocean/services/strapi.yaml" ;;
+            tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
+            
+            # Monitoring
+            prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;
+            grafana) PLAYBOOK="playbooks/individual/ocean/monitoring/grafana_compose.yaml" ;;
+            
+            *) echo "❌ Unknown service: $SERVICE"; exit 1 ;;
+          esac
 
-                  echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
-                  echo "📋 Service '$SERVICE' → Playbook: $PLAYBOOK"
+          echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
+          echo "📋 Service '$SERVICE' → Playbook: $PLAYBOOK"
 
-    validate:
-        name: Validate & Lint
-        needs: determine-playbook
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  validate:
+    name: Validate & Lint
+    needs: determine-playbook
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Validate YAML syntax
-              run: |
-                  echo "Validating YAML syntax for ${{ needs.determine-playbook.outputs.playbook }}"
-                  python3 -c "import yaml; yaml.safe_load(open('${{ needs.determine-playbook.outputs.playbook }}'))"
+      - name: Validate YAML syntax
+        run: |
+          echo "Validating YAML syntax for ${{ needs.determine-playbook.outputs.playbook }}"
+          python3 -c "import yaml; yaml.safe_load(open('${{ needs.determine-playbook.outputs.playbook }}'))"
 
-            - name: Validate Ansible syntax
-              run: |
-                  echo "Validating Ansible playbook syntax"
-                  ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}
+      - name: Validate Ansible syntax
+        run: |
+          echo "Validating Ansible playbook syntax"
+          ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}
 
-            - name: Lint playbook
-              run: |
-                  if command -v ansible-lint &> /dev/null; then
-                    echo "Running ansible-lint"
-                    ansible-lint ${{ needs.determine-playbook.outputs.playbook }}
-                  else
-                    echo "⚠️  ansible-lint not found, skipping"
-                  fi
+      - name: Lint playbook
+        run: |
+          if command -v ansible-lint &> /dev/null; then
+            echo "Running ansible-lint"
+            ansible-lint ${{ needs.determine-playbook.outputs.playbook }}
+          else
+            echo "⚠️  ansible-lint not found, skipping"
+          fi
 
-    dry-run:
-        name: Dry-Run (Check Mode)
-        needs: [determine-playbook, validate]
-        if: ${{ inputs.check_mode == false }}
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  dry-run:
+    name: Dry-Run (Check Mode)
+    needs: [determine-playbook, validate]
+    if: ${{ inputs.check_mode == false }}
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Set up SSH keys
-              run: ssh-add -l || echo "No SSH keys loaded"
+      - name: Set up SSH keys
+        run: ssh-add -l || echo "No SSH keys loaded"
 
-            - name: Run dry-run deployment
-              env:
-                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-              run: |
-                  set -e  # Exit immediately on error
-                  set -o pipefail  # Catch errors in pipes
+      - name: Run dry-run deployment
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e  # Exit immediately on error
+          set -o pipefail  # Catch errors in pipes
 
-                  CMD="ansible-playbook ${{ needs.determine-playbook.outputs.playbook }} --check"
+          CMD="ansible-playbook ${{ needs.determine-playbook.outputs.playbook }} --check"
 
-                  # Skip model downloads for ComfyUI if requested
-                  if [ "${{ inputs.service }}" = "comfyui" ] && [ "${{ inputs.skip_models }}" = "true" ]; then
-                    CMD="$CMD --skip-tags models"
-                  fi
+          # Skip model downloads for ComfyUI if requested
+          if [ "${{ inputs.service }}" = "comfyui" ] && [ "${{ inputs.skip_models }}" = "true" ]; then
+            CMD="$CMD --skip-tags models"
+          fi
 
-                  if [ -n "$VAULT_PASSWORD" ]; then
-                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
-                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
-                  fi
+          if [ -n "$VAULT_PASSWORD" ]; then
+            echo "$VAULT_PASSWORD" > /tmp/vault_pass
+            CMD="$CMD --vault-password-file=/tmp/vault_pass"
+          fi
 
-                  echo "🔍 Running dry-run: $CMD"
-                  eval $CMD
-                  EXIT_CODE=$?
+          echo "🔍 Running dry-run: $CMD"
+          eval $CMD
+          EXIT_CODE=$?
 
-                  rm -f /tmp/vault_pass
+          rm -f /tmp/vault_pass
 
-                  if [ $EXIT_CODE -ne 0 ]; then
-                    echo "❌ Dry-run FAILED with exit code $EXIT_CODE"
-                    echo "Deployment will NOT proceed"
-                    exit $EXIT_CODE
-                  fi
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ Dry-run FAILED with exit code $EXIT_CODE"
+            echo "Deployment will NOT proceed"
+            exit $EXIT_CODE
+          fi
 
-                  echo "✅ Dry-run PASSED - deployment may proceed"
+          echo "✅ Dry-run PASSED - deployment may proceed"
 
-    deploy:
-        name: Deploy ${{ inputs.service }}
-        needs: [determine-playbook, validate, dry-run]
-        if: ${{ always() && needs.validate.result == 'success' && (inputs.check_mode == true || needs.dry-run.result == 'success') }}
-        runs-on: [self-hosted, homelab, ansible]
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  deploy:
+    name: Deploy ${{ inputs.service }}
+    needs: [determine-playbook, validate, dry-run]
+    if: ${{ always() && needs.validate.result == 'success' && (inputs.check_mode == true || needs.dry-run.result == 'success') }}
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Set up SSH keys
-              run: ssh-add -l || echo "No SSH keys loaded"
+      - name: Set up SSH keys
+        run: ssh-add -l || echo "No SSH keys loaded"
 
-            - name: Display deployment info
-              run: |
-                  echo "📋 Deployment Configuration:"
-                  echo "  Service: ${{ inputs.service }}"
-                  echo "  Playbook: ${{ needs.determine-playbook.outputs.playbook }}"
-                  echo "  Check mode: ${{ inputs.check_mode }}"
-                  echo "  Skip models: ${{ inputs.skip_models }}"
-                  echo ""
-                  if [ "${{ inputs.check_mode }}" = "true" ]; then
-                    echo "⚠️  Running in CHECK MODE (no changes will be made)"
-                  else
-                    echo "🚀 Running in LIVE MODE (changes will be applied)"
-                  fi
+      - name: Display deployment info
+        run: |
+          echo "📋 Deployment Configuration:"
+          echo "  Service: ${{ inputs.service }}"
+          echo "  Playbook: ${{ needs.determine-playbook.outputs.playbook }}"
+          echo "  Check mode: ${{ inputs.check_mode }}"
+          echo "  Skip models: ${{ inputs.skip_models }}"
+          echo ""
+          if [ "${{ inputs.check_mode }}" = "true" ]; then
+            echo "⚠️  Running in CHECK MODE (no changes will be made)"
+          else
+            echo "🚀 Running in LIVE MODE (changes will be applied)"
+          fi
 
-            - name: Run Ansible playbook
-              env:
-                  VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-              run: |
-                  set -e  # Exit immediately on error
-                  set -o pipefail  # Catch errors in pipes
+      - name: Run Ansible playbook
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e  # Exit immediately on error
+          set -o pipefail  # Catch errors in pipes
 
-                  CMD="ansible-playbook ${{ needs.determine-playbook.outputs.playbook }}"
+          CMD="ansible-playbook ${{ needs.determine-playbook.outputs.playbook }}"
 
-                  # Add check mode if enabled
-                  if [ "${{ inputs.check_mode }}" = "true" ]; then
-                    CMD="$CMD --check"
-                  fi
+          # Add check mode if enabled
+          if [ "${{ inputs.check_mode }}" = "true" ]; then
+            CMD="$CMD --check"
+          fi
 
-                  # Skip model downloads for ComfyUI if requested
-                  if [ "${{ inputs.service }}" = "comfyui" ] && [ "${{ inputs.skip_models }}" = "true" ]; then
-                    CMD="$CMD --skip-tags models"
-                  fi
+          # Skip model downloads for ComfyUI if requested
+          if [ "${{ inputs.service }}" = "comfyui" ] && [ "${{ inputs.skip_models }}" = "true" ]; then
+            CMD="$CMD --skip-tags models"
+          fi
 
-                  # Add vault password if secret is set
-                  if [ -n "$VAULT_PASSWORD" ]; then
-                    echo "$VAULT_PASSWORD" > /tmp/vault_pass
-                    CMD="$CMD --vault-password-file=/tmp/vault_pass"
-                  fi
+          # Add vault password if secret is set
+          if [ -n "$VAULT_PASSWORD" ]; then
+            echo "$VAULT_PASSWORD" > /tmp/vault_pass
+            CMD="$CMD --vault-password-file=/tmp/vault_pass"
+          fi
 
-                  echo "Running: $CMD"
-                  eval $CMD
-                  EXIT_CODE=$?
+          echo "Running: $CMD"
+          eval $CMD
+          EXIT_CODE=$?
 
-                  # Cleanup
-                  rm -f /tmp/vault_pass
+          # Cleanup
+          rm -f /tmp/vault_pass
 
-                  if [ $EXIT_CODE -ne 0 ]; then
-                    echo "❌ Deployment FAILED with exit code $EXIT_CODE"
-                    exit $EXIT_CODE
-                  fi
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ Deployment FAILED with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
 
-                  echo "✅ Deployment completed successfully"
+          echo "✅ Deployment completed successfully"
 
-            - name: Deployment summary
-              if: success()
-              run: |
-                  echo "✅ ${{ inputs.service }} deployed successfully"
-                  echo "Mode: ${{ inputs.check_mode == 'true' && 'Check (dry-run)' || 'Live deployment' }}"
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ ${{ inputs.service }} deployed successfully"
+          echo "Mode: ${{ inputs.check_mode == 'true' && 'Check (dry-run)' || 'Live deployment' }}"
 
-            - name: Deployment failed
-              if: failure()
-              run: |
-                  echo "❌ Deployment of ${{ inputs.service }} failed"
-                  echo "Check the logs above for details"
-                  exit 1
+      - name: Deployment failed
+        if: failure()
+        run: |
+          echo "❌ Deployment of ${{ inputs.service }} failed"
+          echo "Check the logs above for details"
+          exit 1

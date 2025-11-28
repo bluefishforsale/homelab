@@ -83,7 +83,6 @@ aybooks
 8. ✅ 20+ Docker Compose services with systemd integration
 9. ✅ Grafana + MySQL consolidated stack
 10. ✅ ComfyUI with automated model management
-11. ✅ n8n workflow automation with PostgreSQL
 12. ✅ Media stack (Plex, Sonarr, Radarr, Prowlarr, etc.)
 13. ✅ Prometheus monitoring
 14. ✅ CMS platforms (PayloadCMS, Strapi, TinaCMS)
@@ -95,7 +94,6 @@ aybooks
 1. ✅ 🦙 llama.cpp GPU-accelerated LLM API server (Nvidia P2000 CUDA support)
 2. ✅ 🌐 Open WebUI with automatic llama.cpp integration (pre-configured API endpoints)
 3. ✅ 🎨 ComfyUI with automated model management (FLUX, VAE, LoRA, ControlNet)
-4. ✅ 🔄 n8n workflow automation with PostgreSQL backend and GPU access
 5. ✅ 📦 Automated model downloading and permission management
 
 ## Monitoring

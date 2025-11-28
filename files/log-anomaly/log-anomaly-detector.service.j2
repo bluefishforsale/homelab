@@ -21,7 +21,7 @@ ExecStartPre=-/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml pull -
 ExecStartPre=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml build
 
 # Start command
-ExecStart=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml up -d --wait --timeout 120
+ExecStart=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml up -d
 
 # Stop command
 ExecStop=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml down --timeout 30

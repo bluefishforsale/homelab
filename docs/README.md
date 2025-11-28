@@ -82,7 +82,6 @@ New to this homelab? Start here:
 ### Web Interfaces
 - **Grafana**: https://grafana.terrac.com - Monitoring dashboards
 - **Plex**: https://plex.terrac.com - Media streaming
-- **N8N**: https://n8n.terrac.com - Workflow automation  
 - **Open WebUI**: https://open-webui.terrac.com - AI chat interface
 - **Pi-hole**: http://192.168.1.9/admin - DNS ad-blocking
 - **Proxmox**: https://192.168.1.106:8006 - Virtualization management

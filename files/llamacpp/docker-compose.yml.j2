@@ -11,6 +11,9 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CUDA_LAUNCH_BLOCKING=1
+      - NVIDIA_REQUIRE_CUDA=cuda>=11.0
     
     ports:
       - "{{ port }}:{{ port }}"
@@ -20,19 +23,19 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # RTX 3090 Optimized: 32B Qwen3 abliterated reasoning model with maximum GPU acceleration  
+    # RTX 3090 Optimized: 8B Llama-3.1 Instruct model with full GPU acceleration  
     command: 
       - "--host"
       - "0.0.0.0"
       - "--port" 
       - "{{ port }}"
       - "--model"
-      - "/models/qwen3-32b-abliterated-q4_k_m.gguf"
-      - "--gpu-layers"
-      - "9999"
+      - "/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      - "--n-gpu-layers"
+      - "-1"
       - "--ctx-size"
-      - "32768"
-      - "--n-parallel" 
+      - "16384"
+      - "--parallel" 
       - "4"
       - "--batch-size"
       - "2048"

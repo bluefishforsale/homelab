@@ -68,3 +68,4 @@
     ansible.builtin.systemd:
       name: prowlarr-exporter.service
       state: restarted
+      enabled: true

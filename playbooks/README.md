@@ -87,7 +87,7 @@ Essential infrastructure services:
 
 ### Ocean Services (`individual/ocean/`)
 Application services running on ocean server:
-- **ai/** - AI/ML services (llama.cpp, ComfyUI, n8n, Open WebUI)
+- **ai/** - AI/ML services (llama.cpp, ComfyUI, Open WebUI)
 - **media/** - Media stack (Plex, Sonarr, Radarr, etc.)
 - **monitoring/** - Monitoring (Prometheus, Grafana)
 - **network/** - Network services (nginx, Cloudflare)

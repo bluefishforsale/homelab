@@ -77,3 +77,4 @@
       ansible.builtin.systemd:
         name: sonarr-exporter.service
         state: restarted
+        enabled: true

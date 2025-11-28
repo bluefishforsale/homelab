@@ -417,9 +417,6 @@ ansible-playbook -i inventory.ini playbook_ocean_audible-downloader.yaml
 
 #### 1. Deploy AI Stack
 ```bash
-# Deploy N8N workflow automation
-ansible-playbook -i inventory.ini playbook_ocean_n8n.yaml
-
 # Deploy llama.cpp API server (GPU-accelerated LLM)
 ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
 
@@ -430,7 +427,6 @@ ansible-playbook -i inventory.ini playbook_ocean_open_webui.yaml
 ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
 
 # Access services:
-# N8N: http://192.168.1.143:5678
 # Llama.cpp API: http://192.168.1.143:8080
 # Open WebUI: http://192.168.1.143:3000
 # ComfyUI: http://192.168.1.143:8188
@@ -502,9 +498,7 @@ ansible-playbook -i inventory.ini playbook_ocean_overseerr.yaml
 ```bash
 ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
 ansible-playbook -i inventory.ini playbook_ocean_open_webui.yaml
-ansible-playbook -i inventory.ini playbook_ocean_n8n.yaml
 ansible-playbook -i inventory.ini playbook_ocean_comfyui.yaml
-ansible-playbook -i inventory.ini playbook_ocean_nextcloud.yaml
 ```
 
 #### Phase 5: Optional Services

@@ -114,7 +114,6 @@ log_sources:
     - comfyui
     - llamacpp
     - open-webui
-    - n8n
     
     # Cloud services
     - nextcloud

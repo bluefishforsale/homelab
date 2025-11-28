@@ -92,9 +92,6 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 # Open WebUI (LLM web interface)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml
 
-# n8n (workflow automation with PostgreSQL)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/n8n.yaml
-
 # ComfyUI (AI image generation)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml
 
@@ -124,7 +121,6 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 
 # Check all systemd services status
 echo "=== Checking systemd service status ==="
-ssh ocean "systemctl list-units --type=service --state=running | grep -E '(nginx|grafana|prometheus|plex|sonarr|radarr|prowlarr|bazarr|nzbget|tautulli|overseerr|tdarr|llamacpp|open-webui|n8n|comfyui|nextcloud)'"
 
 # Check docker containers
 echo "=== Checking Docker containers ==="
@@ -160,7 +156,6 @@ ssh ocean "cd /data01/services && for dir in */; do if [ -f \${dir}docker-compos
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tdarr.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/llamacpp.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml && \
-# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/n8n.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml

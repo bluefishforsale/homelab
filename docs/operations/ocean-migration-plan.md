@@ -341,7 +341,6 @@ services=(
   "plex:32400"
   "grafana:8910"
   "comfyui:8188"
-  "n8n:5678"
   "nginx:80"
   "prometheus:9090"
   "llamacpp:8080"

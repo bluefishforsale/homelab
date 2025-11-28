@@ -20,6 +20,7 @@
       - "{{ basedir }}/data"
       - "{{ basedir }}/go"
       - "{{ basedir }}/patterns"
+      - "{{ basedir }}/redis-data"
 
   - name: Copy Go source code files
     ansible.builtin.copy:

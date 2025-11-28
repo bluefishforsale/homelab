@@ -1,0 +1,99 @@
+# llamacpp Model Configuration for RTX 3090 (24GB VRAM)
+# Prioritized for reasoning and code analysis capabilities
+
+llamacpp_models:
+  reasoning:
+    # Primary: Qwen3-32B-abliterated - Uncensored reasoning model (RoadToNowhere)
+    - name: "qwen3-32b-abliterated-q4_k_m.gguf"
+      url: "https://huggingface.co/RoadToNowhere/Qwen3-32B-abliterated-Q4_K_M-GGUF/resolve/main/qwen3-32b-abliterated-q4_k_m.gguf"
+      size: "18GB"
+      parameters: "32B"
+      vram_usage: "~20GB"
+      capabilities: ["reasoning", "step-by-step", "analysis", "math", "thinking", "uncensored"]
+      context_size: "32K"
+      timeout: 3600
+      priority: 1
+      requires_auth: false
+      
+    # Fallback: Public model
+    - name: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      url: "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      size: "4.9GB"
+      parameters: "8B"
+      vram_usage: "~6GB"
+      capabilities: ["reasoning", "general", "analysis", "coding"]
+      context_size: "128K"
+      timeout: 2400
+      priority: 2
+      requires_auth: false
+      
+  coding:
+    # Alternative: Code Llama for technical analysis
+    - name: "CodeLlama-13B-Instruct-Q4_K_M.gguf"
+      url: "https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GGUF/resolve/main/codellama-13b-instruct.q4_k_m.gguf"
+      size: "7.9GB"
+      parameters: "13B"
+      vram_usage: "~9GB"
+      capabilities: ["coding", "technical_analysis", "debugging", "systems"]
+      context_size: "16K"
+      timeout: 3600
+      priority: 2
+      requires_auth: false
+
+  large_reasoning:
+    # For maximum reasoning capability (fits RTX 3090)
+    - name: "Llama-2-70B-Chat-Q2_K.gguf"
+      url: "https://huggingface.co/TheBloke/Llama-2-70B-Chat-GGUF/resolve/main/llama-2-70b-chat.Q2_K.gguf"
+      size: "26GB"
+      parameters: "70B"
+      vram_usage: "~23GB"
+      capabilities: ["reasoning", "large_context", "general", "analysis"]
+      context_size: "4K"
+      timeout: 4800
+      priority: 3
+      requires_auth: false
+
+  backup:
+    # Current model as fallback (much smaller)
+    - name: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+      url: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+      size: "4GB"
+      parameters: "7B"  
+      vram_usage: "~5GB"
+      capabilities: ["reasoning", "basic", "fast"]
+      context_size: "16K"
+      timeout: 1800
+      priority: 4
+      requires_auth: false
+
+# RTX 3090 Performance Profiles
+rtx_3090_profiles:
+  max_performance:
+    model: "qwen3-32b-abliterated-q4_k_m.gguf"
+    gpu_layers: -1
+    context_size: 32768
+    batch_size: 2048
+    parallel_requests: 4
+    flash_attention: true
+    
+  balanced:
+    model: "CodeLlama-13B-Instruct-Q4_K_M.gguf"  
+    gpu_layers: -1
+    context_size: 16384
+    batch_size: 1024
+    parallel_requests: 2
+    flash_attention: true
+    
+  max_reasoning:
+    model: "Llama-2-70B-Chat-Q2_K.gguf"
+    gpu_layers: -1  
+    context_size: 4096
+    batch_size: 512
+    parallel_requests: 1
+    flash_attention: true
+
+# Model download priorities (1 = download first)
+download_priority:
+  1: "qwen3-32b-abliterated-q4_k_m.gguf"         # Qwen3-32B abliterated (uncensored reasoning)
+  2: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"    # Fast fallback  
+  3: "CodeLlama-13B-Instruct-Q4_K_M.gguf"        # Technical analysis

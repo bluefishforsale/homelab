@@ -16,9 +16,9 @@ curl http://192.168.1.143:8085/health
 ## System Architecture
 
 ```
-Log Sources → Promtail → Loki → Anomaly Detector → n8n Alerts
-     ↓           ↓        ↓           ↓            ↓
-  systemd    journald  storage   patterns     notifications
+Log Sources → Promtail → Loki → Anomaly Detector → some ML service Alerts
+     ↓           ↓        ↓           ↓                  ↓
+  systemd    journald  storage   patterns           notifications
   syslog     docker    query     statistics
   containers logs      API       entropy
 ```
@@ -45,11 +45,7 @@ Log Sources → Promtail → Loki → Anomaly Detector → n8n Alerts
 - **Volume mounts** for patterns and data persistence
 - **Systemd integration** following homelab standards
 
-### 4. n8n Alert Integration (✅ Completed)
-- **Webhook endpoint** for receiving anomalies
-- **Severity-based routing** (critical → email, high → email+slack, medium/low → grafana)
-- **Rate limiting** to prevent alert spam
-- **Multiple alert channels** (email, Slack, Grafana, AlertManager)
+### 4. some ML service
 
 ## Verification Steps
 
@@ -81,7 +77,7 @@ The service automatically:
 - Matches patterns against log messages
 - Builds statistical baselines from historical data
 - Detects frequency and rate-change anomalies
-- Sends alerts to n8n webhook
+- Sends alerts to some ML service
 
 ### 4. Monitor Anomaly Detection
 ```bash
@@ -101,7 +97,6 @@ docker compose logs -f
 - `files/log-anomaly/go/` - Go source code
 - `files/log-anomaly/docker-compose-redis.yml.j2` - Go + Redis deployment
 - `playbooks/individual/ocean/log_anomaly_detector_redis.yaml` - Ansible playbook
-- `files/n8n/workflows/log-anomaly-alerts.json` - Alert workflow
 
 ### Deployed Files  
 - `/data01/services/log-anomaly-detector/` - Service directory
@@ -113,8 +108,7 @@ docker compose logs -f
 1. **Monitor the system** for 24-48 hours to build statistical baselines
 2. **Adjust thresholds** if too many false positives occur
 3. **Add custom patterns** for your specific applications  
-4. **Configure n8n credentials** for email and Slack notifications
-5. **Set up Grafana dashboards** to visualize anomaly trends
+4. **Set up Grafana dashboards** to visualize anomaly trends
 
 ## Pattern Updates
 

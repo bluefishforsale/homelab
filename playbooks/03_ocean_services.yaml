@@ -33,8 +33,6 @@
 - name: Deploy ComfyUI for AI Image Generation
   ansible.builtin.import_playbook: individual/ocean/ai/comfyui.yaml
 
-- name: Deploy n8n Workflow Automation
-  ansible.builtin.import_playbook: individual/ocean/ai/n8n.yaml
 
 # ============================================================================
 # Media Services
