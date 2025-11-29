@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,17 +77,104 @@ func getEnvFloat(key string, fallback float64) float64 {
 
 // HTTP handlers
 type HTTPHandlers struct {
-	detector *AnomalyDetector
+	detector            *AnomalyDetector
+	statisticalAnalyzer *RedisStatisticalAnalyzer
+	startTime           time.Time
+	config              Config
+}
+
+// ComponentHealth represents health of a single component
+type ComponentHealth struct {
+	Status    string `json:"status"`
+	LatencyMs int64  `json:"latency_ms,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// HealthResponse represents the health check response
+type HealthResponse struct {
+	Status        string                     `json:"status"`
+	Mode          string                     `json:"mode"`
+	Service       string                     `json:"service"`
+	UptimeSeconds int64                      `json:"uptime_seconds"`
+	Checks        map[string]ComponentHealth `json:"checks"`
+	ColdStart     bool                       `json:"cold_start"`
 }
 
 // HealthHandler handles health check requests
 func (h *HTTPHandlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{
-		"status":  "healthy",
-		"service": "log-anomaly-detector",
+	checks := make(map[string]ComponentHealth)
+	downCount := 0
+
+	// Check Redis
+	redisStart := time.Now()
+	if err := h.statisticalAnalyzer.Ping(); err != nil {
+		checks["redis"] = ComponentHealth{Status: "down", Error: err.Error()}
+		healthStatus.WithLabelValues("redis").Set(0)
+		downCount++
+	} else {
+		checks["redis"] = ComponentHealth{Status: "up", LatencyMs: time.Since(redisStart).Milliseconds()}
+		healthStatus.WithLabelValues("redis").Set(1)
 	}
-	
+
+	// Check Loki connectivity
+	lokiStart := time.Now()
+	lokiResp, err := http.Get(h.config.LokiURL + "/ready")
+	if err != nil || (lokiResp != nil && lokiResp.StatusCode != http.StatusOK) {
+		errMsg := "connection failed"
+		if err != nil {
+			errMsg = err.Error()
+		} else if lokiResp != nil {
+			errMsg = fmt.Sprintf("status %d", lokiResp.StatusCode)
+			lokiResp.Body.Close()
+		}
+		checks["loki"] = ComponentHealth{Status: "down", Error: errMsg}
+		healthStatus.WithLabelValues("loki").Set(0)
+		downCount++
+	} else {
+		lokiResp.Body.Close()
+		checks["loki"] = ComponentHealth{Status: "up", LatencyMs: time.Since(lokiStart).Milliseconds()}
+		healthStatus.WithLabelValues("loki").Set(1)
+	}
+
+	// Check for cold start (no baselines)
+	isColdStart := false
+	if empty, err := h.statisticalAnalyzer.IsEmpty(); err == nil && empty {
+		isColdStart = true
+		coldStartActive.Set(1)
+	} else {
+		coldStartActive.Set(0)
+	}
+
+	// Check dead letter queue size
+	if dlSize, err := h.statisticalAnalyzer.GetDeadLetterSize(); err == nil {
+		deadLetterSize.Set(float64(dlSize))
+	}
+
+	// Determine overall status and mode
+	status := "healthy"
+	mode := "full"
+	if downCount > 0 {
+		status = "degraded"
+		mode = "limited"
+	}
+	if downCount >= 2 {
+		status = "unhealthy"
+		mode = "minimal"
+	}
+
+	response := HealthResponse{
+		Status:        status,
+		Mode:          mode,
+		Service:       "log-anomaly-detector",
+		UptimeSeconds: int64(time.Since(h.startTime).Seconds()),
+		Checks:        checks,
+		ColdStart:     isColdStart,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
+	if status == "unhealthy" {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -126,6 +214,7 @@ func (h *HTTPHandlers) PatternsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	startTime := time.Now()
 	log.Println("Starting Log Anomaly Detector (Go)")
 	
 	// Initialize Prometheus metrics
@@ -148,6 +237,16 @@ func main() {
 		log.Fatalf("Failed to create Redis statistical analyzer: %v", err)
 	}
 	
+	// Check for cold start (empty baselines)
+	if empty, err := statisticalAnalyzer.IsEmpty(); err == nil && empty {
+		log.Warn("COLD START: No baselines found in Redis. Statistical alerts will use 10x higher thresholds for 24h.")
+		coldStartActive.Set(1)
+		coldStartThresholdMultiplier.Set(10.0)
+	} else {
+		coldStartActive.Set(0)
+		coldStartThresholdMultiplier.Set(1.0)
+	}
+	
 	// Initialize anomaly detector
 	detector := NewAnomalyDetector(config, patternManager, statisticalAnalyzer)
 	
@@ -158,7 +257,12 @@ func main() {
 	detector.Start(ctx)
 	
 	// Setup HTTP handlers
-	handlers := &HTTPHandlers{detector: detector}
+	handlers := &HTTPHandlers{
+		detector:            detector,
+		statisticalAnalyzer: statisticalAnalyzer,
+		startTime:           startTime,
+		config:              config,
+	}
 	
 	router := mux.NewRouter()
 	router.HandleFunc("/health", handlers.HealthHandler).Methods("GET")

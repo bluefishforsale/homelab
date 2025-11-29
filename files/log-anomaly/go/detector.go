@@ -463,7 +463,7 @@ func calculateSeverity(score float64) string {
 	return "low"
 }
 
-// sendAlert sends alert for detected anomaly
+// sendAlert sends alert for detected anomaly with retry and dead letter queue
 func (ad *AnomalyDetector) sendAlert(anomaly Anomaly) error {
 	startWebhook := time.Now()
 	defer func() {
@@ -494,21 +494,51 @@ func (ad *AnomalyDetector) sendAlert(anomaly Anomaly) error {
 		return fmt.Errorf("failed to marshal alert data: %w", err)
 	}
 
-	resp, err := ad.httpClient.Post(ad.config.WebhookURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		webhooksSentTotal.WithLabelValues("error", anomaly.Severity).Inc()
-		return fmt.Errorf("failed to send alert: %w", err)
-	}
-	defer resp.Body.Close()
+	// Retry logic: 3 attempts with exponential backoff (1s, 2s)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			webhookRetriesTotal.WithLabelValues(strconv.Itoa(attempt)).Inc()
+			backoff := time.Duration(1<<(attempt-1)) * time.Second // 1s, 2s
+			log.Warnf("Webhook retry attempt %d after %v", attempt+1, backoff)
+			time.Sleep(backoff)
+		}
 
-	if resp.StatusCode != http.StatusOK {
-		webhooksSentTotal.WithLabelValues("error", anomaly.Severity).Inc()
-		return fmt.Errorf("webhook returned status %d", resp.StatusCode)
+		resp, err := ad.httpClient.Post(ad.config.WebhookURL, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			lastErr = fmt.Errorf("attempt %d: failed to send alert: %w", attempt+1, err)
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			webhooksSentTotal.WithLabelValues("success", anomaly.Severity).Inc()
+			log.Infof("Sent anomaly alert: severity=%s, host=%s", anomaly.Severity, anomaly.LogEntry.Host)
+			return nil
+		}
+		lastErr = fmt.Errorf("attempt %d: webhook returned status %d", attempt+1, resp.StatusCode)
 	}
 
-	webhooksSentTotal.WithLabelValues("success", anomaly.Severity).Inc()
-	log.Infof("Sent anomaly alert: severity=%s, host=%s", anomaly.Severity, anomaly.LogEntry.Host)
-	return nil
+	// All retries failed - push to dead letter queue
+	webhooksSentTotal.WithLabelValues("dead_letter", anomaly.Severity).Inc()
+	log.Errorf("Webhook failed after 3 attempts, pushing to dead letter queue: %v", lastErr)
+
+	if err := ad.pushToDeadLetter(jsonData); err != nil {
+		log.Errorf("Failed to push to dead letter queue: %v", err)
+		webhooksSentTotal.WithLabelValues("error", anomaly.Severity).Inc()
+		return fmt.Errorf("webhook failed and dead letter failed: %w", err)
+	}
+
+	deadLetterTotal.Inc()
+	return lastErr
+}
+
+// pushToDeadLetter pushes failed anomaly to Redis dead letter queue
+func (ad *AnomalyDetector) pushToDeadLetter(jsonData []byte) error {
+	if rsa, ok := ad.statisticalAnalyzer.(*RedisStatisticalAnalyzer); ok {
+		return rsa.PushDeadLetter(jsonData)
+	}
+	return fmt.Errorf("statistical analyzer does not support dead letter queue")
 }
 
 // calculateEntropy calculates entropy of log messages

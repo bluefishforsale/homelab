@@ -1,28 +1,29 @@
 # llamacpp Model Configuration for RTX 3090 (24GB VRAM)
-# Prioritized for reasoning and code analysis capabilities
+# Optimized for single-user reasoning with max context in 16GB VRAM budget
 
 llamacpp_models:
   reasoning:
-    # Primary: Qwen3-32B-abliterated - Uncensored reasoning model (RoadToNowhere)
-    - name: "qwen3-32b-abliterated-q4_k_m.gguf"
-      url: "https://huggingface.co/RoadToNowhere/Qwen3-32B-abliterated-Q4_K_M-GGUF/resolve/main/qwen3-32b-abliterated-q4_k_m.gguf"
-      size: "18GB"
-      parameters: "32B"
-      vram_usage: "~20GB"
-      capabilities: ["reasoning", "step-by-step", "analysis", "math", "thinking", "uncensored"]
-      context_size: "32K"
+    # Primary: Qwen3-14B - Optimal for 16GB VRAM with thinking/reasoning
+    # Supports /think mode for step-by-step reasoning
+    - name: "Qwen3-14B-Q4_K_M.gguf"
+      url: "https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf"
+      size: "8.5GB"
+      parameters: "14B"
+      vram_usage: "~9GB base + KV cache"
+      capabilities: ["reasoning", "thinking", "step-by-step", "analysis", "math", "coding"]
+      context_size: "40K"
       timeout: 3600
       priority: 1
       requires_auth: false
       
-    # Fallback: Public model
-    - name: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      url: "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      size: "4.9GB"
+    # Fallback: Qwen3-8B for even larger context
+    - name: "Qwen3-8B-Q4_K_M.gguf"
+      url: "https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf"
+      size: "5.0GB"
       parameters: "8B"
-      vram_usage: "~6GB"
-      capabilities: ["reasoning", "general", "analysis", "coding"]
-      context_size: "128K"
+      vram_usage: "~6GB base + KV cache"
+      capabilities: ["reasoning", "thinking", "general", "analysis", "coding"]
+      context_size: "64K"
       timeout: 2400
       priority: 2
       requires_auth: false
@@ -66,34 +67,39 @@ llamacpp_models:
       priority: 4
       requires_auth: false
 
-# RTX 3090 Performance Profiles
+# RTX 3090 Performance Profiles (16GB VRAM budget for headroom)
 rtx_3090_profiles:
-  max_performance:
-    model: "qwen3-32b-abliterated-q4_k_m.gguf"
+  # Primary: Qwen3-14B with max context for single user
+  single_user_reasoning:
+    model: "Qwen3-14B-Q4_K_M.gguf"
     gpu_layers: -1
-    context_size: 32768
+    context_size: 40960  # 40K context fits in 16GB with 14B model
     batch_size: 2048
-    parallel_requests: 4
+    parallel_requests: 1  # Single user
     flash_attention: true
+    thinking_mode: true
     
-  balanced:
-    model: "CodeLlama-13B-Instruct-Q4_K_M.gguf"  
+  # Alternative: Qwen3-8B with massive context
+  max_context:
+    model: "Qwen3-8B-Q4_K_M.gguf"  
     gpu_layers: -1
-    context_size: 16384
-    batch_size: 1024
-    parallel_requests: 2
+    context_size: 65536  # 64K context with 8B model
+    batch_size: 2048
+    parallel_requests: 1
     flash_attention: true
+    thinking_mode: true
     
-  max_reasoning:
-    model: "Llama-2-70B-Chat-Q2_K.gguf"
+  # Fallback: smaller model for testing
+  lightweight:
+    model: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
     gpu_layers: -1  
-    context_size: 4096
-    batch_size: 512
+    context_size: 32768
+    batch_size: 1024
     parallel_requests: 1
     flash_attention: true
 
 # Model download priorities (1 = download first)
 download_priority:
-  1: "qwen3-32b-abliterated-q4_k_m.gguf"         # Qwen3-32B abliterated (uncensored reasoning)
-  2: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"    # Fast fallback  
-  3: "CodeLlama-13B-Instruct-Q4_K_M.gguf"        # Technical analysis
+  1: "Qwen3-14B-Q4_K_M.gguf"                     # Primary reasoning model (fits 16GB)
+  2: "Qwen3-8B-Q4_K_M.gguf"                      # Fallback with larger context
+  3: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"   # Lightweight reasoning

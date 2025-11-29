@@ -794,7 +794,288 @@ curl -s 'http://192.168.1.143:8087/problems?status=active' | jq '.problems[] | s
 
 ---
 
-## 12. Next Steps
+## 12. Failure Modes & Recovery
+
+### Dependency Failure Behavior
+
+| Component | Detection | Degraded Behavior | Recovery |
+|-----------|-----------|-------------------|----------|
+| **PostgreSQL** | Connection timeout 5s | Buffer anomalies to Redis (`problems:buffer`), skip duration tracking | Auto-reconnect, flush buffer to DB |
+| **Redis** | Ping timeout 1s | Tier 1: pattern-only mode (no baselines), Tier 2: in-memory dedup | Auto-reconnect, rebuild baselines over 24h |
+| **Milvus** | Health check fail | Skip embeddings/similarity search, proceed with other analysis | Auto-reconnect, no data loss |
+| **llamacpp** | 5xx or timeout | Skip LLM analysis, use pattern-based severity | Exponential backoff 1s→300s max |
+| **AlertManager** | Connection fail | Queue alerts in Redis (`alerts:pending`), retry every 60s | Flush queue on recovery |
+| **SMTP** | Auth/connection fail | Queue digest, retry hourly, alert via AlertManager | Manual intervention if persists 24h |
+| **Tier 2 (from Tier 1)** | Webhook 5xx/timeout | Buffer in Redis (`anomalies:pending`), retry 3x with backoff | Tier 2 recovery triggers buffer flush |
+
+### Tier 1 Webhook Retry Logic
+
+```go
+func (d *Detector) sendAlertWithRetry(anomaly Anomaly) error {
+    for attempt := 0; attempt < 3; attempt++ {
+        resp, err := d.httpClient.Post(d.webhookURL, "application/json", anomaly.JSON())
+        if err == nil && resp.StatusCode == 200 {
+            return nil
+        }
+        if attempt < 2 {
+            time.Sleep(time.Duration(1<<attempt) * time.Second) // 1s, 2s
+        }
+    }
+    // Dead letter to Redis - will be replayed when Tier 2 recovers
+    d.redis.LPush(ctx, "anomalies:dead_letter", anomaly.JSON())
+    d.redis.Expire(ctx, "anomalies:dead_letter", 24*time.Hour)
+    deadLetterTotal.Inc()
+    return ErrWebhookFailed
+}
+
+// Tier 2 startup: replay dead letter queue
+func (p *Processor) ReplayDeadLetter() {
+    for {
+        data, err := p.redis.RPop(ctx, "anomalies:dead_letter").Result()
+        if err == redis.Nil {
+            break
+        }
+        var anomaly Anomaly
+        json.Unmarshal([]byte(data), &anomaly)
+        p.processAnomaly(anomaly) // Re-process
+    }
+}
+```
+
+### Cold Start Behavior
+
+| Scenario | Detection | Behavior | Duration |
+|----------|-----------|----------|----------|
+| **Empty PostgreSQL** | `SELECT 1` succeeds, `problems` table empty | Log INFO, operate normally, durations start from 0 | Permanent (expected) |
+| **Empty Redis** | `KEYS baseline:*` returns 0 | Log WARNING, use 10x higher thresholds, suppress z-score alerts | 24h until baselines rebuild |
+| **Empty Milvus** | Collection exists but 0 vectors | Similarity search returns `[]`, log INFO | Until embeddings accumulate |
+| **Schema mismatch** | Migration check fails | Exit with error, require manual migration | Until fixed |
+
+**Cold Start Configuration:**
+```yaml
+cold_start:
+  redis_empty_threshold_multiplier: 10.0  # 10x higher thresholds for 24h
+  suppress_statistical_alerts_hours: 24   # Don't alert on z-score for first 24h
+  log_cold_start_warnings: true
+```
+
+### Circuit Breaker Pattern
+
+```go
+type CircuitBreaker struct {
+    name        string
+    failures    int32
+    threshold   int32         // Open after N failures
+    timeout     time.Duration // Time in open state before half-open
+    lastFailure time.Time
+    state       atomic.Value  // "closed", "open", "half-open"
+}
+
+func (cb *CircuitBreaker) Call(fn func() error) error {
+    state := cb.state.Load().(string)
+    
+    if state == "open" {
+        if time.Since(cb.lastFailure) > cb.timeout {
+            cb.state.Store("half-open")
+        } else {
+            return ErrCircuitOpen
+        }
+    }
+    
+    err := fn()
+    if err != nil {
+        cb.recordFailure()
+        return err
+    }
+    
+    cb.reset()
+    return nil
+}
+
+// Circuit breakers for each dependency
+var circuits = map[string]*CircuitBreaker{
+    "postgresql":   {threshold: 5, timeout: 60 * time.Second},
+    "redis":        {threshold: 3, timeout: 30 * time.Second},
+    "milvus":       {threshold: 5, timeout: 60 * time.Second},
+    "llamacpp":     {threshold: 3, timeout: 300 * time.Second}, // Longer for LLM
+    "alertmanager": {threshold: 5, timeout: 60 * time.Second},
+}
+```
+
+### Health Check States
+
+```go
+type HealthStatus struct {
+    Status   string                  `json:"status"`   // healthy, degraded, unhealthy
+    Mode     string                  `json:"mode"`     // full, limited, minimal
+    Checks   map[string]CheckResult  `json:"checks"`
+    Uptime   int64                   `json:"uptime_seconds"`
+}
+
+func (p *Processor) Health() HealthStatus {
+    checks := map[string]CheckResult{
+        "postgresql":   p.checkPostgres(),
+        "redis":        p.checkRedis(),
+        "milvus":       p.checkMilvus(),
+        "llamacpp":     p.checkLLM(),
+        "alertmanager": p.checkAlertManager(),
+    }
+    
+    // Determine overall status
+    downCount := 0
+    for _, c := range checks {
+        if c.Status == "down" {
+            downCount++
+        }
+    }
+    
+    status := HealthStatus{Checks: checks}
+    switch {
+    case downCount == 0:
+        status.Status = "healthy"
+        status.Mode = "full"
+    case downCount <= 2:
+        status.Status = "degraded"
+        status.Mode = "limited" // Some features disabled
+    default:
+        status.Status = "unhealthy"
+        status.Mode = "minimal" // Only buffering, no processing
+    }
+    return status
+}
+```
+
+**Mode Capabilities:**
+| Mode | PostgreSQL | Redis | Milvus | LLM | AlertManager |
+|------|------------|-------|--------|-----|--------------|
+| **full** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **limited** | ✅ or buffer | ✅ | ❌ skip | ❌ skip | ✅ or queue |
+| **minimal** | buffer only | ✅ required | ❌ | ❌ | queue only |
+
+### Backup & Recovery
+
+| Data Store | Backup Method | Frequency | Location | RTO | RPO |
+|------------|---------------|-----------|----------|-----|-----|
+| PostgreSQL | pg_dump | Daily 3 AM | `/data01/backups/log-anomaly-ml/pg/` | 1h | 24h |
+| Redis | RDB snapshot | Every 15m | `/data01/backups/log-anomaly-ml/redis/` | 15m | 15m |
+| Milvus | Collection export | Daily 4 AM | `/data01/backups/log-anomaly-ml/milvus/` | 2h | 24h |
+
+**PostgreSQL Backup (Ansible cron):**
+```yaml
+- name: PostgreSQL backup cron
+  cron:
+    name: "log-anomaly-ml postgres backup"
+    hour: "3"
+    minute: "0"
+    job: >
+      docker exec log-anomaly-ml-postgres 
+      pg_dump -U log_anomaly_ml log_anomaly_ml | 
+      gzip > /data01/backups/log-anomaly-ml/pg/$(date +\%Y\%m\%d).sql.gz &&
+      find /data01/backups/log-anomaly-ml/pg/ -mtime +7 -delete
+```
+
+**Recovery Runbook:**
+
+```markdown
+### Scenario: PostgreSQL Data Loss
+
+1. Service detects connection failure, enters "degraded" mode
+2. New anomalies buffered to Redis (key: `problems:buffer`)
+3. Alerts: "PostgreSQL unavailable" via metrics
+
+**Recovery Steps:**
+1. Restore from backup:
+   gunzip -c /data01/backups/log-anomaly-ml/pg/YYYYMMDD.sql.gz | \
+     docker exec -i log-anomaly-ml-postgres psql -U log_anomaly_ml
+
+2. Restart ML processor to trigger buffer flush:
+   systemctl restart log-anomaly-ml-processor
+
+3. Verify:
+   curl http://192.168.1.143:8087/health | jq .
+   # Should show status: "healthy", mode: "full"
+
+4. Check buffer was flushed:
+   docker exec redis redis-cli LLEN problems:buffer
+   # Should be 0
+```
+
+```markdown
+### Scenario: Redis Data Loss (Baselines Gone)
+
+1. Tier 1 detector loses all baselines
+2. Z-score calculations invalid for 24h
+3. Service continues with pattern-matching only
+
+**Recovery Steps:**
+1. Service auto-recovers, no manual action needed
+2. Monitor for 24h: baselines will rebuild
+3. Expect higher false positive rate during rebuild
+4. Optional: Temporarily raise thresholds
+   curl -X POST http://192.168.1.143:8085/config \
+     -d '{"frequency_sigma": 5.0}'  # Raise from 3.0
+```
+
+```markdown
+### Scenario: Complete Tier 2 Failure
+
+1. Tier 1 webhooks fail, anomalies go to dead letter queue
+2. Dead letter TTL: 24h
+
+**Recovery Steps:**
+1. Fix Tier 2 issue (restart, fix config, etc.)
+2. On startup, Tier 2 auto-replays dead letter queue
+3. Verify:
+   docker exec redis redis-cli LLEN anomalies:dead_letter
+   # Should decrease as replayed
+
+4. Check for data loss:
+   curl http://192.168.1.143:8087/metrics | grep dead_letter
+   # log_ml_dead_letter_replayed_total should match original count
+```
+
+### Prometheus Alerts for Failure Modes
+
+```yaml
+groups:
+  - name: log-anomaly-ml-failures
+    rules:
+      - alert: LogAnomalyMLDegraded
+        expr: log_ml_health_status{status="degraded"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log anomaly ML processor in degraded mode"
+          
+      - alert: LogAnomalyMLUnhealthy
+        expr: log_ml_health_status{status="unhealthy"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Log anomaly ML processor unhealthy"
+          
+      - alert: DeadLetterQueueGrowing
+        expr: redis_key_size{key="anomalies:dead_letter"} > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead letter queue has {{ $value }} unprocessed anomalies"
+          
+      - alert: CircuitBreakerOpen
+        expr: log_ml_circuit_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.dependency }}"
+```
+
+---
+
+## 13. Next Steps
 
 | # | Task | Status |
 |---|------|--------|

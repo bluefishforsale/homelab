@@ -118,6 +118,39 @@ var (
 		Help:    "Time spent sending webhooks",
 		Buckets: []float64{0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
 	})
+
+	webhookRetriesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "log_anomaly_webhook_retries_total",
+		Help: "Total number of webhook retry attempts",
+	}, []string{"attempt"})
+
+	// Dead letter queue metrics
+	deadLetterTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "log_anomaly_dead_letter_total",
+		Help: "Total anomalies sent to dead letter queue",
+	})
+
+	deadLetterSize = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "log_anomaly_dead_letter_size",
+		Help: "Current size of dead letter queue",
+	})
+
+	// Cold start metrics
+	coldStartActive = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "log_anomaly_cold_start_active",
+		Help: "1 if service is in cold start mode (no baselines), 0 otherwise",
+	})
+
+	coldStartThresholdMultiplier = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "log_anomaly_cold_start_threshold_multiplier",
+		Help: "Current threshold multiplier during cold start",
+	})
+
+	// Health status metrics
+	healthStatus = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "log_anomaly_health_status",
+		Help: "Health status of dependencies (1=up, 0=down)",
+	}, []string{"component"})
 )
 
 // InitMetrics initializes metrics with startup values
