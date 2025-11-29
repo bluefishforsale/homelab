@@ -20,7 +20,14 @@
       - "{{ basedir }}/data"
       - "{{ basedir }}/go"
       - "{{ basedir }}/patterns"
-      - "{{ basedir }}/redis-data"
+
+  - name: Create Redis data directory with correct permissions
+    ansible.builtin.file:
+      path: "{{ basedir }}/redis-data"
+      state: directory
+      owner: "999"
+      group: "999"
+      mode: '0755'
 
   - name: Copy Go source code files
     ansible.builtin.copy:

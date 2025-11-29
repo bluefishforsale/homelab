@@ -5,15 +5,20 @@ services:
     hostname: {{ service }}
     restart: unless-stopped
     
-    # GPU support using runtime (compatible with older docker-compose)
-    runtime: nvidia
+    # GPU support with explicit device reservation
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
     
     environment:
       - TZ=America/Los_Angeles
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - CUDA_LAUNCH_BLOCKING=1
-      - NVIDIA_REQUIRE_CUDA=cuda>=11.0
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=0
     
     ports:
       - "{{ port }}:{{ port }}"
@@ -23,20 +28,22 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # RTX 3090 Optimized: 8B Llama-3.1 Instruct model with full GPU acceleration  
+    # RTX 3090 Optimized: Qwen3-14B for single-user reasoning with max context
+    # Model: 8.5GB + ~7GB KV cache = fits in 16GB VRAM budget
+    # Supports /think mode for step-by-step reasoning
     command: 
       - "--host"
       - "0.0.0.0"
       - "--port" 
       - "{{ port }}"
       - "--model"
-      - "/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      - "/models/Qwen3-14B-Q4_K_M.gguf"
       - "--n-gpu-layers"
-      - "-1"
+      - "41"
       - "--ctx-size"
-      - "16384"
+      - "40960"
       - "--parallel" 
-      - "4"
+      - "1"
       - "--batch-size"
       - "2048"
       - "--ubatch-size" 
@@ -54,8 +61,8 @@ services:
       retries: 5
       start_period: 60s
     
-    # User mapping
-    user: "{{ uid }}:{{ gid }}"
+    # Note: Running as root for CUDA/GPU access
+    # The llama.cpp container requires root for proper GPU memory allocation
     
     # Security options
     security_opt:

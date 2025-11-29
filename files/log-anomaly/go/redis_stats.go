@@ -397,3 +397,58 @@ func (rsa *RedisStatisticalAnalyzer) PurgeOldData(olderThan time.Duration) error
 	
 	return nil
 }
+
+// Ping checks Redis connectivity
+func (rsa *RedisStatisticalAnalyzer) Ping() error {
+	return rsa.client.Ping(rsa.ctx).Err()
+}
+
+// GetClient returns the Redis client for dead letter operations
+func (rsa *RedisStatisticalAnalyzer) GetClient() *redis.Client {
+	return rsa.client
+}
+
+// IsEmpty checks if baselines are empty (cold start detection)
+func (rsa *RedisStatisticalAnalyzer) IsEmpty() (bool, error) {
+	keys, err := rsa.client.Keys(rsa.ctx, "baseline:*").Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check baseline keys: %w", err)
+	}
+	return len(keys) == 0, nil
+}
+
+// GetBaselineCount returns the number of baseline keys
+func (rsa *RedisStatisticalAnalyzer) GetBaselineCount() (int64, error) {
+	keys, err := rsa.client.Keys(rsa.ctx, "baseline:*").Result()
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(keys)), nil
+}
+
+// Dead Letter Queue operations
+
+const deadLetterKey = "anomalies:dead_letter"
+const deadLetterTTL = 24 * time.Hour
+
+// PushDeadLetter adds an anomaly to the dead letter queue
+func (rsa *RedisStatisticalAnalyzer) PushDeadLetter(anomalyJSON []byte) error {
+	pipe := rsa.client.Pipeline()
+	pipe.LPush(rsa.ctx, deadLetterKey, anomalyJSON)
+	pipe.Expire(rsa.ctx, deadLetterKey, deadLetterTTL)
+	_, err := pipe.Exec(rsa.ctx)
+	if err != nil {
+		return fmt.Errorf("failed to push to dead letter queue: %w", err)
+	}
+	return nil
+}
+
+// GetDeadLetterSize returns the current size of the dead letter queue
+func (rsa *RedisStatisticalAnalyzer) GetDeadLetterSize() (int64, error) {
+	return rsa.client.LLen(rsa.ctx, deadLetterKey).Result()
+}
+
+// PopDeadLetter removes and returns an item from the dead letter queue (for replay)
+func (rsa *RedisStatisticalAnalyzer) PopDeadLetter() (string, error) {
+	return rsa.client.RPop(rsa.ctx, deadLetterKey).Result()
+}
