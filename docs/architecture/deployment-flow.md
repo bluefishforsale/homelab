@@ -1,52 +1,109 @@
-# Deployment Flow Diagram
+# Deployment Flow
+
+Ocean services deployment order based on `playbooks/03_ocean_services.yaml`.
+
+---
+
+## Master Playbook
+
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass
+```
+
+---
+
+## Deployment Phases
 
 ```mermaid
 flowchart TD
-    Start([🚀 Start Deployment]) --> Phase1{Phase 1<br/>Infrastructure Foundation}
+    Start([Start]) --> Network{Network Services}
     
-    Phase1 --> Base[playbook_ocean_base.yaml<br/>🐳 Docker Setup]
-    Base --> MySQL[playbook_ocean_mysql.yaml<br/>🗄️ Database]
-    MySQL --> Nginx[playbook_ocean_nginx.yaml<br/>🌐 Reverse Proxy]
+    Network --> DDNS[cloudflare_ddns.yaml]
+    DDNS --> Tunnels[cloudflared.yaml]
+    Tunnels --> Nginx[nginx_compose.yaml]
     
-    Nginx --> Phase2{Phase 2<br/>Network Services}
-    Phase2 --> DDNS[playbook_ocean_cloudflare_ddns.yaml<br/>☁️ Dynamic DNS]
-    DDNS --> Tunnels[playbook_ocean_cloudflared.yaml<br/>🔒 Secure Tunnels]
+    Nginx --> AI{AI/ML Services}
+    AI --> Llama[llamacpp.yaml]
+    Llama --> WebUI[open_webui.yaml]
+    WebUI --> ComfyUI[comfyui.yaml]
     
-    Tunnels --> Phase3{Phase 3<br/>Media Stack}
-    Phase3 --> Plex[playbook_ocean_plex.yaml<br/>🎬 Media Server]
-    Plex --> NZBGet[playbook_ocean_nzbget.yaml<br/>📥 Download Client]
-    NZBGet --> Prowlarr[playbook_ocean_prowlarr.yaml<br/>🔍 Indexer Manager]
-    Prowlarr --> ArrSuite[Arr Suite Deployment<br/>📺 Sonarr<br/>🎥 Radarr<br/>💬 Bazarr]
-    ArrSuite --> MediaEnhance[Media Enhancement<br/>📊 Tautulli<br/>🎫 Overseerr]
+    ComfyUI --> Media{Media Services}
+    Media --> Plex[plex.yaml]
+    Plex --> Sonarr[sonarr.yaml]
+    Sonarr --> Radarr[radarr.yaml]
+    Radarr --> Prowlarr[prowlarr.yaml]
+    Prowlarr --> Bazarr[bazarr.yaml]
+    Bazarr --> NZBGet[nzbget.yaml]
+    NZBGet --> Overseerr[overseerr.yaml]
+    Overseerr --> Tautulli[tautulli.yaml]
+    Tautulli --> Tdarr[tdarr.yaml]
     
-    MediaEnhance --> Phase4{Phase 4<br/>AI/ML Services}
-    Phase4 --> LlamaAPI[playbook_ocean_llamacpp.yaml<br/>🧠 LLM API Server]
-    LlamaAPI --> WebUI[playbook_ocean_open_webui.yaml<br/>💬 Web Interface]
-    N8N --> ComfyUI[playbook_ocean_comfyui.yaml<br/>🎨 AI Image Generation]
+    Tdarr --> Monitoring{Monitoring}
+    Monitoring --> Prometheus[prometheus.yaml]
+    Prometheus --> Grafana[grafana_compose.yaml]
+    Grafana --> DCGM[nvidia_dcgm.yaml]
+    DCGM --> UnPoller[unpoller.yaml]
     
-    ComfyUI --> Phase5{Phase 5<br/>Optional Services}
-    Phase5 --> Transcoding[playbook_ocean_tdarr.yaml<br/>⚡ Video Transcoding]
-    Phase5 --> Audiobooks[playbook_ocean_audible-downloader.yaml<br/>🎧 Audiobook Management]
-    Phase5 --> Monitoring[Monitoring Stack<br/>📈 Prometheus<br/>📊 Grafana]
+    UnPoller --> Services{Application Services}
+    Services --> NextCloud[nextcloud.yaml]
+    NextCloud --> TinaCMS[tinacms.yaml]
+    TinaCMS --> Audible[audible_downloader.yaml]
+    Audible --> Frigate[frigate.yaml]
+    Frigate --> HomeAssistant[homeassistant_compose.yaml]
     
-    Transcoding --> Complete([✅ Deployment Complete])
-    Audiobooks --> Complete
-    Monitoring --> Complete
+    HomeAssistant --> Complete([Complete])
     
-    subgraph "Dependencies"
-        GPU[🎮 NVIDIA P2000<br/>Required for AI Services]
-        ZFS[💾 ZFS Storage<br/>Pre-configured]
-        Network[🌐 Network Access<br/>Port Forwarding]
+    subgraph deps[Dependencies]
+        GPU[RTX 3090 - AI Services]
+        ZFS[data01 - Storage]
     end
     
-    GPU -.-> Phase4
-    ZFS -.-> Phase1
-    Network -.-> Phase2
-    
-    style Phase1 fill:#e3f2fd
-    style Phase2 fill:#e8f5e8  
-    style Phase3 fill:#fff3e0
-    style Phase4 fill:#fce4ec
-    style Phase5 fill:#f3e5f5
-    style Complete fill:#c8e6c9
+    GPU -.-> AI
+    ZFS -.-> Start
+```
+
+---
+
+## Individual Playbook Paths
+
+| Phase | Playbook Path |
+|-------|---------------|
+| **Network** | |
+| Cloudflare DDNS | `individual/ocean/network/cloudflare_ddns.yaml` |
+| Cloudflare Tunnels | `individual/ocean/network/cloudflared.yaml` |
+| nginx | `individual/ocean/network/nginx_compose.yaml` |
+| **AI/ML** | |
+| llama.cpp | `individual/ocean/ai/llamacpp.yaml` |
+| Open WebUI | `individual/ocean/ai/open_webui.yaml` |
+| ComfyUI | `individual/ocean/ai/comfyui.yaml` |
+| **Media** | |
+| Plex | `individual/ocean/media/plex.yaml` |
+| Sonarr | `individual/ocean/media/sonarr.yaml` |
+| Radarr | `individual/ocean/media/radarr.yaml` |
+| Prowlarr | `individual/ocean/media/prowlarr.yaml` |
+| Bazarr | `individual/ocean/media/bazarr.yaml` |
+| NZBGet | `individual/ocean/media/nzbget.yaml` |
+| Overseerr | `individual/ocean/media/overseerr.yaml` |
+| Tautulli | `individual/ocean/media/tautulli.yaml` |
+| Tdarr | `individual/ocean/media/tdarr.yaml` |
+| **Monitoring** | |
+| Prometheus | `individual/ocean/monitoring/prometheus.yaml` |
+| Grafana | `individual/ocean/monitoring/grafana_compose.yaml` |
+| NVIDIA DCGM | `individual/ocean/monitoring/nvidia_dcgm.yaml` |
+| UnPoller | `individual/ocean/monitoring/unpoller.yaml` |
+| **Services** | |
+| NextCloud | `individual/ocean/services/nextcloud.yaml` |
+| TinaCMS | `individual/ocean/services/tinacms.yaml` |
+| Audible Downloader | `individual/ocean/services/audible_downloader.yaml` |
+| Frigate | `individual/ocean/services/frigate.yaml` |
+| Home Assistant | `individual/ocean/services/homeassistant_compose.yaml` |
+
+---
+
+## Deploy Individual Service
+
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
 ```

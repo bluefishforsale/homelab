@@ -1,19 +1,26 @@
-# GitHub Self-Hosted Runners - Complete Setup Guide
+# GitHub Self-Hosted Runners Setup
 
-This guide provides step-by-step instructions for deploying fully automated GitHub Actions self-hosted runners in your homelab.
+Ephemeral Docker-based GitHub Actions runners for the homelab.
 
-## Architecture Overview
+---
 
-- **Runner VM**: Debian-based VM on Proxmox (`gh-runner-01` at `192.168.1.20`)
-- **Runner Containers**: 4 ephemeral Docker containers using `myoung34/github-runner:latest`
-- **Authentication**: GitHub Personal Access Token (PAT) stored in Ansible Vault
-- **SSH Access**: Runners have SSH keys to access homelab hosts for Ansible playbooks
+## Quick Reference
+
+| Setting | Value |
+|---------|-------|
+| Runner VM | gh-runner-01 (192.168.1.250) |
+| Containers | 4 ephemeral runners |
+| Image | myoung34/github-runner:latest |
+| Scope | Repository (bluefishforsale/homelab) |
+| User | github-runner (uid 1100) |
+
+---
 
 ## Prerequisites
 
-1. Proxmox host (`node005` at `192.168.1.105`)
-2. Ansible Vault configured with secrets
-3. GitHub account with repository access
+1. Proxmox host (node005 at 192.168.1.105)
+2. Ansible Vault with PAT at `development.github.token`
+3. GitHub repository access
 
 ## Step 1: Create GitHub Personal Access Token
 
@@ -48,7 +55,7 @@ Add this section to your vault file:
 ```yaml
 development:
   github:
-    vault_github_pat: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # Your PAT here
+    token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # Your PAT here
 ```
 
 Re-encrypt the vault:
@@ -74,12 +81,11 @@ ansible-playbook -i inventories/production/hosts.ini \
   --ask-vault-pass
 ```
 
-**What this does:**
-- Creates VM ID 5000 (`gh-runner-01`)
-- Assigns IP: `192.168.1.20`
-- 4 vCPUs, 8GB RAM, 32GB disk
+**Creates:**
+
+- VM: `gh-runner-01` at `192.168.1.250`
 - Cloned from template 9999
-- Waits up to 5 minutes for SSH to be ready
+- Waits for SSH to be ready
 
 ## Step 3: Deploy GitHub Runners
 
@@ -127,24 +133,17 @@ Title: github-runner@gh-runner-01
 Check that runners are registered and online:
 
 1. Go to: https://github.com/bluefishforsale/homelab/settings/actions/runners
-2. You should see 4 runners:
-   - `gh-runner-01-runner-1`
-   - `gh-runner-01-runner-2`
-   - `gh-runner-01-runner-3`
-   - `gh-runner-01-runner-4`
-3. Status should be **"Idle"** (green)
+2. You should see 4 runners with status **"Idle"** (green)
 
 ### Manual Verification
 
-SSH to the runner VM and check containers:
-
 ```bash
-ssh debian@192.168.1.20
+ssh debian@192.168.1.250
 
-# Check containers are running
+# Check containers
 sudo docker ps
 
-# Check runner logs
+# Check logs
 sudo docker logs github-runner-1
 
 # Check systemd service
@@ -183,22 +182,15 @@ Runners can SSH to any homelab host using the shared SSH key:
 
 ## Management Commands
 
-### View Runner Status
-
 ```bash
-ssh debian@192.168.1.20 "sudo docker ps"
-```
+# View status
+ssh debian@192.168.1.250 "sudo docker ps"
 
-### View Runner Logs
+# View logs
+ssh debian@192.168.1.250 "sudo docker logs github-runner-1 --tail 50"
 
-```bash
-ssh debian@192.168.1.20 "sudo docker logs github-runner-1 --tail 50"
-```
-
-### Restart All Runners
-
-```bash
-ssh debian@192.168.1.20 "sudo systemctl restart github-docker-runners"
+# Restart all runners
+ssh debian@192.168.1.250 "sudo systemctl restart github-docker-runners"
 ```
 
 ### Update PAT
@@ -221,7 +213,7 @@ ansible-playbook -i inventories/github_runners/hosts.ini \
 
 **Check logs:**
 ```bash
-ssh debian@192.168.1.20 "sudo docker logs github-runner-1"
+ssh debian@192.168.1.250 "sudo docker logs github-runner-1"
 ```
 
 **Common issues:**
@@ -233,7 +225,7 @@ ssh debian@192.168.1.20 "sudo docker logs github-runner-1"
 
 **Check for errors:**
 ```bash
-ssh debian@192.168.1.20 "sudo docker logs github-runner-1 2>&1 | grep -i error"
+ssh debian@192.168.1.250 "sudo docker logs github-runner-1 2>&1 | grep -i error"
 ```
 
 **Common causes:**
@@ -243,14 +235,12 @@ ssh debian@192.168.1.20 "sudo docker logs github-runner-1 2>&1 | grep -i error"
 
 ### SSH Key Not Working
 
-**Verify key is mounted:**
 ```bash
-ssh debian@192.168.1.20 "sudo docker exec github-runner-1 ls -la /root/.ssh/"
-```
+# Verify key is mounted
+ssh debian@192.168.1.250 "sudo docker exec github-runner-1 ls -la /root/.ssh/"
 
-**Check permissions:**
-```bash
-ssh debian@192.168.1.20 "ls -la /home/github-runner/.ssh/"
+# Check permissions
+ssh debian@192.168.1.250 "ls -la /home/github-runner/.ssh/"
 ```
 
 ## Workflow Example

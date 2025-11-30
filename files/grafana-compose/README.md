@@ -1,156 +1,194 @@
-# Grafana Monitoring Dashboard with Docker Compose
+# Grafana Monitoring Dashboard
 
-This deployment configures Grafana as a monitoring and visualization platform using Docker Compose, replacing the previous systemd-based container deployment.
+Docker Compose deployment with integrated MySQL database for Grafana monitoring platform.
 
-## Key Benefits
+---
 
-- **Idempotent Deployment**: Safe to run multiple times without side effects
-- **Health Monitoring**: Built-in health checks for service monitoring
-- **Resource Management**: CPU and memory limits for stable operation
-- **Security Hardening**: No new privileges and proper file permissions
+## Quick Reference
 
-## Architecture
+| Component | Image | Port |
+|-----------|-------|------|
+| Grafana | grafana/grafana:11.5.4 | 8910:3000 |
+| MySQL | percona/percona-server:5.7 | 3306:3306 |
 
-### Service Configuration
-- **Image**: grafana/grafana:11.5.4
-- **Port**: 8910:3000 (external:internal)
-- **Database**: MySQL at 192.168.1.143:3306
-- **Health Check**: Built-in API health endpoint
-- **Resources**: 1 CPU core, 1GB memory limit
-
-### Directory Structure
-```
-/data01/services/grafana/
-├── docker-compose.yml          # Docker Compose configuration
-├── .env                       # Environment variables
-├── grafana.ini               # Main Grafana configuration
-├── data/                     # Grafana database and runtime data
-├── plugins/                  # Grafana plugins (auto-installed)
-└── logs/                     # Grafana logs
-```
-
-### Database Configuration
-Grafana uses MySQL database for persistent storage:
-- **Host**: 192.168.1.143:3306
-- **Database**: grafana
-- **User**: grafana
-- **Connection**: Configured in `grafana.ini`
-
-### Pre-installed Plugins
-- **marcusolsson-treemap-panel**: Version 2.0.0 for hierarchical data visualization
-
-## Network Integration
-
-The Grafana container automatically joins the `web_proxy` Docker network, enabling:
-- **Container Name Resolution**: nginx can access via `http://grafana:3000`
-- **Internal Communication**: Direct container-to-container traffic
-- **Service Discovery**: Automatic discovery by other services on the same network
-
-## Configuration
-
-### Access Credentials
-- **URL**: http://grafana.home (via nginx proxy)
-- **Direct Access**: http://192.168.1.143:8910
-
-### Key Configuration Features
-- **Domain**: grafana.home
-- **MySQL Backend**: Persistent storage with mysql database
-- **Plugin Auto-install**: Treemap panel for enhanced visualization
-- **Security**: Admin password protection
+---
 
 ## Deployment
 
-### Prerequisites
-1. Docker and Docker Compose installed
-2. ZFS mounts available at `/data01`
-3. MySQL database accessible at `192.168.1.143:3306`
-4. web_proxy Docker network (created by nginx)
-
-### Deploy
 ```bash
-ansible-playbook playbook_ocean_grafana_compose.yaml
+# Deploy Grafana with integrated MySQL (requires vault)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/monitoring/grafana_compose.yaml --ask-vault-pass
 ```
 
-### Service Management
+---
+
+## Architecture
+
+Two-container deployment with integrated database:
+
+```text
+┌─────────────────────────────────────────────────┐
+│ Docker Compose Stack                            │
+│                                                 │
+│  ┌──────────────┐      ┌──────────────────┐    │
+│  │   Grafana    │─────▶│  grafana-mysql   │    │
+│  │   :8910      │      │     :3306        │    │
+│  └──────────────┘      └──────────────────┘    │
+│         │                      │               │
+│         ▼                      ▼               │
+│     /data01/               /data01/            │
+│     services/              services/           │
+│     grafana/data           grafana/mysql-data  │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## Directory Structure
+
+```text
+/data01/services/grafana/
+├── docker-compose.yml
+├── .env
+├── grafana.ini                 # Grafana configuration
+├── mysql-init.sql              # Database initialization
+├── data/                       # Grafana data
+├── logs/                       # Grafana logs
+├── plugins/                    # Grafana plugins
+├── mysql-data/                 # MySQL data
+├── mysql-logs/                 # MySQL logs
+├── mysql-conf/
+│   └── custom.cnf              # MySQL configuration
+├── provisioning/
+│   ├── users/
+│   │   └── users.yml           # Auto-provisioned users
+│   └── datasources/
+│       └── loki.yml            # Loki datasource
+└── dashboards/                 # Dashboard JSON files (27 items)
+```
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml.j2` | Grafana + MySQL compose config |
+| `grafana.service.j2` | Systemd service |
+| `grafana.env.j2` | Environment variables |
+| `grafana-mysql-container.ini.j2` | Grafana configuration |
+| `mysql-init.sql.j2` | MySQL database initialization |
+| `mysql-custom.cnf.j2` | MySQL configuration |
+| `users.yml.j2` | User provisioning |
+| `dashboards/` | Pre-built dashboard JSON files |
+
+---
+
+## Configuration
+
+### Access
+
+- **URL**: http://grafana.home (via nginx proxy)
+- **Direct**: http://192.168.1.143:8910
+- **MySQL**: localhost:3306 (from host)
+
+### Pre-installed Plugins
+
+- `marcusolsson-treemap-panel 2.0.0` - Hierarchical data visualization
+
+### Provisioned Datasources
+
+- **Loki**: http://192.168.1.143:3100 (log aggregation)
+
+---
+
+## Service Management
+
 ```bash
-# Start service
-sudo systemctl start grafana.service
+# Status
+systemctl status grafana.service
 
-# Stop service  
-sudo systemctl stop grafana.service
+# Restart
+systemctl restart grafana.service
 
-# Restart service
-sudo systemctl restart grafana.service
-
-# Check status
-sudo systemctl status grafana.service
-
-# View logs
+# Logs
 journalctl -u grafana.service -f
-docker-compose -f /data01/services/grafana/docker-compose.yml logs -f
+docker compose -f /data01/services/grafana/docker-compose.yml logs -f
+
+# Container health
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep grafana
 ```
 
-### Health Monitoring
-- **Systemd Status**: `systemctl status grafana.service`
-- **Container Health**: `docker ps` (healthy/unhealthy status)
-- **Grafana API**: `curl http://localhost:3000/api/health`
+---
+
+## Health Checks
+
+```bash
+# Grafana API
+curl http://localhost:8910/api/health
+
+# MySQL
+docker exec grafana-mysql mysqladmin ping -h localhost -u root -p
+
+# Container status
+docker inspect grafana --format='{{.State.Health.Status}}'
+docker inspect grafana-mysql --format='{{.State.Health.Status}}'
+```
+
+---
 
 ## Troubleshooting
 
-### Common Issues
+### Grafana won't start
 
-1. **Database Connection Failed**
-   - Check MySQL service: `systemctl status mysql`
-   - Verify database credentials in `grafana.ini`
-   - Test database connectivity: `mysql -h 192.168.1.143 -u grafana -p`
-
-2. **Plugin Installation Failed**
-   - Check plugin directory permissions: `ls -la /data01/services/grafana/plugins/`
-   - Manually install: `docker exec grafana grafana-cli plugins install marcusolsson-treemap-panel`
-
-3. **Container Network Issues**
-   - Verify network membership: `docker network inspect web_proxy`
-   - Test nginx connectivity: `docker exec nginx curl -I http://grafana:3000`
-
-### Network Debugging
 ```bash
-# List Docker networks
-docker network ls
+# Check MySQL is healthy first (Grafana depends on it)
+docker logs grafana-mysql
 
-# Inspect network members  
-docker network inspect web_proxy
-
-# Test container connectivity from nginx
-docker exec nginx curl -I http://grafana:3000/api/health
-docker exec nginx nslookup grafana
+# Then check Grafana
+docker logs grafana
 ```
 
-## Migration from Legacy Setup
+### Database connection failed
 
-If migrating from the previous systemd-based deployment:
+```bash
+# Verify MySQL container is running
+docker ps | grep grafana-mysql
 
-1. **Stop old service**: `sudo systemctl stop grafana.service && sudo systemctl disable grafana.service`
-2. **Backup data**: `cp -r /data01/services/grafana /data01/services/grafana.backup`
-3. **Deploy new setup**: `ansible-playbook playbook_ocean_grafana_compose.yaml`
-4. **Verify functionality**: Test dashboard access and database connectivity
-5. **Import dashboards**: Restore any custom dashboards if needed
+# Test MySQL connectivity
+docker exec grafana-mysql mysql -u grafana -p -e "SELECT 1"
+
+# Check Grafana config
+cat /data01/services/grafana/grafana.ini | grep -A5 "\[database\]"
+```
+
+### Plugin installation failed
+
+```bash
+# Check plugin directory permissions
+ls -la /data01/services/grafana/plugins/
+
+# Manually install
+docker exec grafana grafana-cli plugins install marcusolsson-treemap-panel
+```
+
+---
+
+## Network
+
+Uses **bridge** network mode (default Docker networking):
+
+- Grafana → MySQL via container link (depends_on)
+- External access via host ports (8910, 3306)
+- nginx proxies via host IP: `http://192.168.1.143:8910`
+
+---
 
 ## Security
 
-- **Container Security**: No new privileges, restricted capabilities
-- **File Permissions**: Read-only configuration files, restricted write access
-- **Network Isolation**: Only exposed ports accessible externally
-- **Resource Limits**: CPU and memory constraints prevent resource exhaustion
-- **Admin Access**: Password-protected admin interface
-
-## Integration
-
-### Prometheus Data Source
-Grafana is pre-configured to connect to Prometheus for metrics visualization:
-- **URL**: http://prometheus:9090 (container name resolution)
-- **Network**: Shared web_proxy network enables direct communication
-
-### Dashboard Management
-- **Default Dashboards**: Import monitoring dashboards for infrastructure services
-- **Custom Dashboards**: Create dashboards for homelab metrics
-- **Plugin Support**: Treemap panel for hierarchical service visualization
+- **no-new-privileges**: Both containers
+- **Resource limits**: 1 CPU, 1GB memory each
+- **Read-only config**: grafana.ini mounted read-only
+- **Vault secrets**: MySQL passwords from encrypted vault
+- **Health checks**: Auto-restart on failure

@@ -1,34 +1,45 @@
-# Proxmox Repository Configuration Playbook
+# Proxmox Repository Configuration
 
-## Purpose
+Configures Proxmox hosts with non-subscription repositories and removes the subscription warning.
 
-Configures Proxmox hosts with non-subscription repositories and removes the subscription warning from the web UI. This playbook should be run after fresh Proxmox installations.
+---
+
+## Quick Reference
+
+| Setting | Value |
+|---------|-------|
+| Hosts | proxmox group (node005, node006) |
+| Vault Required | No |
+| Proxmox Version | 8.x (Bookworm) |
+| Ceph Version | Reef (no-subscription) |
+
+---
 
 ## What It Does
 
-1. **Downloads Proxmox GPG Key** - Ensures package verification
-2. **Configures Non-Subscription Repositories**:
-   - Debian Bookworm main and contrib
-   - Debian security updates
-   - Proxmox PVE no-subscription repository
-3. **Disables Enterprise Repositories**:
-   - Comments out enterprise PVE repository
-   - Comments out enterprise Ceph repository
-4. **Adds Ceph Reef Repository** - No-subscription Ceph Reef for storage
-5. **Removes Subscription Warning** - Patches Proxmox UI to remove nag screen
-6. **Updates Package Cache** - Ensures repositories are ready to use
+1. Downloads Proxmox GPG key
+2. Configures non-subscription repositories (Debian + PVE)
+3. Disables enterprise repositories (PVE + Ceph)
+4. Adds Ceph Reef no-subscription repository
+5. Removes subscription warning from web UI
+6. Updates apt cache
+
+---
 
 ## Usage
 
 ```bash
-# Apply to all Proxmox hosts
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/proxmox_repos.yaml
+# Apply to all Proxmox hosts (no vault required)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_repos.yaml
 
-# Apply to specific Proxmox host
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/proxmox_repos.yaml -l node006
+# Apply to specific host
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_repos.yaml -l node006
 
-# Dry run to see what would change
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/proxmox_repos.yaml --check
+# Dry run
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_repos.yaml --check
 ```
 
 ## When to Use

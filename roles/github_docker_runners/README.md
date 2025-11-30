@@ -49,63 +49,74 @@ This role configures a dedicated runner host VM with:
 ### 1. Create Runner Host VM on Proxmox
 
 ```bash
-cd homelab_playbooks/
-
-# Edit variables in playbook or create vars file
-ansible-playbook 00_create_runner_vm.yaml
+# Create the runner VM on node005
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/create_runner_vm.yaml
 
 # VM will be created on node005:
 #   - Name: gh-runner-01
-#   - VMID: 250
+#   - VMID: 5000
 #   - vCPUs: 16
 #   - RAM: 64 GB
-#   - IP: 192.168.1.250 (or via DNS)
+#   - IP: 192.168.1.20 (via DNS lookup or fallback)
 ```
 
 ### 2. Add Runner Host to Inventory
 
+The runner inventory is at `inventories/github_runners/hosts.ini`:
+
 ```ini
-# inventory.ini
 [github_runners]
-gh-runner-01 ansible_host=192.168.1.250 ansible_user=root
+gh-runner-01 ansible_host=192.168.1.20 ansible_user=debian
+
+[github_runners:vars]
+ansible_python_interpreter=/usr/bin/python3
 ```
 
 ### 3. Configure Runner Settings
 
-```bash
-# Copy example configuration
-cp group_vars/github_runners.yml group_vars/github_runners.yml
+Group vars are at `inventories/github_runners/group_vars/github_runners.yml`:
 
-# Edit configuration
-vim group_vars/github_runners.yml
+```bash
+vim inventories/github_runners/group_vars/github_runners.yml
 ```
 
-Key settings to configure:
+Key settings (defaults shown):
 
 ```yaml
-github_scope: "org"  # or "repo"
-github_org: "your-org-name"
+# Scope: "org" for organization-level, "repo" for repository-level
+github_scope: "repo"
+github_repo: "bluefishforsale/homelab"
+
+# Runner count and labels
 github_runner_count: 4
 github_runner_labels:
   - self-hosted
   - homelab
   - ansible
   - ephemeral
+  - docker
+  - linux
+  - x64
 ```
 
-### 4. Obtain GitHub Registration Token
+### 4. Obtain GitHub Personal Access Token (PAT)
 
-**For organization-level runners:**
-```
-https://github.com/organizations/YOUR-ORG/settings/actions/runners/new
-```
+The myoung34/github-runner image uses a PAT to automatically obtain registration tokens.
 
-**For repository-level runners:**
-```
-https://github.com/YOUR-OWNER/YOUR-REPO/settings/actions/runners/new
-```
+**Create a PAT:**
 
-**Important:** Tokens expire after 1 hour!
+1. Go to: <https://github.com/settings/tokens>
+2. Click "Generate new token" → "Generate new token (classic)"
+3. Set expiration (recommend 90 days or no expiration for homelab)
+4. Select scopes:
+   - `repo` (Full control of private repositories)
+   - `workflow` (Update GitHub Action workflows)
+   - `admin:org` (For org-level runners only)
+5. Click "Generate token"
+6. Copy the token (starts with `ghp_` or `github_pat_`)
+
+**Important:** PATs don't expire after 1 hour like registration tokens. Store securely!
 
 ### 5. Store Token Securely
 
@@ -113,33 +124,36 @@ https://github.com/YOUR-OWNER/YOUR-REPO/settings/actions/runners/new
 
 ```bash
 # Edit vault file
-ansible-vault edit vault_secrets.yaml
+ansible-vault edit vault/secrets.yaml
 
 # Add token in vault structure
 development:
   github:
-    github_registration_token: "YOUR_TOKEN_HERE"
+    token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # Reference in group_vars/github_runners.yml
-github_registration_token: "{{ development.github.github_registration_token }}"
+github_pat_token: "{{ development.github.token }}"
 ```
 
 **Option B: Command-line override**
 
 ```bash
-ansible-playbook github-docker-runners.yml \
-  --extra-vars "github_registration_token=YOUR_TOKEN_HERE"
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml \
+  --extra-vars "github_pat_token=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ### 6. Deploy Runners
 
 ```bash
 # Deploy with vault
-ansible-playbook github-docker-runners.yml --ask-vault-pass
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
 
 # Or with command-line token
-ansible-playbook github-docker-runners.yml \
-  --extra-vars "github_registration_token=YOUR_TOKEN_HERE"
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml \
+  --extra-vars "github_pat_token=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ## Verification
@@ -335,11 +349,12 @@ docker compose restart
 ### Update Configuration
 
 ```bash
-# 1. Edit group_vars/github_runners.yml
-vim group_vars/github_runners.yml
+# 1. Edit group_vars
+vim inventories/github_runners/group_vars/github_runners.yml
 
 # 2. Re-run playbook
-ansible-playbook github-docker-runners.yml --ask-vault-pass
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
 
 # Ansible will:
 #   - Update docker-compose.yml
@@ -354,7 +369,8 @@ ansible-playbook github-docker-runners.yml --ask-vault-pass
 github_runner_count: 8  # Was 4, now 8
 
 # 2. Re-run playbook
-ansible-playbook github-docker-runners.yml --ask-vault-pass
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
 
 # New containers will be created automatically
 ```
@@ -390,10 +406,11 @@ docker compose down
 
 ### Runners Not Registering
 
-**Check token validity:**
+**Check PAT validity:**
 ```bash
-# Tokens expire after 1 hour
-# Generate a new token and re-run playbook
+# Verify PAT has correct scopes (repo, workflow, admin:org)
+# Check if PAT has expired
+curl -H "Authorization: token ghp_your_token" https://api.github.com/user
 ```
 
 **Check container logs:**
@@ -402,7 +419,8 @@ docker logs github-runner-1
 ```
 
 **Common issues:**
-- Expired registration token
+- Invalid or expired PAT
+- PAT missing required scopes (`repo`, `workflow`, `admin:org`)
 - Incorrect GitHub URL (org vs repo)
 - Network connectivity to GitHub
 - Invalid labels format
@@ -434,7 +452,8 @@ docker logs github-runner-1 --tail 100
 ```
 
 **Common causes:**
-- Invalid registration token
+- Invalid or expired PAT
+- PAT missing required scopes
 - Network issues reaching GitHub
 - Docker socket permissions (if mounted)
 - Resource exhaustion (CPU/memory limits too low)
@@ -515,13 +534,14 @@ Runners have SSH access to your homelab:
   - Use read-only SSH keys where possible
   - Monitor SSH access logs
 
-### GitHub Token Expiration
+### GitHub PAT Management
 
-Registration tokens expire after 1 hour:
+Personal Access Tokens (PATs) have configurable expiration:
 
-- **Issue**: Cannot register new runners after token expires
-- **Solution**: Runners stay registered until they exit
-- **Best practice**: Re-run playbook periodically with fresh token
+- **Classic PATs**: Can be set to never expire (recommended for homelab)
+- **Fine-grained PATs**: Maximum 1 year expiration
+- **Best practice**: Set calendar reminder to rotate PAT before expiration
+- **Rotation**: Update vault and re-run playbook to deploy new token
 
 ### Ephemeral Benefits
 
@@ -538,7 +558,8 @@ Ephemeral runners improve security:
 
 ```bash
 # Update runner images
-ansible-playbook github-docker-runners.yml --tags update
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml --tags update
 
 # Or manually
 cd /opt/github-runners
@@ -619,11 +640,14 @@ Different configurations per runner:
 Deploy to multiple VMs for higher capacity:
 
 ```ini
-# inventory.ini
+# inventories/github_runners/hosts.ini
 [github_runners]
-gh-runner-01 ansible_host=192.168.1.250
-gh-runner-02 ansible_host=192.168.1.251
-gh-runner-03 ansible_host=192.168.1.252
+gh-runner-01 ansible_host=192.168.1.20 ansible_user=debian
+# gh-runner-02 ansible_host=192.168.1.21 ansible_user=debian
+# gh-runner-03 ansible_host=192.168.1.22 ansible_user=debian
+
+[github_runners:vars]
+ansible_python_interpreter=/usr/bin/python3
 ```
 
 Each host runs N runners independently.

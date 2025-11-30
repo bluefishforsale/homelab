@@ -1,33 +1,72 @@
-# 🌐 Network Architecture
+# Network Architecture
 
-## Overview
+Homelab network configuration and topology.
 
-The homelab network is designed with performance, redundancy, and security in mind, utilizing bonded interfaces, VLANs, and multiple network tiers for different service types.
+---
 
-## 🏗️ Physical Network Infrastructure
+## Quick Reference
 
-### Network Equipment
-- **Core Switch**: 10GbE managed switch with LACP support
-- **Access Switches**: 1GbE switches for management and IoT devices  
-- **Firewall**: pfSense or equivalent with VLAN support
-- **Internet**: Fiber connection with static IP allocation
+| Host | IP | Purpose |
+|------|----|---------|
+| Gateway | 192.168.1.1 | Router |
+| dns01 | 192.168.1.2 | BIND DNS |
+| gitlab | 192.168.1.5 | CI/CD |
+| pihole | 192.168.1.9 | DNS filtering |
+| node005 | 192.168.1.105 | Proxmox host |
+| node006 | 192.168.1.106 | Proxmox host |
+| ocean | 192.168.1.143 | Docker services |
+| gh-runner-01 | 192.168.1.250 | GitHub runners |
 
-### Interface Configuration
+---
 
-#### Proxmox Host Bonding
+## Network Topology
+
+```text
+Internet
+    │
+    ▼
+Router (192.168.1.1)
+    │
+    ▼
+UniFi US-16-XG (10GbE)
+    │
+    ├── node005 (bond0) ──► dns01, pihole, gitlab, gh-runner-01
+    │
+    └── node006 (bond0) ──► ocean
+```
+
+---
+
+## Subnet: 192.168.1.0/24
+
+Single flat network for all hosts and services.
+
+| Range | Purpose |
+|-------|---------|
+| .1 | Gateway |
+| .2-.50 | Infrastructure VMs |
+| .100-.110 | Proxmox hosts |
+| .143 | Ocean services |
+| .200-.250 | DHCP pool |
+
+---
+
+## Proxmox Host Network
+
+### Bond Configuration (LACP)
+
 ```bash
-# Primary bond configuration (802.3ad LACP)
 auto bond0
 iface bond0 inet manual
-    bond-slaves eno1 eno2
+    bond-slaves eth0 eth1
     bond-miimon 100
     bond-mode 802.3ad
     bond-xmit-hash-policy layer3+4
 ```
 
-#### Bridge Configuration
+### Bridge Configuration
+
 ```bash
-# Main bridge for VM traffic
 auto vmbr0
 iface vmbr0 inet static
     address 192.168.1.106/24
@@ -37,227 +76,88 @@ iface vmbr0 inet static
     bridge-fd 0
 ```
 
-## 🏷️ VLAN Structure
+See [unifi.md](/docs/operations/unifi.md) for switch LACP configuration.
 
-| VLAN ID | Name | Subnet | Purpose |
-|---------|------|---------|---------|
-| 1 | Management | 192.168.1.0/24 | Host management, core services |
-| 10 | Servers | 192.168.10.0/24 | VM and container services |
-| 20 | IoT | 192.168.20.0/24 | Smart home devices |
-| 30 | Guest | 192.168.30.0/24 | Guest network isolation |
-| 100 | Storage | 10.0.100.0/24 | Ceph cluster communication |
+---
 
-## 📍 IP Address Allocation
+## DNS
 
-### Static Reservations (Management VLAN)
-```yaml
-# Core Infrastructure
-gateway: 192.168.1.1
-dns_primary: 192.168.1.2      # BIND DNS server
-pi_hole: 192.168.1.9          # Ad-blocking DNS
+### Internal DNS (BIND)
 
-# Proxmox Hosts
-proxmox01: 192.168.1.106      # Primary hypervisor
-proxmox02: 192.168.1.107      # Secondary hypervisor
+dns01 (192.168.1.2) serves `.home` domain for internal services.
 
-# Service Hosts
-ocean: 192.168.1.143          # Docker services host
-gitlab: 192.168.1.150         # GitLab server
-```
-
-### Dynamic Ranges
-- **DHCP Pool**: 192.168.1.200-250 (client devices)
-- **Reserved**: 192.168.1.50-99 (future static allocations)
-
-## 🚀 High-Performance Features
-
-### Bonding & Aggregation
-- **LACP (802.3ad)**: Active-active load balancing
-- **Hash Policy**: Layer3+4 for optimal distribution
-- **Monitoring**: miimon for link state detection
-
-### Jumbo Frames
 ```bash
-# Enable on storage network for better throughput
-echo 'iface bond0 inet manual
-    mtu 9000' >> /etc/network/interfaces
+# Test resolution
+nslookup ocean.home 192.168.1.2
 ```
 
-### SR-IOV (Future)
-- **GPU Networking**: Direct hardware access for AI workloads
-- **Storage Acceleration**: Bypass kernel for high-IOPS workloads
+### External DNS (Cloudflare)
 
-## 🛡️ Security Architecture
+External access via `*.terrac.com` through Cloudflare tunnels.
 
-### Network Segmentation
-```mermaid
-graph TB
-    subgraph "Internet"
-        CF[Cloudflare]
-    end
-    
-    subgraph "DMZ VLAN"
-        FW[Firewall/Router]
-        CF --> FW
-    end
-    
-    subgraph "Management VLAN"
-        FW --> DNS[DNS Server]
-        FW --> DHCP[DHCP Server]
-        FW --> MGMT[Management Services]
-    end
-    
-    subgraph "Server VLAN"
-        FW --> SVC[Application Services]
-    end
-    
-    subgraph "Storage VLAN"
-        SVC -.-> CEPH[Ceph Cluster]
-    end
-```
+Deploy DDNS updater:
 
-### Firewall Rules
 ```bash
-# Allow core services
-allow 192.168.1.0/24 -> 192.168.1.2:53    # DNS
-allow 192.168.1.0/24 -> 192.168.1.2:67    # DHCP
-allow 192.168.1.0/24 -> 192.168.1.9:53    # Pi-hole
-
-# Block inter-VLAN by default
-deny 192.168.10.0/24 -> 192.168.20.0/24
-deny 192.168.20.0/24 -> 192.168.10.0/24
-
-# Allow specific cross-VLAN services
-allow 192.168.10.0/24 -> 192.168.1.2:53   # Servers to DNS
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/network/cloudflare_ddns.yaml --ask-vault-pass
 ```
 
-## 🔍 DNS Architecture
+---
 
-### BIND Configuration
-```bind
-// Primary zone for internal domain
-zone "home" {
-    type master;
-    file "/etc/bind/db.home";
-    allow-update { key "ddns-key"; };
-    allow-transfer { 192.168.1.9; };  // Pi-hole as secondary
-};
+## External Access
 
-// Reverse DNS
-zone "1.168.192.in-addr.arpa" {
-    type master; 
-    file "/etc/bind/db.192.168.1";
-    allow-update { key "ddns-key"; };
-};
-```
+### Cloudflare Tunnels
 
-### Dynamic DNS Integration
+Services exposed via cloudflared tunnel (no port forwarding required).
+
 ```bash
-# Cloudflare DDNS for external services
-curl -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$RECORD_ID" \
-  -H "Authorization: Bearer $CF_TOKEN" \
-  -H "Content-Type: application/json" \
-  --data '{"type":"A","name":"homelab","content":"'$PUBLIC_IP'"}'
+# Deploy tunnels
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/network/cloudflared.yaml --ask-vault-pass
+
+# Check tunnel status
+ssh terrac@192.168.1.143 "docker logs cloudflared --tail 20"
 ```
 
-### Service Discovery
-- **Internal**: .home domain for all internal services
-- **External**: .terrac.com domain via Cloudflare tunnels
+### Traffic Flow
 
-## 📊 Monitoring & Observability
-
-### Network Metrics Collection
-```yaml
-# Prometheus exporters
-- node_exporter:     # Interface statistics
-- snmp_exporter:     # Switch/router metrics  
-- blackbox_exporter: # Network connectivity probes
+```text
+Internet → Cloudflare → cloudflared → nginx → service
 ```
 
-### Key Metrics to Track
-- **Bandwidth Utilization**: Per-interface throughput
-- **Packet Loss**: Network reliability indicators
-- **Latency**: Round-trip time between critical services
-- **DNS Query Times**: Resolution performance
-- **Connection Tracking**: Firewall state table usage
+---
 
-### Grafana Dashboards
-- **Network Overview**: Aggregate traffic and health
-- **Per-Host Details**: Individual system performance
-- **Storage Network**: Ceph cluster communication
-- **Application Connectivity**: Service-to-service latency
+## Troubleshooting
 
-## 🔧 Troubleshooting Tools
+### Diagnostics
 
-### Network Diagnostics
 ```bash
-# Interface status and statistics
+# Check interfaces
 ip link show
 ip addr show
-ethtool bond0
 
-# Routing and connectivity  
-ip route show
+# Check bond status
+cat /proc/net/bonding/bond0
+
+# Test connectivity
 ping -c 4 192.168.1.1
 traceroute google.com
 
-# DNS resolution testing
-nslookup gitlab.home 192.168.1.2
-dig @192.168.1.9 +short blocked-domain.com
-
-# Performance testing
-iperf3 -s                    # Server mode
-iperf3 -c 192.168.1.143     # Client test to ocean host
+# DNS resolution
+nslookup ocean.home 192.168.1.2
 ```
 
-### Packet Capture
+### Performance Testing
+
 ```bash
-# Capture on specific interface
-tcpdump -i vmbr0 -w /tmp/network.pcap
-
-# Filter for specific traffic
-tcpdump -i any host 192.168.1.143 and port 443
-
-# Real-time monitoring
-sudo ss -tulpn | grep :443   # Check listening services
+# iperf3 between hosts
+iperf3 -s                      # Server
+iperf3 -c 192.168.1.143        # Client
 ```
 
-## 🚀 Performance Optimization
+---
 
-### Kernel Network Tuning
-```bash
-# /etc/sysctl.d/99-network-performance.conf
-net.core.rmem_max = 268435456
-net.core.wmem_max = 268435456  
-net.ipv4.tcp_rmem = 4096 65536 268435456
-net.ipv4.tcp_wmem = 4096 65536 268435456
-net.core.netdev_max_backlog = 30000
-```
+## Related Documentation
 
-### Ceph Network Optimization
-```yaml
-# Ceph cluster and public networks
-cluster_network: 10.0.100.0/24  # Dedicated storage VLAN
-public_network: 192.168.1.0/24   # Client access network
-
-# Performance tuning
-ms_bind_port_min: 6800
-ms_bind_port_max: 7300
-```
-
-## 📅 Future Enhancements
-
-### Network Evolution
-1. **25GbE Backbone**: Upgrade core switching for higher throughput
-2. **RDMA/InfiniBand**: Ultra-low latency for storage and AI workloads  
-3. **Network Function Virtualization**: Software-defined networking
-4. **Service Mesh**: Istio for advanced traffic management
-5. **Edge Computing**: 5G integration for remote services
-
-### Security Improvements  
-1. **Zero Trust Architecture**: Mutual TLS for all internal traffic
-2. **Network Access Control**: 802.1X authentication
-3. **Advanced Threat Detection**: AI-powered anomaly detection
-4. **Microsegmentation**: Container-level network policies
-
-This network architecture provides the foundation for a scalable, secure, and high-performance homelab environment that can grow with your needs while maintaining enterprise-grade capabilities.
+- [UniFi Operations](/docs/operations/unifi.md) - Switch configuration
+- [Architecture Overview](overview.md) - System architecture

@@ -291,7 +291,7 @@ func (sa *StatisticalAnalyzer) DetectRateChangeAnomalies(patternName, host, serv
 
 	if historicalRate <= 0 {
 		if recentRate > 0 {
-			return true, math.Inf(1)
+			return true, 999.0 // Use large finite value instead of +Inf (JSON incompatible)
 		}
 		return false, 0.0
 	}
@@ -376,4 +376,25 @@ func average(nums []int) float64 {
 	}
 	
 	return float64(sum) / float64(len(nums))
+}
+
+// FlushAll clears all SQLite data
+func (sa *StatisticalAnalyzer) FlushAll() error {
+	_, err := sa.db.Exec("DELETE FROM pattern_counts; DELETE FROM baselines;")
+	return err
+}
+
+// IsEmpty checks if baselines are empty
+func (sa *StatisticalAnalyzer) IsEmpty() (bool, error) {
+	var count int
+	err := sa.db.QueryRow("SELECT COUNT(*) FROM baselines").Scan(&count)
+	if err != nil {
+		return true, err
+	}
+	return count == 0, nil
+}
+
+// GetDeadLetterSize returns dead letter queue size (not applicable for SQLite)
+func (sa *StatisticalAnalyzer) GetDeadLetterSize() (int64, error) {
+	return 0, nil
 }

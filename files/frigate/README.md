@@ -1,86 +1,136 @@
 # Frigate NVR
 
-Modern AI-powered Network Video Recorder with hardware acceleration.
+AI-powered Network Video Recorder with hardware-accelerated video decoding.
 
-## Features
+---
 
-- **GPU Acceleration**: NVIDIA P2000 for hardware video decode
-- **AI Object Detection**: Real-time person, car, pet detection
-- **Modern UI**: React-based web interface
-- **Recording**: Motion-based recording with 7-day retention
-- **Events**: 14-day event retention
-- **Live Streaming**: WebRTC for low-latency viewing
-- **Birdseye View**: Multi-camera overview
+## Quick Reference
 
-## Architecture
+| Setting | Value |
+|---------|-------|
+| Image | ghcr.io/blakeblackshear/frigate:stable |
+| Web UI | 5000 |
+| RTSP | 8554 |
+| WebRTC | 8555 (TCP/UDP) |
+| Network | frigate_network (bridge) |
 
-- **Container**: Frigate stable
-- **GPU**: NVIDIA runtime with P2000 hardware acceleration
-- **Storage**: `/data01/services/frigate/`
-- **Database**: SQLite (frigate.db)
-- **Network**: Bridge mode (frigate_network)
-- **Ports**:
-  - 5000: Web UI
-  - 8554: RTSP feeds
-  - 8555: WebRTC
+---
 
-## Configuration
+## Deployment
 
-### Hardware Acceleration
+```bash
+# Deploy Frigate (requires vault for any camera credentials)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/services/frigate.yaml --ask-vault-pass
+```
 
-Uses NVIDIA P2000 for:
-- H.264 video decode
-- Reduced CPU usage
-- Higher camera count support
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml.j2` | Container configuration |
+| `frigate.service.j2` | Systemd service |
+| `frigate.yml.j2` | Frigate config (detectors, recording, objects) |
+
+---
+
+## Directory Structure
+
+```text
+/data01/services/frigate/
+├── docker-compose.yml
+├── config/
+│   ├── config.yml          # Frigate configuration
+│   └── frigate.db          # SQLite database
+├── media/                  # Recordings and clips
+└── database/               # Database directory
+```
+
+---
+
+## Hardware Acceleration
+
+### Video Decode (FFmpeg)
+
+NVIDIA preset for H.264 hardware decode:
+
+```yaml
+ffmpeg:
+  hwaccel_args: preset-nvidia-h264
+```
 
 ### Object Detection
 
-Tracks: person, car, dog, cat
-Filters configured for accuracy
+CPU-based detection (3 threads):
+
+```yaml
+detectors:
+  cpu1:
+    type: cpu
+    num_threads: 3
+```
+
+### Container Resources
+
+- **tmpfs cache**: 4GB at `/tmp/cache`
+- **Shared memory**: 256MB
+- **GPU devices**: `/dev/dri` (Intel/AMD), NVIDIA runtime
+
+---
+
+## Configuration Defaults
+
+### Object Tracking
+
+- person, car, dog, cat
+- Filters for min/max area and confidence threshold
 
 ### Recording
 
-- **Continuous**: Motion-based, 7 days
-- **Events**: 14 days retention
-- **Snapshots**: Enabled with bounding boxes
+- **Retention**: 7 days (motion-based)
+- **Events**: 14 days
+
+### Snapshots
+
+- Enabled with timestamps and bounding boxes
+- 14 days retention
+
+### Live View
+
+- 720p height, quality 8
+- Birdseye multi-camera view enabled
+
+---
 
 ## Access
 
 - **Local**: http://frigate.home
+- **Direct**: http://192.168.1.143:5000
 - **Remote**: https://frigate.terrac.com
+
+---
 
 ## Service Management
 
 ```bash
 # Status
-sudo systemctl status frigate
+systemctl status frigate
 
-# Start/Stop/Restart
-sudo systemctl start frigate
-sudo systemctl stop frigate
-sudo systemctl restart frigate
+# Restart
+systemctl restart frigate
 
 # Logs
-sudo journalctl -u frigate -f
+journalctl -u frigate -f
 docker logs frigate -f
 ```
 
-## Storage
-
-```
-/data01/services/frigate/
-├── config/
-│   ├── config.yml          # Frigate configuration
-│   └── frigate.db          # SQLite database
-├── media/
-│   ├── recordings/         # Video recordings
-│   └── clips/              # Event clips
-└── docker-compose.yml
-```
+---
 
 ## Adding Cameras
 
-Edit `/data01/services/frigate/config/config.yml` and replace `cameras: {}` with:
+Edit `/data01/services/frigate/config/config.yml` and replace `cameras: {}`:
 
 ```yaml
 cameras:
@@ -88,7 +138,7 @@ cameras:
     enabled: true
     ffmpeg:
       inputs:
-        - path: rtsp://username:password@192.168.1.100:554/stream
+        - path: rtsp://user:pass@192.168.1.100:554/stream
           roles:
             - detect
             - record
@@ -96,9 +146,6 @@ cameras:
       width: 1920
       height: 1080
       fps: 5
-    zones:
-      front_porch:
-        coordinates: 100,100,300,100,300,300,100,300
     record:
       enabled: true
     snapshots:
@@ -108,54 +155,73 @@ cameras:
 Restart after changes:
 
 ```bash
-sudo systemctl restart frigate
+systemctl restart frigate
 ```
 
-## Performance
-
-With NVIDIA P2000:
-- 10+ cameras (1080p @ 5fps)
-- Hardware decode reduces CPU load
-- Faster object detection processing
+---
 
 ## Troubleshooting
 
 ### GPU Not Detected
 
-Check NVIDIA runtime:
 ```bash
+# Check NVIDIA runtime
 docker exec frigate nvidia-smi
+
+# Check device access
+ls -la /dev/dri
 ```
 
 ### High CPU Usage
 
-Verify hardware acceleration:
 ```bash
-docker logs frigate | grep hwaccel
+# Verify hardware acceleration
+docker logs frigate | grep -i hwaccel
+
+# Check detector type (should be cpu or gpu)
+docker logs frigate | grep -i detector
 ```
 
 ### Camera Connection Issues
 
-Test RTSP stream:
 ```bash
+# Test RTSP stream
 ffmpeg -i rtsp://camera-ip:554/stream -frames:v 1 test.jpg
+
+# Check Frigate logs for camera errors
+docker logs frigate | grep -i error
 ```
+
+### Health Check
+
+```bash
+# API stats
+curl http://localhost:5000/api/stats
+
+# Container health
+docker inspect frigate --format='{{.State.Health.Status}}'
+```
+
+---
 
 ## Integration
 
-- **Home Assistant**: Native integration available
+- **Home Assistant**: Native integration
 - **MQTT**: Disabled by default
-- **API**: REST API at http://frigate.home/api/
+- **API**: http://localhost:5000/api/
+
+---
 
 ## Security
 
-- Private network (bridge mode)
-- Cloudflare Access protected for remote access
-- No new privileges security option
-- Local camera credentials in config
+- **no-new-privileges**: Enabled
+- **Network**: Dedicated bridge (frigate_network)
+- **Privileged mode**: Required for hardware access
+- **Remote access**: Cloudflare Access protected
+
+---
 
 ## Resources
 
-- Documentation: https://docs.frigate.video/
-- GitHub: https://github.com/blakeblackshear/frigate
-- Community: https://github.com/blakeblackshear/frigate/discussions
+- Docs: <https://docs.frigate.video/>
+- GitHub: <https://github.com/blakeblackshear/frigate>

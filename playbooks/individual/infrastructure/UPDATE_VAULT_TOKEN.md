@@ -1,94 +1,84 @@
-# Automated Vault Token Update
+# Vault Token Management
 
-## Approach 1: Semi-Automated (Recommended)
+Options for managing GitHub runner tokens in Ansible Vault.
 
-The playbook now outputs the exact token value. To update the vault:
+---
 
-```bash
-# 1. Run the token check playbook and capture the token
-TOKEN=$(ansible-playbook playbooks/individual/infrastructure/github_runner_token_check.yaml 2>&1 | grep "Token:" | head -1 | awk '{print $2}')
+## Recommended: PAT Approach (No Token Management)
 
-# 2. Update vault file directly (requires vault password)
-ansible-vault edit vault/secrets.yaml
-# Then manually update the vault_github_registration_token value
+**Use a GitHub Personal Access Token (PAT) instead of registration tokens.**
 
-# OR use sed with temporary decryption (more automated)
-ansible-vault decrypt vault/secrets.yaml
-sed -i.bak "s/vault_github_registration_token:.*/vault_github_registration_token: \"$TOKEN\"/" vault/secrets.yaml
-ansible-vault encrypt vault/secrets.yaml
+The `myoung34/github-runner` image automatically generates registration tokens from your PAT, eliminating manual token management.
+
+```yaml
+# vault/secrets.yaml
+development:
+  github:
+    token: "ghp_xxxxxxxxxxxx"  # Your GitHub PAT
 ```
 
-## Approach 2: Fully Automated Script
+See [SETUP_GITHUB_RUNNERS.md](SETUP_GITHUB_RUNNERS.md) for complete setup.
 
-Create a helper script `update-runner-token.sh`:
+---
+
+## Legacy: Registration Token Approaches
+
+If you need to manage registration tokens directly:
+
+### Option 1: Automated Vault Update Playbook
+
+Use the dedicated playbook that generates a token and updates the vault automatically:
 
 ```bash
-#!/bin/bash
-set -e
-
-VAULT_FILE="vault/secrets.yaml"
-PLAYBOOK="playbooks/individual/infrastructure/github_runner_token_check.yaml"
-
-echo "Generating new GitHub runner token..."
-OUTPUT=$(ansible-playbook "$PLAYBOOK" 2>&1)
-
-# Extract token from playbook output
-TOKEN=$(echo "$OUTPUT" | grep "Token:" | head -1 | awk '{print $2}')
-
-if [ -z "$TOKEN" ]; then
-    echo "ERROR: Failed to generate token"
-    exit 1
-fi
-
-echo "Token generated: $TOKEN"
-echo "Updating vault..."
-
-# Decrypt vault
-ansible-vault decrypt "$VAULT_FILE"
-
-# Update token
-sed -i.bak "s/vault_github_registration_token:.*/vault_github_registration_token: \"$TOKEN\"/" "$VAULT_FILE"
-
-# Re-encrypt vault
-ansible-vault encrypt "$VAULT_FILE"
-
-echo "✓ Vault updated successfully!"
-echo ""
-echo "Next step - Deploy runners:"
-echo "  ansible-playbook -i inventories/github_runners/hosts.ini \\"
-echo "    playbooks/individual/infrastructure/github_docker_runners.yaml \\"
-echo "    --ask-vault-pass"
+ansible-playbook playbooks/individual/infrastructure/github_runner_token_update_vault.yaml \
+  --ask-vault-pass
 ```
 
-Make it executable:
-```bash
-chmod +x update-runner-token.sh
-```
+**Requires**: GitHub CLI (`gh`) authenticated
 
-## Approach 3: Use Extra Vars (No Vault Update)
+### Option 2: Runtime Extra Vars
 
-Skip vault updates entirely and pass the token directly:
+Skip vault updates and pass the token at deploy time:
 
 ```bash
 # Generate token
-TOKEN=$(ansible-playbook playbooks/individual/infrastructure/github_runner_token_check.yaml 2>&1 | grep "Token:" | head -1 | awk '{print $2}')
+TOKEN=$(ansible-playbook playbooks/individual/infrastructure/github_runner_token_check.yaml \
+  --ask-vault-pass 2>&1 | grep "Token:" | head -1 | awk '{print $2}')
 
-# Deploy runners with token
+# Deploy with token
 ansible-playbook -i inventories/github_runners/hosts.ini \
   playbooks/individual/infrastructure/github_docker_runners.yaml \
   --extra-vars "github_registration_token=$TOKEN" \
   --ask-vault-pass
 ```
 
-This approach avoids vault management entirely and is more idempotent.
+### Option 3: Manual Vault Edit
 
-## Recommendation
+```bash
+ansible-vault edit vault/secrets.yaml --ask-vault-pass
+```
 
-**Use Approach 3** - it's:
-- ✅ Fully automated
-- ✅ Idempotent (no file modifications)
-- ✅ Works with CI/CD
-- ✅ Follows Ansible best practices (extra-vars > vault vars)
-- ✅ No vault editing complexity
+Update:
 
-The vault should store long-lived credentials (passwords, API keys), while short-lived tokens (1-hour expiry) are better passed as runtime parameters.
+```yaml
+development:
+  github:
+    vault_github_registration_token: "AXXXX..."
+```
+
+---
+
+## Summary
+
+| Approach | Vault Changes | Automation | Recommended |
+|----------|---------------|------------|-------------|
+| PAT | Once (store PAT) | Full | **Yes** |
+| Update playbook | Each deploy | Full | For legacy |
+| Extra vars | None | Full | For legacy |
+| Manual edit | Each deploy | Manual | No |
+
+## Related Files
+
+- [SETUP_GITHUB_RUNNERS.md](SETUP_GITHUB_RUNNERS.md) - Complete setup guide
+- `github_runner_token_update_vault.yaml` - Auto-update vault playbook
+- `github_runner_token_check.yaml` - Token validation playbook

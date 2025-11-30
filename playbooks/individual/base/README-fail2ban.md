@@ -1,26 +1,36 @@
 # fail2ban SSH Protection
 
-Aggressive fail2ban configuration to block SSH brute force attacks.
+SSH brute force protection using fail2ban.
 
-## Configuration
+---
 
-- **ignoreip**: 127.0.0.1/8, ::1, 192.168.1.0/24 (localhost and local LAN whitelisted)
-- **maxretry**: 3 attempts
-- **findtime**: 120 seconds (2 minutes)
-- **bantime**: 86400 seconds (24 hours)
+## Quick Reference
 
-This means: If an IP makes 3 failed SSH attempts within 2 minutes, it's banned for 24 hours.
+| Setting | Value |
+|---------|-------|
+| ignoreip | 127.0.0.1/8, ::1, 192.168.1.0/24 |
+| maxretry | 3 attempts |
+| findtime | 120 seconds (2 minutes) |
+| bantime | 86400 seconds (24 hours) |
+| logpath | /var/log/auth.log |
+| banaction | iptables-multiport |
 
-**Local LAN Exception:** Connections from 192.168.1.0/24 are never banned (safe for internal access).
+**Rule**: 3 failed SSH attempts within 2 minutes = banned for 24 hours.
+
+**Local LAN Exception**: 192.168.1.0/24 is never banned.
+
+---
 
 ## Deployment
 
 ```bash
-# Deploy to all hosts
-ansible-playbook playbooks/individual/base/fail2ban.yaml
+# Deploy to all hosts (no vault required)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/base/fail2ban.yaml
 
 # Deploy to specific host
-ansible-playbook playbooks/individual/base/fail2ban.yaml -l ocean
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/base/fail2ban.yaml -l ocean
 ```
 
 ## Verification

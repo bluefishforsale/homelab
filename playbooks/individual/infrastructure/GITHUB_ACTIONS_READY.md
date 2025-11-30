@@ -1,21 +1,29 @@
 # GitHub Actions CI/CD Readiness
 
-## ✅ Status: PRODUCTION READY
+CI/CD integration status for GitHub Actions runner management.
 
-The `github_runner_token_check.yaml` playbook is now **fully compatible** with both local execution and GitHub Actions CI/CD pipelines.
+---
+
+## Note: PAT vs Registration Tokens
+
+**Recommended**: Use the PAT approach where runner containers auto-generate registration tokens.
+See [SETUP_GITHUB_RUNNERS.md](SETUP_GITHUB_RUNNERS.md) for the recommended setup.
+
+This document covers the `github_runner_token_check.yaml` playbook for manual registration token management.
+
+---
 
 ## Cross-Platform Support
 
-### ✓ macOS (Local Development)
+### macOS (Local)
+
 - Uses `gh` CLI when available
 - Falls back to manual instructions
-- Compatible with Homebrew package manager
 
-### ✓ Linux (Debian/Ubuntu Runners)
-- Uses `gh` CLI when available  
-- Uses native `ansible.builtin.uri` for API calls
-- Compatible with apt package manager
-- **Optimized for GitHub Actions runners**
+### Linux (Self-Hosted Runners)
+
+- Uses `gh` CLI or `ansible.builtin.uri` for API calls
+- CI workflows use self-hosted runners: `runs-on: [self-hosted, homelab, ansible]`
 
 ## Authentication Methods
 
@@ -78,7 +86,7 @@ gh auth login
 
 ## GitHub Actions Integration
 
-### Example Workflow
+### Example Workflow (Self-Hosted)
 
 ```yaml
 name: Runner Token Validation
@@ -86,28 +94,21 @@ on: push
 
 jobs:
   validate:
-    runs-on: ubuntu-latest  # Debian-based
-    permissions:
-      actions: write  # Required for runner token generation
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
     
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install Ansible
-        run: pip install ansible
       
       - name: Run validation
         run: |
           ansible-playbook \
             playbooks/individual/infrastructure/github_runner_token_check.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
 ```
 
-See `.github/workflows/runner-token-check.yml.example` for complete example.
+See `.github/workflows/runner-token-check.yml.example` for GitHub-hosted runner example.
 
 ## No User Interaction Required
 
@@ -231,28 +232,39 @@ FINAL STATUS: ✓ SUCCESS
 
 ## Next Steps After Token Generation
 
-### Automated Workflow
+### Deploy Runners
+
 ```bash
-# Token automatically available in playbook
 ansible-playbook -i inventories/github_runners/hosts.ini \
-  playbooks/individual/infrastructure/github_docker_runners.yaml
+  playbooks/individual/infrastructure/github_docker_runners.yaml \
+  --ask-vault-pass
 ```
 
-### Manual Update
-```bash
-# Update vault
-ansible-vault edit vault/secrets.yaml
+### Update Vault (if using registration tokens)
 
-# Or use runtime override
-ansible-playbook ... --extra-vars "github_registration_token=TOKEN"
+```bash
+ansible-vault edit vault/secrets.yaml --ask-vault-pass
+```
+
+Or use runtime override:
+
+```bash
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml \
+  --extra-vars "github_registration_token=TOKEN" --ask-vault-pass
 ```
 
 ## Summary
 
-✅ **Platform Ready**: macOS, Linux, GitHub Actions  
-✅ **Zero Interaction**: Fully automated execution  
-✅ **Multi-Auth**: gh CLI, GITHUB_TOKEN, manual fallback  
-✅ **CI/CD Optimized**: Native GitHub Actions integration  
-✅ **Production Safe**: Idempotent, error-handled, secure  
+- **Platform Ready**: macOS, Linux, GitHub Actions
+- **Zero Interaction**: Fully automated execution
+- **Multi-Auth**: gh CLI, GITHUB_TOKEN, manual fallback
+- **CI/CD Optimized**: Self-hosted runners with vault secrets
+- **Production Safe**: Idempotent, error-handled, secure
 
-The playbook is **ready for production use** in both local development and automated CI/CD pipelines without any modifications.
+## Related Files
+
+- [SETUP_GITHUB_RUNNERS.md](SETUP_GITHUB_RUNNERS.md) - Complete setup guide (recommended)
+- [README_GITHUB_RUNNER_TOKEN.md](README_GITHUB_RUNNER_TOKEN.md) - Token management details
+- `.github/workflows/ci-validate.yml` - Main CI workflow
+- `.github/workflows/runner-token-check.yml.example` - Example token check workflow

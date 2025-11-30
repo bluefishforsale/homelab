@@ -1,64 +1,59 @@
-# Ocean Server Migration: Ubuntu 20.04 → Proxmox/Debian
+# Ocean Server Migration: Ubuntu 20.04 to Proxmox/Debian
 
-## Migration Plan Overview
+Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Proxmox.
 
-**Current State:**
-- ✅ Proxmox VE installed on node006 (192.168.1.106)
-- ✅ SSH access as terrac with passwordless 
-- ✅ Network bonding (bond0) configured
-- ✅ IOMMU and VFIO configured for hardware passthrough
-- ✅ Final reboot in progress - ready to create ocean VM
-- Old Ubuntu 20.04 boot disk: Available via USB adapter if needed
-- GPU: NVIDIA RTX 3090 at PCI 42:00.0 (+ audio at 42:00.1) - PCI IDs: 10de:2204, 10de:1aef - ✅ PASSED THROUGH
-- SAS Controller: Broadcom LSI SAS2308 at PCI 02:00.0 (8x 10.9TB disks: sda-sdh) - PCI ID: 1000:0087 - ✅ PASSED THROUGH
-- NVMe: Intel SSD 660P at PCI 05:00.0 (1.9TB) - ❌ NOT passed through (MSI-X issues) - remains on Proxmox host
-- Storage: /data01 (ZFS raidz2 pool, 8-disk array, currently resilvering)
-- VM Specs: 30 cores, 256GB RAM, 128GB boot disk
+---
 
-## Network Architecture Plan
+## Quick Reference
 
-### Current State
-- **ocean** (physical server): 192.168.1.143 (Ubuntu 20.04, baremetal)
-- **node006** (physical server): 192.168.1.106 (Proxmox, existing in inventory)
+| Component | Value |
+|-----------|-------|
+| Proxmox Host | node006 (192.168.1.106) |
+| Ocean VM | 192.168.1.143 (VM on node006) |
+| VM ID | 5000 |
+| Template ID | 9999 |
+| GPU | NVIDIA RTX 3090 (PCI 42:00) - passed through |
+| SAS Controller | LSI SAS2308 (PCI 02:00) - passed through |
+| ZFS Pool | data01 (8x 12TB raidz2) |
+| VM Specs | 30 cores, 256GB RAM, 128GB boot disk |
 
-### Migration Status
-- ✅ **COMPLETED:** Proxmox installed on node006 (192.168.1.106)
-- ✅ **COMPLETED:** Physical disk swap complete
-- ✅ **COMPLETED:** Network bond0 configured
-- ✅ **COMPLETED:** IOMMU enabled in GRUB
-- ✅ **COMPLETED:** VFIO configured for GPU, SAS controller, NVMe
-- ✅ **COMPLETED:** Drivers blacklisted (nouveau, mpt3sas, nvme)
-- 🔄 **IN PROGRESS:** Final reboot to apply VFIO configuration
+---
 
-**Next Steps (After Reboot):**
-- Verify VFIO claimed all hardware (GPU, SAS, NVMe)
-- Create Debian 12 cloud-init template (VM ID 9999)
-- Create ocean VM (VM ID 5000) with hardware passthrough
-- Import ZFS pool data01 in VM
-- Deploy Docker services via Ansible
+## Migration Summary
 
-## Sanity Check: Critical Considerations
+**Completed:**
 
-### ✅ **GOOD PLAN:**
-- Installing new OS on separate disk is safe (no risk to current system)
-- VM approach allows testing before cutover
-- Can fall back to old disk if issues arise
+1. Proxmox VE installed on node006 (192.168.1.106)
+2. IOMMU and VFIO configured for hardware passthrough
+3. Debian 12 cloud-init template created (VM ID 9999)
+4. Ocean VM created with GPU and SAS passthrough
+5. ZFS pool data01 imported in VM
+6. Docker services deployed via Ansible
 
-### ✅ **CONFIRMED CONFIGURATION:**
-1. **Storage: ZFS Pool (data01)**
-   - 8x 10.9TB disks in raidz2 configuration
-   - Connected to SAS controller at PCI 02:00.0
-   - Currently resilvering (will continue in VM)
-   - Will pass entire controller to VM for native performance
-   
-2. **Network Plan:**
-   - Proxmox host (node006): 192.168.1.106 ✅
-   - Ocean VM (direct): 192.168.1.143 (no temporary IP needed)
-   
-3. **Hardware Passthrough:**
-   - GPU: NVIDIA P2000 at PCI 42:00.0
-   - SAS Controller: PCI 02:00.0 (all ZFS disks)
-   - NVMe 2TB PCI 05:00.0
+**Hardware Passthrough:**
+
+- GPU: NVIDIA RTX 3090 at PCI 42:00.0 (+ audio at 42:00.1)
+- SAS Controller: Broadcom LSI SAS2308 at PCI 02:00.0 (8x disks)
+- NVMe: NOT passed through (MSI-X issues) - remains on Proxmox host
+
+## Architecture
+
+### Storage: ZFS Pool (data01)
+
+- 8x 12TB disks in raidz2 configuration
+- Connected to SAS controller at PCI 02:00.0
+- Controller passed through to VM for native ZFS performance
+
+### Network
+
+- Proxmox host (node006): 192.168.1.106
+- Ocean VM: 192.168.1.143
+
+### Hardware Passthrough
+
+- GPU: NVIDIA RTX 3090 at PCI 42:00.0
+- SAS Controller: PCI 02:00.0 (all ZFS disks)
+- NVMe: NOT passed through (remains on Proxmox host)
 
 ---
 
@@ -533,33 +528,13 @@ If you decide to skip Proxmox and install Debian directly:
 
 ---
 
-## Questions to Answer Before Starting
+## Post-Migration
 
-1. **Is /data01 on a separate physical disk?**
-   - Yes → Safe to proceed
-   - No → Need data migration plan
+Ocean is now managed via Ansible. Deploy services with:
 
-2. **Can you temporarily use a different IP for testing?**
-   - Yes (.145) → Recommended
-   - No → Riskier, direct cutover
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass
+```
 
-3. **Do you need GPU in VM?**
-   - Yes → Use Proxmox with passthrough
-   - No → Debian direct install simpler
-
-4. **When is low-usage time for ocean?**
-   - Plan cutover during this window
-
-5. **Do you have physical access to server?**
-   - Yes → Can use USB boot method (safer)
-   - No → Must use remote install (riskier)
-
----
-
-## Next Steps
-
-1. Answer questions above
-2. Verify /data01 location: `lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep data01`
-3. Choose: Proxmox (recommended) or Debian direct
-4. Schedule migration window
-5. Proceed with Phase 1 preparation
+See [getting-started.md](/docs/setup/getting-started.md) for service deployment details.
