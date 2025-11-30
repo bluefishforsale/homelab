@@ -19,6 +19,11 @@ type StatisticalAnalyzerInterface interface {
 	
 	// Connection management
 	Close() error
+	
+	// Maintenance
+	FlushAll() error
+	IsEmpty() (bool, error)
+	GetDeadLetterSize() (int64, error)
 }
 
 // Ensure both implementations satisfy the interface

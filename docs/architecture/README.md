@@ -1,84 +1,78 @@
-# Homelab Architecture Documentation
+# Architecture Documentation
 
-This directory contains comprehensive architecture diagrams for the homelab infrastructure, showing the physical layout, services, network topology, and deployment workflow.
+Architecture diagrams and documentation for the homelab infrastructure.
 
-## Architecture Diagrams
+---
 
-### 1. Physical Architecture
+## Quick Reference
+
+| Host | IP | Purpose |
+|------|----|---------|
+| node005 | 192.168.1.105 | Proxmox - Control VMs |
+| node006 | 192.168.1.106 | Proxmox - Ocean VM |
+| ocean | 192.168.1.143 | Docker services (VM on node006) |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [overview.md](overview.md) | System architecture overview |
+| [networking.md](networking.md) | Network configuration |
+| [network-topology.md](network-topology.md) | Network diagram |
+| [ocean-services.md](ocean-services.md) | Ocean service architecture |
+| [deployment-flow.md](deployment-flow.md) | Service deployment order |
+| [physical-architecture.md](physical-architecture.md) | Physical server layout |
+
+---
+
+## Diagrams
+
+### Physical Layout
+
 ![Rack Front](./homelab_rack_front.jpg)
-![Rack Rear](./homelab_rack_front.jpg)
 
-**Overview**: Shows the two physical servers and their relationships:
-- **Ocean Server** (192.168.1.143): Ubuntu Docker host with ZFS and NVIDIA P2000 GPU
-- **Node006** (192.168.1.106): Proxmox host running all VMs (DNS, K8s cluster, GitLab, Pi-hole)
+### Network Topology
 
-### 2. Ocean Services Architecture  
-![Ocean Services](./ocean-services.png)
-
-**Overview**: Detailed view of all 21 services running on the Ocean server:
-- **Infrastructure**: MySQL, Nginx, Cloudflare services
-- **Media Services**: Plex ecosystem with full Arr suite automation
-- **AI/ML Services**: GPU-accelerated LLM and image generation
-- **Monitoring**: Prometheus and Grafana stack
-
-### 3. Network Topology
 ![Network Topology](./network-topology.png)
 
-**Overview**: Shows network flows and connectivity:
-- External access via Cloudflare tunnels and Access policies
-- Internal network routing and DNS resolution
-- Service interconnections and dependencies
+### Ocean Services
 
-### 4. Deployment Flow
+![Ocean Services](./ocean-services.png)
+
+### Deployment Flow
+
 ![Deployment Flow](./deployment-flow.png)
 
-**Overview**: 5-phase deployment strategy with dependencies:
-1. **Infrastructure Foundation**: Core services setup
-2. **Network Services**: DNS and tunnels
-3. **Media Stack**: Complete automation pipeline
-4. **AI/ML Services**: GPU-powered workloads
-5. **Optional Services**: Enhancement and monitoring
+---
 
-## File Structure
-
-```
-docs/architecture/
-├── README.md                    # This file
-├── physical-architecture.png    # Physical server layout
-├── ocean-services.png          # All ocean services
-├── network-topology.png        # Network connectivity
-├── deployment-flow.png         # Deployment phases
-├── *.md files                  # Markdown source with mermaid code
-└── *.mmd files                 # Raw mermaid diagram files
-```
-
-## Key Infrastructure Facts
+## Infrastructure Summary
 
 ### Physical Servers
-- **Ocean**: Pre-existing Ubuntu server being converted to Ansible management
-- **Node006**: Proxmox hypervisor hosting all VMs
 
-### Services Count
-- **21 Ocean Services**: All containerized with Docker Compose
-- **GPU Utilization**: NVIDIA P2000 for AI/ML workloads
-- **Storage**: ZFS pool with automatic snapshots and management
+- **node005** (Dell R620): 56 cores, 128GB RAM - runs dns01, pihole, gitlab, gh-runner-01
+- **node006** (Dell R720): 40 cores, 680GB RAM, RTX 3090 - runs ocean VM
 
-### Network Architecture
-- **Internal**: 192.168.1.0/24 network
-- **External**: Cloudflare tunnels for secure access
-- **DNS**: Redundant DNS with Pi-hole ad blocking
+### Ocean VM
 
-### Deployment Strategy
-- **Idempotent**: All playbooks safe to run multiple times
-- **Phased**: Clear dependencies and logical ordering
-- **Automated**: Full infrastructure as code approach
+- 30 cores, 256GB RAM
+- ZFS storage (data01 - 8x 12TB raidz2)
+- RTX 3090 GPU passthrough
+- Docker services via systemd
 
-## Using These Diagrams
+### Services
 
-These diagrams can be included in:
-- Project documentation and README files
-- Technical presentations and reviews
-- Troubleshooting and planning sessions
-- New team member onboarding
+- **Network**: nginx, cloudflared, cloudflare_ddns
+- **AI/ML**: llama.cpp, Open WebUI, ComfyUI
+- **Media**: Plex, Sonarr, Radarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr
+- **Monitoring**: Prometheus, Grafana, NVIDIA DCGM, UnPoller
+- **Services**: NextCloud, TinaCMS, Frigate, Home Assistant
 
-All diagrams are in PNG format with transparent backgrounds for easy inclusion in documentation.
+---
+
+## Related Documentation
+
+- [Getting Started](../setup/getting-started.md)
+- [Playbooks README](/playbooks/README.md)
+- [DEVELOPMENT.md](/DEVELOPMENT.md)

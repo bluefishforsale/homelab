@@ -1,501 +1,316 @@
-# 🎮 GPU Management Operations Guide
+# GPU Management Operations
 
-## Overview
+NVIDIA GPU management, monitoring, and optimization for AI/ML workloads.
 
-This guide covers NVIDIA GPU management, monitoring, and optimization for your homelab's AI/ML workloads and virtualization.
+---
 
-## 📋 GPU Hardware Overview
+## Quick Reference
 
-### NVIDIA P2000 Specifications
-- **Architecture**: Pascal
-- **CUDA Cores**: 1024
-- **Memory**: 5GB GDDR5
-- **Memory Bandwidth**: 140 GB/s  
-- **Power Consumption**: 75W
-- **CUDA Compute Capability**: 6.1
+| Component | Value |
+|-----------|-------|
+| GPU | NVIDIA RTX 3090 (24GB VRAM) |
+| Host | ocean (192.168.1.143) on node006 |
+| Passthrough | PCI 42:00.0 via VFIO |
+| Exporter Port | 9835 |
+| CUDA Version | 12.x |
 
-### Supported Workloads
-- **AI/ML Inference**: ComfyUI, llama.cpp, Open WebUI
-- **Video Transcoding**: Tdarr, Plex hardware acceleration
-- **Containerized GPU**: Docker runtime nvidia
-- **Virtualization**: GPU passthrough to VMs
+---
 
-## 🚀 GPU Driver Management
+## GPU Status Check
 
-### NVIDIA Driver Installation
 ```bash
-# Check current GPU status
-lspci | grep -i nvidia
-nvidia-smi  # If drivers installed
+# SSH to ocean and check GPU
+ssh terrac@192.168.1.143
 
-# Remove old drivers (if needed)
-sudo apt remove --purge nvidia-*
-sudo apt autoremove
-
-# Install recommended drivers
-sudo apt update
-sudo apt install nvidia-driver-470  # For P2000 compatibility
-sudo apt install nvidia-utils-470
-
-# Reboot to load drivers
-sudo reboot
-
-# Verify installation
+# Basic status
 nvidia-smi
-nvidia-settings --version
+
+# Detailed info
+nvidia-smi -q -d MEMORY,UTILIZATION,TEMPERATURE,POWER
+
+# Watch real-time
+watch -n 1 nvidia-smi
 ```
 
-### CUDA Runtime Installation
+---
+
+## Driver Management
+
+### Check Driver Status
+
 ```bash
-# Install CUDA toolkit (version compatible with P2000)
-wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
-sudo sh cuda_11.8.0_520.61.05_linux.run --toolkit --silent
+# Check if GPU is visible
+lspci | grep -i nvidia
 
-# Add CUDA to PATH
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-source ~/.bashrc
+# Check loaded modules
+lsmod | grep nvidia
 
-# Verify CUDA installation
-nvcc --version
-nvidia-smi
+# Check driver version
+nvidia-smi | grep "Driver Version"
 ```
 
 ### Driver Persistence
+
 ```bash
-# Enable persistence mode (recommended for servers)
+# Enable persistence mode
 sudo nvidia-smi -pm 1
 
-# Set performance mode
-sudo nvidia-smi -lgc 1328,1531  # Set GPU clock speeds for P2000
-
-# Create systemd service for persistence
-cat > /etc/systemd/system/nvidia-persistence.service << EOF
-[Unit]
-Description=NVIDIA Persistence Daemon
-Wants=syslog.target
-
-[Service]
-Type=forking
-ExecStart=/usr/bin/nvidia-persistenced --verbose
-ExecStopPost=/bin/rm -rf /var/run/nvidia-persistenced
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable --now nvidia-persistence
+# Check persistence status
+nvidia-smi -q | grep "Persistence Mode"
 ```
 
-## 🐳 Docker GPU Integration
+---
 
-### Docker Runtime Configuration
+## Docker GPU Integration
+
+NVIDIA Container Toolkit is deployed via Ansible:
+
 ```bash
-# Install nvidia-container-runtime
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
-sudo apt update
-sudo apt install nvidia-container-runtime nvidia-docker2
-
-# Restart Docker
-sudo systemctl restart docker
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/docker_ce.yaml -l ocean --ask-vault-pass
 ```
 
-### Test GPU Access in Container
+### Test GPU Access
+
 ```bash
 # Test NVIDIA runtime
-docker run --rm --runtime=nvidia --gpus all nvidia/cuda:11.8-base-ubuntu20.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
 
-# Verify CUDA availability
-docker run --rm --runtime=nvidia --gpus all nvidia/cuda:11.8-devel-ubuntu20.04 nvcc --version
+# Test with gpu-test container
+ssh terrac@192.168.1.143 "docker exec gpu-test nvidia-smi"
 ```
 
 ### Docker Compose GPU Configuration
+
 ```yaml
-# Example docker-compose.yml with GPU access
-version: '3.8'
+# Example with GPU reservations (recommended)
 services:
   ai-service:
     image: your-ai-image:latest
-    runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    volumes:
-      - ./models:/app/models
-    ports:
-      - "8080:8080"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
 ```
 
-## 🔧 GPU Performance Optimization
+---
 
-### Performance Monitoring
+## Performance Monitoring
+
+### Real-Time Monitoring
+
 ```bash
-# Real-time GPU monitoring
-nvidia-smi -l 1  # Update every second
+# Watch GPU status
 watch -n 1 nvidia-smi
 
-# Detailed GPU information
-nvidia-smi -q -d MEMORY,UTILIZATION,ECC,TEMPERATURE,POWER,CLOCK,COMPUTE
+# Process monitoring
+nvidia-smi pmon
 
-# GPU process monitoring
-nvidia-smi pmon  # Process monitoring mode
+# Detailed metrics
+nvidia-smi -q -d MEMORY,UTILIZATION,TEMPERATURE,POWER
 ```
 
-### Power and Thermal Management
+### Query Specific Metrics
+
 ```bash
-# Check power limits
-nvidia-smi -q -d POWER
-
-# Set power limit (if supported)
-sudo nvidia-smi -pl 65  # Set to 65W (lower than 75W max for P2000)
-
-# Monitor temperatures
+# Temperature
 nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits
+
+# Memory usage
+nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader
+
+# Power draw
+nvidia-smi --query-gpu=power.draw --format=csv,noheader
+
+# Utilization
+nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv,noheader
 ```
 
-### Memory Management
+---
+
+## GPU Services
+
+### llama.cpp (LLM Server)
+
 ```bash
-# Check GPU memory usage
-nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv,noheader,nounits
+# Deploy
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/ai/llamacpp.yaml --ask-vault-pass
 
-# Clear GPU memory (kill processes using GPU)
-sudo fuser -v /dev/nvidia*
-# Kill specific processes if needed
+# Check GPU layers
+ssh terrac@192.168.1.143 "docker logs llamacpp 2>&1 | grep -i 'offload\|layer'"
+
+# Access: http://192.168.1.143:8080
 ```
 
-## 🎯 Service-Specific GPU Configuration
+### ComfyUI (Image Generation)
 
-### ComfyUI Optimization
-Following the YanWenKun image configuration from your memories:
-```yaml
-# docker-compose.yml for ComfyUI
-services:
-  comfyui:
-    image: yanwk/comfyui-boot:cu126-slim
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - CLI_ARGS=--fast --use-pytorch-cross-attention --fp16-vae
-    volumes:
-      - /data01/services/comfyui:/root
-    ports:
-      - "8188:8188"
-```
-
-### llama.cpp Server Configuration  
-Following the server-cuda configuration from your memories:
-```yaml
-# docker-compose.yml for llama.cpp
-services:
-  llama-cpp:
-    image: ghcr.io/ggerganov/llama.cpp:server-cuda
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-    command: >
-      --host 0.0.0.0
-      --port 8080
-      --model ""
-      --verbose
-      --n-gpu-layers 32
-    volumes:
-      - /data01/services/llama-cpp/models:/models
-    ports:
-      - "8080:8080"
-```
-
-### Plex Hardware Acceleration
 ```bash
-# Enable hardware transcoding in Plex
-# Settings > Server > Transcoder
-# Enable: "Use hardware acceleration when available"
-# Hardware transcoding device: NVIDIA NVENC
+# Deploy
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/ai/comfyui.yaml --ask-vault-pass
 
-# Monitor transcoding sessions
-tail -f '/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Logs/Plex Media Scanner.log'
+# Access: http://192.168.1.143:8188
 ```
 
-## 🔍 GPU Troubleshooting
+### Plex (Hardware Transcoding)
 
-### Common Issues
-
-#### GPU Not Detected
 ```bash
-# Check if GPU is visible to system
-lspci | grep -i vga
+# Deploy
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
+
+# Check NVENC usage during transcoding
+ssh terrac@192.168.1.143 "nvidia-smi pmon -s u -d 1"
+```
+
+---
+
+## Troubleshooting
+
+### GPU Not Detected
+
+```bash
+# Check PCI
 lspci | grep -i nvidia
 
-# Check if drivers are loaded
+# Check driver modules
 lsmod | grep nvidia
 
-# Reload nvidia modules
+# Check dmesg for errors
+dmesg | grep -i nvidia | tail -20
+
+# Reload modules
 sudo modprobe -r nvidia_drm nvidia_modeset nvidia
 sudo modprobe nvidia nvidia_modeset nvidia_drm
-
-# Check for conflicts
-dmesg | grep -i nvidia | tail -20
 ```
 
-#### CUDA Errors
+### Docker GPU Issues
+
 ```bash
-# Check CUDA driver version compatibility
-nvidia-smi | grep "CUDA Version"
-nvcc --version
+# Check runtime
+docker info | grep -i runtime
 
-# Test CUDA functionality
-cat > test_cuda.cu << EOF
-#include <stdio.h>
-__global__ void hello() {
-    printf("Hello from GPU!\n");
-}
-int main() {
-    hello<<<1,1>>>();
-    cudaDeviceSynchronize();
-    return 0;
-}
-EOF
+# Test GPU access
+docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
 
-nvcc test_cuda.cu -o test_cuda
-./test_cuda
-```
-
-#### Docker GPU Issues
-```bash
-# Check nvidia-container-runtime
-docker info | grep nvidia
-
-# Test basic GPU access
-docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu20.04 nvidia-smi
-
-# Check runtime configuration
+# Check daemon config
 cat /etc/docker/daemon.json
 ```
 
-#### Performance Issues
+### Performance Issues
 
 ```bash
-# Check for thermal throttling
-nvidia-smi --query-gpu=clocks_throttle_reasons.active --format=csv,noheader,nounits
+# Check throttling
+nvidia-smi --query-gpu=clocks_throttle_reasons.active --format=csv
 
-# Monitor power consumption
-nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits
-
-# Check PCIe bandwidth
-nvidia-smi --query-gpu=pci.link.gen.current,pci.link.width.current --format=csv,noheader,nounits
+# Check PCIe link
+nvidia-smi --query-gpu=pci.link.gen.current,pci.link.width.current --format=csv
 ```
 
-## 📊 GPU Monitoring & Alerting
+---
 
-### Prometheus GPU Exporter
+## Prometheus GPU Exporter
 
-**NVIDIA GPU Exporter**: [utkuozdemir/nvidia_gpu_exporter](https://github.com/utkuozdemir/nvidia_gpu_exporter)
+GPU metrics are collected via `utkuozdemir/nvidia_gpu_exporter`, deployed with the node-exporter playbook.
 
-This exporter provides comprehensive GPU metrics for Prometheus monitoring, deployed automatically via the `playbook_node-exporter.yaml` playbook alongside other hardware exporters.
+### Deploy
 
-**Installation & Configuration**:
 ```bash
-# Deployed via consolidated node-exporter playbook (includes all hardware exporters)
-ansible-playbook playbook_node-exporter.yaml
-
-# The playbook automatically:
-# 1. Detects NVIDIA GPU presence (GPU-specific tasks only run if GPU found)
-# 2. Creates Docker Compose deployment with health checks
-# 3. Configures systemd service management alongside other exporters
-# 4. Sets up proper GPU access and security settings
-
-# Manual verification (if needed)
-systemctl status nvidia-gpu-exporter
-docker-compose -f /data01/services/nvidia-gpu-exporter/docker-compose.yml ps
-curl http://localhost:9445/metrics | grep nvidia_gpu
-
-# Check container health
-docker inspect nvidia-gpu-exporter --format='{{.State.Health.Status}}'
-
-# Check all hardware exporters status
-systemctl status cadvisor node-exporter process-exporter nvidia-gpu-exporter
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/node_exporter.yaml -l ocean
 ```
 
-**Docker Compose Deployment**:
-The service uses Docker Compose with the official `utkuozdemir/nvidia_gpu_exporter` image, managed by systemd.
+### Verify
 
-**Key Features**:
-
-- **Health Checks**: bash TCP socket monitoring every 30 seconds (curl-free)
-- **GPU Runtime**: Full NVIDIA Docker runtime integration
-- **Security**: no-new-privileges, resource limits, read-only filesystem
-- **Logging**: JSON file driver with rotation (10MB, 3 files)
-- **Auto-restart**: unless-stopped policy with systemd integration
-
-**Service Configuration**:
-```yaml
-# docker-compose.yml
-services:
-  nvidia-gpu-exporter:
-    image: utkuozdemir/nvidia_gpu_exporter:1.4.0
-    runtime: nvidia
-    ports:
-      - "9445:9835"
-    healthcheck:
-      test: ["CMD", "timeout", "5", "bash", "-c", "</dev/tcp/localhost/9835"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-```
-
-**Metrics Endpoint**: `http://localhost:9445/metrics`
-
-### Key Metrics to Monitor
-```yaml
-# GPU utilization percentage
-nvidia_gpu_utilization_gpu_percentage
-
-# GPU memory usage
-nvidia_gpu_memory_used_bytes
-nvidia_gpu_memory_total_bytes
-
-# GPU temperature
-nvidia_gpu_temperature_celsius
-
-# Power consumption
-nvidia_gpu_power_watts
-
-# Fan speed
-nvidia_gpu_fanspeed_percentage
-```
-
-### Grafana Dashboard
-Key panels for GPU monitoring:
-- GPU utilization over time
-- Memory usage (used/total)
-- Temperature trends
-- Power consumption
-- Process list with GPU usage
-- Error rate monitoring
-
-## 🖥️ Virtualization & Passthrough
-
-### GPU Passthrough Setup
 ```bash
-# Enable IOMMU in GRUB (if not already done)
-echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"' >> /etc/default/grub
-update-grub
+# Check service
+ssh terrac@192.168.1.143 "systemctl status nvidia-gpu-exporter"
 
-# Load VFIO modules
-echo 'vfio
-vfio_iommu_type1  
-vfio_pci
-vfio_virqfd' >> /etc/modules
-
-# Bind GPU to VFIO
-lspci | grep NVIDIA  # Note the PCIe ID (e.g., 01:00.0)
-lspci -n -s 01:00.0  # Get vendor:device ID (e.g., 10de:1c30)
-
-echo 'options vfio-pci ids=10de:1c30' >> /etc/modprobe.d/vfio.conf
-update-initramfs -u
-reboot
+# Check metrics
+curl -s http://192.168.1.143:9835/metrics | grep nvidia_gpu | head -10
 ```
 
-### Verify Passthrough Setup
+### Key Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `nvidia_gpu_utilization_gpu_percentage` | GPU utilization |
+| `nvidia_gpu_memory_used_bytes` | VRAM used |
+| `nvidia_gpu_memory_total_bytes` | Total VRAM |
+| `nvidia_gpu_temperature_celsius` | GPU temperature |
+| `nvidia_gpu_power_watts` | Power draw |
+
+---
+
+## GPU Passthrough (Proxmox)
+
+The RTX 3090 is passed through to ocean VM on node006.
+
+### Verify on Proxmox Host
+
 ```bash
-# Check IOMMU groups
-find /sys/kernel/iommu_groups/ -type l | grep 01:00.0
+# SSH to node006
+ssh root@192.168.1.106
 
-# Verify VFIO binding
-lspci -nnk | grep -A 3 NVIDIA
+# Check VFIO binding
+lspci -nnk -s 42:00 | grep -A 2 "Kernel driver"
+# Should show: Kernel driver in use: vfio-pci
 ```
 
-## 🔄 Maintenance Procedures
+### Verify in VM
 
-### Regular Maintenance Tasks
-
-#### Daily Checks
 ```bash
-# GPU health status
-nvidia-smi --query-gpu=name,driver_version,temperature.gpu,power.draw,utilization.gpu --format=csv,noheader
+# SSH to ocean
+ssh terrac@192.168.1.143
 
-# Check for errors
-dmesg | grep -i "nvidia\|gpu\|cuda" | tail -10
+# Check GPU is visible
+lspci | grep -i nvidia
+nvidia-smi
 ```
 
-#### Weekly Maintenance
+See [ocean-migration-plan.md](ocean-migration-plan.md) for full passthrough setup.
+
+---
+
+## Emergency Procedures
+
+### GPU Unresponsive
+
 ```bash
-# Clean GPU memory
-sudo nvidia-smi --gpu-reset  # Only if no processes running
+# Stop GPU containers
+ssh terrac@192.168.1.143 "sudo systemctl stop llamacpp comfyui plex"
 
-# Check driver updates
-apt list --upgradable | grep nvidia
+# Reset GPU
+ssh terrac@192.168.1.143 "sudo nvidia-smi --gpu-reset"
 
-# Review GPU utilization trends
-# Check Grafana dashboards for patterns
+# Restart services
+ssh terrac@192.168.1.143 "sudo systemctl start llamacpp comfyui plex"
 ```
 
-#### Monthly Tasks
+### Thermal Emergency (>85°C)
+
 ```bash
-# Comprehensive GPU diagnostics
-nvidia-smi -q > /tmp/gpu-status-$(date +%Y%m%d).log
+# Check temperature
+ssh terrac@192.168.1.143 "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
 
-# Review and update GPU configurations
-# Check for new CUDA versions
-# Review container image updates (ComfyUI, llama.cpp, etc.)
+# Stop high-load services
+ssh terrac@192.168.1.143 "sudo systemctl stop llamacpp comfyui"
+
+# Monitor until temperature drops
+ssh terrac@192.168.1.143 "watch -n 1 nvidia-smi --query-gpu=temperature.gpu --format=csv"
 ```
 
-## 🚨 Emergency Procedures
+---
 
-### GPU Failure Recovery
-```bash
-# If GPU becomes unresponsive
-sudo systemctl stop docker  # Stop GPU containers
-sudo nvidia-smi --gpu-reset
-sudo systemctl start docker
+## Related Documentation
 
-# If driver issues
-sudo systemctl stop nvidia-persistenced
-sudo modprobe -r nvidia_drm nvidia_modeset nvidia
-sudo modprobe nvidia nvidia_modeset nvidia_drm
-sudo systemctl start nvidia-persistenced
-```
-
-### Thermal Emergency
-```bash
-# If GPU overheating (>80°C for P2000)
-# 1. Check current temperature
-nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits
-
-# 2. Reduce power limit temporarily
-sudo nvidia-smi -pl 50  # Reduce to 50W
-
-# 3. Stop high-load processes
-docker stop $(docker ps -q --filter ancestor=yanwk/comfyui-boot:cu126-slim)
-
-# 4. Check physical ventilation
-# 5. Resume normal operations once temperature drops
-```
-
-## 📋 GPU Optimization Checklist
-
-### Performance Optimization
-- [ ] Enable GPU persistence mode
-- [ ] Set appropriate power limits
-- [ ] Configure optimal clock speeds
-- [ ] Enable hardware acceleration in applications
-- [ ] Monitor thermal performance
-
-### Container Optimization
-- [ ] Use runtime: nvidia for Docker
-- [ ] Set NVIDIA_VISIBLE_DEVICES appropriately
-- [ ] Optimize CUDA image versions
-- [ ] Configure GPU memory limits if needed
-- [ ] Monitor container GPU usage
-
-### Application-Specific Tuning
-- [ ] ComfyUI: Enable fp16-vae and cross-attention optimization
-- [ ] llama.cpp: Configure n-gpu-layers based on VRAM
-- [ ] Plex: Enable NVENC hardware transcoding
-- [ ] N8N: GPU access for AI workflows
-
-This GPU management guide ensures optimal performance and reliability of your NVIDIA P2000 while supporting the AI/ML services in your homelab environment.
+- [ocean-migration-plan.md](ocean-migration-plan.md) - GPU passthrough setup
+- [dell-hardware.md](dell-hardware.md) - Server hardware details
+- [files/gpu-test/README.md](/files/gpu-test/README.md) - GPU test container

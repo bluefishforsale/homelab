@@ -1,155 +1,135 @@
-# 🏗️ Homelab Architecture Overview
+# Architecture Overview
 
-## 🎯 Vision & Goals
+Homelab infrastructure architecture and design.
 
-### Core Principles
-1. **🤖 Fully Automated** - Infrastructure as Code with minimal manual intervention
-2. **🔐 SSH-Free Operations** - 99% of tasks handled through automation and web interfaces
-3. **🛡️ Security First** - Publicly signed certificates, no self-signed anywhere
-4. **📝 Git-Driven** - All infrastructure and services managed through version control
-5. **📊 Observable** - Comprehensive logging and monitoring across all components
-6. **🏢 Isolated Environments** - Proper separation between dev/staging/production
-7. **⚡ High Availability** - Resilient architecture with redundancy for critical services
+---
 
-## 🏗️ System Architecture
+## Infrastructure Summary
 
-### Infrastructure Layers
+| Host | IP | Hardware | Purpose |
+|------|----|----------|---------|
+| node005 | 192.168.1.105 | Dell R620 (56 cores, 128GB) | Proxmox - Control VMs |
+| node006 | 192.168.1.106 | Dell R720 (40 cores, 680GB, RTX 3090) | Proxmox - Ocean VM |
+| ocean | 192.168.1.143 | VM on node006 (30 cores, 256GB) | Docker services |
+| dns01 | 192.168.1.2 | VM on node005 | BIND DNS |
+| pihole | 192.168.1.9 | VM on node005 | DNS filtering |
+| gitlab | 192.168.1.5 | VM on node005 | CI/CD |
+| gh-runner-01 | 192.168.1.250 | VM on node005 | GitHub Actions runners |
+
+---
+
+## Architecture Diagram
 
 ```mermaid
 graph TB
     subgraph "Physical Layer"
-        PM1[Proxmox Host 1<br/>192.168.1.106]
-        PM2[Proxmox Host 2<br/>192.168.1.107]
-        NW[Network Equipment<br/>10GbE + 1GbE]
+        PM1[node005<br/>192.168.1.105]
+        PM2[node006<br/>192.168.1.106]
+        NW[UniFi 10GbE Switch]
     end
     
-    subgraph "Virtualization Layer"
-        PM1 --> VM1[Control VMs]
-        PM1 --> VM2[Service VMs]
-        PM2 --> VM3[Storage VMs]
+    subgraph "node005 VMs"
+        PM1 --> DNS[dns01<br/>192.168.1.2]
+        PM1 --> PH[pihole<br/>192.168.1.9]
+        PM1 --> GL[gitlab<br/>192.168.1.5]
+        PM1 --> GH[gh-runner-01<br/>192.168.1.250]
     end
     
-    subgraph "Service Layer"
-        DNS[BIND DNS<br/>192.168.1.2]
-        DHCP[DHCPd<br/>192.168.1.2]
-        PH[Pi-hole<br/>192.168.1.9]
-        GL[GitLab<br/>CI/CD]
-        CF[Cloudflare<br/>Tunnels]
+    subgraph "node006 VMs"
+        PM2 --> OCEAN[ocean<br/>192.168.1.143]
     end
     
-    subgraph "Container Layer"
-        DOCKER[Docker Services<br/>Ocean Host]
+    subgraph "Ocean Services"
+        OCEAN --> MEDIA[Media Stack]
+        OCEAN --> AI[AI/ML Services]
+        OCEAN --> MON[Monitoring]
     end
 ```
 
-### Network Architecture
+---
 
-| Component | IP Range/Address | Purpose |
-|-----------|------------------|---------|
-| **Management Network** | 192.168.1.0/24 | Host management and services |
-| **DNS Primary** | 192.168.1.2 | BIND DNS server |
-| **Pi-hole** | 192.168.1.9 | Ad-blocking DNS |
-| **Ocean Media Server** | 192.168.1.143 | Docker services host |
+## Storage
 
-## 🔧 Component Overview
+| Pool | Type | Location | Size |
+|------|------|----------|------|
+| data01 | ZFS raidz2 | ocean VM (node006) | 8x 12TB |
+| local-lvm | LVM | node005 | VM boot disks |
+| local-lvm | LVM | node006 | VM boot disks |
 
-### Core Infrastructure
-- **Proxmox VE Cluster** - Hypervisor platform with HA capabilities
-- **Ceph Storage** - Distributed storage backend (CephFS + block storage)
-- **BIND DNS** - Authoritative DNS with dynamic updates
-- **DHCPd** - Network address management with reservations
-- **Pi-hole** - Network-wide ad blocking and DNS filtering
+Ocean services mount `/data01/services/` for persistent storage.
 
-### Automation & CI/CD
-- **GitLab** - Source control, CI/CD pipelines, container registry  
-- **Ansible** - Configuration management and deployment
-- **Cloudflared** - Secure tunnel access without port forwarding
-- **Rundeck** (Planned) - Job scheduling and workflow automation
+---
 
-### Container Platforms
-- **Docker** - Single-host containerized services (media stack, AI services)
+## Network
 
-### Observability Stack
-- **Grafana** - Metrics visualization and dashboards
-- **Prometheus** - Metrics collection and alerting
-- **Loki** (Planned) - Log aggregation and analysis
-- **Tautulli** - Plex media server monitoring
+| Component | IP | Purpose |
+|-----------|-----|---------|
+| Gateway | 192.168.1.1 | Router |
+| dns01 | 192.168.1.2 | BIND DNS |
+| pihole | 192.168.1.9 | DNS filtering |
+| node005 | 192.168.1.105 | Proxmox |
+| node006 | 192.168.1.106 | Proxmox |
+| ocean | 192.168.1.143 | Docker services |
 
-### Security & Access
-- **Cloudflare Access** - Zero-trust application access
-- **SSH Key Management** - GitHub-based key distribution
-- **Vault Secrets** - Centralized credential management
-- **TLS Everywhere** - Public certificates for all services
+### Traffic Flow
 
-## 📊 Service Distribution
+1. **External**: Internet → Cloudflare → cloudflared tunnel → nginx → services
+2. **Internal**: Client → pihole → dns01 → service resolution
+3. **Metrics**: Exporters → Prometheus → Grafana
 
-### Ocean Host (192.168.1.143) - Docker Services
-- **Media Stack**: Plex, Sonarr, Radarr, Tautulli, NZBGet, Overseerr
-- **AI/ML Services**: N8N, Open WebUI, ComfyUI, llama.cpp
-- **Monitoring**: Grafana, Prometheus, cAdvisor
-- **Development**: Portainer, MySQL
+---
 
-### Control Plane Services
-- **GitLab**: CI/CD, source control, container registry
-- **DNS**: BIND with dynamic DNS updates
-- **DHCP**: Centralized IP address management
-- **Monitoring**: Infrastructure and application metrics
+## Ocean Services
 
-## 🔄 Data Flow & Integration
+### Networking
 
-### Deployment Pipeline
-1. **Code Changes** → GitLab repository
-2. **CI Pipeline** → Automated testing and building
-3. **Ansible Playbooks** → Infrastructure provisioning
-4. **Container Deployment** → Docker containers
-5. **Health Checks** → Monitoring and alerting
+- nginx (reverse proxy)
+- cloudflared (Cloudflare tunnels)
+- cloudflare_ddns (dynamic DNS)
 
-### Network Traffic Flow
-1. **Internet** → Cloudflare → Tunnel → Services
-2. **Internal** → Pi-hole DNS → BIND → Service Resolution
-3. **Monitoring** → Prometheus → Grafana → Alerting
+### AI/ML (GPU)
 
-### Storage Architecture
-- **Ceph Cluster** - Distributed storage backend
-- **VM Disks** - Ceph RBD volumes
-- **Shared Storage** - CephFS for application data
-- **Backup Strategy** - Automated snapshots and replication
+- llama.cpp (LLM API server)
+- Open WebUI (chat interface)
+- ComfyUI (image generation)
 
-## 🚀 Evolution Roadmap
+### Media
 
-### Phase 1: Core Infrastructure ✅
-- Proxmox cluster with Ceph storage
-- DNS/DHCP services
-- Basic VM provisioning
+- Plex, Sonarr, Radarr, Prowlarr, Bazarr
+- NZBGet, Overseerr, Tautulli, Tdarr
 
-### Phase 2: Automation & Services ✅ 
-- Ansible automation
-- Docker service stack
-- Monitoring foundation
-- Cloudflare tunnels
+### Monitoring
 
-### Phase 3: Advanced Features 🔄
-- Service discovery for Docker
-- Advanced monitoring with Loki
-- Enhanced security controls
+- Prometheus, Grafana
+- NVIDIA DCGM, UnPoller
 
-### Phase 4: Enterprise Features 📅
-- Multi-environment isolation
-- Disaster recovery automation
-- Advanced security controls
-- Performance optimization
+### Services
 
-## 📈 Scalability Considerations
+- NextCloud, TinaCMS
+- Frigate, Home Assistant
 
-### Horizontal Scaling
-- **Proxmox Nodes**: Add additional hypervisors to cluster
-- **Docker Hosts**: Add additional Docker service hosts
-- **Ceph OSDs**: Expand storage capacity
-- **Service Replicas**: Scale individual applications
+---
 
-### Vertical Scaling  
-- **CPU/Memory**: Upgrade hypervisor hardware
-- **Storage Performance**: NVMe tiers for hot data
-- **Network Bandwidth**: 25GbE+ for high-throughput workloads
+## Deployment
 
-This architecture provides a solid foundation for a production-ready homelab with enterprise-grade capabilities while maintaining simplicity and automation-first principles.
+All infrastructure managed via Ansible:
+
+```bash
+# Full deployment
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/00_site.yaml --ask-vault-pass
+
+# Ocean services only
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass
+```
+
+See [deployment-flow.md](deployment-flow.md) for service order.
+
+---
+
+## Related Documentation
+
+- [Network Design](networking.md)
+- [Ocean Services](ocean-services.md)
+- [Deployment Flow](deployment-flow.md)

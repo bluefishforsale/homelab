@@ -55,7 +55,7 @@ services:
       - LOKI_URL={{ loki_url | default('http://192.168.1.143:3100') }}
       - CHECK_INTERVAL={{ check_interval | default('30') }}
       - BATCH_SIZE={{ batch_size | default('1000') }}
-      - WEBHOOK_URL={{ webhook_url | default('http://192.168.1.143:5678/webhook/log-anomaly') }}
+      - WEBHOOK_URL={{ webhook_url | default('http://192.168.1.143:8087/webhook/anomaly') }}
       - FREQUENCY_SIGMA={{ frequency_sigma | default('3.0') }}
       - RATE_CHANGE_THRESHOLD={{ rate_change_threshold | default('5.0') }}
       - ENTROPY_THRESHOLD={{ entropy_threshold | default('4.5') }}

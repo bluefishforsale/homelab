@@ -298,7 +298,7 @@ func (rsa *RedisStatisticalAnalyzer) DetectRateChangeAnomalies(patternName, host
 	
 	if historicalRate <= 0 {
 		if recentRate > 0 {
-			return true, math.Inf(1)
+			return true, 999.0 // Use large finite value instead of +Inf (JSON incompatible)
 		}
 		return false, 0.0
 	}
@@ -451,4 +451,24 @@ func (rsa *RedisStatisticalAnalyzer) GetDeadLetterSize() (int64, error) {
 // PopDeadLetter removes and returns an item from the dead letter queue (for replay)
 func (rsa *RedisStatisticalAnalyzer) PopDeadLetter() (string, error) {
 	return rsa.client.RPop(rsa.ctx, deadLetterKey).Result()
+}
+
+// FlushAll clears all data from Redis (patterns, baselines, queues)
+func (rsa *RedisStatisticalAnalyzer) FlushAll() error {
+	// Get all keys matching our patterns
+	patterns := []string{"pattern:*", "baseline:*", "entropy:*", deadLetterKey}
+	
+	for _, pattern := range patterns {
+		keys, err := rsa.client.Keys(rsa.ctx, pattern).Result()
+		if err != nil {
+			return fmt.Errorf("failed to get keys for pattern %s: %w", pattern, err)
+		}
+		if len(keys) > 0 {
+			if err := rsa.client.Del(rsa.ctx, keys...).Err(); err != nil {
+				return fmt.Errorf("failed to delete keys for pattern %s: %w", pattern, err)
+			}
+		}
+	}
+	
+	return nil
 }

@@ -1,0 +1,88 @@
+---
+- name: Deploy Log Anomaly ML Processor Service
+  become: true
+  hosts: ocean
+  vars:
+    service_name: log-anomaly-ml-processor
+    basedir: /data01/services/{{ service_name }}
+    user: media
+    group: media
+  vars_files:
+    - ../../../vault/secrets.yaml
+  # Note: If vault doesn't have log_anomaly_ml.postgres_password or smtp.gmail_*,
+  # defaults will be used. Add these to vault for production.
+  tasks:
+  - name: Create ML processor service directories
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0755'
+    loop:
+      - "{{ basedir }}"
+      - "{{ basedir }}/go"
+
+  - name: Create PostgreSQL data directory
+    ansible.builtin.file:
+      path: "{{ basedir }}/postgres-data"
+      state: directory
+      owner: "999"
+      group: "999"
+      mode: '0700'
+
+  - name: Create Redis data directory
+    ansible.builtin.file:
+      path: "{{ basedir }}/redis-data"
+      state: directory
+      owner: "999"
+      group: "999"
+      mode: '0755'
+
+  - name: Copy Go source code files
+    ansible.builtin.copy:
+      src: ../../../files/log-anomaly-ml/go/
+      dest: "{{ basedir }}/go/"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart log-anomaly-ml-processor
+
+  - name: Deploy docker-compose file
+    ansible.builtin.template:
+      src: ../../../files/log-anomaly-ml/docker-compose.yml.j2
+      dest: "{{ basedir }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0640'
+    notify: Restart log-anomaly-ml-processor
+
+  - name: Deploy systemd service
+    ansible.builtin.template:
+      src: ../../../files/log-anomaly-ml/log-anomaly-ml-processor.service.j2
+      dest: /etc/systemd/system/log-anomaly-ml-processor.service
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Restart log-anomaly-ml-processor
+
+  - name: Build Docker image
+    ansible.builtin.shell: |
+      cd {{ basedir }}
+      docker compose build --no-cache log-anomaly-ml-processor
+    become_user: "{{ user }}"
+    when: true
+
+  - name: Enable and start ML processor service
+    ansible.builtin.systemd:
+      name: log-anomaly-ml-processor
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
+  handlers:
+  - name: Restart log-anomaly-ml-processor
+    ansible.builtin.systemd:
+      name: log-anomaly-ml-processor
+      state: restarted
+      daemon_reload: yes

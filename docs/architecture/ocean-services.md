@@ -1,64 +1,68 @@
-# Ocean Server Services Architecture
+# Ocean Services Architecture
+
+Services running on ocean VM (192.168.1.143).
+
+---
+
+## Service Diagram
 
 ```mermaid
 graph TB
-    subgraph "🐋 Ocean Server (192.168.1.143)"
-        subgraph "Infrastructure Services"
-            MySQL[(🗄️ MySQL<br/>:3306)]
-            Nginx[🌐 Nginx<br/>:80, :443]
-            DDNS[☁️ Cloudflare DDNS<br/>Dynamic IP Updates]
-            Cloudflared[🔒 Cloudflared<br/>Secure Tunnels]
+    subgraph ocean["Ocean VM (192.168.1.143)"]
+        subgraph network["Network"]
+            Nginx[nginx<br/>:80, :443]
+            DDNS[cloudflare_ddns]
+            Cloudflared[cloudflared]
         end
         
-        subgraph "Media Services - Core"
-            Plex[🎬 Plex<br/>:32400]
-            NZBGet[📥 NZBGet<br/>:6789]
-            Prowlarr[🔍 Prowlarr<br/>:9696]
-            Sonarr[📺 Sonarr<br/>:8902]
-            Radarr[🎥 Radarr<br/>:7878]
-            Bazarr[💬 Bazarr<br/>:6767]
+        subgraph ai["AI/ML (GPU)"]
+            LlamaCpp[llama.cpp<br/>:8080]
+            OpenWebUI[Open WebUI<br/>:3000]
+            ComfyUI[ComfyUI<br/>:8188]
         end
         
-        subgraph "Media Services - Enhancement"
-            Tautulli[📊 Tautulli<br/>:8905]
-            Overseerr[🎫 Overseerr<br/>:5055]
-            Tdarr[⚡ Tdarr<br/>:8265]
-            Audible[🎧 Audible Downloader<br/>:8080]
+        subgraph media["Media"]
+            Plex[Plex<br/>:32400]
+            Sonarr[Sonarr<br/>:8989]
+            Radarr[Radarr<br/>:7878]
+            Prowlarr[Prowlarr<br/>:9696]
+            Bazarr[Bazarr<br/>:6767]
+            NZBGet[NZBGet<br/>:6789]
+            Overseerr[Overseerr<br/>:5055]
+            Tautulli[Tautulli<br/>:8181]
+            Tdarr[Tdarr<br/>:8265]
         end
         
-        subgraph "AI/ML Services"
-            LlamaCpp[🧠 llama.cpp<br/>:8080<br/>GPU Accelerated]
-            OpenWebUI[💬 Open WebUI<br/>:3000]
-            ComfyUI[🎨 ComfyUI<br/>:8188<br/>GPU Accelerated]
+        subgraph monitoring["Monitoring"]
+            Prometheus[Prometheus<br/>:9090]
+            Grafana[Grafana<br/>:8910]
+            DCGM[NVIDIA DCGM]
+            UnPoller[UnPoller<br/>:9130]
         end
         
-        subgraph "Monitoring Services"
-            Prometheus[📈 Prometheus<br/>:9090]
-            Grafana[📊 Grafana<br/>:3001]
+        subgraph services["Services"]
+            NextCloud[NextCloud]
+            TinaCMS[TinaCMS]
+            Frigate[Frigate]
+            HomeAssistant[Home Assistant]
+            Audible[Audible Downloader]
         end
         
-        subgraph "Storage"
-            ZFS[💾 ZFS Pool<br/>/data01]
-            Docker[🐳 Docker Volumes<br/>/data01/services]
-        end
-        
-        subgraph "Hardware"
-            GPU[🎮 NVIDIA P2000<br/>CUDA Support]
+        subgraph hardware["Hardware"]
+            GPU[RTX 3090<br/>24GB VRAM]
+            ZFS[ZFS data01<br/>8x 12TB]
         end
     end
     
-    Internet[🌍 Internet] --> Cloudflared
+    Internet[Internet] --> Cloudflared
     Cloudflared --> Nginx
     Nginx --> Plex
     Nginx --> OpenWebUI
-    MySQL --> Grafana
     
     Prowlarr --> Sonarr
     Prowlarr --> Radarr
     Sonarr --> NZBGet
     Radarr --> NZBGet
-    NZBGet --> Plex
-    Bazarr --> Plex
     
     Plex --> Tautulli
     Overseerr --> Sonarr
@@ -67,17 +71,35 @@ graph TB
     LlamaCpp --> OpenWebUI
     GPU --> LlamaCpp
     GPU --> ComfyUI
+    GPU --> Plex
     
     Prometheus --> Grafana
+    DCGM --> Prometheus
+    UnPoller --> Prometheus
     
-    ZFS --> Docker
-    Docker --> Plex
-    Docker --> MySQL
-    Docker --> LlamaCpp
-    Docker --> ComfyUI
-    
-    style GPU fill:#ffeb3b
-    style ZFS fill:#4caf50
-    style MySQL fill:#ff9800
-    style Cloudflared fill:#2196f3
+    ZFS --> Plex
+    ZFS --> LlamaCpp
 ```
+
+---
+
+## Service List
+
+| Category | Services |
+|----------|----------|
+| Network | nginx, cloudflared, cloudflare_ddns |
+| AI/ML | llama.cpp, Open WebUI, ComfyUI |
+| Media | Plex, Sonarr, Radarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr |
+| Monitoring | Prometheus, Grafana, NVIDIA DCGM, UnPoller |
+| Services | NextCloud, TinaCMS, Audible Downloader, Frigate, Home Assistant |
+
+---
+
+## Deploy
+
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass
+```
+
+See [deployment-flow.md](deployment-flow.md) for service order.

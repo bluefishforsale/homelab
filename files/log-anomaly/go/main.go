@@ -213,6 +213,27 @@ func (h *HTTPHandlers) PatternsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(patterns)
 }
 
+// FlushHandler clears all Redis data (patterns, baselines, queues)
+func (h *HTTPHandlers) FlushHandler(w http.ResponseWriter, r *http.Request) {
+	if err := h.statisticalAnalyzer.FlushAll(); err != nil {
+		log.Printf("Flush failed: %v", err)
+		http.Error(w, fmt.Sprintf("Flush failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Reset metrics
+	coldStartActive.Set(1)
+	deadLetterSize.Set(0)
+	
+	log.Println("All data flushed successfully")
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "All data flushed (patterns, baselines, queues)",
+	})
+}
+
 func main() {
 	startTime := time.Now()
 	log.Println("Starting Log Anomaly Detector (Go)")
@@ -268,6 +289,7 @@ func main() {
 	router.HandleFunc("/health", handlers.HealthHandler).Methods("GET")
 	router.HandleFunc("/status", handlers.StatusHandler).Methods("GET")
 	router.HandleFunc("/patterns", handlers.PatternsHandler).Methods("GET")
+	router.HandleFunc("/admin/flush", handlers.FlushHandler).Methods("POST")
 	router.Handle("/metrics", promhttp.Handler())
 	
 	// Start HTTP server

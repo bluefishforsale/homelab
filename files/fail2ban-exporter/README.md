@@ -2,16 +2,58 @@
 
 Prometheus exporter for fail2ban metrics across all homelab nodes.
 
-## Overview
+---
 
-Exports fail2ban ban statistics and jail information to Prometheus for monitoring SSH protection and security events.
+## Quick Reference
 
-## Architecture
+| Setting | Value |
+|---------|-------|
+| Image | registry.gitlab.com/hctrdev/fail2ban-prometheus-exporter:latest |
+| Port | 9191 |
+| Network | fail2ban_net (bridge) |
+| Storage | /var/lib/services/fail2ban-exporter |
 
-- **Image**: registry.gitlab.com/hctrdev/fail2ban-prometheus-exporter:latest
-- **Port**: 9191 (default)
-- **Network**: Bridge network with exposed port
-- **Storage**: /var/lib/services/fail2ban-exporter (not /data01 - works on all nodes)
+---
+
+## Deployment
+
+```bash
+# Deploy to all nodes (no vault required)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/fail2ban_exporter.yaml
+
+# Deploy to specific host
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/fail2ban_exporter.yaml -l ocean
+```
+
+**Auto-detection**: Playbook checks for Docker AND fail2ban before deploying. Skips hosts without both.
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `fail2ban-exporter-compose.yml.j2` | Docker Compose configuration |
+| `fail2ban-exporter.service.j2` | Systemd service |
+| `fail2ban-exporter.env.j2` | Environment variables |
+| `fail2ban-grafana-dahsboard.json` | Grafana dashboard |
+
+---
+
+## Directory Structure
+
+```text
+/var/lib/services/fail2ban-exporter/
+├── docker-compose.yml
+├── .env
+└── README.md
+```
+
+**Note**: Uses `/var/lib/services/` (not `/data01/`) so it works on all nodes.
+
+---
 
 ## Metrics Exposed
 
@@ -21,52 +63,45 @@ Exports fail2ban ban statistics and jail information to Prometheus for monitorin
 - `fail2ban_jail_failed_current` - Current failed attempts per jail
 - `fail2ban_jail_failed_total` - Total failed attempts per jail
 
-## Deployment
-
-```bash
-# Deploy to all nodes
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/fail2ban_exporter.yaml
-
-# Deploy to specific host
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/fail2ban_exporter.yaml -l ocean
-
-# Check status on all hosts
-ansible all -i inventories/production/hosts.ini -m shell -a "systemctl status fail2ban-exporter"
-```
+---
 
 ## Access
 
 - **Metrics**: `http://<hostname>:9191/metrics`
 - **Example**: `http://ocean.home:9191/metrics`
 
-## Prometheus Configuration
+---
 
-Scrape config in prometheus.yml:
+## Prometheus Configuration
 
 ```yaml
 - job_name: 'fail2ban-exporter'
-  relabel_configs: *dropPortNumber
   static_configs:
-{% for host in groups['all'] %}
-  - targets: ['{{ host }}.home:9191']
-{% endfor %}
+    - targets:
+      - 'ocean.home:9191'
+      - 'node005.home:9191'
+      - 'node006.home:9191'
 ```
+
+---
+
+## Service Management
+
+```bash
+# Status
+systemctl status fail2ban-exporter
+
+# Restart
+systemctl restart fail2ban-exporter
+
+# Logs
+journalctl -u fail2ban-exporter -f
+docker logs fail2ban-exporter
+```
+
+---
 
 ## Troubleshooting
-
-### Check exporter is running
-
-```bash
-systemctl status fail2ban-exporter
-docker ps | grep fail2ban-exporter
-```
-
-### View logs
-
-```bash
-docker logs fail2ban-exporter
-journalctl -u fail2ban-exporter -f
-```
 
 ### Test metrics endpoint
 
@@ -74,25 +109,45 @@ journalctl -u fail2ban-exporter -f
 curl http://localhost:9191/metrics
 ```
 
-### Verify fail2ban integration
+### Health check
 
 ```bash
-# Check fail2ban socket directory
+docker inspect fail2ban-exporter --format='{{.State.Health.Status}}'
+```
+
+### Verify fail2ban socket
+
+```bash
+# Check fail2ban socket directory (mounted read-only)
 ls -la /var/run/fail2ban/
 
-# Test fail2ban client
+# Test fail2ban is working
 fail2ban-client status
 ```
+
+### Container not starting
+
+```bash
+# Check if fail2ban is installed
+which fail2ban-client
+
+# Check if socket exists
+ls -la /var/run/fail2ban/fail2ban.sock
+```
+
+---
 
 ## Requirements
 
 - fail2ban installed and running on host
 - Docker installed on host
-- Ports:
-  - 9191 exposed for Prometheus scraping
+- fail2ban socket at `/var/run/fail2ban/`
+
+---
 
 ## Security
 
-- Read-only access to fail2ban socket and database
-- No new privileges security option
-- Minimal resource limits (128M memory, 0.5 CPU)
+- **no-new-privileges**: Enabled
+- **Read-only socket**: `/var/run/fail2ban:ro`
+- **Resource limits**: 128M memory, 0.5 CPU
+- **Health check**: wget-based metrics endpoint check

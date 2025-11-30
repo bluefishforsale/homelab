@@ -160,6 +160,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:8086']
 
+  - job_name: 'log-anomaly-ml-processor'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    static_configs:
+    - targets: ['ocean.home:8087']
+
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
     metrics_path: /probe
@@ -424,6 +431,7 @@ scrape_configs:
         - http://192.168.1.143:8910    # Grafana
         - http://192.168.1.143:9090    # Prometheus
         - http://192.168.1.143:8086    # Log Anomaly Detector
+        - http://192.168.1.143:8087    # Log Anomaly ML Processor
         labels:
           probe_type: "http"
           category: "internal_services"
