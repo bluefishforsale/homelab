@@ -391,6 +391,16 @@ func (d *Database) PurgeOldProblems(resolvedRetention, suppressedRetention time.
 	return err
 }
 
+// UpdateLLMAnalysis updates the LLM analysis for a problem
+func (d *Database) UpdateLLMAnalysis(problemID, analysis string) error {
+	_, err := d.db.Exec(`
+		UPDATE problems 
+		SET llm_analysis = $1, updated_at = NOW() 
+		WHERE id = $2
+	`, analysis, problemID)
+	return err
+}
+
 // GetStats returns problem statistics
 func (d *Database) GetStats() (*ProblemStats, error) {
 	stats := &ProblemStats{

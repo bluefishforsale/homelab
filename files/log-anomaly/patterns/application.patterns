@@ -1,26 +1,26 @@
 # Application Log Patterns for Anomaly Detection
 # Format: PATTERN_NAME GROK_PATTERN [anomaly_score] [description]
 
-# Generic application patterns
-APP_STARTUP (?i)(started|starting|initializ|boot|launch) 0.3 Application startup
-APP_SHUTDOWN (?i)(stop|shutdown|exit|terminat|quit) 0.5 Application shutdown  
-APP_READY (?i)(ready|listen|serving|available) 0.2 Application ready state
-APP_ERROR (?i)(error|exception|fail|panic|fatal|crash) 2.5 Application error
-APP_WARNING (?i)(warn|warning|deprecat|notice) 1.0 Application warning
+# Generic application patterns (scores lowered to reduce noise)
+APP_STARTUP (?i)(started|starting|initializ|boot|launch) 0.2 Application startup
+APP_SHUTDOWN (?i)(stop|shutdown|exit|terminat|quit) 0.3 Application shutdown  
+APP_READY (?i)(ready|listen|serving|available) 0.1 Application ready state
+APP_ERROR (?i)(error|exception|fail|panic|fatal|crash) 0.8 Application error (generic, low score)
+APP_WARNING (?i)(warn|warning|deprecat|notice) 0.3 Application warning
 APP_DEBUG (?i)(debug|trace|verbose) 0.1 Debug logging (normal)
 
-# Database applications
-DB_CONNECTION (?i)database.*connect|db.*connect|sql.*connect 0.3 Database connection
+# Database applications (more specific patterns score higher)
+DB_CONNECTION (?i)database.*connect|db.*connect|sql.*connect 0.2 Database connection
 DB_DISCONNECT (?i)database.*disconnect|db.*disconnect|sql.*close 0.2 Database disconnection
-DB_ERROR (?i)database.*error|db.*error|sql.*error|deadlock 2.5 Database error
-DB_SLOW_QUERY (?i)slow.*query|query.*timeout|query.*[5-9][0-9]ms 1.5 Slow database query
-DB_CONNECTION_POOL (?i)connection.*pool|pool.*exhaust 2.0 Connection pool issues
+DB_ERROR (?i)database.*error|db.*error|sql.*error|deadlock 2.0 Database error
+DB_SLOW_QUERY (?i)slow.*query|query.*timeout|query.*[5-9][0-9]ms 1.0 Slow database query
+DB_CONNECTION_POOL (?i)connection.*pool|pool.*exhaust 1.5 Connection pool issues
 
 # Web application patterns
 WEB_REQUEST (?i)(GET|POST|PUT|DELETE|PATCH).*HTTP 0.1 HTTP request (normal)
-WEB_REQUEST_ERROR (?i)HTTP.*[45][0-9][0-9] 1.5 HTTP error response
-WEB_TIMEOUT (?i)request.*timeout|gateway.*timeout 2.0 Web request timeout
-WEB_RATE_LIMIT (?i)rate.*limit|too many requests 1.8 Rate limiting triggered
+WEB_REQUEST_ERROR (?i)HTTP.*[45][0-9][0-9] 0.8 HTTP error response (common, low score)
+WEB_TIMEOUT (?i)request.*timeout|gateway.*timeout 1.5 Web request timeout
+WEB_RATE_LIMIT (?i)rate.*limit|too many requests 1.2 Rate limiting triggered
 SESSION_CREATE (?i)session.*create|login.*success 0.3 User session created
 SESSION_EXPIRE (?i)session.*expir|session.*timeout 0.5 User session expired
 
@@ -32,10 +32,10 @@ MICROSERVICE_COMM (?i)service.*call|rpc.*call|grpc 0.2 Microservice communicatio
 CIRCUIT_BREAKER (?i)circuit.*breaker|fallback.*triggered 2.0 Circuit breaker activated
 
 # Authentication and authorization
-AUTH_LOGIN (?i)login.*success|authentication.*success 0.3 Successful login
+AUTH_LOGIN (?i)login.*success|authentication.*success 0.2 Successful login
 AUTH_LOGOUT (?i)logout|session.*end 0.2 User logout
-AUTH_FAIL (?i)login.*fail|authentication.*fail|invalid.*credentials 1.5 Login failure
-AUTH_LOCKOUT (?i)account.*locked|user.*disabled|brute.*force 3.0 Account lockout
+AUTH_FAIL (?i)login.*fail|authentication.*fail|invalid.*credentials 2.0 Login failure
+AUTH_LOCKOUT (?i)account.*locked|user.*disabled|brute.*force 4.0 Account lockout (security event)
 TOKEN_EXPIRED (?i)token.*expir|jwt.*expir|refresh.*token 0.8 Token expiration
 PERMISSION_DENIED (?i)permission.*denied|unauthorized|forbidden 1.5 Access denied
 

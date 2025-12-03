@@ -79,6 +79,18 @@ var (
 		Help:    "Time spent processing",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"operation"})
+
+	// LLM metrics
+	llmRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "log_ml_llm_requests_total",
+		Help: "Total LLM analysis requests",
+	}, []string{"status"})
+
+	llmRequestDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "log_ml_llm_request_duration_seconds",
+		Help:    "Time spent on LLM requests",
+		Buckets: []float64{1, 5, 10, 30, 60},
+	})
 )
 
 // InitMetrics initializes metrics
@@ -87,4 +99,5 @@ func InitMetrics() {
 	healthStatus.WithLabelValues("postgresql").Set(0)
 	healthStatus.WithLabelValues("redis").Set(0)
 	healthStatus.WithLabelValues("alertmanager").Set(0)
+	healthStatus.WithLabelValues("llm").Set(0)
 }

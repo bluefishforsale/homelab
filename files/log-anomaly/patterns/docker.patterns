@@ -41,10 +41,10 @@ VOLUME_ERROR (?i)docker.*volume.*error|volume.*fail|mount.*fail 2.5 Volume error
 STORAGE_DRIVER_ERROR (?i)storage.*driver.*error|devicemapper.*error 3.0 Storage driver error
 
 # Container application logs (common patterns)
-APP_STARTUP (?i)(started|listening|ready).*port.*[0-9]+ 0.3 Application started on port
-APP_SHUTDOWN (?i)(stopping|shutdown|exit|sigterm) 0.8 Application shutdown
-APP_ERROR (?i)(error|exception|fail|panic|fatal) 2.0 Application error
-APP_WARNING (?i)(warn|warning|deprecat) 0.8 Application warning
+APP_STARTUP (?i)(started|listening|ready).*port.*[0-9]+ 0.2 Application started on port
+APP_SHUTDOWN (?i)(stopping|shutdown|exit|sigterm) 0.5 Application shutdown
+APP_ERROR (?i)(error|exception|fail|panic|fatal) 0.8 Application error (generic, low score)
+APP_WARNING (?i)(warn|warning|deprecat) 0.3 Application warning
 
 # Security-related container events
 CONTAINER_PRIVILEGE (?i)container.*privilege|privileged.*container 1.5 Privileged container

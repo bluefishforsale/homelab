@@ -52,13 +52,21 @@ services:
       - CHECK_INTERVAL={{ check_interval | default('30') }}
       - BATCH_SIZE={{ batch_size | default('1000') }}
       - WEBHOOK_URL={{ webhook_url | default('http://192.168.1.143:5678/webhook/log-anomaly') }}
-      - FREQUENCY_SIGMA={{ frequency_sigma | default('3.0') }}
-      - RATE_CHANGE_THRESHOLD={{ rate_change_threshold | default('5.0') }}
-      - ENTROPY_THRESHOLD={{ entropy_threshold | default('4.5') }}
-      - LEVENSHTEIN_THRESHOLD={{ levenshtein_threshold | default('0.7') }}
+      # Detection thresholds (raised for signal quality)
+      - FREQUENCY_SIGMA={{ frequency_sigma | default('4.0') }}
+      - RATE_CHANGE_THRESHOLD={{ rate_change_threshold | default('10.0') }}
+      - ENTROPY_THRESHOLD={{ entropy_threshold | default('6.5') }}
+      - LEVENSHTEIN_THRESHOLD={{ levenshtein_threshold | default('0.90') }}
       - PATTERNS_DIR=/app/patterns
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=
+      # Signal quality settings
+      - ALERT_COOLDOWN_MINUTES={{ alert_cooldown_minutes | default('60') }}
+      - MIN_SEVERITY={{ min_severity | default('high') }}
+      - MIN_PATTERN_SCORE={{ min_pattern_score | default('3.0') }}
+      - MIN_REPETITION_COUNT={{ min_repetition_count | default('20') }}
+      - SUPPRESSED_SERVICES={{ suppressed_services | default('blackbox-exporter,promtail,node-exporter') }}
+      - DASHBOARD_URL={{ dashboard_url | default('http://ocean.home/d/log-anomaly-detector/log-anomaly-detector-tier-1') }}
     depends_on:
       - redis
     healthcheck:

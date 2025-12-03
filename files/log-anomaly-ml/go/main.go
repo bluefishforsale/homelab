@@ -169,6 +169,18 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 		healthStatus.WithLabelValues("alertmanager").Set(1)
 	}
 
+	// Check LLM (optional - doesn't affect overall health)
+	if h.app.processor.llm != nil {
+		llmStart := time.Now()
+		if h.app.processor.llm.IsAvailable() {
+			checks["llm"] = ComponentHealth{Status: "up", LatencyMs: time.Since(llmStart).Milliseconds()}
+			healthStatus.WithLabelValues("llm").Set(1)
+		} else {
+			checks["llm"] = ComponentHealth{Status: "down", Error: "LLM server unreachable"}
+			healthStatus.WithLabelValues("llm").Set(0)
+		}
+	}
+
 	// Get queue sizes
 	dlSize, _ := h.app.redis.GetDeadLetterSize()
 	deadLetterSize.Set(float64(dlSize))
@@ -335,6 +347,44 @@ func (h *Handlers) StatsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stats)
 }
 
+// AnalyzeProblemHandler triggers LLM analysis for a problem
+func (h *Handlers) AnalyzeProblemHandler(w http.ResponseWriter, r *http.Request) {
+	if h.app.processor.llm == nil {
+		http.Error(w, "LLM not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	problem, err := h.app.db.GetProblem(id)
+	if err != nil {
+		http.Error(w, "Problem not found", http.StatusNotFound)
+		return
+	}
+
+	// Run analysis synchronously for manual requests
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	analysis, err := h.app.processor.llm.AnalyzeProblem(ctx, problem)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("LLM analysis failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Save to database
+	if err := h.app.db.UpdateLLMAnalysis(id, analysis); err != nil {
+		log.Warnf("Failed to save analysis: %v", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"problem_id": id,
+		"analysis":   analysis,
+	})
+}
+
 // FlushHandler clears all data from PostgreSQL and Redis
 func (h *Handlers) FlushHandler(w http.ResponseWriter, r *http.Request) {
 	var errors []string
@@ -412,6 +462,7 @@ func main() {
 	router.HandleFunc("/problems/{id}", handlers.ProblemHandler).Methods("GET")
 	router.HandleFunc("/problems/{id}/resolve", handlers.ResolveProblemHandler).Methods("POST")
 	router.HandleFunc("/problems/{id}/suppress", handlers.SuppressProblemHandler).Methods("POST")
+	router.HandleFunc("/problems/{id}/analyze", handlers.AnalyzeProblemHandler).Methods("POST")
 	router.HandleFunc("/digest/trigger", handlers.DigestTriggerHandler).Methods("POST")
 	router.HandleFunc("/admin/flush", handlers.FlushHandler).Methods("POST")
 	router.Handle("/metrics", promhttp.Handler())

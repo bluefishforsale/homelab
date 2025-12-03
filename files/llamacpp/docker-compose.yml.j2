@@ -51,6 +51,7 @@ services:
       - "--flash-attn"
       - "--api-key"
       - "{{ api_key | default('llamacpp-homelab-key') }}"
+      - "--metrics"
       - "--verbose"
     
     # Health check - check if server is responding

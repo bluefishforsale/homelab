@@ -19,16 +19,30 @@ type Processor struct {
 	redis    *RedisClient
 	alertMgr *AlertManagerClient
 	digest   *DigestSender
+	llm      *LLMClient
 	config   Config
 }
 
 // NewProcessor creates a new processor
 func NewProcessor(db *Database, redis *RedisClient, alertMgr *AlertManagerClient, config Config) *Processor {
+	var llm *LLMClient
+	if config.LLMUrl != "" {
+		llm = NewLLMClient(config.LLMUrl)
+		if llm.IsAvailable() {
+			log.Infof("LLM client initialized: %s", config.LLMUrl)
+			healthStatus.WithLabelValues("llm").Set(1)
+		} else {
+			log.Warnf("LLM server not available at %s - analysis disabled", config.LLMUrl)
+			healthStatus.WithLabelValues("llm").Set(0)
+		}
+	}
+
 	return &Processor{
 		db:       db,
 		redis:    redis,
 		alertMgr: alertMgr,
 		digest:   NewDigestSender(config),
+		llm:      llm,
 		config:   config,
 	}
 }
@@ -73,6 +87,11 @@ func (p *Processor) ProcessAnomaly(anomaly Anomaly) (*ProcessResult, error) {
 
 	// Update metrics
 	anomaliesProcessed.WithLabelValues(anomaly.Severity, anomaly.Host).Inc()
+
+	// Trigger LLM analysis for new high/critical problems
+	if isNew && p.llm != nil && (anomaly.Severity == "high" || anomaly.Severity == "critical") {
+		p.llm.AnalyzeProblemAsync(problem, p.db)
+	}
 
 	// Route alert based on severity
 	if err := p.routeAlert(problem, isNew); err != nil {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,16 +19,24 @@ import (
 
 // Config holds configuration for the anomaly detector
 type Config struct {
-	LokiURL               string  `json:"loki_url"`
-	CheckInterval         int     `json:"check_interval"`
-	BatchSize             int     `json:"batch_size"`
-	WebhookURL            string  `json:"webhook_url"`
-	FrequencySigma        float64 `json:"frequency_sigma"`
-	RateChangeThreshold   float64 `json:"rate_change_threshold"`
-	EntropyThreshold      float64 `json:"entropy_threshold"`
-	LevenshteinThreshold  float64 `json:"levenshtein_threshold"`
-	PatternsDir           string  `json:"patterns_dir"`
-	DBPath                string  `json:"db_path"`
+	LokiURL               string   `json:"loki_url"`
+	CheckInterval         int      `json:"check_interval"`
+	BatchSize             int      `json:"batch_size"`
+	WebhookURL            string   `json:"webhook_url"`
+	FrequencySigma        float64  `json:"frequency_sigma"`
+	RateChangeThreshold   float64  `json:"rate_change_threshold"`
+	EntropyThreshold      float64  `json:"entropy_threshold"`
+	LevenshteinThreshold  float64  `json:"levenshtein_threshold"`
+	PatternsDir           string   `json:"patterns_dir"`
+	DBPath                string   `json:"db_path"`
+	// Signal quality settings
+	AlertCooldownMinutes  int      `json:"alert_cooldown_minutes"`
+	MinSeverity           string   `json:"min_severity"`
+	MinPatternScore       float64  `json:"min_pattern_score"`
+	MinRepetitionCount    int      `json:"min_repetition_count"`
+	SuppressedServices    []string `json:"suppressed_services"`
+	// Dashboard link
+	DashboardURL          string   `json:"dashboard_url"`
 }
 
 // loadConfig loads configuration from environment variables
@@ -37,12 +46,20 @@ func loadConfig() Config {
 		CheckInterval:         getEnvInt("CHECK_INTERVAL", 30),
 		BatchSize:             getEnvInt("BATCH_SIZE", 1000),
 		WebhookURL:            getEnv("WEBHOOK_URL", "http://192.168.1.143:5678/webhook/log-anomaly"),
-		FrequencySigma:        getEnvFloat("FREQUENCY_SIGMA", 3.0),
-		RateChangeThreshold:   getEnvFloat("RATE_CHANGE_THRESHOLD", 5.0),
-		EntropyThreshold:      getEnvFloat("ENTROPY_THRESHOLD", 4.5),
-		LevenshteinThreshold:  getEnvFloat("LEVENSHTEIN_THRESHOLD", 0.7),
+		FrequencySigma:        getEnvFloat("FREQUENCY_SIGMA", 4.0),       // Raised from 3.0
+		RateChangeThreshold:   getEnvFloat("RATE_CHANGE_THRESHOLD", 10.0), // Raised from 5.0
+		EntropyThreshold:      getEnvFloat("ENTROPY_THRESHOLD", 6.5),     // Raised from 4.5
+		LevenshteinThreshold:  getEnvFloat("LEVENSHTEIN_THRESHOLD", 0.90), // Raised from 0.7
 		PatternsDir:           getEnv("PATTERNS_DIR", "/app/patterns"),
 		DBPath:                getEnv("DB_PATH", "/app/data/anomaly_stats.db"),
+		// Signal quality defaults
+		AlertCooldownMinutes:  getEnvInt("ALERT_COOLDOWN_MINUTES", 60),   // 1 hour between same alerts
+		MinSeverity:           getEnv("MIN_SEVERITY", "high"),            // Only high/critical alerts
+		MinPatternScore:       getEnvFloat("MIN_PATTERN_SCORE", 3.0),     // Raised from 2.0
+		MinRepetitionCount:    getEnvInt("MIN_REPETITION_COUNT", 20),     // Raised from 3
+		SuppressedServices:    getEnvList("SUPPRESSED_SERVICES", "blackbox-exporter,promtail,node-exporter"),
+		// Dashboard link
+		DashboardURL:          getEnv("DASHBOARD_URL", "http://ocean.home/d/log-anomaly-detector/log-anomaly-detector-tier-1"),
 	}
 	return config
 }
@@ -73,6 +90,26 @@ func getEnvFloat(key string, fallback float64) float64 {
 		}
 	}
 	return fallback
+}
+
+// getEnvList gets environment variable as comma-separated list with fallback
+func getEnvList(key, fallback string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = fallback
+	}
+	if value == "" {
+		return []string{}
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // HTTP handlers
@@ -213,6 +250,19 @@ func (h *HTTPHandlers) PatternsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(patterns)
 }
 
+// SourcesHandler returns auto-discovered hosts and services from logs
+func (h *HTTPHandlers) SourcesHandler(w http.ResponseWriter, r *http.Request) {
+	if h.detector == nil {
+		http.Error(w, "Service not ready", http.StatusServiceUnavailable)
+		return
+	}
+	
+	sources := h.detector.GetDiscoveredSources()
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sources)
+}
+
 // FlushHandler clears all Redis data (patterns, baselines, queues)
 func (h *HTTPHandlers) FlushHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.statisticalAnalyzer.FlushAll(); err != nil {
@@ -289,6 +339,7 @@ func main() {
 	router.HandleFunc("/health", handlers.HealthHandler).Methods("GET")
 	router.HandleFunc("/status", handlers.StatusHandler).Methods("GET")
 	router.HandleFunc("/patterns", handlers.PatternsHandler).Methods("GET")
+	router.HandleFunc("/sources", handlers.SourcesHandler).Methods("GET")
 	router.HandleFunc("/admin/flush", handlers.FlushHandler).Methods("POST")
 	router.Handle("/metrics", promhttp.Handler())
 	
