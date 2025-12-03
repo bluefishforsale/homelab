@@ -28,32 +28,6 @@ llamacpp_models:
       priority: 2
       requires_auth: false
       
-  coding:
-    # Alternative: Code Llama for technical analysis
-    - name: "CodeLlama-13B-Instruct-Q4_K_M.gguf"
-      url: "https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GGUF/resolve/main/codellama-13b-instruct.q4_k_m.gguf"
-      size: "7.9GB"
-      parameters: "13B"
-      vram_usage: "~9GB"
-      capabilities: ["coding", "technical_analysis", "debugging", "systems"]
-      context_size: "16K"
-      timeout: 3600
-      priority: 2
-      requires_auth: false
-
-  large_reasoning:
-    # For maximum reasoning capability (fits RTX 3090)
-    - name: "Llama-2-70B-Chat-Q2_K.gguf"
-      url: "https://huggingface.co/TheBloke/Llama-2-70B-Chat-GGUF/resolve/main/llama-2-70b-chat.Q2_K.gguf"
-      size: "26GB"
-      parameters: "70B"
-      vram_usage: "~23GB"
-      capabilities: ["reasoning", "large_context", "general", "analysis"]
-      context_size: "4K"
-      timeout: 4800
-      priority: 3
-      requires_auth: false
-
   backup:
     # Current model as fallback (much smaller)
     - name: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
