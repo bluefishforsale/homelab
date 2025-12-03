@@ -1,0 +1,122 @@
+---
+# Log Anomaly Detection Configuration
+# This file defines patterns, thresholds, and settings for the log anomaly detection system
+
+# Core service configuration
+log_anomaly:
+  service_name: log-anomaly-detector
+  port: 8085
+  loki_url: "http://192.168.1.143:3100"
+  check_interval: 30  # seconds between anomaly checks
+  batch_size: 1000    # logs to process per batch
+  
+  # Statistical thresholds (raised to reduce noise)
+  thresholds:
+    frequency_sigma: 4.0       # Standard deviations for frequency anomalies (was 3.0)
+    rate_change_threshold: 10.0 # Rate change multiplier threshold (was 5.0)
+    entropy_threshold: 6.5      # Entropy score threshold (was 4.5)
+    levenshtein_threshold: 0.90 # String similarity threshold (was 0.7)
+    min_pattern_score: 3.0      # Minimum pattern score to trigger alert (was 2.0)
+    min_repetition_count: 20    # Minimum similar messages to alert (was 3)
+    
+  # Pattern matching configuration
+  patterns:
+    enable_grok: true
+    enable_regex: true
+    enable_statistical: true
+    enable_ruleless: true
+    
+    # Time windows for analysis
+    baseline_window: "24h"    # How far back to establish baselines
+    analysis_window: "5m"     # Current window to analyze
+    
+  # Alert configuration  
+  alerts:
+    enable_alerts: true
+    webhook_url: "http://192.168.1.143:5678/webhook/log-anomaly"
+    severity_levels:
+      - low
+      - medium  
+      - high
+      - critical
+    
+    # Alert filtering (to reduce noise)
+    min_severity: "high"      # Only send high/critical alerts
+    cooldown_minutes: 60      # Deduplication window (1 hour)
+    
+    # Suppressed services (known noisy sources)
+    suppressed_services:
+      - blackbox-exporter
+      - promtail
+      - node-exporter
+      - prometheus
+    
+    # Dashboard link for alerts
+    dashboard_url: "http://ocean.home/d/log-anomaly-detector/log-anomaly-detector-tier-1"
+    
+    # Severity thresholds (raised)
+    low_threshold: 3.0        # Score >= 3.0
+    medium_threshold: 5.0     # Score >= 5.0
+    high_threshold: 8.0       # Score >= 8.0
+    critical_threshold: 10.0  # Score >= 10.0
+    
+  # Retention settings
+  retention:
+    baseline_data: "7d"       # How long to keep statistical baselines
+    anomaly_history: "30d"    # How long to keep detected anomalies
+    pattern_cache: "1d"       # How long to cache compiled patterns
+
+# Pattern categories and their associated files
+pattern_categories:
+  system:
+    description: "System-level logs (kernel, systemd, hardware)"
+    patterns_file: "system.patterns"
+    severity_boost: 1.2
+    
+  security:
+    description: "Authentication, authorization, security events"
+    patterns_file: "security.patterns" 
+    severity_boost: 2.0
+    
+  application:
+    description: "Application-specific logs"
+    patterns_file: "application.patterns"
+    severity_boost: 1.0
+    
+  network:
+    description: "Network-related logs (SSH, HTTP, DNS)"
+    patterns_file: "network.patterns"
+    severity_boost: 1.5
+    
+  docker:
+    description: "Docker container logs"
+    patterns_file: "docker.patterns"
+    severity_boost: 1.1
+    
+  media:
+    description: "Media stack logs (Plex, Sonarr, etc.)"
+    patterns_file: "media.patterns"
+    severity_boost: 1.0
+
+# Log sources are auto-discovered from incoming logs
+# Query discovered sources via API: curl http://192.168.1.143:8086/sources
+# Response includes:
+#   - hosts: list of all hosts seen
+#   - services: list of all services seen
+#   - host_count: number of unique hosts
+#   - service_count: number of unique services
+#   - host_details: per-host stats (first_seen, last_seen, log_count, anomaly_count)
+#   - service_details: per-host/service stats
+#
+# No hardcoded configuration needed - everything is learned dynamically from logs
+
+# Ignore patterns - logs to skip during analysis
+ignore_patterns:
+  - pattern: ".*health check.*"
+    reason: "Routine health checks create noise"
+  - pattern: ".*GET /metrics HTTP/1.1.*200.*"
+    reason: "Prometheus scraping is expected"
+  - pattern: ".*logrotate.*"
+    reason: "Log rotation is routine maintenance"
+  - pattern: ".*CRON.*"
+    reason: "Scheduled cron jobs are expected"

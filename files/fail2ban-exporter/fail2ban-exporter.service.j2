@@ -1,0 +1,29 @@
+[Unit]
+Description={{ fail2ban_exporter_service }}
+After=docker.service fail2ban.service
+Requires=docker.service
+Wants=fail2ban.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ fail2ban_exporter_home }}
+EnvironmentFile={{ fail2ban_exporter_home }}/.env
+
+# Stop running instance
+ExecStartPre=-docker compose down --timeout 30
+
+# Start services
+ExecStart=docker compose up -d --quiet-pull
+
+# Stop services
+ExecStop=docker compose down --timeout 30
+
+# Cleanup
+ExecReload=docker compose restart
+
+TimeoutStartSec=120
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

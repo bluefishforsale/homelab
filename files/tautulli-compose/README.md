@@ -1,51 +1,58 @@
 # Tautulli Docker Compose Deployment
 
-Tautulli is a web application for monitoring, analytics, and notifications for Plex Media Server. This deployment includes both the main Tautulli service and the Prometheus exporter for metrics collection.
+Plex statistics and monitoring with Prometheus exporter.
 
-## Architecture
+---
 
-- **Tautulli**: Main web application for Plex statistics and monitoring
-- **Tautulli Exporter**: Prometheus exporter for metrics collection
-- **Network**: Default Docker bridge (host IP communication)
-- **Port Mapping**: 
-  - Tautulli: 8905 (external) → 8905 (internal)
-  - Exporter: 8913 (external) → 9487 (internal)
+## Quick Reference
+
+| Service | Image | External Port | Internal Port |
+|---------|-------|---------------|---------------|
+| Tautulli | linuxserver/tautulli:latest | 8905 | 8181 |
+| Exporter | nwalke/tautulli_exporter:latest | 8913 | 9487 |
+
+---
+
+## Deployment
+
+```bash
+# Deploy (requires vault for API key)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/media/tautulli.yaml --ask-vault-pass
+```
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml.j2` | Tautulli + Exporter containers |
+| `tautulli-compose.service.j2` | Systemd service |
+| `tautulli.env.j2` | Environment variables |
+| `config.ini.j2` | Tautulli configuration with Plex connection |
+
+---
 
 ## Services
 
 ### Tautulli
-- **Image**: linuxserver/tautulli:latest
-- **Container**: tautulli
-- **User**: media (1001:1001)
-- **Resources**: 4 CPU cores, 2GB RAM
+
+- **User**: PUID/PGID 1001 (media)
+- **Resources**: 4 CPU, 2GB RAM
+- **Health Check**: HTTP on port 8181 (120s start period)
 - **Volumes**:
-  - `/data01/services/tautulli/config` → `/config` (main configuration)
-  - Plex logs mounted read-only for monitoring
-- **Health Check**: HTTP GET on port 8905
+  - `/data01/services/tautulli/config` → `/config`
+  - Plex logs → `/logs:ro`
 
 ### Tautulli Exporter
-- **Image**: nwalke/tautulli_exporter:latest
-- **Container**: tautulli-exporter
-- **Resources**: 0.5 CPU cores, 256MB RAM
-- **Dependencies**: Waits for Tautulli to be healthy
-- **Metrics**: Available at http://192.168.1.143:8913/metrics
-- **Health Check**: Metrics endpoint verification
 
-## Deployment
+- **Resources**: 0.5 CPU, 256MB RAM
+- **Health Check**: Disabled (no shell in container)
+- **Depends on**: Tautulli healthy
+- **Connects via**: Host IP to Tautulli port
 
-### Using Ansible (Recommended)
-
-```bash
-# Deploy Tautulli with docker-compose
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tautulli.yaml
-```
-
-### Manual Deployment
-
-```bash
-cd /data01/services/tautulli
-docker compose up -d
-```
+---
 
 ## Management
 
@@ -85,16 +92,16 @@ docker compose logs -f
 
 ## Access URLs
 
-- **Tautulli Web**: http://192.168.1.143:8905
-- **Internal**: http://tautulli.home
-- **External**: https://tautulli.terrac.com (via Cloudflare tunnel)
-- **Metrics**: http://192.168.1.143:8913/metrics
+- **Tautulli Web**: `http://192.168.1.143:8905`
+- **Internal**: `http://tautulli.home`
+- **External**: `https://tautulli.terrac.com` (via Cloudflare tunnel)
+- **Metrics**: `http://192.168.1.143:8913/metrics`
 
 ## Configuration
 
 ### First-Time Setup
 
-1. Navigate to http://192.168.1.143:8905
+1. Navigate to `http://192.168.1.143:8905`
 2. Complete the Tautulli setup wizard
 3. Configure Plex Media Server connection
 4. Set up admin account and notifications
@@ -114,6 +121,7 @@ TAUTULLI_API_KEY=<from vault>
 ### API Key
 
 The Tautulli API key is stored in vault secrets under `media_services.tautulli.api_key` and used for:
+
 - Prometheus exporter integration
 - API access for automation
 - External integrations
@@ -134,6 +142,7 @@ The exporter provides metrics for Prometheus at port 8913:
 ### Grafana Dashboard
 
 Import Tautulli exporter dashboard for visualization:
+
 - Dashboard ID: 12651 (from grafana.com)
 - Data source: Prometheus
 
@@ -182,6 +191,7 @@ du -sh /data01/services/tautulli/config/tautulli.db
 ### Backup
 
 Important files to backup:
+
 - `/data01/services/tautulli/config/tautulli.db` (main database)
 - `/data01/services/tautulli/config/config.ini` (configuration)
 
@@ -204,6 +214,7 @@ docker compose up -d --force-recreate
 ### Database Maintenance
 
 Access Tautulli settings → Database → Database Maintenance:
+
 - Clear table row counts
 - Clear watched/streamed history
 - Backup database

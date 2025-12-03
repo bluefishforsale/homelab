@@ -1,167 +1,114 @@
-# NextCloud File Sharing Platform
+# NextCloud
 
-NextCloud deployment with MariaDB backend and Redis caching using Docker Compose.
+File sharing platform with MariaDB and Redis.
+
+---
+
+## Quick Reference
+
+| Property | Value |
+|----------|-------|
+| Host | ocean (192.168.1.143) |
+| Port | 8081 |
+| Image | nextcloud:28-apache |
+| Database | MariaDB 11 |
+| Cache | Redis 7 |
+
+---
 
 ## Architecture
 
-- **NextCloud**: Apache-based file sharing and collaboration platform
-- **MariaDB**: Database backend for NextCloud data and metadata  
-- **Redis**: Caching layer for improved performance
-- **Network**: Private bridge network (172.22.0.0/16) for inter-service communication
+```text
+NextCloud (:8081) → MariaDB → Redis
+     ↑
+   nginx → cloudflared → internet
+```
 
-## Services
+Private network: 172.22.0.0/16
 
-### NextCloud (Port 8081)
-- Image: `nextcloud:28-apache`
-- Resources: 2 CPU cores, 2GB memory limit
-- Volumes: data, config, apps, themes
-- Media access: Read-only mount to /data01/media
-- Backup access: Read-write mount to /data01/backups
+---
 
-### MariaDB Database  
-- Image: `mariadb:11`
-- Database: nextcloud
-- User: nextcloud
-- Custom configuration for NextCloud optimization
-- Resources: 1 CPU core, 1GB memory limit
+## Deploy
 
-### Redis Cache
-- Image: `redis:7-alpine`  
-- Memory limit: 256MB with LRU eviction
-- Password protected
-- Resources: 0.5 CPU cores, 512MB memory limit
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/services/nextcloud.yaml --ask-vault-pass
+```
 
-## Configuration
+---
 
-### Required Vault Variables
-Add to `vault_secrets.yaml`:
+## Vault Variables
+
+Required in `vault/secrets.yaml`:
 
 ```yaml
 cloud_services:
   nextcloud:
     admin_user: "admin"
-    admin_password: "secure-admin-password"
-    database_password: "secure-db-password"
-    database_root_password: "secure-root-password"
-    redis_password: "secure-redis-password"
-    domain: "nextcloud.terrac.com"  # Optional, defaults shown
+    admin_password: "<password>"
+    database_password: "<password>"
+    database_root_password: "<password>"
+    redis_password: "<password>"
 ```
 
-### Directory Structure
-```
+---
+
+## Directory Structure
+
+```text
 /data01/services/nextcloud/
-├── data/              # NextCloud data files
-├── config/            # NextCloud configuration
-├── apps/              # Custom NextCloud apps
-├── themes/            # Custom NextCloud themes
-├── mariadb-data/      # Database files
-├── mariadb-logs/      # Database logs
-├── mariadb-conf/      # Database configuration
-├── redis-data/        # Redis persistence
-├── docker-compose.yml # Container configuration
-└── .env               # Environment variables
+├── data/           # NextCloud files
+├── config/         # Configuration
+├── apps/           # Custom apps
+├── mariadb-data/   # Database
+├── redis-data/     # Cache
+└── docker-compose.yml
 ```
 
-## Features
-
-### Security
-- No new privileges for all containers
-- User mapping (uid:gid 1001:1001)
-- Private network isolation
-- Password-protected Redis cache
-
-### Performance
-- PHP memory limit: 1GB
-- Upload limit: 10GB  
-- Max file uploads: 100
-- Redis caching for database queries and file locks
-- MariaDB optimized for NextCloud workload
-
-### Health Checks
-- NextCloud: HTTP status endpoint
-- MariaDB: Database connectivity check
-- Redis: Ping response with authentication
-
-### Integration
-- Read-only access to media library (/data01/media)
-- Backup storage access (/data01/backups)
-- Trusted domains configured for external access
-- HTTPS overrides for proper proxy integration
-
-## Deployment
-
-```bash
-# Deploy NextCloud
-ansible-playbook playbook_ocean_nextcloud.yaml
-
-# Verify deployment
-systemctl status nextcloud.service
-docker-compose -f /data01/services/nextcloud/docker-compose.yml ps
-```
+---
 
 ## Access
 
-- **Local**: http://192.168.1.143:8081
-- **Domain**: https://nextcloud.terrac.com (via Cloudflare tunnel)
-- **Admin**: Login with admin credentials from vault
+| Method | URL |
+|--------|-----|
+| Local | `http://192.168.1.143:8081` |
+| Internal | `http://nextcloud.home` |
+| External | `https://nextcloud.terrac.com` |
 
-## Initial Setup
-
-After deployment, NextCloud will automatically:
-1. Initialize the database schema
-2. Configure Redis caching
-3. Set up admin user account
-4. Configure trusted domains
+---
 
 ## Management
 
 ```bash
-# Service management
-systemctl start nextcloud.service
-systemctl stop nextcloud.service
+# Service
+systemctl status nextcloud.service
 systemctl restart nextcloud.service
-systemctl reload nextcloud.service
 
-# Container management
-cd /data01/services/nextcloud
-docker-compose ps
-docker-compose logs -f nextcloud
-docker-compose exec nextcloud su -s /bin/bash www-data
+# Logs
+docker logs nextcloud --tail 50
+docker logs nextcloud-db --tail 50
 
-# Database management
-docker-compose exec nextcloud-db mysql -u nextcloud -p nextcloud
+# Shell
+docker exec -it nextcloud bash
 
-# Redis management  
-docker-compose exec nextcloud-redis redis-cli -a <password>
+# Database
+docker exec -it nextcloud-db mysql -u nextcloud -p nextcloud
 ```
 
-## Maintenance
-
-### Backups
-- Database: Regular mysqldump to /data01/backups
-- Data: File-level backup of /data01/services/nextcloud/data
-- Configuration: Backup of config directory
-
-### Updates
-- NextCloud: Update version tag in vars and redeploy
-- Apps: Use NextCloud web interface or occ command
-- Database: MariaDB updates via image tag changes
-
-### Performance Tuning
-- Monitor Redis memory usage
-- Adjust PHP limits based on usage
-- MariaDB buffer pool sizing in custom.cnf
+---
 
 ## Troubleshooting
 
-### Common Issues
-- **503 errors**: Check container health and logs
-- **Database connection**: Verify MariaDB container status
-- **Upload failures**: Check PHP limits and disk space
-- **Performance**: Monitor Redis hit rates and database queries
+| Issue | Check |
+|-------|-------|
+| 503 errors | Container health, logs |
+| DB connection | MariaDB container status |
+| Upload failures | PHP limits, disk space |
+| Slow performance | Redis memory, DB queries |
 
-### Log Files
-- NextCloud: `docker-compose logs nextcloud`
-- MariaDB: `docker-compose logs nextcloud-db`
-- Redis: `docker-compose logs nextcloud-redis`
-- System: `journalctl -u nextcloud.service`
+---
+
+## Related Documentation
+
+- [playbooks/individual/ocean/services/nextcloud.yaml](/playbooks/individual/ocean/services/nextcloud.yaml)
+- [docs/architecture/ocean-services.md](/docs/architecture/ocean-services.md)

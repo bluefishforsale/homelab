@@ -1,47 +1,41 @@
-# 🔧 Common Issues Troubleshooting Guide
+# Common Issues Troubleshooting Guide
 
-## Overview
+This guide covers frequently encountered issues in the homelab environment.
 
-This guide covers the most frequently encountered issues in your homelab environment and their solutions.
+**Quick Reference:**
 
-## 🌐 Network Issues
+| Host | IP | Purpose |
+|------|----|---------|
+| ocean | 192.168.1.143 | Media/AI services, Prometheus, Grafana |
+| dns01 | 192.168.1.2 | BIND9 DNS |
+| pihole | 192.168.1.9 | DNS filtering |
+| node005 | 192.168.1.105 | Proxmox hypervisor |
+| node006 | 192.168.1.106 | Proxmox hypervisor (GPU) |
+
+---
+
+## Network Issues
 
 ### DNS Resolution Problems
 
-#### Symptoms
-- Services can't resolve hostnames
-- Web interfaces inaccessible by domain name
-- Internal service discovery failing
-
-#### Diagnostics
 ```bash
 # Test DNS resolution
 nslookup gitlab.home 192.168.1.2
 dig @192.168.1.2 ocean.home
-host plex.terrac.com
 
-# Check DNS server status
-systemctl status bind9
-systemctl status pihole-FTL
+# Check DNS server status (dns01)
+ssh debian@192.168.1.2 "systemctl status bind9"
 
-# Verify DNS configuration
-cat /etc/resolv.conf
-cat /etc/systemd/resolved.conf
-```
+# Check pihole status
+ssh debian@192.168.1.9 "systemctl status pihole-FTL"
 
-#### Solutions
-```bash
 # Restart DNS services
-sudo systemctl restart bind9
-sudo systemctl restart pihole-FTL
+ssh debian@192.168.1.2 "sudo systemctl restart bind9"
+ssh debian@192.168.1.9 "sudo systemctl restart pihole-FTL"
 
-# Flush DNS caches
-sudo systemctl flush-dns
-sudo resolvectl flush-caches
-
-# Fix DNS configuration
-echo "nameserver 192.168.1.2" | sudo tee /etc/resolv.conf
-echo "nameserver 192.168.1.9" | sudo tee -a /etc/resolv.conf
+# Ansible: Redeploy DNS
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/core/services/dns.yaml --ask-vault-pass
 ```
 
 ### Network Connectivity Issues
@@ -94,29 +88,28 @@ sudo dhclient -v eth0
 sudo systemctl restart isc-dhcp-server
 ```
 
-## 🖥️ Virtualization Issues
+## Virtualization Issues
 
 ### VM Won't Start
 
-#### Common Causes & Solutions
 ```bash
-# Check VM configuration
-qm config 143
+# Check VM configuration (on Proxmox node)
+ssh root@192.168.1.106 "qm config VMID"
 
 # Look for locks
-qm unlock 143
+ssh root@192.168.1.106 "qm unlock VMID"
 
 # Check storage availability
-pvesm status
+ssh root@192.168.1.106 "pvesm status"
 
 # Check resource availability
-pvesh get /nodes/proxmox01/status
+ssh root@192.168.1.106 "pvesh get /nodes/node006/status"
 
-# Start with more verbose output
-qm start 143 --debug
+# Start with debug output
+ssh root@192.168.1.106 "qm start VMID --debug"
 ```
 
-#### Storage Issues
+#### VM Storage Issues
 ```bash
 # Check Ceph cluster health
 ceph -s
@@ -158,7 +151,7 @@ dd if=/dev/zero of=/tmp/test bs=1G count=1 oflag=direct
 fio --name=test --ioengine=libaio --rw=randread --bs=4k --size=1G --direct=1
 ```
 
-## 🐳 Container Issues
+## Container Issues
 
 ### Docker Service Problems
 
@@ -230,7 +223,7 @@ docker network prune
 docker-compose up -d
 ```
 
-## 🎮 GPU Issues
+## GPU Issues
 
 ### NVIDIA Driver Problems
 
@@ -277,36 +270,28 @@ nvidia-smi --query-gpu=clocks_throttle_reasons.active --format=csv
 sudo nvidia-smi -pl 65  # Reduce from 75W to 65W
 ```
 
-## 💾 Storage Issues
+## Storage Issues
 
-### ZFS Problems
+### ZFS Problems (ocean VM)
 
-#### Pool Import Issues
 ```bash
-# Check importable pools
-zpool import
+# Check pool status
+ssh terrac@192.168.1.143 "zpool status data01"
 
 # Force import if needed
-zpool import -f tank
+ssh terrac@192.168.1.143 "sudo zpool import -f data01"
 
-# Check pool status
-zpool status -v
+# Check for errors
+ssh terrac@192.168.1.143 "zpool status -x"
 
-# Clear errors after fixing issues
-zpool clear tank
-```
-
-#### Disk Failures
-```bash
-# Check for failed disks
-zpool status -x
-
-# Replace failed disk
-zpool replace tank /dev/old-disk /dev/new-disk
+# Clear errors after fixing
+ssh terrac@192.168.1.143 "sudo zpool clear data01"
 
 # Monitor resilver progress
-watch 'zpool status tank'
+ssh terrac@192.168.1.143 "watch 'zpool status data01'"
 ```
+
+See `docs/operations/zfs-disk-replacement.md` for disk replacement procedures.
 
 ### Ceph Storage Issues
 
@@ -337,7 +322,7 @@ ceph osd dump | grep slow
 ceph daemon osd.0 config show
 ```
 
-## 🔐 Security & Authentication Issues
+## Security & Authentication Issues
 
 ### SSH Access Problems
 
@@ -391,23 +376,23 @@ systemctl restart apache2
 
 ### Ansible Vault Issues
 
-#### Can't Decrypt Vault
 ```bash
-# Check vault password file
-ls -la ~/.ansible_vault_pass
-chmod 600 ~/.ansible_vault_pass
-
 # Test vault decryption
-ansible-vault view vault_secrets.yaml
+ansible-vault view vault/secrets.yaml --ask-vault-pass
 
-# Set environment variable
-export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible_vault_pass
+# Edit vault
+ansible-vault edit vault/secrets.yaml --ask-vault-pass
+
+# Run playbook with vault
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/00_site.yaml --ask-vault-pass
 
 # Debug vault issues
-ansible-playbook playbook.yaml --ask-vault-pass -vvv
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/00_site.yaml --ask-vault-pass -vvv
 ```
 
-## 🔧 Service-Specific Issues
+## Service-Specific Issues
 
 ### Cloudflare Tunnel Issues
 
@@ -459,99 +444,69 @@ gitlab-rails console -e production
 # user.save!
 ```
 
-### Plex Issues
+### Plex Issues (ocean)
 
-#### Plex Server Unreachable
 ```bash
-# Check Plex service status
-docker ps | grep plex
-docker logs plex
+# Check Plex service
+ssh terrac@192.168.1.143 "docker ps | grep plex"
+ssh terrac@192.168.1.143 "systemctl status plex"
 
-# Check Plex configuration
-docker exec plex cat /config/Library/Application\ Support/Plex\ Media\ Server/Preferences.xml
+# View logs
+ssh terrac@192.168.1.143 "docker logs plex --tail 50"
 
-# Restart Plex container
-docker restart plex
+# Restart Plex
+ssh terrac@192.168.1.143 "sudo systemctl restart plex"
+
+# Check GPU access
+ssh terrac@192.168.1.143 "docker exec plex nvidia-smi"
+
+# Redeploy via Ansible
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
 ```
 
-#### Transcoding Issues
+## Monitoring & Alerting Issues (ocean)
+
+### Grafana (port 8910)
+
 ```bash
-# Check GPU access in Plex container
-docker exec plex nvidia-smi
+# Check Grafana service
+ssh terrac@192.168.1.143 "docker ps | grep grafana"
+ssh terrac@192.168.1.143 "systemctl status grafana"
 
-# Check transcoding logs
-docker exec plex tail -f /config/Library/Application\ Support/Plex\ Media\ Server/Logs/Plex\ Media\ Scanner.log
+# Check logs
+ssh terrac@192.168.1.143 "docker logs grafana --tail 50"
 
-# Verify hardware acceleration settings
-# Plex Settings > Server > Transcoder > Use hardware acceleration
+# Restart Grafana
+ssh terrac@192.168.1.143 "sudo systemctl restart grafana"
+
+# Access: http://192.168.1.143:8910
+
+# Redeploy
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/monitoring/grafana_compose.yaml --ask-vault-pass
 ```
 
-### N8N Workflow Issues
+### Prometheus (port 9090)
 
-#### Database Connection Problems
 ```bash
-# Check PostgreSQL status
-docker ps | grep n8n-db
-docker logs n8n-db
+# Check Prometheus
+ssh terrac@192.168.1.143 "docker ps | grep prometheus"
+ssh terrac@192.168.1.143 "systemctl status prometheus"
 
-# Check N8N database connectivity
-docker exec n8n-db pg_isready -U n8n
+# Check targets
+curl http://192.168.1.143:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
 
-# Reset database connection
-docker restart n8n
-docker restart n8n-db
+# Check specific exporter
+curl http://192.168.1.143:9100/metrics | head -20  # node-exporter
+curl http://192.168.1.143:8912/metrics | head -20  # cadvisor
+
+# Redeploy
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/monitoring/prometheus.yaml --ask-vault-pass
 ```
 
-## 📊 Monitoring & Alerting Issues
-
-### Grafana Access Problems
-
-#### Can't Access Grafana Web Interface
-```bash
-# Check Grafana service status
-docker ps | grep grafana
-docker logs grafana
-
-# Check port binding
-netstat -tlnp | grep 8910
-ss -tlnp | grep 8910
-
-# Check firewall rules
-ufw status
-iptables -L | grep 8910
-```
-
-#### Data Source Issues
-```bash
-# Test Prometheus connectivity
-curl http://192.168.1.143:9090/metrics
-
-# Check Grafana data source configuration
-# Grafana > Configuration > Data Sources
-
-# Check Grafana logs for errors
-docker logs grafana | grep -i error
-```
-
-### Prometheus Scraping Issues
-
-#### Targets Down
-```bash
-# Check Prometheus targets
-curl http://192.168.1.143:9090/targets
-
-# Check target endpoint directly
-curl http://target-ip:port/metrics
-
-# Check network connectivity
-ping target-ip
-telnet target-ip port
-
-# Check Prometheus configuration
-docker exec prometheus cat /etc/prometheus/prometheus.yml
-```
-
-## 🚨 Emergency Recovery Procedures
+## Emergency Recovery Procedures
 
 ### System Won't Boot
 
@@ -596,7 +551,7 @@ mysqlcheck --repair --all-databases
 pg_resetwal /var/lib/postgresql/data
 ```
 
-## 🔍 Diagnostic Tools
+## Diagnostic Tools
 
 ### Network Diagnostics
 ```bash

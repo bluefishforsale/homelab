@@ -15,11 +15,17 @@
 - name: Configure System Users and Groups
   ansible.builtin.import_playbook: individual/base/users.yaml
 
-- name: Configure Timezone, Sysctl, Udev, and Logging
-  ansible.builtin.import_playbook: individual/base/tz_sysctl_udev_logging.yaml
+- name: Configure Timezone, Sysctl, and Udev
+  ansible.builtin.import_playbook: individual/base/tz_sysctl_udev.yaml
+
+- name: Configure System Logging
+  ansible.builtin.import_playbook: individual/base/logging.yaml
 
 - name: Configure Unattended Security Upgrades
   ansible.builtin.import_playbook: individual/base/unattended_upgrade.yaml
+
+- name: Configure fail2ban for SSH Protection
+  ansible.builtin.import_playbook: individual/base/fail2ban.yaml
 
 - name: Configure RAM Disk (if applicable)
   ansible.builtin.import_playbook: individual/base/ramdisk.yaml

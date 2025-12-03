@@ -1,0 +1,60 @@
+---
+- name: Configure fail2ban for SSH protection
+  become: true
+  hosts: all
+  strategy: free
+
+  tasks:
+    - name: Ensure fail2ban is installed
+      apt:
+        name: fail2ban
+        state: present
+        update_cache: no
+
+    - name: Create fail2ban jail.local configuration
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          # Never ban local LAN connections
+          ignoreip = 127.0.0.1/8 ::1 192.168.1.0/24
+          
+          # Ban hosts for 24 hours (86400 seconds)
+          bantime = 86400
+          
+          # A host is banned if it has generated "maxretry" during the last "findtime" seconds
+          findtime = 120
+          maxretry = 3
+          
+          # Destination email for action that send you an email
+          destemail = root@localhost
+          sender = root@localhost
+          
+          # Action shortcuts for iptables
+          banaction = iptables-multiport
+          banaction_allports = iptables-allports
+          
+          [sshd]
+          enabled = true
+          port = ssh
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 3
+          findtime = 120
+          bantime = 86400
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart fail2ban
+
+    - name: Ensure fail2ban service is enabled and started
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: restart fail2ban
+      systemd:
+        name: fail2ban
+        state: restarted

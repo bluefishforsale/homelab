@@ -1,50 +1,67 @@
-# Readme OSX / Proxmox
+# macOS Setup
 
-# install VM solution
-# requirements
-brew install qemu
+## Development Environment
 
-# MacOS VPN kit for bridging
-# terminal 1 qemu-local
-# requirements
+For local Ansible development on macOS, see [DEVELOPMENT.md](/DEVELOPMENT.md).
+
+```bash
+# Quick setup
+make setup
+echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+make validate
+```
+
+---
+
+## Experimental: Proxmox in QEMU on macOS
+
+**Note**: This is experimental/reference documentation for running Proxmox virtualized on macOS. Not recommended for production use.
+
+### Prerequisites
+
+```bash
+brew install qemu cdrtools wget
+```
+
+### VPNKit for Networking (Optional)
+
+```bash
 brew install opam
 opam init
-# package build and start
 git clone https://github.com/moby/vpnkit.git
-cd vpnkit
-make
+cd vpnkit && make
 ./vpnkit --ethernet /tmp/vpnkit.sock
+```
 
+### Download ISOs
 
-# These prep steps are done in your data dir (here it's another disk)
-# terminal 1
-cd /Volumes/4TB/VMs/ProxMox
+```bash
+mkdir -p ~/VMs/ProxMox && cd ~/VMs/ProxMox
 
-# download required ISOs
+# Proxmox ISO
 wget https://enterprise.proxmox.com/iso/proxmox-ve_8.3-1.iso
+
+# Debian cloud images (for testing)
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-arm64.qcow2
 
-# Create Qemu disk for Proxmox to be installed on
+# Create disk for Proxmox
 qemu-img create proxmox.img 10G
+```
 
+### Cloud-Init ISO
 
-# start in the local directory with relative sources and files
-# terminal 2
-cd qemu-local || mkdir qemu-local
-
-# make the cloud-init iso
-# requirements
-brew install cdrtools
-
+```bash
+mkdir -p cloud-init
 touch cloud-init/meta-data
+# Edit cloud-init/user-data with your config
 mkisofs -output cloud-init.iso -volid cidata -joliet -rock cloud-init/user-data cloud-init/meta-data
-cp cloud-init.iso /Volumes/4TB/VMs/ProxMox/
+```
 
-# Run these from terminal 1 (the data dir)
-cd /Volumes/4TB/VMs/ProxMox
+### Test ARM64 VM (Apple Silicon)
 
-# test that QEMU can run at least native arm64 img
+```bash
 qemu-system-aarch64 \
   -M virt,highmem=off \
   -bios "/opt/homebrew/Cellar/qemu/9.2.0/share/qemu/edk2-aarch64-code.fd" \
@@ -57,11 +74,13 @@ qemu-system-aarch64 \
   -boot d \
   -serial stdio \
   -display none \
-  -netdev socket,id=net0,path=/tmp/vpnkit.sock -device virtio-net-pci,netdev=net0
-  -nodefaults
+  -netdev socket,id=net0,path=/tmp/vpnkit.sock \
+  -device virtio-net-pci,netdev=net0
+```
 
+### Run Proxmox x86_64 (Intel Mac Only)
 
-# run proxmox ISO and created disk image for installation phase 
+```bash
 qemu-system-x86_64 \
   -M q35 \
   -enable-kvm \
@@ -70,9 +89,12 @@ qemu-system-x86_64 \
   -smp 4 \
   -cpu host \
   -drive file=proxmox-ve_8.3-1.iso,if=virtio,cache=writeback \
-  -drive file=cloud-init.iso,if=virtio \
+  -drive file=proxmox.img,if=virtio,format=raw \
   -boot menu=on \
   -serial stdio \
   -display none \
-  -netdev bridge,id=net0,br=vm-br0 -device virtio-net-pci,netdev=net0 \
-  -nodefaults
+  -netdev user,id=net0 \
+  -device virtio-net-pci,netdev=net0
+```
+
+**Note**: `-enable-kvm` requires Intel Mac with KVM support. Apple Silicon cannot run x86 Proxmox.

@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: log-anomaly-ml-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: log_anomaly_ml
+      POSTGRES_USER: log_anomaly_ml
+      POSTGRES_PASSWORD: "{{ log_anomaly_ml.postgres_password | default('changeme') }}"
+    volumes:
+      - {{ basedir }}/postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U log_anomaly_ml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: log-anomaly-ml-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - {{ basedir }}/redis-data:/data
+    ports:
+      - "127.0.0.1:6380:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  log-anomaly-ml-processor:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    container_name: log-anomaly-ml-processor
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      - TZ=America/Los_Angeles
+      - PORT=8087
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=log_anomaly_ml
+      - POSTGRES_USER=log_anomaly_ml
+      - POSTGRES_PASSWORD={{ log_anomaly_ml.postgres_password | default('changeme') }}
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+      - ALERTMANAGER_URL={{ alertmanager_url | default('http://192.168.1.143:9093') }}
+      - SMTP_HOST={{ smtp_host | default('smtp.gmail.com') }}
+      - SMTP_PORT={{ smtp_port | default('587') }}
+      - SMTP_USER={{ smtp.gmail_user | default('') }}
+      - SMTP_PASSWORD={{ smtp.gmail_app_password | default('') }}
+      - SMTP_FROM={{ smtp_from | default('homelab-alerts@gmail.com') }}
+      - DIGEST_RECIPIENT={{ digest_recipient | default('terracnosaur@gmail.com') }}
+      - DIGEST_HOUR={{ digest_hour | default('6') }}
+      - LLM_URL={{ llm_url | default('http://192.168.1.143:8080') }}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8087/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

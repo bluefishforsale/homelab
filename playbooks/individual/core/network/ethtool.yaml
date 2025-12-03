@@ -1,6 +1,6 @@
 ---
 - name: Configure systemd service for ethtool settings
-  hosts: all
+  hosts: proxmox
   become: true
   gather_facts: true
 
@@ -29,14 +29,24 @@
       changed_when: false
       failed_when: false
 
+    - name: Get maximum combined channels supported by hardware
+      ansible.builtin.shell: "{{ ethtool_path.stdout }} -l {{ item }} | grep -A5 'Pre-set maximums' | grep -i combined | awk '{print $2}' || echo 1"
+      loop: "{{ network_interfaces.stdout_lines }}"
+      register: interface_max_combined
+      changed_when: false
+      failed_when: false
+
     - name: Set ethtool commands for interfaces with known speeds and multiqueue
       ansible.builtin.set_fact:
         ethtool_commands: "{{ ethtool_commands | default([]) + command_list }}"
       vars:
+        max_combined: "{{ interface_max_combined.results[ansible_loop.index0].stdout | default('1') }}"
         command_list:
-          - "ExecStart={{ ethtool_path.stdout }} -s {{ item.item }} autoneg off speed {{ item.stdout }} duplex full"
-          - "ExecStart={{ ethtool_path.stdout }} -L {{ item.item }} combined 128"
+          - "ExecStart=-{{ ethtool_path.stdout }} -s {{ item.item }} autoneg off speed {{ item.stdout }} duplex full"
+          - "ExecStart=-{{ ethtool_path.stdout }} -L {{ item.item }} combined {{ max_combined }}"
       loop: "{{ interface_speeds.results }}"
+      loop_control:
+        extended: yes
       when: item.stdout != "unknown"
 
     - name: Create systemd service file for ethtool settings
@@ -44,13 +54,16 @@
         src: ../../../../files/ethtool/ethtool-settings.service.j2
         dest: /etc/systemd/system/ethtool-settings.service
         mode: '0644'
+      when: ethtool_commands is defined and ethtool_commands | length > 0
 
     - name: Reload systemd daemon
       ansible.builtin.systemd:
         daemon_reload: yes
+      when: ethtool_commands is defined and ethtool_commands | length > 0
 
     - name: Enable and start ethtool-settings service
       ansible.builtin.systemd:
         name: ethtool-settings.service
         enabled: yes
         state: started
+      when: ethtool_commands is defined and ethtool_commands | length > 0

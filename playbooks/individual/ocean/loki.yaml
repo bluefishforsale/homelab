@@ -1,0 +1,62 @@
+- name: Deploy Loki Log Aggregation System
+  become: true
+  hosts: ocean
+  vars:
+    service_name: loki
+    basedir: /data01/services/{{ service_name }}
+    user: media
+    group: media
+  tasks:
+  - name: Create Loki service directories
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0755'
+    loop:
+      - "{{ basedir }}"
+      - "{{ basedir }}/data"
+      - "{{ basedir }}/config"
+
+  - name: Deploy Loki configuration
+    ansible.builtin.template:
+      src: ../../../files/loki/loki-config.yaml.j2
+      dest: "{{ basedir }}/config/loki-config.yaml"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart loki
+
+  - name: Deploy Loki docker-compose file
+    ansible.builtin.template:
+      src: ../../../files/loki/docker-compose.yml.j2
+      dest: "{{ basedir }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ group }}"
+      mode: '0644'
+    notify: Restart loki
+
+  - name: Deploy Loki systemd service
+    ansible.builtin.template:
+      src: ../../../files/loki/loki.service.j2
+      dest: /etc/systemd/system/loki.service
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Restart loki
+
+  - name: Enable and start Loki service
+    ansible.builtin.systemd:
+      name: loki
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
+  handlers:
+  - name: Restart loki
+    ansible.builtin.systemd:
+      name: loki
+      state: restarted
+      daemon_reload: yes
+      enabled: true

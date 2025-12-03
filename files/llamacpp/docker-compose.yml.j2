@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   llamacpp:
     image: {{ image }}:{{ version }}
@@ -7,12 +5,20 @@ services:
     hostname: {{ service }}
     restart: unless-stopped
     
-    # GPU support using runtime (compatible with older docker-compose)
-    runtime: nvidia
+    # GPU support with explicit device reservation
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
     
     environment:
       - TZ=America/Los_Angeles
       - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=0
     
     ports:
       - "{{ port }}:{{ port }}"
@@ -22,22 +28,30 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # Start server with Phi-3.5 model pre-loaded and GPU acceleration
-    # Try fewer GPU layers to avoid memory buffer issues
+    # RTX 3090 Optimized: Qwen3-14B for single-user reasoning with max context
+    # Model: 8.5GB + ~7GB KV cache = fits in 16GB VRAM budget
+    # Supports /think mode for step-by-step reasoning
     command: 
       - "--host"
       - "0.0.0.0"
       - "--port" 
       - "{{ port }}"
       - "--model"
-      #- "/models/Phi-3.5-mini-instruct-Q4_K_M.gguf"
-      - "/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
-      - "--gpu-layers"
-      - "9999"
+      - "/models/Qwen3-14B-Q4_K_M.gguf"
+      - "--n-gpu-layers"
+      - "41"
       - "--ctx-size"
-      - "16384"
+      - "40960"
+      - "--parallel" 
+      - "1"
+      - "--batch-size"
+      - "2048"
+      - "--ubatch-size" 
+      - "512"
+      - "--flash-attn"
       - "--api-key"
       - "{{ api_key | default('llamacpp-homelab-key') }}"
+      - "--metrics"
       - "--verbose"
     
     # Health check - check if server is responding
@@ -48,8 +62,8 @@ services:
       retries: 5
       start_period: 60s
     
-    # User mapping
-    user: "{{ uid }}:{{ gid }}"
+    # Note: Running as root for CUDA/GPU access
+    # The llama.cpp container requires root for proper GPU memory allocation
     
     # Security options
     security_opt:

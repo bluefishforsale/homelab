@@ -1,0 +1,51 @@
+[Unit]
+Description=Loki Log Aggregation System
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ basedir }}
+User=root
+Group=root
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME=loki
+Environment=COMPOSE_HTTP_TIMEOUT=60
+
+# Pre-start commands (idempotent)
+ExecStartPre=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml pull --quiet
+
+# Start command
+ExecStart=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml up -d
+
+# Stop command
+ExecStop=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml down --timeout 30
+
+# Reload command
+ExecReload=/usr/bin/docker compose -f {{ basedir }}/docker-compose.yml restart
+
+# Service behavior
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=180
+TimeoutStopSec=60
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ basedir }}
+ReadOnlyPaths=/var/run/docker.sock
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=loki
+
+[Install]
+WantedBy=multi-user.target

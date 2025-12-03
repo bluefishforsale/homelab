@@ -1,0 +1,105 @@
+# Application Log Patterns for Anomaly Detection
+# Format: PATTERN_NAME GROK_PATTERN [anomaly_score] [description]
+
+# Generic application patterns (scores lowered to reduce noise)
+APP_STARTUP (?i)(started|starting|initializ|boot|launch) 0.2 Application startup
+APP_SHUTDOWN (?i)(stop|shutdown|exit|terminat|quit) 0.3 Application shutdown  
+APP_READY (?i)(ready|listen|serving|available) 0.1 Application ready state
+APP_ERROR (?i)(error|exception|fail|panic|fatal|crash) 0.8 Application error (generic, low score)
+APP_WARNING (?i)(warn|warning|deprecat|notice) 0.3 Application warning
+APP_DEBUG (?i)(debug|trace|verbose) 0.1 Debug logging (normal)
+
+# Database applications (more specific patterns score higher)
+DB_CONNECTION (?i)database.*connect|db.*connect|sql.*connect 0.2 Database connection
+DB_DISCONNECT (?i)database.*disconnect|db.*disconnect|sql.*close 0.2 Database disconnection
+DB_ERROR (?i)database.*error|db.*error|sql.*error|deadlock 2.0 Database error
+DB_SLOW_QUERY (?i)slow.*query|query.*timeout|query.*[5-9][0-9]ms 1.0 Slow database query
+DB_CONNECTION_POOL (?i)connection.*pool|pool.*exhaust 1.5 Connection pool issues
+
+# Web application patterns
+WEB_REQUEST (?i)(GET|POST|PUT|DELETE|PATCH).*HTTP 0.1 HTTP request (normal)
+WEB_REQUEST_ERROR (?i)HTTP.*[45][0-9][0-9] 0.8 HTTP error response (common, low score)
+WEB_TIMEOUT (?i)request.*timeout|gateway.*timeout 1.5 Web request timeout
+WEB_RATE_LIMIT (?i)rate.*limit|too many requests 1.2 Rate limiting triggered
+SESSION_CREATE (?i)session.*create|login.*success 0.3 User session created
+SESSION_EXPIRE (?i)session.*expir|session.*timeout 0.5 User session expired
+
+# API and microservice patterns
+API_CALL (?i)api.*call|endpoint.*request 0.1 API call (normal)
+API_ERROR (?i)api.*error|endpoint.*error|service.*unavailable 2.0 API error
+API_LATENCY (?i)api.*latency.*[5-9][0-9][0-9]ms|slow.*api 1.5 High API latency
+MICROSERVICE_COMM (?i)service.*call|rpc.*call|grpc 0.2 Microservice communication
+CIRCUIT_BREAKER (?i)circuit.*breaker|fallback.*triggered 2.0 Circuit breaker activated
+
+# Authentication and authorization
+AUTH_LOGIN (?i)login.*success|authentication.*success 0.2 Successful login
+AUTH_LOGOUT (?i)logout|session.*end 0.2 User logout
+AUTH_FAIL (?i)login.*fail|authentication.*fail|invalid.*credentials 2.0 Login failure
+AUTH_LOCKOUT (?i)account.*locked|user.*disabled|brute.*force 4.0 Account lockout (security event)
+TOKEN_EXPIRED (?i)token.*expir|jwt.*expir|refresh.*token 0.8 Token expiration
+PERMISSION_DENIED (?i)permission.*denied|unauthorized|forbidden 1.5 Access denied
+
+# Background job and task processing
+JOB_START (?i)(job|task|worker).*start|processing.*start 0.3 Background job started
+JOB_COMPLETE (?i)(job|task|worker).*complete|processing.*done 0.2 Background job completed
+JOB_FAIL (?i)(job|task|worker).*fail|processing.*error 2.0 Background job failed
+JOB_TIMEOUT (?i)(job|task|worker).*timeout|processing.*timeout 1.8 Background job timeout
+QUEUE_SIZE (?i)queue.*size.*[5-9][0-9]|queue.*full 1.5 Large queue size
+
+# Cache and storage patterns
+CACHE_HIT (?i)cache.*hit 0.1 Cache hit (normal)
+CACHE_MISS (?i)cache.*miss 0.3 Cache miss
+CACHE_ERROR (?i)cache.*error|cache.*fail|cache.*timeout 1.5 Cache error
+CACHE_EVICTION (?i)cache.*evict|cache.*expir 0.5 Cache eviction
+STORAGE_READ (?i)storage.*read|file.*read|read.*operation 0.1 Storage read
+STORAGE_WRITE (?i)storage.*write|file.*write|write.*operation 0.2 Storage write
+STORAGE_ERROR (?i)storage.*error|file.*error|i/o.*error 2.0 Storage error
+
+# Message queue and event processing
+MESSAGE_PUBLISH (?i)message.*publish|event.*publish|queue.*send 0.2 Message published
+MESSAGE_CONSUME (?i)message.*consume|event.*process|queue.*receive 0.2 Message consumed  
+MESSAGE_ERROR (?i)message.*error|event.*error|queue.*error 2.0 Message processing error
+DEAD_LETTER (?i)dead.*letter|dlq|poison.*message 2.5 Dead letter queue
+EVENT_REPLAY (?i)event.*replay|message.*replay 1.0 Event replay
+
+# Business logic patterns
+BUSINESS_RULE_VIOLATION (?i)business.*rule|validation.*error|constraint.*violation 1.5 Business rule violation
+DATA_VALIDATION_ERROR (?i)validation.*fail|invalid.*data|schema.*error 1.2 Data validation error
+WORKFLOW_START (?i)workflow.*start|process.*start 0.3 Workflow started
+WORKFLOW_COMPLETE (?i)workflow.*complete|process.*complete 0.2 Workflow completed
+WORKFLOW_ERROR (?i)workflow.*error|process.*error|step.*fail 2.0 Workflow error
+
+# Integration patterns
+EXTERNAL_API_CALL (?i)external.*api|third.*party|upstream.*service 0.5 External API call
+EXTERNAL_API_ERROR (?i)external.*api.*error|third.*party.*error|upstream.*error 2.2 External API error
+INTEGRATION_TIMEOUT (?i)integration.*timeout|external.*timeout|upstream.*timeout 2.0 Integration timeout
+WEBHOOK_RECEIVED (?i)webhook.*received|callback.*received 0.5 Webhook received
+WEBHOOK_ERROR (?i)webhook.*error|callback.*error 1.8 Webhook error
+
+# Performance patterns
+HIGH_CPU_APP (?i)application.*cpu.*[8-9][0-9]% 2.0 High application CPU usage
+HIGH_MEMORY_APP (?i)application.*memory.*[8-9][0-9]% 2.2 High application memory usage
+GARBAGE_COLLECTION (?i)gc.*pause|garbage.*collect|memory.*cleanup 0.5 Garbage collection
+MEMORY_LEAK (?i)memory.*leak|heap.*grow|out.*of.*memory 3.5 Memory leak detected
+THREAD_POOL_EXHAUSTED (?i)thread.*pool.*full|worker.*exhausted 2.5 Thread pool exhaustion
+
+# Configuration and deployment
+CONFIG_RELOAD (?i)config.*reload|configuration.*refresh 0.8 Configuration reloaded
+CONFIG_ERROR (?i)config.*error|configuration.*invalid|settings.*error 2.5 Configuration error
+DEPLOYMENT_START (?i)deployment.*start|deploy.*begin|release.*start 1.0 Deployment started
+DEPLOYMENT_COMPLETE (?i)deployment.*complete|deploy.*success|release.*complete 0.8 Deployment completed
+DEPLOYMENT_ERROR (?i)deployment.*error|deploy.*fail|release.*error 3.0 Deployment error
+
+# Anomaly patterns for applications
+REPEATED_ERROR (?i)error.*(.{10,}).*\1.*\1 2.5 Repeated identical errors
+ERROR_SPIKE (?i)error.*count.*[1-9][0-9]+ 3.0 Error count spike
+UNUSUAL_USER_AGENT (?i)user.*agent.*(bot|crawler|scanner|exploit) 1.5 Unusual user agent
+SQL_INJECTION_ATTEMPT (?i)sql.*injection|union.*select|drop.*table 4.0 SQL injection attempt
+XSS_ATTEMPT (?i)script.*alert|javascript.*void|eval.*function 3.5 XSS attempt
+BRUTE_FORCE_API (?i)api.*attempt.*\b(\w+)\b.*\1.*\1 3.0 API brute force
+
+# Resource exhaustion
+FILE_DESCRIPTOR_LIMIT (?i)too many.*files|file.*descriptor.*limit 3.0 File descriptor limit
+CONNECTION_LIMIT (?i)connection.*limit|too many.*connection 2.8 Connection limit reached
+DISK_SPACE_LOW (?i)disk.*space.*low|storage.*full 2.5 Low disk space
+BANDWIDTH_LIMIT (?i)bandwidth.*limit|traffic.*quota 2.0 Bandwidth limit reached

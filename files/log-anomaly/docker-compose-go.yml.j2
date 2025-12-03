@@ -1,0 +1,101 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: log-anomaly-redis
+    restart: unless-stopped
+    user: "999:999"  # redis user
+    ports:
+      - "127.0.0.1:6379:6379"  # Only bind to localhost for security
+    volumes:
+      - {{ basedir }}/redis-data:/data
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 300 10
+      --save 60 10000
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  log-anomaly-detector:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    container_name: log-anomaly-detector
+    restart: unless-stopped
+    user: "1001:1001"  # media user
+    ports:
+      - "8086:8085"
+    volumes:
+      - {{ basedir }}/data:/app/data
+      - {{ basedir }}/patterns:/app/patterns:ro
+    environment:
+      - TZ=America/Los_Angeles
+      - LOKI_URL={{ loki_url | default('http://192.168.1.143:3100') }}
+      - CHECK_INTERVAL={{ check_interval | default('30') }}
+      - BATCH_SIZE={{ batch_size | default('1000') }}
+      - WEBHOOK_URL={{ webhook_url | default('http://192.168.1.143:8087/webhook/anomaly') }}
+      # Detection thresholds (raised for signal quality)
+      - FREQUENCY_SIGMA={{ frequency_sigma | default('4.0') }}
+      - RATE_CHANGE_THRESHOLD={{ rate_change_threshold | default('10.0') }}
+      - ENTROPY_THRESHOLD={{ entropy_threshold | default('6.5') }}
+      - LEVENSHTEIN_THRESHOLD={{ levenshtein_threshold | default('0.90') }}
+      - PATTERNS_DIR=/app/patterns
+      - DB_PATH=/app/data/anomaly_stats.db
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+      # Signal quality settings
+      - ALERT_COOLDOWN_MINUTES={{ alert_cooldown_minutes | default('60') }}
+      - MIN_SEVERITY={{ min_severity | default('high') }}
+      - MIN_PATTERN_SCORE={{ min_pattern_score | default('3.0') }}
+      - MIN_REPETITION_COUNT={{ min_repetition_count | default('20') }}
+      - SUPPRESSED_SERVICES={{ suppressed_services | default('blackbox-exporter,promtail,node-exporter') }}
+      - DASHBOARD_URL={{ dashboard_url | default('http://ocean.home/d/log-anomaly-detector/log-anomaly-detector-tier-1') }}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+

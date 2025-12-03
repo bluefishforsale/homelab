@@ -1,12 +1,16 @@
 # Development Setup
 
+Local development environment setup for the homelab Ansible repository.
+
+---
+
 ## Quick Start
 
 ```bash
-# One-time setup: Install all dependencies
+# One-time setup
 make setup
 
-# Add Python bin directory to your PATH
+# Add Python bin directory to PATH
 echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 
@@ -14,124 +18,252 @@ source ~/.zshrc
 make validate
 ```
 
+---
+
 ## Prerequisites
 
-- **macOS** with Homebrew installed
+- **macOS** with Homebrew
 - **Python 3** (comes with macOS)
-- **Homebrew**: Install from https://brew.sh
+- **Homebrew**: <https://brew.sh>
 
-## Setup Commands
+---
 
-### Complete Setup
-```bash
-make setup              # Install all dependencies (Homebrew + Python)
+## Repository Structure
+
+```text
+homelab/
+├── playbooks/
+│   ├── 00_site.yaml              # Complete infrastructure
+│   ├── 01_base_system.yaml       # Base system config
+│   ├── 02_core_infrastructure.yaml   # Core services
+│   ├── 03_ocean_services.yaml    # Ocean server services
+│   └── individual/               # Individual service playbooks
+│       ├── base/                 # Base system playbooks
+│       ├── infrastructure/       # Core infrastructure (docker, github runners)
+│       └── ocean/                # Ocean server services
+├── inventories/
+│   ├── production/hosts.ini      # Production inventory
+│   └── github_runners/hosts.ini  # GitHub runners inventory
+├── roles/                        # Ansible roles
+├── files/                        # Service configuration files
+├── vault/                        # Encrypted secrets (ansible-vault)
+└── docs/operations/              # Operations documentation
 ```
 
-### Individual Setup
-```bash
-make setup-brew         # Install Homebrew packages (Ansible)
-make setup-python       # Install Python packages from requirements.txt
-```
+---
 
-## Validation Commands
+## Make Targets
 
-### Run All Checks
-```bash
-make validate           # Run all validation checks
-```
+### Setup
 
-### Individual Checks
-```bash
-make validate-yaml      # Validate YAML syntax
-make validate-ansible   # Validate Ansible playbook syntax
-make validate-templates # Validate Jinja2 templates
-make security-scan      # Scan for hardcoded secrets
-make check-vault        # Verify vault files are encrypted
-```
+| Target | Description |
+|--------|-------------|
+| `make setup` | Install all dependencies (Homebrew + Python) |
+| `make setup-brew` | Install Homebrew packages (ansible) |
+| `make setup-python` | Install Python packages from requirements.txt |
 
-### Optional Linting
-```bash
-make lint-ansible       # Lint Ansible playbooks (requires ansible-lint)
-```
+### Validation
+
+| Target | Description |
+|--------|-------------|
+| `make validate` | Run all validation checks |
+| `make validate-yaml` | Validate YAML syntax |
+| `make validate-ansible` | Validate Ansible playbook syntax |
+| `make validate-templates` | Validate Jinja2 templates |
+| `make security-scan` | Scan for hardcoded secrets |
+| `make check-vault` | Verify vault files are encrypted |
+| `make lint-ansible` | Lint Ansible playbooks (optional) |
+
+### Utility
+
+| Target | Description |
+|--------|-------------|
+| `make clean` | Clean temporary files |
+| `make help` | Show all available targets |
+
+---
 
 ## Dependencies
 
 ### Homebrew Packages
-- `ansible` - Ansible automation tool
 
-### Python Packages (from requirements.txt)
-- `pyyaml>=6.0` - YAML parsing and validation
-- `jinja2>=3.1` - Jinja2 template validation
-- `ansible>=2.15` - Ansible for playbook execution
+- `ansible` - Automation tool
+
+### Python Packages (requirements.txt)
+
+- `pyyaml>=6.0` - YAML parsing
+- `jinja2>=3.1` - Template validation
+- `ansible>=2.15` - Playbook execution
+
+---
 
 ## PATH Configuration
-
-After installing Python packages, add the Python bin directory to your PATH:
 
 ```bash
 # For zsh (default on macOS)
 echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 
-# For bash
-echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.bash_profile
-source ~/.bash_profile
+# Check Python version if 3.13 doesn't match
+python3 --version
 ```
 
-## Ansible Vault Configuration
+---
 
-For playbooks that use encrypted vault files, you have two options:
+## Ansible Vault
 
-### Option 1: Use --ask-vault-pass flag (Recommended for local dev)
+### Option 1: Interactive prompt (recommended)
 
 ```bash
-ansible-playbook --ask-vault-pass playbooks/00_site.yaml
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/00_site.yaml --ask-vault-pass
 ```
 
-### Option 2: Set environment variable
+### Option 2: Environment variable
 
 ```bash
 export ANSIBLE_VAULT_PASSWORD="your-vault-password"
-ansible-playbook playbooks/00_site.yaml
+ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml
 ```
 
-Or add to your shell profile:
+### Vault file location
+
+Secrets stored in `vault/secrets.yaml` (encrypted).
 
 ```bash
-# For zsh
-echo 'export ANSIBLE_VAULT_PASSWORD="your-vault-password"' >> ~/.zshrc
-source ~/.zshrc
+# Edit vault
+ansible-vault edit vault/secrets.yaml
+
+# Encrypt new file
+ansible-vault encrypt vault/new-secrets.yaml
+
+# View encrypted file
+ansible-vault view vault/secrets.yaml
 ```
 
-**Note**: `make validate` commands run syntax checks only and don't require vault access.
+---
 
-**Note:** The Python version (3.13) may vary depending on your system. Check with:
+## Running Playbooks
+
+### Master playbooks
+
 ```bash
-python3 --version
+# Full infrastructure
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/00_site.yaml --ask-vault-pass
+
+# Base system only
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/01_base_system.yaml --ask-vault-pass
+
+# Ocean services only
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass
 ```
+
+### Individual service playbooks
+
+```bash
+# Deploy nginx
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/network/nginx_compose.yaml --ask-vault-pass
+
+# Deploy Plex
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
+```
+
+### Dry-run mode
+
+```bash
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/03_ocean_services.yaml --ask-vault-pass --check
+```
+
+---
+
+## CI/CD Workflows
+
+GitHub Actions workflows in `.github/workflows/`:
+
+### Automatic (on push/PR)
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| `ci-validate.yml` | Push/PR | YAML, Ansible, template validation |
+| `pr-test.yml` | PR opened | Test playbooks on ephemeral VM |
+| `pr-cleanup.yml` | PR closed | Destroy test VM |
+| `main-apply.yml` | Merge to main | Auto-deploy changed playbooks |
+
+### Manual (workflow_dispatch)
+
+| Workflow | Description |
+|----------|-------------|
+| `deploy-services.yml` | Deploy master playbooks |
+| `deploy-ocean-service.yml` | Deploy individual ocean services |
+| `deploy-critical-service.yml` | Deploy DNS/DHCP/Plex (approval required) |
+| `deploy-changed-services.yml` | Deploy all changed services |
+
+### Required secrets
+
+Configure in GitHub → Settings → Secrets:
+
+- `ANSIBLE_VAULT_PASSWORD` - Vault decryption password
+
+See `.github/workflows/README.md` for full documentation.
+
+---
+
+## Self-Hosted Runners
+
+CI/CD uses self-hosted GitHub Actions runners:
+
+```bash
+# Deploy runners
+ansible-playbook -i inventories/github_runners/hosts.ini \
+  playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
+```
+
+Runner labels: `self-hosted`, `homelab`, `ansible`, `ephemeral`, `docker`
+
+---
 
 ## Troubleshooting
 
 ### Permission Denied: ~/Library/Python
-If you get permission errors:
+
 ```bash
 sudo chown -R $USER ~/Library/Python
 ```
 
 ### Command Not Found: ansible
-Make sure the Python bin directory is in your PATH:
+
 ```bash
+# Check PATH includes Python bin
 echo $PATH | grep "Library/Python"
+
+# If not, add it
+echo 'export PATH="$HOME/Library/Python/3.13/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-If not found, add it as shown in the PATH Configuration section above.
-
 ### PyYAML Not Installed
-Run the setup:
+
 ```bash
 make setup-python
 ```
 
-## CI/CD
+### Vault Decryption Fails
 
-These same validation checks run automatically in GitHub Actions on every push. See `.github/workflows/ci-validate.yml` for details.
+```bash
+# Verify vault password
+ansible-vault view vault/secrets.yaml --ask-vault-pass
+```
+
+---
+
+## Validation Notes
+
+- `make validate` runs syntax checks only (no vault access required)
+- CI workflows use self-hosted runners with pre-mounted SSH keys
+- All vault files must be encrypted before committing

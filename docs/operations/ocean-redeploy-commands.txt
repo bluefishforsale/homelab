@@ -1,0 +1,177 @@
+#!/bin/bash
+# Ocean Server Redeployment Commands - Post Ubuntu 22.04 Upgrade
+# Execute these commands in order to restore all services
+
+# ==============================================================================
+# PHASE 0: Docker Installation (CRITICAL - Run First!)
+# ==============================================================================
+
+# Install Docker CE with Compose v2 plugin for Ubuntu 22.04
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/docker_ce.yaml -l ocean
+
+# ==============================================================================
+# PHASE 1: Base System & Infrastructure
+# ==============================================================================
+
+# Base system configuration
+ansible-playbook -i inventories/production/hosts.ini playbooks/01_base_system.yaml -l ocean
+
+# Node exporters (monitoring agents)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/node_exporter.yaml -l ocean
+
+# ==============================================================================
+# PHASE 2: Core Infrastructure Services
+# ==============================================================================
+
+# Nginx reverse proxy
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/nginx_compose.yaml
+
+# Cloudflare DDNS
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/cloudflare_ddns.yaml
+
+# Cloudflare tunnels
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/cloudflared.yaml
+
+# ==============================================================================
+# PHASE 3: Monitoring Stack
+# ==============================================================================
+
+# Prometheus, Alertmanager, Karma
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/prometheus.yaml
+
+# Grafana with MySQL
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/grafana_compose.yaml
+
+# UnPoller (UniFi metrics)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/unpoller.yaml
+
+# NVIDIA DCGM exporter (GPU monitoring)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/nvidia_dcgm.yaml
+
+# ==============================================================================
+# PHASE 4: Media Services
+# ==============================================================================
+
+# Plex Media Server + Meta Manager
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml
+
+# NZBGet (download client)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/nzbget.yaml
+
+# Prowlarr (indexer manager)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/prowlarr.yaml
+
+# Sonarr (TV shows)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/sonarr.yaml
+
+# Radarr (movies)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/radarr.yaml
+
+# Bazarr (subtitles)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/bazarr.yaml
+
+# Tautulli (Plex monitoring)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tautulli.yaml
+
+# Overseerr (media requests)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/overseerr.yaml
+
+# Tdarr (transcoding)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tdarr.yaml
+
+# Audible Downloader
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/audible.yaml
+
+# ==============================================================================
+# PHASE 5: AI/ML Services
+# ==============================================================================
+
+# Llama.cpp (GPU-accelerated LLM inference)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/llamacpp.yaml
+
+# Open WebUI (LLM web interface)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml
+
+# ComfyUI (AI image generation)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml
+
+# ==============================================================================
+# PHASE 6: Cloud/Web Services
+# ==============================================================================
+
+# NextCloud (file sharing with MariaDB + Redis)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml
+
+# TinaCMS (headless CMS)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml
+
+# WordPress (if deployed)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/wordpress.yaml
+
+# Home Assistant (if deployed)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/homeassistant_compose.yaml
+
+# Frigate NVR (if deployed)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/frigate.yaml
+
+
+# ==============================================================================
+# VERIFICATION COMMANDS
+# ==============================================================================
+
+# Check all systemd services status
+echo "=== Checking systemd service status ==="
+
+# Check docker containers
+echo "=== Checking Docker containers ==="
+ssh ocean "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+
+# Check docker compose services
+echo "=== Checking Docker Compose services ==="
+ssh ocean "cd /data01/services && for dir in */; do if [ -f \${dir}docker-compose.yml ]; then echo \"=== \$dir ===\"  && cd \$dir && docker compose ps && cd ..; fi; done"
+
+# ==============================================================================
+# QUICK DEPLOYMENT SCRIPT (run all phases sequentially)
+# ==============================================================================
+
+# Uncomment to run all phases at once:
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/docker_ce.yaml -l ocean && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/01_base_system.yaml -l ocean && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/node_exporter.yaml -l ocean && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/nginx_compose.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/cloudflare_ddns.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/cloudflared.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/prometheus.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/grafana_compose.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/unpoller.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/nvidia_dcgm.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/nzbget.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/prowlarr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/sonarr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/radarr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/bazarr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tautulli.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/overseerr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tdarr.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/llamacpp.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml
+
+# ==============================================================================
+# NOTES
+# ==============================================================================
+# CRITICAL UPDATES FOR UBUNTU 22.04:
+# - docker_ce playbook updated to use Ubuntu repository (was using Debian)
+# - docker-compose-plugin now installed for Docker Compose v2 support
+# - All service playbooks updated to use 'docker compose' v2 syntax
+# 
+# DEPLOYMENT:
+# - Phase 0 (docker_ce) MUST be run first to install Docker with v2 support
+# - Vault password will be required for encrypted variables
+# - Run from homelab repository root directory
+# - Estimated total deployment time: 30-45 minutes
+# - Services can be deployed individually or in phases
+# - All playbooks are idempotent - safe to re-run

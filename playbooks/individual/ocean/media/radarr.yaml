@@ -77,3 +77,4 @@
       ansible.builtin.systemd:
         name: radarr-exporter.service
         state: restarted
+        enabled: true

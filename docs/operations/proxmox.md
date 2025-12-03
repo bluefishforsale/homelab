@@ -1,364 +1,482 @@
-# 🏗️ Proxmox Operations Guide
+# Proxmox Operations Guide
 
-## Overview
+Comprehensive guide for Proxmox VE operations, maintenance, and homelab-specific setup.
 
-This guide covers day-to-day operations, maintenance, and advanced configuration for your Proxmox VE cluster.
+**Hardware Reference:**
 
-## 📋 Daily Operations
+- **node006** (192.168.1.106): 40 cores, 680GB RAM, 64TB ZFS (8x 12TB HDD), RTX 3090 24GB, bonded 10G
+- **node005** (192.168.1.105): 56 cores, 128GB RAM, 1TB SSD
 
-### Cluster Health Monitoring
+**VMs from inventory:**
+
+- ocean (192.168.1.143) - Media/AI server on node006
+- dns01 (192.168.1.2) - BIND9 DNS on node005
+- pihole (192.168.1.9) - DNS filtering on node005
+- gitlab (192.168.1.5) - GitLab on node005
+- gh-runner-01 (192.168.1.250) - GitHub runner on node005
+- metrics (192.168.1.30) - Prometheus/Grafana on node005
+
+---
+
+## Quick Reference
+
+### Daily Health Checks
+
 ```bash
-# Check cluster status
-pvecm status
-pvecm nodes
-
-# Check node health
-pveversion
-uptime
-df -h
-
-# Monitor resource usage
-pvesh get /cluster/resources
-pvesh get /nodes/{node}/status
+pvecm status && pvecm nodes     # Cluster status
+pveversion && uptime && df -h   # Node health
+pvesh get /cluster/resources    # Resource usage
+ceph -s                         # Ceph status (if enabled)
 ```
 
-### VM Management
+### VM/Container Commands
+
 ```bash
-# List all VMs
-qm list
+qm list                              # List VMs
+qm start|stop|shutdown|status {vmid} # VM control
+qm config {vmid}                     # View VM config
+qm migrate {vmid} {node} --online    # Live migration
 
-# Start/stop VMs
-qm start {vmid}
-qm stop {vmid}
-qm shutdown {vmid}  # Graceful shutdown
-
-# VM status and configuration
-qm status {vmid}
-qm config {vmid}
-
-# Live migration
-qm migrate {vmid} {target-node}
-qm migrate {vmid} {target-node} --online  # Live migration
+pct list                             # List containers
+pct start|stop|enter {ctid}          # Container control
 ```
 
-### Container Management
+### Backup/Restore
+
 ```bash
-# List containers
-pct list
-
-# Container operations
-pct start {ctid}
-pct stop {ctid}
-pct enter {ctid}  # Enter container console
-
-# Container configuration
-pct config {ctid}
-pct set {ctid} --memory 2048  # Modify container
+vzdump {vmid} --storage {storage} --mode snapshot   # Backup VM
+vzdump --all --storage {storage} --mode snapshot    # Backup all
+qmrestore {backup-file} {vmid} --storage {storage}  # Restore
+pvesm list {backup-storage}                         # List backups
 ```
 
-## 🔧 System Maintenance
+---
 
-### Package Management
+## Initial Setup
+
+### APT Repository Configuration (Ansible)
+
+Use the playbook to automate repo setup and subscription warning removal:
+
 ```bash
-# Update package lists
-apt update
+# Configure repos and remove subscription warning on all Proxmox nodes
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_repos.yaml
 
-# Upgrade Proxmox (be careful with major versions)
-apt list --upgradable
-apt upgrade
-
-# Check for Proxmox-specific updates
-pve-efiboot-tool refresh  # Update EFI boot entries
-update-grub              # Update GRUB configuration
+# Or target specific node
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_repos.yaml -l node006
 ```
 
-### Storage Management
+### Manual APT Configuration
+
+If not using Ansible:
+
 ```bash
-# List storage configurations
-pvesm status
+# Get GPG key
+wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg \
+  -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
 
-# Storage usage
-pvesm list {storage}
-df -h
+# Configure no-subscription repos
+cat << EOF > /etc/apt/sources.list
+deb http://ftp.debian.org/debian bookworm main contrib
+deb http://ftp.debian.org/debian bookworm-updates main contrib
+deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription
+deb http://security.debian.org/debian-security bookworm-security main contrib
+EOF
 
-# Clean up storage
-vzdump --clean 1  # Clean old backups (keep 1)
-qm disk-cleanup {vmid}  # Clean unused VM disks
+# Disable enterprise repo
+echo "# deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise" \
+  > /etc/apt/sources.list.d/pve-enterprise.list
+
+apt-get update
 ```
 
-### Backup Operations
+### Remove Subscription Warning (Manual)
+
 ```bash
-# Manual backup
-vzdump {vmid} --storage {backup-storage} --mode snapshot
-
-# Backup all VMs
-vzdump --all --storage {backup-storage} --mode snapshot
-
-# Restore from backup
-qmrestore {backup-file} {vmid} --storage {storage}
-
-# List backups
-pvesm list {backup-storage}
+sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" \
+  /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js && systemctl restart pveproxy.service
 ```
 
-## 🌐 Network Operations
+### Install QEMU Guest Agent (Ansible)
 
-### Bridge Management
 ```bash
-# List network interfaces
-ip link show
-brctl show
+# Install on all VMs
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/infrastructure/proxmox_qemu_agent.yaml
+```
 
-# Network configuration
-cat /etc/network/interfaces
+### Network Bonding (Dual 10GbE)
 
-# Apply network changes (be careful!)
+```bash
+cat << EOF > /etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+iface eno1 inet manual
+iface eno2 inet manual
+
+auto bond0
+iface bond0 inet manual
+      bond-slaves eno1 eno2
+      bond-miimon 100
+      bond-mode 802.3ad
+      bond-xmit-hash-policy Layer3+4
+
+auto vmbr0
+iface vmbr0 inet static
+        address  192.168.1.106/24
+        gateway  192.168.1.1
+        bridge-ports bond0
+        bridge-stp off
+        bridge-fd 0
+EOF
+
 ifreload -a
-
-# Test connectivity
-ping -c 4 192.168.1.1
+ping -c 2 192.168.1.1 && ping -c 2 1.1.1.1
 ```
 
-### VLAN Configuration
-```bash
-# Add VLAN to bridge
-echo "auto vmbr0.100
-iface vmbr0.100 inet manual" >> /etc/network/interfaces
+---
 
-# Configure VLAN bridge
-echo "auto vmbr100
-iface vmbr100 inet static
-    address 192.168.100.1/24
-    bridge-ports vmbr0.100
-    bridge-stp off
-    bridge-fd 0" >> /etc/network/interfaces
-```
+## GPU/PCI Passthrough
 
-### Firewall Management
-```bash
-# Cluster firewall status
-pvesh get /cluster/firewall/options
+### Enable IOMMU and VFIO
 
-# Node firewall status
-pvesh get /nodes/{node}/firewall/options
-
-# List firewall rules
-pvesh get /cluster/firewall/rules
-pvesh get /nodes/{node}/firewall/rules
-
-# VM-specific firewall
-pvesh get /nodes/{node}/qemu/{vmid}/firewall/rules
-```
-
-## 💾 Ceph Storage Operations
-
-### Cluster Health
-```bash
-# Overall cluster status
-ceph -s
-ceph health detail
-
-# Monitor cluster in real-time
-ceph -w
-
-# Check cluster usage
-ceph df
-rados df
-```
-
-### OSD Management
-```bash
-# List OSDs
-ceph osd tree
-ceph osd ls
-
-# OSD status
-ceph osd stat
-ceph osd dump
-
-# Manage OSDs
-ceph osd out {osd-id}    # Mark OSD out
-ceph osd in {osd-id}     # Mark OSD in
-ceph osd down {osd-id}   # Mark OSD down
-
-# Remove OSD (careful!)
-ceph osd out {osd-id}
-systemctl stop ceph-osd@{osd-id}
-ceph osd crush remove osd.{osd-id}
-ceph osd rm {osd-id}
-```
-
-### Pool Management
-```bash
-# List pools
-ceph osd lspools
-rados lspools
-
-# Pool information
-ceph osd pool get {pool-name} all
-ceph osd pool stats
-
-# Create pool
-ceph osd pool create {pool-name} {pg-num}
-
-# Set pool quotas
-ceph osd pool set-quota {pool-name} max_objects 1000
-ceph osd pool set-quota {pool-name} max_bytes 1TB
-```
-
-### RBD Operations
-```bash
-# List RBD images
-rbd ls {pool-name}
-rbd ls -l {pool-name}  # Detailed list
-
-# RBD image information
-rbd info {pool-name}/{image-name}
-
-# Create RBD snapshot
-rbd snap create {pool-name}/{image-name}@{snap-name}
-
-# List snapshots
-rbd snap ls {pool-name}/{image-name}
-
-# Clone from snapshot
-rbd clone {pool-name}/{image-name}@{snap-name} {pool-name}/{new-image}
-```
-
-## 🔧 Advanced Configuration
-
-### GPU Passthrough Setup
 ```bash
 # Enable IOMMU in GRUB
-echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"' >> /etc/default/grub
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet"/GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"/g' /etc/default/grub
 update-grub
 
 # Load VFIO modules
-echo 'vfio
+cat << EOF >> /etc/modules
+vfio
 vfio_iommu_type1
 vfio_pci
-vfio_virqfd' >> /etc/modules
+vfio_virqfd
+EOF
 
-# Blacklist GPU driver on host
-echo 'blacklist nouveau
-blacklist nvidia' >> /etc/modprobe.d/blacklist.conf
+# Optional: unsafe interrupts for certain hardware
+echo "options vfio_iommu_type1 allow_unsafe_interrupts=1" > /etc/modprobe.d/iommu_unsafe_interrupts.conf
+echo "options kvm ignore_msrs=1" > /etc/modprobe.d/kvm.conf
 
-# Bind GPU to VFIO
-lspci | grep NVIDIA  # Note the PCIe ID
-echo 'options vfio-pci ids=10de:1b06' >> /etc/modprobe.d/vfio.conf
+# Blacklist GPU drivers
+cat << EOF >> /etc/modprobe.d/blacklist.conf
+blacklist radeon
+blacklist nouveau
+blacklist nvidia
+EOF
 
-# Update initramfs
+# Additional driver blacklists (for SAS passthrough)
+echo "blacklist mpt3sas" > /etc/modprobe.d/blacklist-mpt3sas.conf
+```
+
+### Configure VFIO Device Binding
+
+```bash
+# Get PCI IDs
+lspci -nn | grep -E "NVIDIA|SAS|NVMe"
+
+# Configure VFIO (adjust IDs for your hardware)
+# RTX 3090: 10de:2204 (GPU) + 10de:1aef (Audio)
+# SAS2308: 1000:0087
+cat << EOF > /etc/modprobe.d/vfio.conf
+options vfio-pci ids=10de:2204,10de:1aef,1000:0087 disable_vga=1
+softdep mpt3sas pre: vfio-pci
+EOF
+
+# Apply changes
 update-initramfs -u
 reboot
 ```
 
-### PCI Passthrough Validation
+### Verify Passthrough
+
 ```bash
-# Check IOMMU groups
-find /sys/kernel/iommu_groups/ -type l | sort -V
-
-# Verify VFIO binding
-lspci -nnk | grep -A 3 NVIDIA
-
-# Check available devices for passthrough
-pvesh get /nodes/{node}/hardware/pci
+dmesg | grep -e DMAR -e IOMMU              # Check IOMMU enabled
+find /sys/kernel/iommu_groups/ -type l | sort -V  # Check IOMMU groups
+lspci -nnk | grep -A 3 "NVIDIA\|SAS"       # Verify vfio-pci driver
+ls -la /dev/vfio/                          # Check VFIO devices
+pvesh get /nodes/{node}/hardware/pci       # Available for passthrough
 ```
 
-### CPU Configuration
+---
+
+## Ceph Storage
+
+### Installation
+
 ```bash
-# Check CPU features
-cat /proc/cpuinfo | grep flags
+# Add Ceph repo
+cat << EOF > /etc/apt/sources.list.d/ceph.list
+deb http://download.proxmox.com/debian/ceph-reef bookworm no-subscription
+EOF
 
-# Enable CPU features for VMs
-qm set {vmid} --cpu host  # Pass through all CPU features
-qm set {vmid} --cpu kvm64,+aes,+avx,+avx2  # Specific features
-
-# NUMA configuration
-qm set {vmid} --numa 1  # Enable NUMA
-qm set {vmid} --sockets 2 --cores 4  # Multi-socket config
+# Install and initialize
+pveceph install --version reef --repository no-subscription
+pveceph init --network 192.168.1.0/24
+pveceph mon create
+pveceph mgr create
+ceph -s
 ```
 
-## 🚨 Troubleshooting
+### Single-Node CRUSH Map Fix
 
-### Common Issues
+For single-node setups, change failure domain from `host` to `osd`:
 
-#### VM Won't Start
 ```bash
-# Check VM configuration
-qm config {vmid}
+ceph osd getcrushmap -o current.crush
+crushtool -d current.crush -o current.txt
 
-# Check for locks
-qm unlock {vmid}
+# Edit current.txt: change "step chooseleaf firstn 0 type host" to "type osd"
+# rule replicated_rule { ... step chooseleaf firstn 0 type osd ... }
 
-# Check storage availability
-pvesm status
+crushtool -c current.txt -o new.crush
+ceph osd setcrushmap -i new.crush
+```
 
-# VM logs
+### Create OSDs with NVMe DB
+
+```bash
+# Write keyring
+ceph auth get client.bootstrap-osd > /etc/pve/priv/ceph.client.bootstrap-osd.keyring
+
+# Create 8 OSDs with shared NVMe for block.db
+ceph-volume lvm batch /dev/sd{a,b,c,d,e,f,g,h} --db-devices /dev/nvme0n1 --yes
+
+# Create pools
+ceph osd pool create replicated-data-pool-name 64
+ceph osd pool application enable replicated-data-pool-name rbd
+pvesm add rbd ceph-lvm -pool replicated-data-pool-name
+```
+
+### CephFS Setup
+
+```bash
+ceph osd pool create cephfs_metadata_pool 32
+ceph osd pool application enable cephfs_metadata_pool cephfs
+ceph fs new cephfs cephfs_metadata_pool replicated-data-pool-name
+
+# Reduce replication for single-node (optional)
+ceph osd pool set cephfs_data size 2
+ceph osd pool set cephfs_metadata size 2
+```
+
+### Ceph Operations
+
+```bash
+# Health and monitoring
+ceph -s && ceph health detail
+ceph -w                     # Real-time monitoring
+ceph df && rados df         # Usage
+
+# OSD management
+ceph osd tree
+ceph osd out|in|down {osd-id}
+
+# Pool management
+ceph osd lspools
+ceph osd pool get {pool} all
+ceph osd pool set-quota {pool} max_bytes 1TB
+
+# RBD operations
+rbd ls -l {pool}
+rbd info {pool}/{image}
+rbd snap create {pool}/{image}@{snap}
+```
+
+### Nuclear Option: Destroy All Ceph
+
+```bash
+pveceph mds destroy $HOSTNAME
+pveceph fs destroy cephfs
+pvesm remove rbd ceph-lvm -pool data
+for pool in data cephfs_data cephfs_metadata; do pveceph pool destroy $pool; done
+for osd in $(seq 0 7); do
+  for step in stop down out purge destroy; do ceph osd $step $osd --force; done
+done
+lvdisplay | grep ceph | grep Name | awk '{print $3}' | xargs lvremove --yes
+vgdisplay | grep 'VG Name' | grep ceph | awk '{print $3}' | xargs vgremove -y
+for disk in a b c d e f g h; do wipefs -a /dev/sd${disk}; done
+wipefs -a /dev/nvme0n1
+pveceph mgr destroy $HOSTNAME
+pveceph mon destroy $HOSTNAME
+pveceph stop && pveceph purge
+rm /etc/pve/ceph.conf
+find /var/lib/ceph/ -mindepth 2 -delete
+```
+
+---
+
+## VM Templates and Deployment
+
+### Create Debian 12 Template (VMID 9999)
+
+```bash
+wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
+curl https://github.com/bluefishforsale.keys > rsa.keys
+
+qm create 9999 --name debian-12-generic-amd64 --net0 virtio,bridge=vmbr0
+qm importdisk 9999 debian-12-generic-amd64.qcow2 local-lvm
+qm set 9999 --net0 virtio,bridge=vmbr0,queues=64
+qm set 9999 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9999-disk-0
+qm set 9999 --bios ovmf --machine q35
+qm set 9999 --efidisk0 local-lvm:0,format=raw,efitype=4m,pre-enrolled-keys=0,size=4M
+qm set 9999 --boot order=scsi0
+qm set 9999 --ide2 local-lvm:cloudinit
+qm set 9999 --serial0 socket --vga serial0
+qm set 9999 --sshkeys rsa.keys
+qm set 9999 --cores 2 --memory 4096
+qm set 9999 --agent enabled=1
+qm set 9999 --hotplug network,disk
+qm template 9999
+```
+
+### Homelab VMs
+
+#### dns01 (VMID 2000)
+
+```bash
+qm clone 9999 2000
+qm set 2000 --name dns01 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1 --nameserver=1.1.1.1 --onboot 1
+qm set 2000 --cores 1 --memory 1024
+qm resize 2000 scsi0 +8G
+qm start 2000
+```
+
+#### pihole (VMID 3000)
+
+```bash
+qm clone 9999 3000
+qm set 3000 --name pihole --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 3000 --cores 1 --memory 1024
+qm resize 3000 scsi0 +8G
+qm start 3000
+```
+
+#### gitlab (VMID 4000)
+
+```bash
+qm clone 9999 4000
+qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.5/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 4000 --cores 16 --memory 32768
+qm resize 4000 scsi0 +28G
+qm start 4000
+```
+
+#### ocean (VMID 5000) - Primary Media/AI Server
+
+```bash
+qm clone 9999 5000
+qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 5000 --cores 30 --memory 262144
+qm resize 5000 scsi0 +126G
+qm set 5000 --hostpci0=42:00,pcie=1,x-vga=1  # RTX 3090 GPU
+qm set 5000 --hostpci1=02:00,pcie=1          # SAS Controller
+qm start 5000
+```
+
+**Post-install ZFS import in ocean VM:**
+
+```bash
+sudo sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
+sudo apt update && sudo apt install -y zfsutils-linux
+sudo modprobe zfs && sudo zpool import -f data01
+zpool status data01
+```
+
+#### metrics (VMID 6000)
+
+```bash
+qm clone 9999 6000
+qm set 6000 --name metrics --ipconfig0 ip=192.168.1.30/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 6000 --cores 16 --memory 16384
+qm resize 6000 scsi0 +100G
+qm start 6000
+```
+
+#### Kubernetes Cluster (VMIDs 501-513)
+
+```bash
+x=5
+for y in 0 1; do
+  for z in 1 2 3; do
+    n="${x}${y}${z}"
+    qm clone 9999 ${n}
+    qm set ${n} --name kube${n} --ipconfig0 ip=$(host kube${n}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+    qm resize ${n} scsi0 +8G
+    qm set ${n} --cores 8 --memory 8192
+    [[ "$y" == "3" ]] && qm set ${n} --hostpci0=42:00,pcie=1  # GPU on kube*13
+    qm start ${n}
+  done
+done
+
+# Bulk operations
+for x in 5; do for y in 0 1; do for z in 1 2 3; do qm start "$x$y$z"; done; done; done   # Start all
+for x in 5; do for y in 0 1; do for z in 1 2 3; do qm stop "$x$y$z"; qm destroy "$x$y$z"; done; done; done  # Destroy all
+```
+
+---
+
+## Performance Tuning
+
+### VM Optimization
+
+```bash
+qm set {vmid} --cpu host,flags=+aes,+avx,+avx2           # CPU passthrough
+qm set {vmid} --scsi0 {storage}:vm-{vmid}-disk-0,cache=writeback,iothread=1,discard=on,ssd=1
+qm set {vmid} --net0 virtio,bridge=vmbr0
+qm set {vmid} --balloon 0                                 # Disable ballooning
+qm set {vmid} --numa 1                                    # Enable NUMA
+```
+
+### Ceph SSD Optimization
+
+```bash
+ceph tell osd.* injectargs '--osd_op_queue wpq'
+ceph tell osd.* injectargs '--osd_op_queue_cut_off high'
+```
+
+---
+
+## Troubleshooting
+
+### VM Issues
+
+```bash
+qm config {vmid}                    # Check config
+qm unlock {vmid}                    # Remove locks
+pvesm status                        # Check storage
 tail -f /var/log/syslog | grep {vmid}
 ```
 
-#### Network Issues
+### Network Issues
+
 ```bash
-# Check bridge status
-brctl show
-ip link show vmbr0
-
-# Reset network stack (last resort)
-systemctl restart networking
-
-# Check for dropped packets
-cat /proc/net/dev | grep vmbr0
+brctl show && ip link show vmbr0
+cat /proc/net/dev | grep vmbr0      # Check dropped packets
+systemctl restart networking        # Last resort
 ```
 
-#### Storage Issues
+### Ceph Issues
+
 ```bash
-# Check Ceph health
 ceph health detail
-
-# Check OSD status
 ceph osd tree
-
-# Fix common issues
-ceph osd scrub {osd-id}     # Manual scrub
-ceph pg deep-scrub {pg-id}  # Deep scrub specific PG
+ceph osd scrub {osd-id}
+ceph pg deep-scrub {pg-id}
 ```
 
-### Performance Optimization
+---
 
-#### VM Performance Tuning
+## Monitoring
+
+### Prometheus PVE Exporter
+
 ```bash
-# Enable VirtIO drivers
-qm set {vmid} --scsi0 local-lvm:vm-{vmid}-disk-0,cache=writeback,iothread=1
-qm set {vmid} --net0 virtio,bridge=vmbr0
-
-# CPU optimization
-qm set {vmid} --cpu host,flags=+aes,+avx,+avx2
-qm set {vmid} --vcpus 4  # Enable vCPU hotplug
-
-# Memory optimization
-qm set {vmid} --balloon 0  # Disable memory ballooning
-qm set {vmid} --shares 2000  # CPU shares for priority
-```
-
-#### Storage Performance
-```bash
-# Enable SSD optimizations for Ceph
-ceph tell osd.* injectargs '--osd_op_queue wpq'
-ceph tell osd.* injectargs '--osd_op_queue_cut_off high'
-
-# Tune VM disk settings
-qm set {vmid} --scsi0 local-lvm:vm-{vmid}-disk-0,discard=on,ssd=1
-```
-
-## 📊 Monitoring Integration
-
-### Prometheus Metrics
-```bash
-# Install PVE exporter
 wget https://github.com/prometheus-pve/prometheus-pve-exporter/releases/download/v3.0.0/pve_exporter-3.0.0.pve
 dpkg -i pve_exporter-3.0.0.pve
 
-# Configure exporter
 cat > /etc/pve-exporter/pve.yml << EOF
 default:
   user: monitoring@pve
@@ -366,113 +484,73 @@ default:
   verify_ssl: false
 EOF
 
-# Start exporter
 systemctl enable --now pve-exporter
 ```
 
-### Log Analysis
-```bash
-# Important log files
-tail -f /var/log/syslog          # System logs
-tail -f /var/log/pveproxy.log    # Web interface logs
-tail -f /var/log/ceph/ceph.log   # Ceph cluster logs
+### Log Files
 
-# Journal logs
-journalctl -u pvedaemon -f       # PVE daemon
-journalctl -u ceph-mon@$(hostname) -f  # Ceph monitor
+```bash
+tail -f /var/log/syslog              # System
+tail -f /var/log/pveproxy.log        # Web UI
+tail -f /var/log/ceph/ceph.log       # Ceph
+journalctl -u pvedaemon -f           # PVE daemon
 ```
 
-## 🔐 Security Operations
+---
+
+## Security
 
 ### User Management
+
 ```bash
-# List users
 pvesh get /access/users
-
-# Add user
 pvesh create /access/users --userid newuser@pve --password secretpass
-
-# User permissions
 pvesh set /access/acl --path /vms/{vmid} --users user@pve --roles PVEVMUser
-
-# API tokens
-pvesh create /access/users/{userid}/token/{tokenid} --expire 1577836800
+pvesh create /access/users/{userid}/token/{tokenid}
 ```
 
-### SSL Certificate Management
-```bash
-# Upload custom certificate
-pvesm upload {storage} {cert-file} --content vztmpl
+### SSL/ACME
 
-# Let's Encrypt (if using ACME)
+```bash
 pvenode acme account register default mail@example.com
 pvenode acme cert order --domains pve.example.com
 ```
 
-## 📅 Maintenance Schedule
+---
 
-### Daily Tasks
-- [ ] Check cluster health (`pvecm status`)
-- [ ] Monitor resource usage
-- [ ] Review backup status
-- [ ] Check for critical alerts
+## Emergency Procedures
 
-### Weekly Tasks
-- [ ] Update package lists (`apt update`)
-- [ ] Review storage usage
-- [ ] Clean old backups
-- [ ] Check Ceph health
-- [ ] Review security logs
+### Node Failure
 
-### Monthly Tasks
-- [ ] Apply security updates
-- [ ] Review and rotate certificates
-- [ ] Performance analysis
-- [ ] Capacity planning review
-- [ ] Backup/restore testing
-
-### Quarterly Tasks
-- [ ] Major version updates (plan carefully)
-- [ ] Hardware health check
-- [ ] Disaster recovery testing
-- [ ] Security audit
-- [ ] Documentation updates
-
-## 🆘 Emergency Procedures
-
-### Node Failure Recovery
 ```bash
-# Single node failure
-pvecm expected 1  # If losing quorum
-
-# Fence failed node
-pvecm add_node {new-node} # Add replacement
-pvecm delnode {failed-node} # Remove failed node
+pvecm expected 1                    # If losing quorum
+pvecm delnode {failed-node}
 ```
 
 ### Split-Brain Recovery
-```bash
-# Determine which node to keep
-pvecm expected 1
-pvecm node --force # Force node to be master
 
-# Rejoin other node
+```bash
+pvecm expected 1
 systemctl stop pve-cluster
 rm -rf /var/lib/pve-cluster/cfs_lock
 systemctl start pve-cluster
 ```
 
-### Ceph Recovery
-```bash
-# Emergency Ceph restart
-systemctl restart ceph.target
+### Ceph Emergency
 
-# Force cluster recovery (dangerous!)
-ceph osd set noout
-ceph osd set norebalance
+```bash
+ceph osd set noout && ceph osd set norebalance
 # Fix issues
-ceph osd unset noout
-ceph osd unset norebalance
+ceph osd unset noout && ceph osd unset norebalance
 ```
 
-This operations guide provides comprehensive coverage of daily Proxmox management tasks while following the idempotency principles from your homelab memories - all operations are designed to be repeatable and safe.
+---
+
+## Maintenance Schedule
+
+| Frequency | Tasks |
+|-----------|-------|
+| Daily | Cluster health, resource usage, backup status |
+| Weekly | `apt update`, storage review, clean old backups |
+| Monthly | Security updates, certificates, capacity planning |
+| Quarterly | Major updates, DR testing, security audit |

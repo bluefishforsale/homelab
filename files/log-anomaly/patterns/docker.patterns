@@ -1,0 +1,94 @@
+# Docker Log Patterns for Anomaly Detection  
+# Format: PATTERN_NAME GROK_PATTERN [anomaly_score] [description]
+
+# Docker daemon events
+DOCKER_START (?i)docker.*container.*start|containerd.*start 0.5 Container started
+DOCKER_STOP (?i)docker.*container.*stop|containerd.*stop 0.8 Container stopped
+DOCKER_RESTART (?i)docker.*container.*restart 1.5 Container restarted
+DOCKER_KILL (?i)docker.*container.*kill|container.*killed 2.5 Container killed
+DOCKER_DIED (?i)docker.*container.*died|container.*exited 2.0 Container died
+
+# Docker Compose events
+COMPOSE_UP (?i)docker-compose.*up|compose.*start 0.5 Docker Compose startup
+COMPOSE_DOWN (?i)docker-compose.*down|compose.*stop 0.8 Docker Compose shutdown
+COMPOSE_ERROR (?i)docker-compose.*error|compose.*fail 2.5 Docker Compose error
+
+# Container resource issues
+CONTAINER_OOM (?i)container.*killed.*oom|out of memory.*container 4.0 Container out of memory
+CONTAINER_CPU_THROTTLE (?i)container.*cpu.*throttl 2.0 Container CPU throttling  
+CONTAINER_DISK_FULL (?i)container.*no space|disk.*full.*container 3.5 Container disk space full
+MEMORY_LIMIT (?i)container.*memory.*limit|memory.*exceed 3.0 Container memory limit hit
+
+# Health check patterns
+HEALTH_CHECK_PASS (?i)health.*check.*pass|healthcheck.*ok 0.1 Health check passed
+HEALTH_CHECK_FAIL (?i)health.*check.*fail|healthcheck.*fail 2.5 Health check failed
+HEALTH_CHECK_TIMEOUT (?i)health.*check.*timeout|healthcheck.*timeout 2.0 Health check timeout
+
+# Image and registry operations
+IMAGE_PULL (?i)docker.*pull|pulling.*image 0.3 Docker image pull
+IMAGE_PUSH (?i)docker.*push|pushing.*image 0.5 Docker image push
+IMAGE_ERROR (?i)docker.*image.*error|pull.*error|push.*error 2.5 Docker image error
+REGISTRY_AUTH (?i)registry.*auth|docker.*login 0.8 Registry authentication
+
+# Network issues in containers
+CONTAINER_NETWORK_ERROR (?i)container.*network.*error|docker.*network.*fail 2.5 Container network error
+BRIDGE_ERROR (?i)docker.*bridge.*error|bridge.*fail 2.0 Docker bridge error
+PORT_BINDING_ERROR (?i)port.*bind.*error|port.*already.*use 3.0 Port binding error
+
+# Volume and storage
+VOLUME_MOUNT (?i)docker.*volume.*mount|volume.*attached 0.3 Volume mounted
+VOLUME_ERROR (?i)docker.*volume.*error|volume.*fail|mount.*fail 2.5 Volume error
+STORAGE_DRIVER_ERROR (?i)storage.*driver.*error|devicemapper.*error 3.0 Storage driver error
+
+# Container application logs (common patterns)
+APP_STARTUP (?i)(started|listening|ready).*port.*[0-9]+ 0.2 Application started on port
+APP_SHUTDOWN (?i)(stopping|shutdown|exit|sigterm) 0.5 Application shutdown
+APP_ERROR (?i)(error|exception|fail|panic|fatal) 0.8 Application error (generic, low score)
+APP_WARNING (?i)(warn|warning|deprecat) 0.3 Application warning
+
+# Security-related container events
+CONTAINER_PRIVILEGE (?i)container.*privilege|privileged.*container 1.5 Privileged container
+CONTAINER_ROOT (?i)container.*root.*user|running.*as.*root 1.0 Container running as root
+CONTAINER_ESCAPE (?i)container.*escape|breakout.*container 4.5 Container escape attempt
+SECURITY_OPT (?i)security.*opt|seccomp|apparmor.*container 0.5 Container security options
+
+# Resource monitoring
+HIGH_CPU_CONTAINER (?i)container.*cpu.*[8-9][0-9]%|cpu.*100% 2.0 High CPU usage in container
+HIGH_MEMORY_CONTAINER (?i)container.*memory.*[8-9][0-9]%|memory.*full 2.5 High memory usage in container
+CONTAINER_STATS (?i)container.*stats|resource.*usage 0.1 Container resource stats
+
+# Docker system events  
+DOCKER_DAEMON_START (?i)dockerd.*start|docker.*daemon.*start 0.8 Docker daemon started
+DOCKER_DAEMON_STOP (?i)dockerd.*stop|docker.*daemon.*stop 2.0 Docker daemon stopped
+DOCKER_SYSTEM_ERROR (?i)dockerd.*error|docker.*daemon.*error 3.0 Docker daemon error
+DOCKER_SYSTEM_WARN (?i)dockerd.*warn|docker.*daemon.*warn 1.5 Docker daemon warning
+
+# Registry and image security
+UNTRUSTED_IMAGE (?i)untrusted.*image|unsigned.*image 3.0 Untrusted image usage
+IMAGE_VULNERABILITY (?i)vulnerabilit.*image|cve.*container 2.5 Image vulnerability detected
+REGISTRY_ERROR (?i)registry.*error|docker.*registry.*fail 2.0 Registry connection error
+
+# Swarm and orchestration (if used)
+SWARM_NODE_JOIN (?i)swarm.*node.*join|node.*added 1.0 Swarm node joined
+SWARM_NODE_LEAVE (?i)swarm.*node.*leave|node.*removed 1.5 Swarm node left
+SWARM_SERVICE_ERROR (?i)swarm.*service.*error|service.*fail 2.5 Swarm service error
+
+# Container networking specifics  
+CONTAINER_DNS_ERROR (?i)container.*dns.*error|dns.*resolution.*fail 2.0 Container DNS error
+OVERLAY_NETWORK (?i)overlay.*network|network.*overlay 0.5 Overlay network activity
+INGRESS_ERROR (?i)ingress.*error|ingress.*fail 2.5 Ingress network error
+
+# Anomaly patterns for containers
+CONTAINER_RESTART_LOOP (?i)container.*restart.*(\w+).*\1.*\1 4.0 Container restart loop
+MULTIPLE_CONTAINER_FAILS (?i)container.*fail.*(\w+).*container.*fail 3.5 Multiple container failures
+UNUSUAL_CONTAINER_TIME (?i)container.*([01]?[0-9]|2[0-3]):([0-5][0-9]) 1.0 Container activity at unusual time
+
+# Performance anomalies
+SLOW_CONTAINER_START (?i)container.*start.*[3-9][0-9]s|start.*[1-9][0-9][0-9]s 2.0 Slow container startup
+CONTAINER_DEADLOCK (?i)container.*deadlock|deadlock.*container 3.5 Container deadlock
+RESOURCE_STARVATION (?i)container.*starv|resource.*unavailable 3.0 Container resource starvation
+
+# Specific service patterns (homelab services)
+MEDIA_SERVICE_ERROR (?i)(plex|sonarr|radarr|bazarr).*error 1.5 Media service error
+AI_SERVICE_ERROR (?i)(comfyui|llamacpp|open-webui).*error 1.8 AI service error  
+INFRA_SERVICE_ERROR (?i)(nginx|grafana|prometheus).*error 2.2 Infrastructure service error
