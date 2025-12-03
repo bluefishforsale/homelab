@@ -1,0 +1,110 @@
+# Media Stack Log Patterns for Anomaly Detection
+# Format: PATTERN_NAME GROK_PATTERN [anomaly_score] [description]
+
+# Plex Media Server patterns
+PLEX_START (?i)plex.*start|plex.*ready 0.5 Plex server started
+PLEX_TRANSCODING (?i)plex.*transcod|transcod.*start 0.3 Plex transcoding activity
+PLEX_TRANSCODE_ERROR (?i)plex.*transcod.*error|transcod.*fail 2.0 Plex transcoding error
+PLEX_LOGIN (?i)plex.*login|plex.*auth.*success 0.3 Plex user login
+PLEX_LOGIN_FAIL (?i)plex.*login.*fail|plex.*auth.*fail 1.5 Plex login failure
+PLEX_LIBRARY_SCAN (?i)plex.*scan|library.*refresh|metadata.*refresh 0.5 Plex library scan
+PLEX_DATABASE_ERROR (?i)plex.*database.*error|plex.*db.*error 2.5 Plex database error
+PLEX_PLUGIN_ERROR (?i)plex.*plugin.*error|plugin.*crash 2.0 Plex plugin error
+PLEX_REMOTE_ACCESS (?i)plex.*remote.*access|plex.*tunnel 0.8 Plex remote access
+PLEX_BANDWIDTH_LIMIT (?i)plex.*bandwidth|plex.*throttl 1.0 Plex bandwidth limiting
+
+# Sonarr (TV shows) patterns
+SONARR_EPISODE_GRAB (?i)sonarr.*grab|episode.*download.*start 0.5 Sonarr episode grabbed
+SONARR_EPISODE_IMPORT (?i)sonarr.*import|episode.*import.*complete 0.3 Sonarr episode imported
+SONARR_EPISODE_ERROR (?i)sonarr.*error|episode.*download.*fail 2.0 Sonarr episode error
+SONARR_QUALITY_UPGRADE (?i)sonarr.*upgrade|quality.*upgrade 0.8 Sonarr quality upgrade
+SONARR_SERIES_ADD (?i)sonarr.*series.*add|new.*series 0.5 Sonarr series added
+SONARR_INDEXER_ERROR (?i)sonarr.*indexer.*error|indexer.*fail 2.0 Sonarr indexer error
+SONARR_DISK_SPACE (?i)sonarr.*disk.*space|sonarr.*storage.*low 2.5 Sonarr disk space warning
+
+# Radarr (Movies) patterns  
+RADARR_MOVIE_GRAB (?i)radarr.*grab|movie.*download.*start 0.5 Radarr movie grabbed
+RADARR_MOVIE_IMPORT (?i)radarr.*import|movie.*import.*complete 0.3 Radarr movie imported
+RADARR_MOVIE_ERROR (?i)radarr.*error|movie.*download.*fail 2.0 Radarr movie error
+RADARR_QUALITY_UPGRADE (?i)radarr.*upgrade|movie.*quality.*upgrade 0.8 Radarr quality upgrade
+RADARR_MOVIE_ADD (?i)radarr.*movie.*add|new.*movie 0.5 Radarr movie added
+RADARR_INDEXER_ERROR (?i)radarr.*indexer.*error|indexer.*fail.*radarr 2.0 Radarr indexer error
+RADARR_DISK_SPACE (?i)radarr.*disk.*space|radarr.*storage.*low 2.5 Radarr disk space warning
+
+# Bazarr (Subtitles) patterns
+BAZARR_SUBTITLE_DOWNLOAD (?i)bazarr.*subtitle.*download|subtitle.*grab 0.3 Bazarr subtitle downloaded
+BAZARR_SUBTITLE_ERROR (?i)bazarr.*subtitle.*error|subtitle.*fail 1.5 Bazarr subtitle error
+BAZARR_PROVIDER_ERROR (?i)bazarr.*provider.*error|subtitle.*provider.*fail 2.0 Bazarr provider error
+BAZARR_UPGRADE (?i)bazarr.*upgrade|subtitle.*upgrade 0.5 Bazarr subtitle upgrade
+
+# NZBGet patterns
+NZBGET_DOWNLOAD_START (?i)nzbget.*download.*start|nzb.*start 0.5 NZBGet download started
+NZBGET_DOWNLOAD_COMPLETE (?i)nzbget.*download.*complete|nzb.*complete 0.3 NZBGet download completed
+NZBGET_DOWNLOAD_ERROR (?i)nzbget.*download.*error|nzb.*fail 2.0 NZBGet download error
+NZBGET_UNPACK (?i)nzbget.*unpack|extract.*start 0.3 NZBGet unpacking
+NZBGET_UNPACK_ERROR (?i)nzbget.*unpack.*error|extract.*fail 2.0 NZBGet unpack error
+NZBGET_SERVER_ERROR (?i)nzbget.*server.*error|news.*server.*fail 2.5 NZBGet server error
+NZBGET_DISK_SPACE (?i)nzbget.*disk.*space|nzbget.*storage.*full 2.8 NZBGet disk space issue
+NZBGET_REPAIR (?i)nzbget.*repair|par.*repair 0.8 NZBGet file repair
+
+# Prowlarr (Indexer management) patterns
+PROWLARR_INDEXER_TEST (?i)prowlarr.*test|indexer.*test 0.3 Prowlarr indexer test
+PROWLARR_INDEXER_ERROR (?i)prowlarr.*indexer.*error|indexer.*fail 2.0 Prowlarr indexer error
+PROWLARR_SEARCH (?i)prowlarr.*search|indexer.*search 0.2 Prowlarr search query
+PROWLARR_RATE_LIMIT (?i)prowlarr.*rate.*limit|indexer.*throttl 1.5 Prowlarr rate limiting
+PROWLARR_SYNC (?i)prowlarr.*sync|indexer.*sync 0.5 Prowlarr sync activity
+
+# Tautulli (Plex monitoring) patterns
+TAUTULLI_STREAM_START (?i)tautulli.*stream.*start|play.*start 0.2 Tautulli stream started
+TAUTULLI_STREAM_STOP (?i)tautulli.*stream.*stop|play.*stop 0.1 Tautulli stream stopped
+TAUTULLI_NOTIFICATION (?i)tautulli.*notification|alert.*sent 0.5 Tautulli notification sent
+TAUTULLI_DATABASE_ERROR (?i)tautulli.*database.*error|tautulli.*db.*error 2.0 Tautulli database error
+TAUTULLI_PLEX_CONNECTION (?i)tautulli.*plex.*connect|plex.*server.*connect 0.3 Tautulli-Plex connection
+
+# Overseerr (Request management) patterns  
+OVERSEERR_REQUEST (?i)overseerr.*request|media.*request 0.8 Overseerr media request
+OVERSEERR_APPROVAL (?i)overseerr.*approv|request.*approv 0.5 Overseerr request approved
+OVERSEERR_ERROR (?i)overseerr.*error|request.*error 2.0 Overseerr error
+OVERSEERR_NOTIFICATION (?i)overseerr.*notification|overseerr.*webhook 0.3 Overseerr notification
+
+# Tdarr (Transcoding) patterns
+TDARR_TRANSCODE_START (?i)tdarr.*transcod.*start|transcod.*begin 0.5 Tdarr transcoding started
+TDARR_TRANSCODE_COMPLETE (?i)tdarr.*transcod.*complete|transcod.*finish 0.3 Tdarr transcoding completed
+TDARR_TRANSCODE_ERROR (?i)tdarr.*transcod.*error|transcod.*fail 2.5 Tdarr transcoding error
+TDARR_WORKER_ERROR (?i)tdarr.*worker.*error|node.*error 2.0 Tdarr worker error
+TDARR_GPU_ERROR (?i)tdarr.*gpu.*error|hardware.*transcod.*error 3.0 Tdarr GPU error
+TDARR_DISK_SPACE (?i)tdarr.*disk.*space|transcod.*storage.*full 2.8 Tdarr disk space issue
+
+# Audible Downloader patterns
+AUDIBLE_DOWNLOAD_START (?i)audible.*download.*start|audiobook.*start 0.5 Audible download started
+AUDIBLE_DOWNLOAD_COMPLETE (?i)audible.*download.*complete|audiobook.*complete 0.3 Audible download completed
+AUDIBLE_DOWNLOAD_ERROR (?i)audible.*download.*error|audiobook.*error 2.0 Audible download error
+AUDIBLE_AUTH_ERROR (?i)audible.*auth.*error|audible.*login.*fail 2.5 Audible authentication error
+AUDIBLE_CONVERT_ERROR (?i)audible.*convert.*error|aax.*error 2.0 Audible conversion error
+
+# General media stack anomalies
+MEDIA_DISK_FULL (?i)(sonarr|radarr|plex|nzbget).*disk.*full|storage.*exhaust 4.0 Media disk full
+MEDIA_PERMISSION_ERROR (?i)(sonarr|radarr|plex|nzbget).*permission.*denied 2.5 Media permission error
+MEDIA_NETWORK_ERROR (?i)(sonarr|radarr|plex|nzbget).*network.*error|connection.*fail 2.0 Media network error
+MEDIA_CONFIG_ERROR (?i)(sonarr|radarr|plex|nzbget).*config.*error|settings.*invalid 2.5 Media config error
+
+# API communication between services
+MEDIA_API_ERROR (?i)(sonarr|radarr).*api.*error|webhook.*fail 2.0 Media API error
+MEDIA_WEBHOOK_SUCCESS (?i)(sonarr|radarr).*webhook.*success|notification.*sent 0.3 Media webhook success
+MEDIA_NOTIFICATION_ERROR (?i)(sonarr|radarr|overseerr).*notification.*error|alert.*fail 1.5 Media notification error
+
+# Performance patterns for media
+SLOW_LIBRARY_SCAN (?i)(plex|sonarr|radarr).*scan.*slow|scan.*[5-9][0-9]min 1.5 Slow media library scan
+HIGH_TRANSCODE_LOAD (?i)(plex|tdarr).*transcod.*[8-9][0-9]%|transcod.*overload 2.0 High transcode load
+MEDIA_MEMORY_HIGH (?i)(plex|sonarr|radarr).*memory.*[8-9][0-9]% 1.8 High memory usage media service
+
+# Security patterns for media services
+MEDIA_UNAUTHORIZED_ACCESS (?i)(plex|sonarr|radarr).*unauthorized|403.*forbidden 2.0 Unauthorized media access
+MEDIA_BRUTE_FORCE (?i)(plex|sonarr|radarr).*login.*attempt.*fail.*\b(\w+)\b.*\1 3.0 Media service brute force
+MEDIA_EXTERNAL_ACCESS (?i)(plex|sonarr|radarr).*external.*access|remote.*login 1.0 External media access
+
+# Content and quality patterns
+DUPLICATE_CONTENT (?i)(sonarr|radarr).*duplicate|already.*exist 0.8 Duplicate content detection
+QUALITY_MISMATCH (?i)(sonarr|radarr).*quality.*mismatch|wrong.*quality 1.0 Quality mismatch
+MISSING_CONTENT (?i)(sonarr|radarr|plex).*missing|not.*found 1.2 Missing content
+CORRUPTED_FILE (?i)(sonarr|radarr|nzbget).*corrupt|checksum.*fail 2.0 Corrupted media file

@@ -4,6 +4,62 @@
 
 This guide covers management, monitoring, and maintenance of Dell PowerEdge servers in your homelab environment.
 
+## 🖥️ Hardware Inventory
+
+### Node006 - Dell PowerEdge R720 (Primary Server)
+
+| Component | Specification |
+|-----------|---------------|
+| **Hostname** | node006.home |
+| **Model** | Dell PowerEdge R720 |
+| **CPU** | 40 cores (2x Intel Xeon E5-2670 v2) |
+| **RAM** | 680 GB DDR3 ECC |
+| **Storage** | 64 TB ZFS RAIDZ2 |
+| **GPU** | NVIDIA RTX 3090 24GB |
+| **Hypervisor** | Proxmox VE |
+| **Network** | 192.168.1.106 (iDRAC), 192.168.1.x (management) |
+
+**Primary Workloads:**
+- **ocean VM** (192.168.1.143): Main service host for media stack, AI/ML services, monitoring
+- GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, ComfyUIm log-ml)
+- 64TB storage pool for media, backups, and service data
+
+### Node005 - Dell PowerEdge R620 (Infrastructure Server)
+
+| Component | Specification |
+|-----------|---------------|
+| **Hostname** | node005.home |
+| **Model** | Dell PowerEdge R620 |
+| **CPU** | 56 cores (2x Intel Xeon E5-2697 v2) |
+| **RAM** | 128 GB DDR3 ECC |
+| **Boot Disk** | 64 GB SSD |
+| **VM Storage** | 256 GB SSD + 1 TB SSD (vm-boot-lvm-thin) |
+| **GPU** | None |
+| **Hypervisor** | Proxmox VE |
+| **Network** | 192.168.1.x (management) |
+
+**Primary Workloads:**
+- **dns01**: BIND9 DNS server
+- **pihole**: DNS filtering and ad blocking
+- **GitHub Runner VMs**: CI/CD automation
+- **Kubernetes cluster nodes**: Container orchestration
+
+### Network Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    192.168.1.0/24 Network                   │
+├─────────────────────────────────────────────────────────────┤
+│  Node006 (R720)              │  Node005 (R620)              │
+│  ├─ iDRAC: 192.168.1.16      │  ├─ iDRAC: 192.168.1.15      |
+│  ├─ host: 192.168.1.106      │  ├─ host: 192.168.1.105      |
+│      ├─ ocean 192.168.1.143  │     ├─ dns01: 192.168.1.2    │
+│                              │     ├─ pihole: 192.168.1.9   │
+│                              │     └─ runners: 192.168.1.20 │
+│                              │                              |
+└─────────────────────────────────────────────────────────────┘
+```
+
 ## 📋 Hardware Monitoring
 
 ### iDRAC (Integrated Dell Remote Access Controller)

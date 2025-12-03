@@ -64,3 +64,4 @@
     ansible.builtin.systemd:
       name: bazarr.service
       state: restarted
+      enabled: true

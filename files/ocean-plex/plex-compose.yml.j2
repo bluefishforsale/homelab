@@ -13,11 +13,15 @@ services:
       PLEX_UID: "{{ uid }}"
       PLEX_GID: "{{ uid }}"
       NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      NVIDIA_DRIVER_CAPABILITIES: all
+      LD_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/nvidia/current:/usr/lib/plexmediaserver/lib
     devices:
 {% for dev in devices %}
       - {{ dev }}:{{ dev }}
 {% endfor %}
+      - /dev/dri:/dev/dri
+    group_add:
+      - "104"  # render group for DRI device access
     ports:
 {% for port in plex_ports_tcp %}
       - "{{ port }}:{{ port }}/tcp"
@@ -36,11 +40,6 @@ services:
       - {{ data }}:/data01
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, video, utility, compute]
         limits:
           cpus: '16'
           memory: 16G
@@ -67,12 +66,16 @@ services:
     hostname: {{ exporter_service }}
     restart: always
     environment:
-      PLEX_SERVER: http://plex:32400
-      PLEX_TOKEN: "{{ plex_token }}"
+      PLEX_ADDR: http://plex:32400
+      PLEX_TOKEN: "{{ media_services.plex.api_key }}"
+      PLEX_TIMEOUT: "300"
+      PLEX_RETRIES_COUNT: "3"
+      PLEX_SSL_VERIFY: "false"
     ports:
       - "{{ exporter_port }}:{{ exporter_port }}"
     depends_on:
-      - plex
+      plex:
+        condition: service_healthy
     deploy:
       resources:
         limits:

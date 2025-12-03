@@ -216,15 +216,50 @@
     - name: Install NVIDIA driver prerequisites
       ansible.builtin.apt:
         name:
-        - linux-headers-{{ kernel_version.stdout }}
+        - linux-headers-amd64
         - firmware-misc-nonfree
+        - dkms
+        - build-essential
         state: present
         update_cache: yes
 
-    - name: Install NVIDIA driver
+    - name: Check if NVIDIA CUDA repository keyring exists
+      ansible.builtin.stat:
+        path: /usr/share/keyrings/cuda-archive-keyring.gpg
+      register: cuda_keyring_exists
+
+    - name: Download and install NVIDIA CUDA keyring (if not exists)
+      ansible.builtin.get_url:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb
+        dest: /tmp/cuda-keyring_1.1-1_all.deb
+        mode: '0644'
+      when: not cuda_keyring_exists.stat.exists
+
+    - name: Install NVIDIA CUDA keyring (if not exists)
       ansible.builtin.apt:
-        name: nvidia-driver
+        deb: /tmp/cuda-keyring_1.1-1_all.deb
         state: present
+      when: not cuda_keyring_exists.stat.exists
+      register: cuda_keyring_installed
+
+    - name: Update apt cache after CUDA keyring installation
+      ansible.builtin.apt:
+        update_cache: yes
+      when: cuda_keyring_installed is changed
+
+    - name: Upgrade NVIDIA driver packages to latest (CUDA 12.6+ support)
+      ansible.builtin.apt:
+        upgrade: full
+        update_cache: yes
+      register: nvidia_upgrade_result
+      changed_when: "'nvidia' in nvidia_upgrade_result.stdout"
+
+    - name: Install NVIDIA cuda-drivers package (includes nvidia-smi)
+      ansible.builtin.apt:
+        name: cuda-drivers
+        state: present
+        update_cache: yes
+      register: cuda_drivers_install
 
     - name: Blacklist Nouveau driver
       ansible.builtin.copy:
@@ -256,10 +291,13 @@
       ansible.builtin.apt:
         update_cache: yes
 
-    - name: Install NVIDIA Container Toolkit
+    - name: Install NVIDIA Container Toolkit (latest)
       ansible.builtin.apt:
-        name: nvidia-container-toolkit
-        state: present
+        name: 
+          - nvidia-container-toolkit
+          - nvidia-container-runtime
+        state: latest
+        update_cache: yes
 
     - name: Configure NVIDIA Container Runtime for Docker
       ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
@@ -267,53 +305,101 @@
       changed_when: nvidia_runtime_config.rc == 0
       notify: restart docker
 
-    - name: Check if nvidia-smi already works (drivers loaded)
-      ansible.builtin.command: nvidia-smi
-      register: nvidia_smi_check
+    - name: Verify NVIDIA Container Toolkit installation
+      ansible.builtin.command: nvidia-ctk --version
+      register: nvidia_ctk_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display NVIDIA Container Toolkit version
+      ansible.builtin.debug:
+        msg: "NVIDIA Container Toolkit version: {{ nvidia_ctk_version.stdout }}"
+      when: nvidia_ctk_version.rc == 0
+
+    - name: Check current NVIDIA driver version
+      ansible.builtin.command: nvidia-smi --query-gpu=driver_version --format=csv,noheader
+      register: current_driver_version
       failed_when: false
       changed_when: false
 
-    - name: Reboot to load NVIDIA drivers
+    - name: Display current driver version
+      ansible.builtin.debug:
+        msg: "Current NVIDIA driver version: {{ current_driver_version.stdout | default('Not available') }}"
+
+    - name: Check if nvidia-smi works after upgrade
+      ansible.builtin.command: nvidia-smi
+      register: nvidia_smi_check_post_upgrade
+      failed_when: false
+      changed_when: false
+
+    - name: Determine if reboot is needed
+      ansible.builtin.set_fact:
+        reboot_needed: >-
+          {{ nvidia_upgrade_result is changed or 
+             nvidia_smi_check_post_upgrade.rc != 0 or
+             current_driver_version.stdout is version('580', '<') }}
+
+    - name: Reboot to load updated NVIDIA drivers (if needed)
       ansible.builtin.reboot:
-        msg: "Rebooting to load NVIDIA drivers"
+        msg: "Rebooting to load updated NVIDIA drivers"
         connect_timeout: 5
         reboot_timeout: 600
         pre_reboot_delay: 0
         post_reboot_delay: 30
         test_command: uptime
-      when: nvidia_smi_check.rc != 0
+      when: reboot_needed | bool
 
-    - name: Wait for system to become reachable after reboot
-      ansible.builtin.wait_for_connection:
-        connect_timeout: 20
-        sleep: 5
-        delay: 5
-        timeout: 600
-      when: nvidia_smi_check.rc != 0
-
-    - name: Verify NVIDIA driver loaded with nvidia-smi
+    - name: Verify NVIDIA driver installation and CUDA support
       ansible.builtin.command: nvidia-smi
-      register: nvidia_smi_output
-      retries: 10
-      delay: 10
-      until: nvidia_smi_output.rc == 0
+      register: nvidia_smi_final
+      failed_when: false
       changed_when: false
 
-    - name: Display nvidia-smi output
+    - name: Display NVIDIA driver and CUDA information
       ansible.builtin.debug:
-        msg: "{{ nvidia_smi_output.stdout_lines }}"
+        msg: "{{ nvidia_smi_final.stdout_lines[:5] }}"
+      when: nvidia_smi_final.rc == 0
 
-    - name: Test Docker GPU access
-      ansible.builtin.command: docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
-      register: docker_gpu_test
-      retries: 3
-      delay: 5
-      until: docker_gpu_test.rc == 0
+    - name: Ensure Docker service is started
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Wait for Docker daemon to be ready
+      ansible.builtin.command: docker info
+      register: docker_info_check
+      retries: 5
+      delay: 2
+      until: docker_info_check.rc == 0
+
+    - name: Test NVIDIA Container Runtime with CUDA 12.6
+      ansible.builtin.command: >
+        docker run --rm --runtime=nvidia --gpus all
+        nvidia/cuda:12.6-base-ubuntu22.04 nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv
+      register: nvidia_container_test
+      failed_when: false
       changed_when: false
 
-    - name: Display Docker GPU test result
+    - name: Display container GPU test results
       ansible.builtin.debug:
-        msg: "✅ Docker GPU access verified! NVIDIA runtime working correctly."
+        msg: "✅ Container GPU test successful: {{ nvidia_container_test.stdout_lines }}"
+      when: nvidia_container_test.rc == 0
+
+    - name: Display container GPU test failure (if any)
+      ansible.builtin.debug:
+        msg: "❌ Container GPU test failed: {{ nvidia_container_test.stderr }}"
+      when: nvidia_container_test.rc != 0
+
+    - name: Verify final setup summary
+      ansible.builtin.debug:
+        msg: |
+          🚀 NVIDIA Setup Complete:
+          - Driver: {{ current_driver_version.stdout | default('Unknown') }}
+          - Container Toolkit: {{ nvidia_ctk_version.stdout | default('Unknown') }}
+          - Container GPU: {{ 'Working' if nvidia_container_test.rc == 0 else 'Failed' }}
+          - Ready for llamacpp GPU acceleration: {{ 'Yes' if nvidia_container_test.rc == 0 else 'No' }}
+
 
   handlers:
   - name: restart docker

@@ -1,167 +1,177 @@
-# llama.cpp API Server Deployment
+# llama.cpp API Server
 
-This deployment provides a GPU-accelerated llama.cpp server with API endpoints for model inference.
+GPU-accelerated LLM inference server with OpenAI-compatible API.
 
-## Features
+---
 
-- **GPU Support**: Full Nvidia P2000 GPU acceleration using CUDA
-- **API Server**: REST API endpoints for completions and embeddings
-- **Docker Compose**: Robust container orchestration with health checks
-- **Systemd Integration**: System service management with auto-restart
-- **Security**: Restricted permissions and sandboxed execution
-- **Persistence**: Models stored in `/data01/services/llamacpp/models`
+## Quick Reference
 
-## Directory Structure
+| Setting | Value |
+|---------|-------|
+| Image | ghcr.io/ggerganov/llama.cpp:server-cuda |
+| Port | 8080 |
+| GPU | RTX 3090 (CUDA) |
+| Default Model | Qwen3-14B-Q4_K_M.gguf |
+| API Key | `llamacpp-homelab-key` |
 
-```
-/data01/services/llamacpp/
-├── docker-compose.yml    # Generated from template
-├── .env                 # Environment variables
-├── models/              # Model storage directory
-├── config/              # Configuration files
-└── logs/                # Application logs
-```
-
-## API Endpoints
-
-Once deployed, the server exposes these endpoints on port 8080:
-
-- `GET /health` - Health check
-- `POST /completion` - Text completion
-- `POST /v1/chat/completions` - Chat completions (OpenAI-compatible)
-- `POST /embedding` - Generate embeddings
-- `GET /v1/models` - List loaded models
+---
 
 ## Deployment
 
-Run the playbook to deploy:
-
 ```bash
-ansible-playbook -i inventory.ini playbook_ocean_llamacpp.yaml
+# Deploy with automatic model download (requires vault for HF token)
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/ai/llamacpp.yaml --ask-vault-pass
+
+# Skip model downloads
+ansible-playbook -i inventories/production/hosts.ini \
+  playbooks/individual/ocean/ai/llamacpp.yaml --ask-vault-pass --skip-tags models
 ```
+
+Models are automatically downloaded from HuggingFace based on `vars/vars_llamacpp_models.yaml`.
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml.j2` | Container with GPU config |
+| `llamacpp.service.j2` | Systemd service |
+| `llamacpp.env.j2` | Environment variables |
+
+---
+
+## Directory Structure
+
+```text
+/data01/services/llamacpp/
+├── docker-compose.yml
+├── .env
+├── models/              # GGUF model files
+├── config/
+└── logs/
+```
+
+---
+
+## Default Configuration (RTX 3090 Optimized)
+
+```yaml
+model: Qwen3-14B-Q4_K_M.gguf
+n-gpu-layers: 41
+ctx-size: 40960
+parallel: 1
+batch-size: 2048
+ubatch-size: 512
+flash-attn: enabled
+```
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/v1/models` | GET | List loaded models |
+| `/v1/chat/completions` | POST | Chat completions (OpenAI-compatible) |
+| `/completion` | POST | Text completion |
+| `/embedding` | POST | Generate embeddings |
+
+**Authentication**: Include `Authorization: Bearer llamacpp-homelab-key` header.
+
+---
 
 ## Service Management
 
 ```bash
-# Check service status
-sudo systemctl status llamacpp
+# Status
+systemctl status llamacpp
 
-# Start/stop service
-sudo systemctl start llamacpp
-sudo systemctl stop llamacpp
+# Restart
+systemctl restart llamacpp
 
-# View logs
-sudo journalctl -u llamacpp -f
+# Logs
+journalctl -u llamacpp -f
+docker logs -f llamacpp
 ```
 
-## Model Management
+---
 
-### Download a Model
-
-Models should be in GGUF format. Download to the models directory:
+## Testing
 
 ```bash
-# Example: Download Llama 3.1 8B model (4-bit quantized)
-cd /data01/services/llamacpp/models
-wget https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+# Health check
+curl http://localhost:8080/health
 
-# Or download Phi-3.5 Mini (smaller model for testing)
-wget https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf
-```
+# List models
+curl -H "Authorization: Bearer llamacpp-homelab-key" \
+  http://localhost:8080/v1/models
 
-### Load a Model
-
-Once downloaded, load the model via API:
-
-```bash
-# Load Llama 3.1 8B model
-curl -X POST http://localhost:8080/v1/models \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-  }'
-
-# Or load Phi-3.5 Mini
-curl -X POST http://localhost:8080/v1/models \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "/models/Phi-3.5-mini-instruct-Q4_K_M.gguf"
-  }'
-```
-
-### Test the Model
-
-Once a model is loaded, test it with a completion:
-
-```bash
-# Test chat completion
+# Chat completion
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer llamacpp-homelab-key" \
   -d '{
-    "messages": [
-      {"role": "user", "content": "What is the capital of France?"}
-    ],
-    "max_tokens": 100,
-    "temperature": 0.7
-  }'
-
-# Test simple completion
-curl -X POST http://localhost:8080/completion \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "The capital of France is",
-    "n_predict": 10
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 100
   }'
 ```
 
-### Check Model Status
-
-```bash
-# List currently loaded models
-curl http://localhost:8080/v1/models
-
-# Check server health
-curl http://localhost:8080/health
-```
+---
 
 ## Troubleshooting
 
 ### Check GPU Access
-```bash
-# Verify GPU is available in container
-docker exec llamacpp nvidia-smi
 
-# Check CUDA availability
-docker exec llamacpp nvidia-ml-py --query-gpu=name,memory.total,memory.used --format=csv
+```bash
+docker exec llamacpp nvidia-smi
 ```
 
-### View Container Logs
-```bash
-# Follow container logs
-docker logs -f llamacpp
+### View Logs
 
-# Check docker-compose logs
-cd /data01/services/llamacpp
-docker-compose logs -f
+```bash
+docker logs -f llamacpp
 ```
 
 ### Common Issues
 
-1. **GPU not detected**: Ensure nvidia-docker2 is installed and docker daemon restarted
-2. **Model loading fails**: Check model file permissions and path
-3. **Out of memory**: Reduce context size or use smaller model quantization
-4. **API timeouts**: Increase timeout values in environment file
+- **GPU not detected**: Ensure NVIDIA Container Toolkit installed
+- **Out of memory**: Reduce `ctx-size` or use smaller quantization
+- **Model loading fails**: Check model permissions and path
+
+---
+
+## Model Management
+
+Models defined in `vars/vars_llamacpp_models.yaml`. Playbook downloads priority 1-2 models automatically.
+
+### Manual Model Download
+
+```bash
+cd /data01/services/llamacpp/models
+# Public models
+wget https://huggingface.co/Qwen/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf
+
+# Authenticated models (need HF token)
+curl -H "Authorization: Bearer YOUR_HF_TOKEN" \
+  -L -o model.gguf \
+  "https://huggingface.co/repo/resolve/main/model.gguf"
+```
+
+---
 
 ## Performance Tuning
 
-Edit `/data01/services/llamacpp/.env` to adjust performance parameters:
+Environment variables in `.env`:
 
-- `LLAMA_ARG_N_THREADS`: CPU threads to use
-- `LLAMA_ARG_N_PARALLEL`: Parallel sequences
-- `LLAMA_ARG_BATCH_SIZE`: Batch size for processing
-- `LLAMA_ARG_CTX_SIZE`: Context window size
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLAMA_ARG_CTX_SIZE` | 4096 | Context window |
+| `LLAMA_ARG_N_GPU_LAYERS` | -1 | GPU layers (-1 = all) |
+| `LLAMA_ARG_N_THREADS` | 8 | CPU threads |
+| `LLAMA_ARG_BATCH_SIZE` | 512 | Batch size |
+| `LLAMA_ARG_FLASH_ATTN` | 1 | Flash attention |
 
-Restart service after changes:
-```bash
-sudo systemctl restart llamacpp
-```
+**Note**: Command-line args in docker-compose.yml override .env for loaded model.

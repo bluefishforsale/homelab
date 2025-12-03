@@ -1,4 +1,24 @@
 ---
+# Plex Media Server and companion services deployment
+# 
+# Available tags:
+#   --tags config           Deploy only config files
+#   --tags service          Deploy only systemd service definitions
+#   --tags setup            Create only directories
+#   --tags plex             Deploy only plex-related tasks
+#   --tags meta-manager     Deploy only meta-manager tasks
+#   --skip-tags restart     Prevent service restarts (use with --tags config)
+#
+# Usage examples:
+#   Deploy configs without restarting services:
+#     ansible-playbook playbooks/individual/ocean/media/plex.yaml --tags config --skip-tags restart
+#   
+#   Update only Plex configs (no meta-manager):
+#     ansible-playbook playbooks/individual/ocean/media/plex.yaml --tags plex,config --skip-tags restart
+#   
+#   Full deployment (default):
+#     ansible-playbook playbooks/individual/ocean/media/plex.yaml
+#
 - name: Plex and companion docker systemd services
   hosts: ocean
   become: true
@@ -50,6 +70,7 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
+    tags: [always, setup, plex]
 
   - name: Ensure subdirs exist
     ansible.builtin.file:
@@ -61,17 +82,25 @@
     with_items:
     - "Profiles"
     - "config/Library/Application Support/Plex Media Server"
+    tags: [always, setup, plex]
+
+  - name: Remove old lowercase preferences file if it exists
+    ansible.builtin.file:
+      path: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      state: absent
+    tags: [config, plex]
 
   - name: Create preferences file
     ansible.builtin.template:
       src: "{{ files }}/config/preferences.xml"
-      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
+      dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/Preferences.xml"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
     notify:
     - Reload systemd daemon
     - Restart plex service
+    tags: [config, plex]
 
   - name: Copy all files from Profiles directory
     ansible.builtin.copy:
@@ -86,6 +115,7 @@
     notify:
     - Reload systemd daemon
     - Restart plex service
+    tags: [config, plex]
 
   - name: Create plex docker-compose files
     ansible.builtin.template:
@@ -100,6 +130,7 @@
     notify:
     - Reload systemd daemon
     - Restart plex service
+    tags: [config, plex]
 
   - name: Create plex docker-compose systemd service
     ansible.builtin.template:
@@ -109,6 +140,7 @@
     notify:
     - Reload systemd daemon
     - Restart plex service
+    tags: [service, plex]
 
   - name: Ensure meta-manager basedir exists
     ansible.builtin.file:
@@ -117,6 +149,7 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
+    tags: [always, setup, meta-manager]
 
   - name: Create meta_manager_home preferences file
     ansible.builtin.template:
@@ -128,6 +161,7 @@
     notify:
     - Reload systemd daemon
     - Restart meta-manager service
+    tags: [config, meta-manager]
 
   - name: Create meta-manager docker-compose files
     ansible.builtin.template:
@@ -142,6 +176,7 @@
     notify:
     - Reload systemd daemon
     - Restart meta-manager service
+    tags: [config, meta-manager]
 
   - name: Create meta-manager docker-compose systemd service
     ansible.builtin.template:
@@ -153,24 +188,29 @@
     notify:
     - Reload systemd daemon
     - Restart meta-manager service
+    tags: [service, meta-manager]
 
   - name: Enable meta-manager service
     ansible.builtin.systemd:
       name: plex-meta-manager.service
       enabled: true
       state: started
+    tags: [service, meta-manager]
 
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
+    tags: [restart, service]
 
   - name: Restart plex service
     ansible.builtin.systemd:
       name: plex.service
       state: restarted
+    tags: [restart, plex]
 
   - name: Restart meta-manager service
     ansible.builtin.systemd:
       name: plex-meta-manager.service
       state: restarted
+    tags: [restart, meta-manager]

@@ -16,19 +16,20 @@ WorkingDirectory={{ home }}
 # Environment
 Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
+ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
+ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull --quiet'
 
 # Start command
-ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
+ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
 
 # Stop command  
-ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecStop=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
 
 # Reload command
-ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml restart
+ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
 
 # Service behavior
 Restart=on-failure
@@ -38,9 +39,6 @@ TimeoutStopSec=60
 
 # Security
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
 ReadWritePaths={{ home }}
 ReadOnlyPaths=/var/run/docker.sock
 
@@ -48,6 +46,10 @@ ReadOnlyPaths=/var/run/docker.sock
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier={{ service }}
+
+[Install]
+WantedBy=multi-user.target
+
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,104 @@
+---
+# Configure Proxmox repositories and remove subscription warnings
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/proxmox_repos.yaml
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/proxmox_repos.yaml -l node006
+#
+- name: Configure Proxmox repositories and remove subscription warnings
+  hosts: proxmox
+  become: true
+
+  tasks:
+
+  - name: Download Proxmox release GPG key
+    ansible.builtin.get_url:
+      url: https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg
+      dest: /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
+      mode: '0644'
+      owner: root
+      group: root
+    register: gpg_key
+
+  - name: Configure main sources.list with non-subscription repos
+    ansible.builtin.copy:
+      content: |
+        deb http://ftp.debian.org/debian bookworm main contrib
+        deb http://ftp.debian.org/debian bookworm-updates main contrib
+        deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription
+        deb http://security.debian.org/debian-security bookworm-security main contrib
+      dest: /etc/apt/sources.list
+      mode: '0644'
+      owner: root
+      group: root
+    register: sources_list
+
+  - name: Disable enterprise PVE repository
+    ansible.builtin.copy:
+      content: |
+        # deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise
+      dest: /etc/apt/sources.list.d/pve-enterprise.list
+      mode: '0644'
+      owner: root
+      group: root
+    register: pve_enterprise
+
+  - name: Disable enterprise Ceph repository
+    ansible.builtin.copy:
+      content: |
+        # deb https://enterprise.proxmox.com/debian/ceph-quincy bookworm enterprise
+      dest: /etc/apt/sources.list.d/ceph.list
+      mode: '0644'
+      owner: root
+      group: root
+    register: ceph_enterprise
+
+  - name: Configure Ceph Reef non-subscription repository
+    ansible.builtin.copy:
+      content: |
+        deb http://download.proxmox.com/debian/ceph-reef bookworm no-subscription
+      dest: /etc/apt/sources.list.d/ceph.list
+      mode: '0644'
+      owner: root
+      group: root
+    register: ceph_reef
+
+  - name: Update apt cache
+    ansible.builtin.apt:
+      update_cache: yes
+    when: gpg_key.changed or sources_list.changed or pve_enterprise.changed or ceph_enterprise.changed or ceph_reef.changed
+
+  - name: Backup proxmoxlib.js before modification
+    ansible.builtin.copy:
+      src: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+      dest: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js.bak
+      remote_src: yes
+      mode: '0644'
+      owner: root
+      group: root
+      force: no
+    register: backup_proxmoxlib
+
+  - name: Check if subscription warning is already patched
+    ansible.builtin.shell: |
+      grep -q "void({ //" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    register: patch_check
+    failed_when: false
+    changed_when: false
+
+  - name: Remove subscription warning from Proxmox UI
+    ansible.builtin.shell: |
+      sed -Ezi "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/\1/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    when: patch_check.rc != 0
+    register: patch_applied
+    notify: Restart pveproxy
+
+  - name: Show patch status
+    ansible.builtin.debug:
+      msg: "{{ 'Subscription warning already removed' if patch_check.rc == 0 else 'Subscription warning patch applied' }}"
+
+  handlers:
+  - name: Restart pveproxy
+    ansible.builtin.systemd:
+      name: pveproxy.service
+      state: restarted

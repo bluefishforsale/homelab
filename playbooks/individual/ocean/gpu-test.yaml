@@ -1,0 +1,64 @@
+---
+- name: GPU Test Service
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    service_name: gpu-test
+    service_home: "/data01/services/{{ service_name }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service_name }}"
+    user: terrac
+    devices:
+      - /dev/nvidia0
+      - /dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools
+      - /dev/nvidiactl
+      - /dev/nvidia-modeset
+
+  tasks:
+    - name: Ensure base directory exists
+      ansible.builtin.file:
+        path: "{{ service_home }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+
+    - name: Create docker-compose.yml
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ service_home }}/docker-compose.yml"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart gpu-test service
+
+    - name: Create systemd service
+      ansible.builtin.template:
+        src: "{{ files }}/gpu-test.service.j2"
+        dest: /etc/systemd/system/gpu-test.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart gpu-test service
+
+    - name: Enable gpu-test service
+      ansible.builtin.systemd:
+        name: gpu-test
+        enabled: true
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart gpu-test service
+      ansible.builtin.systemd:
+        name: gpu-test
+        state: restarted

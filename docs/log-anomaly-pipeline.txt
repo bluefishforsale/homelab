@@ -1,0 +1,1091 @@
+# Log Anomaly Detection Pipeline
+
+Status Legend: ⬜ Not Started | 🔄 In Progress | ✅ Complete
+
+---
+
+## 1. Purpose
+
+The Log Anomaly Detection Pipeline is a multi-tier system that automatically identifies unusual patterns, errors, and security events across the homelab infrastructure without requiring predefined rules for every possible failure mode. It combines traditional pattern matching with statistical analysis and machine learning to detect both known issues (via 300+ patterns) and novel anomalies (via entropy analysis, clustering, and LLM semantic understanding).
+
+The pipeline operates in two tiers: **Tier 1 (log-anomaly-detector)** performs real-time pattern matching and statistical analysis on logs streamed from Loki, generating anomaly events with severity scores. **Tier 2 (log-anomaly-ml-processor)** receives these anomalies, groups them into persistent "problems" with duration tracking, applies advanced ML techniques (embeddings, clustering, LLM analysis), and routes alerts appropriately—critical/high via Prometheus AlertManager for immediate notification, medium/low via daily digest email summarizing active issues and their durations.
+
+---
+
+## 2. Architecture Overview
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                           LOG ANOMALY DETECTION PIPELINE                          │
+├───────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│  ┌──────────────┐                                                                 │
+│  │   HOSTS      │  journald ──┐                                                   │
+│  │ ocean,dns01, │             │                                                   │
+│  │ node005,006  │             ▼                                                   │
+│  └──────────────┘      ┌──────────┐    ┌──────────┐    ┌────────────────────┐    │
+│                        │ Promtail │───▶│   Loki   │───▶│ log-anomaly-       │    │
+│  ┌──────────────┐      │ (agents) │    │ :3100    │    │ detector (Go)      │    │
+│  │ Network/IoT  │      └──────────┘    └────┬─────┘    │ :8085      [TIER 1]│    │
+│  │ Devices      │ syslog:1514 ─────────────▶│          └──────┬─────────────┘    │
+│  └──────────────┘                           │                 │                   │
+│                                             │                 ├───────────┐       │
+│                                             │                 │           │       │
+│                                             ▼                 │           ▼       │
+│                                       ┌──────────┐            │    ┌───────────┐  │
+│                                       │ Grafana  │            │    │   Redis   │  │
+│                                       │ :8910    │            │    │   :6379   │  │
+│                                       └──────────┘            │    │ baselines │  │
+│                                                               │    │ + cache   │  │
+│                                                     webhook   │    └─────┬─────┘  │
+│                                                        POST   │          │        │
+│                                                               ▼          │        │
+│                                                  ┌────────────────────┐  │        │
+│                                                  │ log-anomaly-ml-    │◀─┘        │
+│                                                  │ processor (Go)     │           │
+│                                                  │ :8087      [TIER 2]│           │
+│                                                  └──────┬─────────────┘           │
+│                                                         │                         │
+│              ┌──────────────────┬───────────────────────┼───────────────┐         │
+│              │                  │                       │               │         │
+│              ▼                  ▼                       ▼               ▼         │
+│       ┌─────────────┐    ┌─────────────┐         ┌───────────┐   ┌──────────┐    │
+│       │ PostgreSQL  │    │  llamacpp   │         │  Milvus   │   │AlertMgr  │    │
+│       │   :5433     │    │   :8080     │         │  :19530   │   │  :9093   │    │
+│       │  problems   │    │  Qwen3-14B  │         │  vectors  │   │crit/high │    │
+│       └─────────────┘    └─────────────┘         └───────────┘   └──────────┘    │
+│                                                                                   │
+│                                         │                                         │
+│                                         ▼                                         │
+│                                  ┌─────────────┐                                  │
+│                                  │    SMTP     │                                  │
+│                                  │   Gmail     │                                  │
+│                                  │ daily digest│                                  │
+│                                  └─────────────┘                                  │
+└───────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Tech Stack
+
+| Layer | Component | Technology | Version | Purpose |
+|-------|-----------|------------|---------|---------|
+| **Collection** | Log Collector | Promtail | latest | Ship logs from journald/syslog to Loki |
+| **Collection** | Log Storage | Loki | 2.9.3 | Time-series log aggregation |
+| **Tier 1** | Anomaly Detector | Go | 1.22+ | Pattern matching, statistical analysis |
+| **Tier 1** | Stats Backend | Redis | 7.x | Baseline storage, pattern counters |
+| **Tier 2** | ML Processor | Go | 1.22+ | Clustering, LLM analysis, alerting |
+| **Tier 2** | Vector DB | Milvus | 2.3.3 | Embedding storage, similarity search |
+| **Tier 2** | Problem DB | PostgreSQL | 16 | Problem tracking, duration history |
+| **Tier 2** | LLM Backend | llamacpp | latest | Semantic analysis via Qwen3-14B |
+| **Alerting** | Immediate | AlertManager | 0.27+ | Critical/high severity routing |
+| **Alerting** | Digest | Gmail SMTP | - | Daily summary email |
+| **Visualization** | Dashboards | Grafana | 10.x | Log exploration, metrics |
+
+---
+
+## 4. Components
+
+### 4.1 Promtail (Log Collection) ✅ COMPLETE
+**Playbook:** `playbooks/individual/base/logging.yaml`
+
+| Feature | Status |
+|---------|--------|
+| journald scraping | ✅ |
+| Docker logs via journald | ✅ |
+| Syslog listener (ocean:1514) | ✅ |
+| Multi-host deployment | ✅ |
+| Loki push client | ✅ |
+
+### 4.2 Loki (Log Storage) ✅ COMPLETE
+**Playbook:** `playbooks/individual/ocean/loki.yaml`  
+**Files:** `files/loki/docker-compose.yml.j2`, `loki-config.yaml.j2`
+
+| Feature | Status |
+|---------|--------|
+| Log ingestion API | ✅ |
+| LogQL query engine | ✅ |
+| 7-day retention | ✅ |
+| Grafana datasource | ✅ |
+| Compression | ✅ |
+
+### 4.3 log-anomaly-detector (Tier 1) ✅ COMPLETE
+**Playbook:** `playbooks/individual/ocean/log_anomaly_detector_go.yaml`  
+**Files:** `files/log-anomaly/go/*.go`, `files/log-anomaly/patterns/*.patterns`
+
+| Feature | Status |
+|---------|--------|
+| 300+ patterns (6 categories) | ✅ |
+| Frequency z-score detection | ✅ |
+| Rate-of-change detection | ✅ |
+| Entropy analysis | ✅ |
+| Levenshtein similarity | ✅ |
+| Redis baseline storage | ✅ |
+| Prometheus metrics | ✅ |
+| Webhook alert output | ✅ |
+| Structured JSON parsing | ✅ |
+| REST API (/health, /status, /patterns) | ✅ |
+
+### 4.4 log-anomaly-ml-processor (Tier 2) ⬜ NOT STARTED
+**Playbook:** `playbooks/individual/ocean/log_anomaly_ml_processor.yaml` (planned)  
+**Files:** `files/log-anomaly-ml/go/*.go` (planned)
+
+| Feature | Status |
+|---------|--------|
+| Webhook receiver | ⬜ |
+| Problem tracking with duration | ⬜ |
+| PostgreSQL problem database | ⬜ |
+| Deduplication (Redis) | ⬜ |
+| Rate limiting | ⬜ |
+| AlertManager integration | ⬜ |
+| SMTP daily digest | ⬜ |
+| Prometheus metrics | ⬜ |
+| Vector embeddings (Milvus) | ⬜ |
+| HDBSCAN clustering | ⬜ |
+| LLM semantic analysis | ⬜ |
+| LLM request queue with backoff | ⬜ |
+| Benford's Law analysis | ⬜ |
+| Zipf's Law analysis | ⬜ |
+| Spectral/FFT analysis | ⬜ |
+| Markov chain analysis | ⬜ |
+| Distribution drift detection | ⬜ |
+
+### 4.5 Milvus (Vector Database) ⬜ NOT STARTED
+**Playbook:** `playbooks/individual/ocean/milvus.yaml` (planned)
+
+| Feature | Status |
+|---------|--------|
+| Vector storage | ⬜ |
+| Similarity search | ⬜ |
+| IVF_FLAT indexing | ⬜ |
+
+---
+
+## 5. Log Sources & Metrics Sources
+
+### Log Sources
+
+| Source | Collection Method | Hosts | Status |
+|--------|-------------------|-------|--------|
+| systemd-journald | Promtail journal scrape | all | ✅ |
+| Docker containers | journald log driver | all | ✅ |
+| syslog (remote) | Promtail syslog:1514 | ocean | ✅ |
+| Network devices | syslog → ocean | routers, switches | ✅ |
+| IoT devices | syslog → ocean | various | ✅ |
+
+### Metrics Sources (Prometheus)
+
+| Source | Endpoint | Metrics Prefix | Status |
+|--------|----------|----------------|--------|
+| log-anomaly-detector | :8085/metrics | `log_anomaly_*` | ✅ |
+| log-anomaly-ml-processor | :8087/metrics | `log_ml_*` | ⬜ |
+| Loki | :3100/metrics | `loki_*` | ✅ |
+| Promtail | :9080/metrics | `promtail_*` | ✅ |
+| Redis | :6379 (exporter) | `redis_*` | ✅ |
+
+---
+
+## 6. Features
+
+### Implemented ✅
+
+| Feature | Component | Description |
+|---------|-----------|-------------|
+| Pattern matching | Tier 1 | 300+ regex patterns in 6 categories |
+| Frequency anomalies | Tier 1 | Z-score detection (3-sigma threshold) |
+| Rate-of-change | Tier 1 | 5x multiplier threshold |
+| Entropy analysis | Tier 1 | Detect unusual randomness (threshold: 4.5) |
+| Levenshtein distance | Tier 1 | String similarity (threshold: 0.7) |
+| 24h baselines | Tier 1 | Hourly pattern counters in Redis |
+| Webhook alerts | Tier 1 | POST anomalies to downstream service |
+| Log visualization | Grafana | Loki datasource, dashboards |
+
+### Planned ⬜
+
+| Feature | Component | Description |
+|---------|-----------|-------------|
+| Problem tracking | Tier 2 | Group anomalies, track duration |
+| PostgreSQL persistence | Tier 2 | Durable problem state (dedicated container) |
+| AlertManager routing | Tier 2 | Immediate alerts for critical/high |
+| Email digest | Tier 2 | Daily summary at 6 AM PT |
+| Quiet hours | Tier 2 | Suppress non-critical 10PM-7AM |
+| Vector embeddings | Tier 2 | Log similarity via Milvus |
+| HDBSCAN clustering | Tier 2 | Group related anomalies |
+| LLM analysis | Tier 2 | Semantic explanation via Qwen3-14B |
+| LLM queue + backoff | Tier 2 | Serialize requests, exponential backoff |
+| Benford's Law | Tier 2 | Detect fabricated numeric data |
+| Zipf's Law | Tier 2 | Token frequency anomalies |
+| Spectral analysis | Tier 2 | Missing/new periodic patterns |
+| Markov chains | Tier 2 | Sequence probability anomalies |
+| K-S distribution drift | Tier 2 | Baseline comparison |
+
+---
+
+## 7. Implementation Phases
+
+### Phase 1: Foundation ✅ COMPLETE
+| Step | Status | Details |
+|------|--------|---------|
+| Deploy Loki | ✅ | `playbooks/individual/ocean/loki.yaml` |
+| Deploy Promtail (all hosts) | ✅ | `playbooks/individual/base/logging.yaml` |
+| Configure syslog listener | ✅ | ocean:1514 for network devices |
+| Grafana Loki datasource | ✅ | Log exploration dashboards |
+
+### Phase 2: Tier 1 Anomaly Detection ✅ COMPLETE
+| Step | Status | Details |
+|------|--------|---------|
+| Build Go detector | ✅ | Replaced Python, 50-80% memory reduction |
+| Pattern matching engine | ✅ | 300+ patterns, 6 categories |
+| Statistical analysis | ✅ | Frequency, rate-change, entropy, Levenshtein |
+| Redis backend | ✅ | Baselines, pattern counters |
+| Prometheus metrics | ✅ | /metrics endpoint |
+| Deploy as Docker service | ✅ | systemd + docker-compose |
+
+### Phase 3: Tier 2 ML Enhancement ⬜ NOT STARTED
+| Step | Status | Details |
+|------|--------|---------|
+| Build Go ML processor | ⬜ | Core service skeleton |
+| Problem tracking | ⬜ | PostgreSQL schema, duration tracking |
+| Webhook receiver | ⬜ | Receive from Tier 1 |
+| Deduplication | ⬜ | Redis-based |
+| AlertManager client | ⬜ | POST alerts API |
+| SMTP digest emailer | ⬜ | Gmail via vault credentials |
+| Deploy Milvus | ⬜ | Vector database for embeddings |
+| Embedding pipeline | ⬜ | llamacpp embed API |
+| HDBSCAN clustering | ⬜ | Group similar anomalies |
+| LLM analysis queue | ⬜ | Serialized with backoff |
+
+### Phase 4: Advanced Analysis ⬜ NOT STARTED
+| Step | Status | Details |
+|------|--------|---------|
+| Benford's Law analyzer | ⬜ | Chi-squared on numeric fields |
+| Zipf's Law analyzer | ⬜ | Token frequency distribution |
+| Spectral analyzer (FFT) | ⬜ | Periodic pattern detection |
+| Markov chain analyzer | ⬜ | Sequence probability |
+| K-S distribution drift | ⬜ | Baseline comparison |
+
+---
+
+## 8. Mathematical Techniques
+
+### Tier 1 (Implemented)
+
+| Technique | Purpose | Parameters |
+|-----------|---------|------------|
+| **Z-score** | Detect frequency anomalies | threshold: 3.0 sigma |
+| **Rate-of-change** | Detect sudden spikes/drops | threshold: 5.0x |
+| **Shannon Entropy** | Detect unusual randomness | threshold: 4.5 |
+| **Levenshtein Distance** | Detect similar but not identical messages | threshold: 0.7 |
+
+### Tier 2 (Planned)
+
+| Technique | Purpose | Parameters |
+|-----------|---------|------------|
+| **Benford's Law** | Detect fabricated numeric data (response times, bytes) | chi-squared threshold: 15.51 (p=0.05, df=8) |
+| **Zipf's Law** | Detect unnatural token distributions | deviation threshold: 0.3 |
+| **Kolmogorov-Smirnov** | Detect distribution drift over time | p-value: 0.01, baseline: 7d |
+| **FFT Spectral Analysis** | Detect missing cron jobs, malware beaconing | expected periods: 5m, 1h, 24h |
+| **Markov Chains** | Detect impossible state transitions | min probability: 0.001, order: 2 |
+| **Jensen-Shannon Divergence** | Compare log distributions across hosts/time | - |
+| **HDBSCAN** | Cluster similar anomalies, find outliers | min_cluster_size: 3, min_samples: 2 |
+| **Cosine Similarity** | Find similar past anomalies via embeddings | threshold: 0.8 |
+
+---
+
+## 9. Configuration Reference
+
+### Secrets (Ansible Vault)
+
+| Secret | Vault Path | Used By |
+|--------|------------|---------|
+| Gmail SMTP user | `vault_gmail_user` | Tier 2 digest |
+| Gmail app password | `vault_gmail_app_password` | Tier 2 digest |
+| PostgreSQL password | `vault_log_anomaly_ml_db_password` | Tier 2 problem DB |
+
+### Variables
+
+**File:** `vars/vars_log_anomaly.yaml`
+```yaml
+log_anomaly:
+  service_name: log-anomaly-detector
+  port: 8085
+  loki_url: "http://192.168.1.143:3100"
+  check_interval: 30
+  batch_size: 1000
+  thresholds:
+    frequency_sigma: 3.0
+    rate_change_threshold: 5.0
+    entropy_threshold: 4.5
+    levenshtein_threshold: 0.7
+```
+
+**File:** `vars/vars_log_anomaly_ml.yaml` (planned)
+```yaml
+log_anomaly_ml:
+  service_name: log-anomaly-ml-processor
+  port: 8087
+  
+  # PostgreSQL (dedicated container)
+  postgresql:
+    host: "192.168.1.143"
+    port: 5433  # Non-standard port to avoid conflict
+    database: "log_anomaly_ml"
+    user: "log_anomaly_ml"
+    # password from vault: vault_log_anomaly_ml_db_password
+  
+  milvus_host: "192.168.1.143"
+  milvus_port: 19530
+  redis_addr: "192.168.1.143:6379"
+  alertmanager_url: "http://192.168.1.143:9093"
+  digest_hour: 6
+  digest_recipient: "terracnosaur@gmail.com"
+```
+
+### Models
+
+| Model | Location | Size | Context | Purpose |
+|-------|----------|------|---------|---------|
+| Qwen3-14B-Q4_K_M | llamacpp :8080 | 8.5GB | 40K | LLM analysis |
+| nomic-embed-text-v1.5 | llamacpp :8080 | 137M | 8K | Embeddings (planned) |
+
+### Resource Limits
+
+**Hard Limits (Docker Compose):**
+| Service | CPU | RAM (max) | Storage (max) |
+|---------|-----|-----------|---------------|
+| log-anomaly-detector | 1 core | 512MB | 1GB |
+| log-anomaly-ml-processor | 1 core | 1GB | 1GB |
+| PostgreSQL (problems) | 0.5 core | 512MB | 1GB |
+| Redis | 0.5 core | 512MB | 1GB |
+| Milvus | 2 cores | 4GB | 1GB |
+| milvus-etcd | 0.5 core | 256MB | 256MB |
+| milvus-minio | 0.5 core | 256MB | 1GB |
+
+**Docker Compose Resource Syntax:**
+```yaml
+services:
+  log-anomaly-ml-processor:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # Storage limit via volume size (ext4 quota or dedicated partition)
+```
+
+### Data Retention (to enforce storage limits)
+
+| Data Store | Retention Policy | Estimated Size | Enforcement |
+|------------|------------------|----------------|-------------|
+| **PostgreSQL** | 30 days problems, 7 days resolved | ~500MB | Cron job: daily purge |
+| **Redis** | 24h baselines, 6h anomaly cache | ~100MB | TTL on all keys |
+| **Milvus** | 30 days embeddings | ~800MB | Background job: purge old vectors |
+
+**PostgreSQL Retention Job:**
+```sql
+-- Run daily via pg_cron or application scheduler
+DELETE FROM problems 
+WHERE status = 'resolved' 
+  AND resolved_at < NOW() - INTERVAL '7 days';
+
+DELETE FROM problems 
+WHERE created_at < NOW() - INTERVAL '30 days';
+
+-- Vacuum to reclaim space
+VACUUM ANALYZE problems;
+```
+
+**Redis Memory Policy:**
+```conf
+# redis.conf
+maxmemory 512mb
+maxmemory-policy allkeys-lru
+```
+
+**Milvus Retention:**
+```go
+// Run daily
+func (m *MilvusClient) PurgeOldEmbeddings(olderThan time.Duration) error {
+    cutoff := time.Now().Add(-olderThan).Unix()
+    expr := fmt.Sprintf("timestamp < %d", cutoff)
+    return m.collection.Delete(ctx, expr)
+}
+```
+
+**Storage Monitoring Alerts:**
+```yaml
+# Prometheus alert rules
+- alert: StorageNearLimit
+  expr: |
+    (container_fs_usage_bytes / container_fs_limit_bytes) > 0.8
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "{{ $labels.container }} storage at {{ $value | humanizePercentage }}"
+```
+
+### Endpoint URLs
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Loki | http://192.168.1.143:3100 | Log queries |
+| Loki push | http://192.168.1.143:3100/loki/api/v1/push | Promtail target |
+| log-anomaly-detector | http://192.168.1.143:8085 | Tier 1 API |
+| log-anomaly-ml-processor | http://192.168.1.143:8087 | Tier 2 API (planned) |
+| llamacpp | http://192.168.1.143:8080 | LLM inference |
+| llamacpp chat | http://192.168.1.143:8080/v1/chat/completions | OpenAI-compatible |
+| Milvus | http://192.168.1.143:19530 | Vector DB (planned) |
+| PostgreSQL | 192.168.1.143:5433 | Problem DB (planned) |
+| Redis | 192.168.1.143:6379 | Cache/stats |
+| AlertManager | http://192.168.1.143:9093 | Alert routing (planned) |
+| Grafana | http://192.168.1.143:8910 | Dashboards |
+
+---
+
+## 10. API Reference
+
+### Tier 1: log-anomaly-detector
+
+#### GET /health
+```json
+{"status": "healthy", "uptime": 3600}
+```
+
+#### GET /status
+```json
+{
+  "logs_processed": 150000,
+  "anomalies_detected": 47,
+  "patterns_loaded": 312,
+  "redis_connected": true,
+  "last_check": "2024-11-28T15:30:00Z"
+}
+```
+
+#### GET /patterns
+```json
+{
+  "categories": {
+    "system": 52,
+    "security": 78,
+    "network": 45,
+    "docker": 38,
+    "application": 65,
+    "media": 34
+  },
+  "total": 312
+}
+```
+
+#### Webhook Output (POST to Tier 2)
+```json
+{
+  "timestamp": "2024-11-28T15:32:05Z",
+  "host": "ocean",
+  "service": "nginx",
+  "severity": "high",
+  "anomaly_type": "upstream_timeout",
+  "score": 8.5,
+  "description": "Upstream timeout to plex backend",
+  "log_message": "upstream timed out (110: Connection timed out)",
+  "pattern_matches": ["nginx_upstream_error"],
+  "statistical_scores": {
+    "frequency_zscore": 4.2,
+    "rate_change": 3.1,
+    "entropy": 2.8
+  }
+}
+```
+
+### Tier 2: log-anomaly-ml-processor (Planned)
+
+#### POST /webhook/anomaly
+Receives anomaly from Tier 1 (payload above).
+
+**Response:**
+```json
+{"status": "accepted", "problem_id": "abc123", "is_new_problem": false}
+```
+
+#### GET /health
+```json
+{
+  "status": "healthy",
+  "uptime": 7200,
+  "checks": {
+    "postgresql": {"status": "up", "latency_ms": 2},
+    "redis": {"status": "up", "latency_ms": 2},
+    "milvus": {"status": "up", "latency_ms": 15},
+    "llamacpp": {"status": "up", "latency_ms": 50},
+    "alertmanager": {"status": "up", "latency_ms": 10}
+  },
+  "problems_active": 3,
+  "llm_queue_depth": 2
+}
+```
+
+#### GET /problems?status=active
+```json
+{
+  "problems": [
+    {
+      "id": "abc123",
+      "fingerprint": "ocean:nginx:upstream_timeout",
+      "title": "Nginx upstream timeouts to Plex",
+      "severity": "high",
+      "status": "active",
+      "first_seen": "2024-11-28T11:45:00Z",
+      "last_seen": "2024-11-28T15:32:05Z",
+      "duration": "3h 47m",
+      "occurrence_count": 23,
+      "affected_hosts": ["ocean"],
+      "affected_services": ["nginx", "plex"],
+      "llm_analysis": "Plex transcoder not responding. GPU may be overloaded."
+    }
+  ],
+  "total": 3
+}
+```
+
+#### GET /problems/{id}
+Full problem details including sample anomalies.
+
+#### POST /problems/{id}/resolve
+```json
+{"status": "resolved", "resolved_at": "2024-11-28T16:00:00Z"}
+```
+
+#### POST /problems/{id}/suppress
+```json
+{"status": "suppressed", "reason": "Known issue, ticket #123"}
+```
+
+#### POST /digest/trigger
+Manually trigger digest email.
+```json
+{"status": "sent", "recipient": "terracnosaur@gmail.com", "problems_included": 5}
+```
+
+#### POST /similar
+Find similar past anomalies.
+```json
+// Request
+{"message": "upstream timed out", "top_k": 5}
+
+// Response
+{
+  "similar": [
+    {"id": "xyz789", "similarity": 0.92, "message": "upstream timeout to backend", "was_false_positive": false}
+  ]
+}
+```
+
+### AlertManager API (outbound)
+
+**POST http://192.168.1.143:9093/api/v2/alerts**
+```json
+[
+  {
+    "labels": {
+      "alertname": "LogAnomaly",
+      "severity": "high",
+      "host": "ocean",
+      "service": "nginx",
+      "problem_id": "abc123"
+    },
+    "annotations": {
+      "summary": "Nginx upstream timeouts to Plex",
+      "description": "23 occurrences over 3h 47m. Plex transcoder not responding.",
+      "dashboard": "http://192.168.1.143:8910/d/log-anomalies?var-problem=abc123"
+    },
+    "startsAt": "2024-11-28T11:45:00Z"
+  }
+]
+```
+
+---
+
+## 11. Manual Testing
+
+### Test Promtail → Loki
+
+```bash
+# Check Promtail is running
+systemctl status promtail
+
+# Check Promtail targets
+curl -s http://localhost:9080/targets | jq .
+
+# Query recent logs from Loki
+curl -s 'http://192.168.1.143:3100/loki/api/v1/query_range' \
+  --data-urlencode 'query={job="systemd-journal"}' \
+  --data-urlencode 'limit=5' | jq '.data.result[0].values[:3]'
+```
+
+### Test log-anomaly-detector (Tier 1)
+
+```bash
+# Health check
+curl -s http://192.168.1.143:8085/health | jq .
+
+# Status
+curl -s http://192.168.1.143:8085/status | jq .
+
+# Loaded patterns
+curl -s http://192.168.1.143:8085/patterns | jq .
+
+# Prometheus metrics
+curl -s http://192.168.1.143:8085/metrics | grep log_anomaly
+
+# Check Redis baselines
+docker exec redis redis-cli KEYS "baseline:*" | head -5
+
+# View recent anomaly counts
+docker exec redis redis-cli ZRANGE anomalies:recent 0 5 WITHSCORES
+```
+
+### Test log-anomaly-ml-processor (Tier 2) - Planned
+
+```bash
+# Health check
+curl -s http://192.168.1.143:8087/health | jq .
+
+# List active problems
+curl -s 'http://192.168.1.143:8087/problems?status=active' | jq .
+
+# Get specific problem
+curl -s http://192.168.1.143:8087/problems/abc123 | jq .
+
+# Manually resolve a problem
+curl -X POST http://192.168.1.143:8087/problems/abc123/resolve | jq .
+
+# Trigger digest email
+curl -X POST http://192.168.1.143:8087/digest/trigger | jq .
+
+# Simulate anomaly webhook (for testing)
+curl -X POST http://192.168.1.143:8087/webhook/anomaly \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "timestamp": "2024-11-28T15:32:05Z",
+    "host": "ocean",
+    "service": "nginx",
+    "severity": "high",
+    "anomaly_type": "upstream_timeout",
+    "score": 8.5,
+    "description": "Test anomaly",
+    "log_message": "upstream timed out"
+  }' | jq .
+
+# Check LLM queue depth
+curl -s http://192.168.1.143:8087/metrics | grep llm_queue_depth
+```
+
+### Test llamacpp (LLM Backend)
+
+```bash
+# Health check
+curl -s http://192.168.1.143:8080/health | jq .
+
+# Test chat completion
+curl -s http://192.168.1.143:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "messages": [{"role": "user", "content": "Explain this log error: upstream timed out"}],
+    "max_tokens": 100,
+    "temperature": 0.3
+  }' | jq '.choices[0].message.content'
+
+# Check GPU utilization during request
+nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
+```
+
+### Test Milvus (Vector DB) - Planned
+
+```bash
+# Check Milvus health
+curl -s http://192.168.1.143:9091/healthz
+
+# List collections (requires pymilvus)
+docker exec -it milvus python3 -c "
+from pymilvus import connections, utility
+connections.connect('default', host='localhost', port='19530')
+print(utility.list_collections())
+"
+```
+
+### Test PostgreSQL (Problem DB) - Planned
+
+```bash
+# Check PostgreSQL is accepting connections
+docker exec log-anomaly-ml-postgres pg_isready -U log_anomaly_ml
+
+# Connect and check tables
+docker exec -it log-anomaly-ml-postgres psql -U log_anomaly_ml -d log_anomaly_ml -c "\dt"
+
+# Query active problems
+docker exec -it log-anomaly-ml-postgres psql -U log_anomaly_ml -d log_anomaly_ml \
+  -c "SELECT id, fingerprint, severity, status, first_seen, occurrence_count FROM problems WHERE status = 'active';"
+
+# Check problem count by severity
+docker exec -it log-anomaly-ml-postgres psql -U log_anomaly_ml -d log_anomaly_ml \
+  -c "SELECT severity, status, COUNT(*) FROM problems GROUP BY severity, status;"
+
+# External connection test (from ocean host)
+psql -h 192.168.1.143 -p 5433 -U log_anomaly_ml -d log_anomaly_ml -c "SELECT 1;"
+```
+
+### Test AlertManager
+
+```bash
+# Check AlertManager health
+curl -s http://192.168.1.143:9093/-/healthy
+
+# List active alerts
+curl -s http://192.168.1.143:9093/api/v2/alerts | jq .
+
+# Send test alert
+curl -X POST http://192.168.1.143:9093/api/v2/alerts \
+  -H 'Content-Type: application/json' \
+  -d '[{
+    "labels": {"alertname": "TestAlert", "severity": "info"},
+    "annotations": {"summary": "Test alert from CLI"}
+  }]'
+```
+
+### Test SMTP (Gmail)
+
+```bash
+# Test with swaks (install: apt install swaks)
+swaks --to terracnosaur@gmail.com \
+  --from homelab-alerts@gmail.com \
+  --server smtp.gmail.com:587 \
+  --auth LOGIN \
+  --auth-user "$SMTP_USER" \
+  --auth-password "$SMTP_PASSWORD" \
+  --tls \
+  --header "Subject: Test from homelab" \
+  --body "This is a test email from log-anomaly-ml-processor"
+```
+
+### End-to-End Test
+
+```bash
+# 1. Generate a test log that should trigger anomaly
+logger -t test-anomaly "CRITICAL ERROR: Database connection failed repeatedly"
+
+# 2. Wait for Promtail to ship (max 15s)
+sleep 15
+
+# 3. Check if it appeared in Loki
+curl -s 'http://192.168.1.143:3100/loki/api/v1/query' \
+  --data-urlencode 'query={job="systemd-journal"} |= "test-anomaly"' | jq .
+
+# 4. Check if detector picked it up (look at recent metrics)
+curl -s http://192.168.1.143:8085/metrics | grep anomalies_detected
+
+# 5. Check if ML processor received it (once implemented)
+curl -s 'http://192.168.1.143:8087/problems?status=active' | jq '.problems[] | select(.title | contains("Database"))'
+```
+
+---
+
+## 12. Failure Modes & Recovery
+
+### Dependency Failure Behavior
+
+| Component | Detection | Degraded Behavior | Recovery |
+|-----------|-----------|-------------------|----------|
+| **PostgreSQL** | Connection timeout 5s | Buffer anomalies to Redis (`problems:buffer`), skip duration tracking | Auto-reconnect, flush buffer to DB |
+| **Redis** | Ping timeout 1s | Tier 1: pattern-only mode (no baselines), Tier 2: in-memory dedup | Auto-reconnect, rebuild baselines over 24h |
+| **Milvus** | Health check fail | Skip embeddings/similarity search, proceed with other analysis | Auto-reconnect, no data loss |
+| **llamacpp** | 5xx or timeout | Skip LLM analysis, use pattern-based severity | Exponential backoff 1s→300s max |
+| **AlertManager** | Connection fail | Queue alerts in Redis (`alerts:pending`), retry every 60s | Flush queue on recovery |
+| **SMTP** | Auth/connection fail | Queue digest, retry hourly, alert via AlertManager | Manual intervention if persists 24h |
+| **Tier 2 (from Tier 1)** | Webhook 5xx/timeout | Buffer in Redis (`anomalies:pending`), retry 3x with backoff | Tier 2 recovery triggers buffer flush |
+
+### Tier 1 Webhook Retry Logic
+
+```go
+func (d *Detector) sendAlertWithRetry(anomaly Anomaly) error {
+    for attempt := 0; attempt < 3; attempt++ {
+        resp, err := d.httpClient.Post(d.webhookURL, "application/json", anomaly.JSON())
+        if err == nil && resp.StatusCode == 200 {
+            return nil
+        }
+        if attempt < 2 {
+            time.Sleep(time.Duration(1<<attempt) * time.Second) // 1s, 2s
+        }
+    }
+    // Dead letter to Redis - will be replayed when Tier 2 recovers
+    d.redis.LPush(ctx, "anomalies:dead_letter", anomaly.JSON())
+    d.redis.Expire(ctx, "anomalies:dead_letter", 24*time.Hour)
+    deadLetterTotal.Inc()
+    return ErrWebhookFailed
+}
+
+// Tier 2 startup: replay dead letter queue
+func (p *Processor) ReplayDeadLetter() {
+    for {
+        data, err := p.redis.RPop(ctx, "anomalies:dead_letter").Result()
+        if err == redis.Nil {
+            break
+        }
+        var anomaly Anomaly
+        json.Unmarshal([]byte(data), &anomaly)
+        p.processAnomaly(anomaly) // Re-process
+    }
+}
+```
+
+### Cold Start Behavior
+
+| Scenario | Detection | Behavior | Duration |
+|----------|-----------|----------|----------|
+| **Empty PostgreSQL** | `SELECT 1` succeeds, `problems` table empty | Log INFO, operate normally, durations start from 0 | Permanent (expected) |
+| **Empty Redis** | `KEYS baseline:*` returns 0 | Log WARNING, use 10x higher thresholds, suppress z-score alerts | 24h until baselines rebuild |
+| **Empty Milvus** | Collection exists but 0 vectors | Similarity search returns `[]`, log INFO | Until embeddings accumulate |
+| **Schema mismatch** | Migration check fails | Exit with error, require manual migration | Until fixed |
+
+**Cold Start Configuration:**
+```yaml
+cold_start:
+  redis_empty_threshold_multiplier: 10.0  # 10x higher thresholds for 24h
+  suppress_statistical_alerts_hours: 24   # Don't alert on z-score for first 24h
+  log_cold_start_warnings: true
+```
+
+### Circuit Breaker Pattern
+
+```go
+type CircuitBreaker struct {
+    name        string
+    failures    int32
+    threshold   int32         // Open after N failures
+    timeout     time.Duration // Time in open state before half-open
+    lastFailure time.Time
+    state       atomic.Value  // "closed", "open", "half-open"
+}
+
+func (cb *CircuitBreaker) Call(fn func() error) error {
+    state := cb.state.Load().(string)
+    
+    if state == "open" {
+        if time.Since(cb.lastFailure) > cb.timeout {
+            cb.state.Store("half-open")
+        } else {
+            return ErrCircuitOpen
+        }
+    }
+    
+    err := fn()
+    if err != nil {
+        cb.recordFailure()
+        return err
+    }
+    
+    cb.reset()
+    return nil
+}
+
+// Circuit breakers for each dependency
+var circuits = map[string]*CircuitBreaker{
+    "postgresql":   {threshold: 5, timeout: 60 * time.Second},
+    "redis":        {threshold: 3, timeout: 30 * time.Second},
+    "milvus":       {threshold: 5, timeout: 60 * time.Second},
+    "llamacpp":     {threshold: 3, timeout: 300 * time.Second}, // Longer for LLM
+    "alertmanager": {threshold: 5, timeout: 60 * time.Second},
+}
+```
+
+### Health Check States
+
+```go
+type HealthStatus struct {
+    Status   string                  `json:"status"`   // healthy, degraded, unhealthy
+    Mode     string                  `json:"mode"`     // full, limited, minimal
+    Checks   map[string]CheckResult  `json:"checks"`
+    Uptime   int64                   `json:"uptime_seconds"`
+}
+
+func (p *Processor) Health() HealthStatus {
+    checks := map[string]CheckResult{
+        "postgresql":   p.checkPostgres(),
+        "redis":        p.checkRedis(),
+        "milvus":       p.checkMilvus(),
+        "llamacpp":     p.checkLLM(),
+        "alertmanager": p.checkAlertManager(),
+    }
+    
+    // Determine overall status
+    downCount := 0
+    for _, c := range checks {
+        if c.Status == "down" {
+            downCount++
+        }
+    }
+    
+    status := HealthStatus{Checks: checks}
+    switch {
+    case downCount == 0:
+        status.Status = "healthy"
+        status.Mode = "full"
+    case downCount <= 2:
+        status.Status = "degraded"
+        status.Mode = "limited" // Some features disabled
+    default:
+        status.Status = "unhealthy"
+        status.Mode = "minimal" // Only buffering, no processing
+    }
+    return status
+}
+```
+
+**Mode Capabilities:**
+| Mode | PostgreSQL | Redis | Milvus | LLM | AlertManager |
+|------|------------|-------|--------|-----|--------------|
+| **full** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **limited** | ✅ or buffer | ✅ | ❌ skip | ❌ skip | ✅ or queue |
+| **minimal** | buffer only | ✅ required | ❌ | ❌ | queue only |
+
+### Backup & Recovery
+
+| Data Store | Backup Method | Frequency | Location | RTO | RPO |
+|------------|---------------|-----------|----------|-----|-----|
+| PostgreSQL | pg_dump | Daily 3 AM | `/data01/backups/log-anomaly-ml/pg/` | 1h | 24h |
+| Redis | RDB snapshot | Every 15m | `/data01/backups/log-anomaly-ml/redis/` | 15m | 15m |
+| Milvus | Collection export | Daily 4 AM | `/data01/backups/log-anomaly-ml/milvus/` | 2h | 24h |
+
+**PostgreSQL Backup (Ansible cron):**
+```yaml
+- name: PostgreSQL backup cron
+  cron:
+    name: "log-anomaly-ml postgres backup"
+    hour: "3"
+    minute: "0"
+    job: >
+      docker exec log-anomaly-ml-postgres 
+      pg_dump -U log_anomaly_ml log_anomaly_ml | 
+      gzip > /data01/backups/log-anomaly-ml/pg/$(date +\%Y\%m\%d).sql.gz &&
+      find /data01/backups/log-anomaly-ml/pg/ -mtime +7 -delete
+```
+
+**Recovery Runbook:**
+
+```markdown
+### Scenario: PostgreSQL Data Loss
+
+1. Service detects connection failure, enters "degraded" mode
+2. New anomalies buffered to Redis (key: `problems:buffer`)
+3. Alerts: "PostgreSQL unavailable" via metrics
+
+**Recovery Steps:**
+1. Restore from backup:
+   gunzip -c /data01/backups/log-anomaly-ml/pg/YYYYMMDD.sql.gz | \
+     docker exec -i log-anomaly-ml-postgres psql -U log_anomaly_ml
+
+2. Restart ML processor to trigger buffer flush:
+   systemctl restart log-anomaly-ml-processor
+
+3. Verify:
+   curl http://192.168.1.143:8087/health | jq .
+   # Should show status: "healthy", mode: "full"
+
+4. Check buffer was flushed:
+   docker exec redis redis-cli LLEN problems:buffer
+   # Should be 0
+```
+
+```markdown
+### Scenario: Redis Data Loss (Baselines Gone)
+
+1. Tier 1 detector loses all baselines
+2. Z-score calculations invalid for 24h
+3. Service continues with pattern-matching only
+
+**Recovery Steps:**
+1. Service auto-recovers, no manual action needed
+2. Monitor for 24h: baselines will rebuild
+3. Expect higher false positive rate during rebuild
+4. Optional: Temporarily raise thresholds
+   curl -X POST http://192.168.1.143:8085/config \
+     -d '{"frequency_sigma": 5.0}'  # Raise from 3.0
+```
+
+```markdown
+### Scenario: Complete Tier 2 Failure
+
+1. Tier 1 webhooks fail, anomalies go to dead letter queue
+2. Dead letter TTL: 24h
+
+**Recovery Steps:**
+1. Fix Tier 2 issue (restart, fix config, etc.)
+2. On startup, Tier 2 auto-replays dead letter queue
+3. Verify:
+   docker exec redis redis-cli LLEN anomalies:dead_letter
+   # Should decrease as replayed
+
+4. Check for data loss:
+   curl http://192.168.1.143:8087/metrics | grep dead_letter
+   # log_ml_dead_letter_replayed_total should match original count
+```
+
+### Prometheus Alerts for Failure Modes
+
+```yaml
+groups:
+  - name: log-anomaly-ml-failures
+    rules:
+      - alert: LogAnomalyMLDegraded
+        expr: log_ml_health_status{status="degraded"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log anomaly ML processor in degraded mode"
+          
+      - alert: LogAnomalyMLUnhealthy
+        expr: log_ml_health_status{status="unhealthy"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Log anomaly ML processor unhealthy"
+          
+      - alert: DeadLetterQueueGrowing
+        expr: redis_key_size{key="anomalies:dead_letter"} > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead letter queue has {{ $value }} unprocessed anomalies"
+          
+      - alert: CircuitBreakerOpen
+        expr: log_ml_circuit_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.dependency }}"
+```
+
+---
+
+## 13. Next Steps
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Review and approve this specification | ⬜ |
+| 2 | Add Gmail SMTP credentials to Ansible vault | ⬜ |
+| 3 | Build log-anomaly-ml-processor v1 (core features) | ⬜ |
+| 4 | Deploy Milvus vector database | ⬜ |
+| 5 | Configure AlertManager integration | ⬜ |
+| 6 | Update Tier 1 webhook URL to point to Tier 2 | ⬜ |
+| 7 | Implement LLM analysis with queue + backoff | ⬜ |
+| 8 | Test end-to-end pipeline | ⬜ |
+| 9 | Create Grafana dashboards for ML processor | ⬜ |
+| 10 | Implement advanced statistical analysis (Phase 4) | ⬜ |
