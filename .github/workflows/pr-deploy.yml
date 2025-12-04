@@ -142,10 +142,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible pyyaml
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Validate changed playbooks
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
 
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
@@ -182,10 +188,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Dry-run playbook
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           echo "🔍 Dry-run: ${{ matrix.playbook }}"
 
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
@@ -216,10 +228,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Deploy playbook
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           echo "🚀 Deploying: ${{ matrix.playbook }}"
 
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
