@@ -382,13 +382,18 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const results = fs.readFileSync('/tmp/test-results.txt', 'utf8');
-            const total = '${{ steps.test.outputs.total }}';
-            const passed = '${{ steps.test.outputs.passed }}';
-            const failed = '${{ steps.test.outputs.failed }}';
+            let results = 'No test results available (tests may not have run)';
+            try {
+              results = fs.readFileSync('/tmp/test-results.txt', 'utf8');
+            } catch (e) {
+              console.log('Results file not found, using fallback message');
+            }
+            const total = '${{ steps.test.outputs.total }}' || '0';
+            const passed = '${{ steps.test.outputs.passed }}' || '0';
+            const failed = '${{ steps.test.outputs.failed }}' || '0';
 
-            const status = failed > 0 ? '❌' : '✅';
-            const conclusion = failed > 0 ? 'FAILED' : 'PASSED';
+            const status = (failed > 0 || total === '0') ? '❌' : '✅';
+            const conclusion = (failed > 0 || total === '0') ? 'FAILED' : 'PASSED';
 
             const comment = `## ${status} CI Test Results - ${conclusion}
 
