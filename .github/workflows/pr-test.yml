@@ -252,9 +252,10 @@ jobs:
         env:
           PROXMOX_SSH_KEY: ${{ secrets.PROXMOX_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$PROXMOX_SSH_KEY" | base64 -d > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          mkdir -p ${{ runner.temp }}/.ssh
+          echo "$PROXMOX_SSH_KEY" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+          chmod 600 ${{ runner.temp }}/.ssh/id_rsa
+          echo "SSH_KEY_FILE=${{ runner.temp }}/.ssh/id_rsa" >> $GITHUB_ENV
 
       - name: Install Ansible
         run: |
@@ -289,6 +290,7 @@ jobs:
           [all:vars]
           ansible_python_interpreter=/usr/bin/python3
           ansible_host_key_checking=False
+          ansible_ssh_private_key_file=$SSH_KEY_FILE
           EOF
 
           echo "Dynamic inventory created:"
