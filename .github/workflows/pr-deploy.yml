@@ -117,7 +117,7 @@ jobs:
 
           # Convert to JSON
           if [ $PLAYBOOK_COUNT -gt 0 ]; then
-            PLAYBOOKS_JSON=$(printf '%s\n' "${UNIQUE_PLAYBOOKS[@]}" | jq -R . | jq -s .)
+            PLAYBOOKS_JSON=$(printf '%s\n' "${UNIQUE_PLAYBOOKS[@]}" | jq -R . | jq -sc .)
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             PLAYBOOKS_JSON="[]"
