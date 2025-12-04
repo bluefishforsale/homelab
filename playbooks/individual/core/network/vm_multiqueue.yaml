@@ -1,6 +1,6 @@
 ---
 - name: Configure VM network multiqueue settings in Proxmox
-  hosts: proxmox_hosts
+  hosts: proxmox
   become: true
   gather_facts: true
 

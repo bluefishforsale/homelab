@@ -173,6 +173,9 @@ scrape_configs:
     relabel_configs: *dropPortNumber
     scrape_interval: 15s
     scrape_timeout: 10s
+    authorization:
+      type: Bearer
+      credentials: "{{ ai_services.llamacpp.api_key | default('llamacpp-homelab-key') }}"
     static_configs:
     - targets: ['ocean.home:8080']
 

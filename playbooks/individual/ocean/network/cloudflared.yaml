@@ -13,6 +13,7 @@
     service: cloudflared
     files: "../../../../files/{{ service }}"
     path_home: "/etc/{{ service }}"
+    local_cert_path: "/tmp/cloudflared-ansible-cert.pem"
     config: "{{ path_home }}/config.yaml"
     cert: "{{ path_home }}/cert.pem"
     # Ocean gets the main tunnel (web apps + SSH), others get SSH-only
@@ -23,10 +24,21 @@
 
   tasks:
 
+  # Write vault cert to temp file for local cloudflared commands
+  - name: Create temporary cert file from vault for local commands
+    ansible.builtin.copy:
+      content: "{{ cloudflare.cert_pem }}"
+      dest: "{{ local_cert_path }}"
+      mode: '0600'
+    delegate_to: localhost
+    run_once: true
+    become: false
+    changed_when: false
+
   # Tunnel Management Tasks
   - name: Check if SSH tunnel already exists for non-ocean hosts
     ansible.builtin.command: >
-      cloudflared tunnel --origincert {{ files }}/cert.pem info ssh-{{ inventory_hostname }}
+      cloudflared tunnel --origincert {{ local_cert_path }} info ssh-{{ inventory_hostname }}
     register: tunnel_check
     failed_when: false
     changed_when: false
@@ -44,7 +56,7 @@
 
   - name: Create SSH tunnel for non-ocean hosts
     ansible.builtin.command: >
-      cloudflared tunnel --origincert {{ files }}/cert.pem create ssh-{{ inventory_hostname }}
+      cloudflared tunnel --origincert {{ local_cert_path }} create ssh-{{ inventory_hostname }}
     register: tunnel_creation
     when: 
       - inventory_hostname != 'ocean'
@@ -63,7 +75,7 @@
 
   - name: Get existing tunnel ID if tunnel already existed
     ansible.builtin.command: >
-      cloudflared tunnel --origincert {{ files }}/cert.pem --output json info ssh-{{ inventory_hostname }}
+      cloudflared tunnel --origincert {{ local_cert_path }} --output json info ssh-{{ inventory_hostname }}
     register: existing_tunnel_info
     when: 
       - inventory_hostname != 'ocean'
@@ -132,7 +144,7 @@
 
   - name: Create DNS route for SSH tunnel using cloudflared
     ansible.builtin.command: >
-      cloudflared tunnel --origincert {{ files }}/cert.pem route dns ssh-{{ inventory_hostname }} ssh-{{ inventory_hostname }}.terrac.com
+      cloudflared tunnel --origincert {{ local_cert_path }} route dns ssh-{{ inventory_hostname }} ssh-{{ inventory_hostname }}.terrac.com
     register: dns_route_result
     failed_when: 
       - dns_route_result.rc != 0
@@ -354,8 +366,62 @@
     when:
       - inventory_hostname == 'ocean' 
       - ocean_cf_access_apps.json.result | selectattr('domain','equalto', item.domain) | list | length > 0
-  # Create reusable policies first
-  - name: Create reusable admin policy (always included)
+
+  # Get existing reusable policies first to avoid duplicates
+  - name: Get existing reusable policies for terrac.com zone
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies?reusable=true"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: existing_policies_terrac
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+
+  - name: Get existing reusable policies for saetnere.com zone
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.saetnere_com }}/access/policies?reusable=true"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: existing_policies_saetnere
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+
+  - name: Extract existing policy IDs by name (terrac.com)
+    ansible.builtin.set_fact:
+      existing_admin_policy_id: "{{ (existing_policies_terrac.json.result | selectattr('name', 'equalto', 'Allow admin') | list | first).id | default('') }}"
+      existing_plex_policy_id: "{{ (existing_policies_terrac.json.result | selectattr('name', 'equalto', 'Allow plex users') | list | first).id | default('') }}"
+      existing_bypass_policy_id: "{{ (existing_policies_terrac.json.result | selectattr('name', 'equalto', 'Allow everyone (bypass)') | list | first).id | default('') }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - existing_policies_terrac is defined
+      - existing_policies_terrac.json.result is defined
+
+  - name: Extract existing bypass policy ID (saetnere.com)
+    ansible.builtin.set_fact:
+      existing_bypass_policy_saetnere_id: "{{ (existing_policies_saetnere.json.result | selectattr('name', 'equalto', 'Allow everyone (bypass)') | list | first).id | default('') }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - existing_policies_saetnere is defined
+      - existing_policies_saetnere.json.result is defined
+
+  # Only create policies if they don't exist
+  - name: Create reusable admin policy (if not exists)
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
       method: POST
@@ -369,19 +435,17 @@
         decision: "allow"
         include: "{{ cloudflare.access_allow_emails['admin'] | map('regex_replace', '^(.+)$', '{\"email\": {\"email\": \"\\1\"}}') | map('from_json') | list }}"
         reusable: true
-      status_code: [200, 400]
-    register: reusable_admin_policy
+      status_code: [200]
+    register: created_admin_policy
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
+      - existing_admin_policy_id | default('') == ''
     delegate_to: localhost
     become: false
-    failed_when:
-      - reusable_admin_policy.status == 400
-      - "'already exists' not in reusable_admin_policy.json.errors[0].message | default('')"
 
-  - name: Create reusable plex-users policy
+  - name: Create reusable plex-users policy (if not exists)
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
       method: POST
@@ -395,19 +459,17 @@
         decision: "allow"
         include: "{{ cloudflare.access_allow_emails['plex-users'] | map('regex_replace', '^(.+)$', '{\"email\": {\"email\": \"\\1\"}}') | map('from_json') | list }}"
         reusable: true
-      status_code: [200, 400]
-    register: reusable_plex_policy
+      status_code: [200]
+    register: created_plex_policy
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
+      - existing_plex_policy_id | default('') == ''
     delegate_to: localhost
     become: false
-    failed_when:
-      - reusable_plex_policy.status == 400
-      - "'already exists' not in reusable_plex_policy.json.errors[0].message | default('')"
 
-  - name: Create reusable public bypass policy for terrac.com zone (no authentication)
+  - name: Create reusable bypass policy for terrac.com (if not exists)
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
       method: POST
@@ -422,19 +484,17 @@
         include:
           - everyone: {}
         reusable: true
-      status_code: [200, 400]
-    register: reusable_bypass_policy
+      status_code: [200]
+    register: created_bypass_policy
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
+      - existing_bypass_policy_id | default('') == ''
     delegate_to: localhost
     become: false
-    failed_when:
-      - reusable_bypass_policy.status == 400
-      - "'already exists' not in reusable_bypass_policy.json.errors[0].message | default('')"
 
-  - name: Create reusable public bypass policy for saetnere.com zone (no authentication)
+  - name: Create reusable bypass policy for saetnere.com (if not exists)
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.saetnere_com }}/access/policies"
       method: POST
@@ -449,17 +509,35 @@
         include:
           - everyone: {}
         reusable: true
-      status_code: [200, 400]
-    register: reusable_bypass_policy_saetnere
+      status_code: [200]
+    register: created_bypass_policy_saetnere
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
+      - existing_bypass_policy_saetnere_id | default('') == ''
     delegate_to: localhost
     become: false
-    failed_when:
-      - reusable_bypass_policy_saetnere.status == 400
-      - "'already exists' not in reusable_bypass_policy_saetnere.json.errors[0].message | default('')"
+
+  # Set final policy IDs (use existing or newly created)
+  - name: Set final policy IDs
+    ansible.builtin.set_fact:
+      reusable_admin_policy_id: "{{ existing_admin_policy_id | default('') or (created_admin_policy.json.result.id | default('')) }}"
+      reusable_plex_policy_id: "{{ existing_plex_policy_id | default('') or (created_plex_policy.json.result.id | default('')) }}"
+      reusable_bypass_policy_id: "{{ existing_bypass_policy_id | default('') or (created_bypass_policy.json.result.id | default('')) }}"
+      reusable_bypass_policy_saetnere_id: "{{ existing_bypass_policy_saetnere_id | default('') or (created_bypass_policy_saetnere.json.result.id | default('')) }}"
+    when:
+      - inventory_hostname == 'ocean'
+
+  - name: Debug policy IDs
+    ansible.builtin.debug:
+      msg:
+        - "Admin policy ID: {{ reusable_admin_policy_id }}"
+        - "Plex policy ID: {{ reusable_plex_policy_id }}"
+        - "Bypass policy ID (terrac): {{ reusable_bypass_policy_id }}"
+        - "Bypass policy ID (saetnere): {{ reusable_bypass_policy_saetnere_id }}"
+    when:
+      - inventory_hostname == 'ocean'
 
   # Replace ALL policies with ONLY reusable policies for applications
   - name: Replace all policies with reusable policies (ocean apps)
@@ -476,7 +554,7 @@
         domain: "{{ item.domain }}"
         type: "self_hosted"
         session_duration: "24h"
-        policies: "{{ [reusable_bypass_policy_saetnere.json.result.id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy.json.result.id] if item.access_type == 'fully_public' else ([reusable_admin_policy.json.result.id] + ([reusable_plex_policy.json.result.id] if item.access_type == 'public' else [])) }}"
+        policies: "{{ [reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else [])) }}"
       status_code: [200, 400]
     register: replace_policy_result
     loop: "{{ ocean_access_apps }}"
@@ -485,7 +563,7 @@
       - ocean_access_app_ids[item.domain] is defined
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
-      - (item.access_type == 'fully_public' and ((item.zone_id == cloudflare.saetnere_com and reusable_bypass_policy_saetnere.json.result.id is defined) or (item.zone_id == cloudflare.terrac_com and reusable_bypass_policy.json.result.id is defined))) or (item.access_type == 'private' and reusable_admin_policy.json.result.id is defined) or (item.access_type == 'public' and reusable_admin_policy.json.result.id is defined and reusable_plex_policy.json.result.id is defined)
+      - reusable_admin_policy_id | default('') != ''
     delegate_to: localhost
     become: false
     failed_when:
@@ -568,12 +646,12 @@
         app_type: "ssh"
         session_duration: "24h"
         policies:
-          - "{{ reusable_admin_policy.json.result.id }}"
+          - "{{ reusable_admin_policy_id }}"
       status_code: [200, 400]
     register: ocean_ssh_app_create
     when:
       - inventory_hostname == 'ocean'
-      - reusable_admin_policy.json.result.id is defined
+      - reusable_admin_policy_id | default('') != ''
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
@@ -722,7 +800,7 @@
         app_type: "ssh"
         session_duration: "24h"
         policies:
-          - "{{ hostvars['ocean']['reusable_admin_policy']['json']['result']['id'] }}"
+          - "{{ hostvars['ocean']['reusable_admin_policy_id'] }}"
       status_code: [200, 400]
     register: ssh_replace_policy_result
     when:
@@ -730,8 +808,8 @@
       - cf_access_app_id is defined
       - cf_access_app_id != ''
       - cf_access_app_id != 'undefined'
-      - hostvars['ocean']['reusable_admin_policy'] is defined
-      - hostvars['ocean']['reusable_admin_policy']['json']['result']['id'] is defined
+      - hostvars['ocean']['reusable_admin_policy_id'] is defined
+      - hostvars['ocean']['reusable_admin_policy_id'] != ''
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
@@ -846,9 +924,9 @@
       name: cloudflared
       state: present
 
-  - name: Copy Cloudflare certificate
+  - name: Write Cloudflare certificate from vault
     ansible.builtin.copy:
-      src: "{{ files }}/cert.pem"
+      content: "{{ cloudflare.cert_pem }}"
       dest: "{{ path_home }}/cert.pem"
       mode: '0600'
     notify:
@@ -899,6 +977,16 @@
     notify:
     - Reload systemd daemon
     - Restart service
+
+  # Cleanup temp cert file
+  - name: Remove temporary cert file
+    ansible.builtin.file:
+      path: "{{ local_cert_path }}"
+      state: absent
+    delegate_to: localhost
+    run_once: true
+    become: false
+    changed_when: false
 
   handlers:
   - name: Reload systemd daemon
