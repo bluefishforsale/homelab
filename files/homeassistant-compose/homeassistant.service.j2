@@ -1,10 +1,12 @@
 [Unit]
 Description=Home Assistant with Docker Compose
 Documentation=https://www.home-assistant.io/docs/
-After=docker.service zfs-mount.service zfs-import.target network-online.target
-Wants=network-online.target
+# Start EARLY - immediately after docker to claim UDP ports before other host-networked services
+After=docker.service zfs-mount.service zfs-import.target
 Requires=docker.service zfs-mount.service zfs-import.target
 RequiresMountsFor=/data01
+# Other services should start AFTER this
+Before=cloudflared.service node-exporter.service dcgm-exporter.service
 
 [Service]
 Type=oneshot
@@ -18,17 +20,17 @@ Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
+ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down --remove-orphans --timeout 30'
+ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull --quiet'
 
 # Start command
-ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
+ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
 
 # Stop command
-ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecStop=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
 
 # Reload command
-ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml restart
+ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
 
 # Service behavior
 Restart=on-failure
@@ -38,9 +40,6 @@ TimeoutStopSec=60
 
 # Security
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
 ReadWritePaths={{ home }}
 ReadOnlyPaths=/var/run/docker.sock
 
