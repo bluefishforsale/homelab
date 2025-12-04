@@ -283,7 +283,7 @@
       },
       "targets": [
         {
-          "expr": "llamacpp:predicted_tokens_total{job=\"llamacpp\"}",
+          "expr": "llamacpp:tokens_predicted_total{job=\"llamacpp\"}",
           "refId": "A"
         }
       ],
@@ -314,7 +314,7 @@
       },
       "targets": [
         {
-          "expr": "rate(llamacpp:predicted_tokens_total{job=\"llamacpp\"}[5m])",
+          "expr": "rate(llamacpp:tokens_predicted_total{job=\"llamacpp\"}[5m])",
           "refId": "A"
         }
       ],
@@ -482,7 +482,7 @@
           "refId": "A"
         },
         {
-          "expr": "rate(llamacpp:predicted_tokens_total{job=\"llamacpp\"}[5m])",
+          "expr": "rate(llamacpp:tokens_predicted_total{job=\"llamacpp\"}[5m])",
           "legendFormat": "Generated Tokens/s",
           "refId": "B"
         }
@@ -516,7 +516,7 @@
           "refId": "A"
         },
         {
-          "expr": "increase(llamacpp:predicted_tokens_total{job=\"llamacpp\"}[1h])",
+          "expr": "increase(llamacpp:tokens_predicted_total{job=\"llamacpp\"}[1h])",
           "legendFormat": "Generated Tokens (1h)",
           "refId": "B"
         }

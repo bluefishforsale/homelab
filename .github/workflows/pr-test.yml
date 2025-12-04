@@ -211,20 +211,21 @@ jobs:
       - name: Wait for SSH to be ready
         run: |
           VM_IP="${{ steps.get-ip.outputs.ip }}"
-          echo "Waiting for SSH on $VM_IP..."
-          for i in {1..60}; do
-            if nc -zv -w 5 $VM_IP 22 2>/dev/null; then
-              echo "SSH is ready on $VM_IP"
-              sleep 30  # Extra time for cloud-init to complete
-              break
+          SSH_KEY="${{ runner.temp }}/.ssh/proxmox_key"
+          echo "Waiting for SSH on $VM_IP as debian user..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            if ssh -i "$SSH_KEY" -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes debian@$VM_IP 'exit 0' 2>/dev/null; then
+              echo "SSH connection successful to debian@$VM_IP"
+              exit 0
             fi
-            if [ $i -eq 60 ]; then
-              echo "ERROR: Timeout waiting for SSH"
-              exit 1
-            fi
-            echo "Attempt $i/60: SSH not ready, waiting..."
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: SSH not ready, waiting 5s..."
             sleep 5
           done
+          echo "ERROR: Timeout waiting for SSH after $MAX_ATTEMPTS attempts"
+          exit 1
 
       - name: Display VM information
         run: |
@@ -247,6 +248,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        env:
+          PROXMOX_SSH_KEY: ${{ secrets.PROXMOX_SSH_KEY }}
+        run: |
+          mkdir -p ${{ runner.temp }}/.ssh
+          echo "$PROXMOX_SSH_KEY" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+          chmod 600 ${{ runner.temp }}/.ssh/id_rsa
+          echo "SSH_KEY_FILE=${{ runner.temp }}/.ssh/id_rsa" >> $GITHUB_ENV
+
       - name: Install Ansible
         run: |
           python3 -m pip install --user --quiet ansible
@@ -257,29 +267,30 @@ jobs:
           VM_IP="${{ needs.provision-vm.outputs.vm-ip }}"
           cat > /tmp/ci-inventory-pr-${{ github.event.pull_request.number }}.ini <<EOF
           [ocean]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [docker]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [github_runners]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [baremetal]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [dns]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [pihole]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [node005]
-          $VM_IP ansible_user=root
+          $VM_IP ansible_user=debian
 
           [all:vars]
           ansible_python_interpreter=/usr/bin/python3
           ansible_host_key_checking=False
+          ansible_ssh_private_key_file=$SSH_KEY_FILE
           EOF
 
           echo "Dynamic inventory created:"
@@ -373,13 +384,18 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const results = fs.readFileSync('/tmp/test-results.txt', 'utf8');
-            const total = '${{ steps.test.outputs.total }}';
-            const passed = '${{ steps.test.outputs.passed }}';
-            const failed = '${{ steps.test.outputs.failed }}';
+            let results = 'No test results available (tests may not have run)';
+            try {
+              results = fs.readFileSync('/tmp/test-results.txt', 'utf8');
+            } catch (e) {
+              console.log('Results file not found, using fallback message');
+            }
+            const total = '${{ steps.test.outputs.total }}' || '0';
+            const passed = '${{ steps.test.outputs.passed }}' || '0';
+            const failed = '${{ steps.test.outputs.failed }}' || '0';
 
-            const status = failed > 0 ? '❌' : '✅';
-            const conclusion = failed > 0 ? 'FAILED' : 'PASSED';
+            const status = (failed > 0 || total === '0') ? '❌' : '✅';
+            const conclusion = (failed > 0 || total === '0') ? 'FAILED' : 'PASSED';
 
             const comment = `## ${status} CI Test Results - ${conclusion}
 

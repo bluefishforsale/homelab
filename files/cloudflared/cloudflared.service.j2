@@ -1,6 +1,8 @@
 [Unit]
 Description={{ service }}
-After=network.target
+# Start LATE - after all other services to avoid UDP port collisions
+After=network-online.target docker.service homeassistant.service nginx.service
+Wants=network-online.target
 
 [Service]
 Restart=always
@@ -9,7 +11,7 @@ TimeoutStartSec=5
 PrivateTmp=true
 Type=simple
 PIDFile=/run/cloudflared.pid
-ExecStart=cloudflared tunnel --config {{ config }} run {{ ssh_tunnel_id | default(cloudflared.tunnels[tunnel_name].id) }}
+ExecStart=cloudflared tunnel --config {{ config }} run {{ tunnel }}
 
 # Logging
 StandardOutput=journal

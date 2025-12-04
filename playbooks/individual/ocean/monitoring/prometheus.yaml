@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vault/secrets.yaml
+
   vars:
     image: prom/prometheus
     version: latest
