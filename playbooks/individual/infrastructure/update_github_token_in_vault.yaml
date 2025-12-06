@@ -144,12 +144,12 @@
           Expected structure:
           development:
             github:
-              vault_github_registration_token: "TOKEN_HERE"
+              github_registration_token: "TOKEN_HERE"
 
     - name: Display current token (first 10 chars only)
       ansible.builtin.debug:
         msg: |
-          Current token in vault: {{ vault_secrets.development.github.vault_github_registration_token | default('NOT_SET') | truncate(10, true, '...') }}
+          Current token in vault: {{ vault_secrets.development.github.github_registration_token | default('NOT_SET') | truncate(10, true, '...') }}
           New token to set: {{ token_data.token | truncate(10, true, '...') }}
 
     - name: Update ONLY the GitHub registration token (deep merge)
@@ -158,7 +158,7 @@
           {{ vault_secrets | combine({
             'development': vault_secrets.development | combine({
               'github': vault_secrets.development.github | default({}) | combine({
-                'vault_github_registration_token': token_data.token
+                'github_registration_token': token_data.token
               })
             })
           }, recursive=True) }}
@@ -227,6 +227,6 @@
     - name: Assert token was updated correctly
       ansible.builtin.assert:
         that:
-          - final_check.development.github.vault_github_registration_token == token_data.token
+          - final_check.development.github.github_registration_token == token_data.token
         success_msg: "✓ Token verified in vault - matches generated token"
         fail_msg: "❌ Token mismatch - vault update may have failed"

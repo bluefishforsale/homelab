@@ -136,7 +136,7 @@
           {{ vault_yaml | combine({
             'development': vault_yaml.development | combine({
               'github': vault_yaml.development.github | default({}) | combine({
-                'vault_github_registration_token': token_data.token
+                'github_registration_token': token_data.token
               })
             })
           }, recursive=True) }}
