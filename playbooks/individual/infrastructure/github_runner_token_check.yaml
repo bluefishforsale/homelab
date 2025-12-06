@@ -318,7 +318,7 @@
              Then set:
              development:
                github:
-                 vault_github_registration_token: "{{ new_token_data.token }}"
+                 github_registration_token: "{{ new_token_data.token }}"
           
           2. Or pass the token at runtime:
              
@@ -363,7 +363,7 @@
              Then set:
              development:
                github:
-                 vault_github_registration_token: "{{ new_token_data.token }}"
+                 github_registration_token: "{{ new_token_data.token }}"
           
           2. Or pass the token at runtime:
              
