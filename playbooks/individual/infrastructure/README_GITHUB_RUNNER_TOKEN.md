@@ -140,7 +140,7 @@ NEXT STEPS
    Then set:
    development:
      github:
-       vault_github_registration_token: "AABBCCDD1234567890..."
+       github_registration_token: "AABBCCDD1234567890..."
 
 2. Or pass the token at runtime:
    
@@ -182,7 +182,7 @@ For registration tokens (manual approach):
 ```yaml
 development:
   github:
-    vault_github_registration_token: "YOUR_TOKEN_HERE"
+    github_registration_token: "YOUR_TOKEN_HERE"
 ```
 
 For PAT (recommended approach):
@@ -285,7 +285,7 @@ github_pat_token: "{{ development.github.token }}"
 # vault/secrets.yaml
 development:
   github:
-    vault_github_registration_token: "AXXXX..."
+    github_registration_token: "AXXXX..."
 ```
 
 ## Related Files
