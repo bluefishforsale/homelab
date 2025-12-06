@@ -193,21 +193,23 @@ jobs:
           python3 -m pip install --user --quiet ansible
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Dry-run playbook
+      - name: Dry-run playbook (CI mode)
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          echo "🔍 Dry-run: ${{ matrix.playbook }}"
+          echo "🔍 Dry-run (CI mode): ${{ matrix.playbook }}"
 
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
 
+          # Use CI inventory (localhost) for validation
+          # This verifies tasks would run without SSH to production
           ansible-playbook \
             --check \
             --diff \
             --vault-password-file=/tmp/.vault_pass \
-            -i inventories/production/hosts.ini \
+            -i .github/ci_inventory.ini \
             "${{ matrix.playbook }}"
 
           rm -f /tmp/.vault_pass
