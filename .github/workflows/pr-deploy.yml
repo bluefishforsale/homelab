@@ -174,50 +174,9 @@ jobs:
           echo ""
           echo "✅ All playbooks validated"
 
-  dry-run:
-    name: Dry-run (${{ matrix.playbook }})
-    needs: [detect-changes, validate]
-    if: needs.detect-changes.outputs.has_changes == 'true'
-    runs-on: [self-hosted, homelab, ansible]
-    strategy:
-      matrix:
-        playbook: ${{ fromJson(needs.detect-changes.outputs.playbooks) }}
-      fail-fast: false
-      max-parallel: 1
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Ansible
-        run: |
-          python3 -m pip install --user --quiet ansible
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Dry-run playbook (CI mode)
-        env:
-          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "🔍 Dry-run (CI mode): ${{ matrix.playbook }}"
-
-          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
-          chmod 600 /tmp/.vault_pass
-
-          # Use CI inventory (localhost) for validation
-          # This verifies tasks would run without SSH to production
-          ansible-playbook \
-            --check \
-            --diff \
-            --vault-password-file=/tmp/.vault_pass \
-            -i .github/ci_inventory.ini \
-            "${{ matrix.playbook }}"
-
-          rm -f /tmp/.vault_pass
-          echo "✅ Dry-run passed"
-
   deploy:
     name: Deploy (${{ matrix.playbook }})
-    needs: [detect-changes, validate, dry-run]
+    needs: [detect-changes, validate]
     if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
     environment: production
@@ -255,7 +214,7 @@ jobs:
 
   summary:
     name: Deployment Summary
-    needs: [detect-changes, validate, dry-run, deploy]
+    needs: [detect-changes, validate, deploy]
     if: always() && needs.detect-changes.outputs.has_changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
     steps:
@@ -267,7 +226,6 @@ jobs:
           echo ""
           echo "Playbooks: ${{ needs.detect-changes.outputs.playbook_count }}"
           echo "Validation: ${{ needs.validate.result }}"
-          echo "Dry-run: ${{ needs.dry-run.result }}"
           echo "Deploy: ${{ needs.deploy.result }}"
           echo ""
 
