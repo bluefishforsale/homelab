@@ -523,7 +523,50 @@ CEO (LLM-backed)
 - Work items assigned and tracked through completion
 - Work history preserved for performance metrics
 
-### 7. Scheduler & SCRUM Meetings
+### 7. Product Pipeline System
+
+The product pipeline system continuously generates and develops product ideas through a multi-stage lifecycle:
+
+**Pipeline Stages:**
+
+1. **Ideation** - CEO generates product idea via LLM with constraints (no AI/quantum, small cap, startup-viable)
+2. **Work Packet** - Employees create comprehensive documentation:
+   - Market research (research employee)
+   - Competitive analysis (analysis employee)
+   - Business plan (writing employee)
+   - Financial projections (analysis employee)
+   - Marketing strategy (marketing employee)
+3. **C-Suite Review** - Executives review work packet and approve/request revisions (max 3 iterations)
+4. **Board Vote** - Simulated board voting on product viability
+5. **Execution Plan** - C-Suite generates detailed execution plan with phases, milestones, KPIs
+6. **Launched** - Final state with downloadable HTML execution plan
+
+**Key Features:**
+
+- **Continuous Operation**: Maintains up to 5 concurrent pipelines
+- **Seed Persistence**: Company seed (name, sector, mission, vision) persists in PostgreSQL across restarts
+- **Diversity**: Tracks existing ideas to generate complementary, non-overlapping products
+- **PDF Export**: HTML execution plans can be previewed in browser or downloaded for printing
+- **Real-time Updates**: WebSocket events + frontend polling every 5 seconds
+- **Constraints**: Only startup-viable, bootstrappable ideas; no AI/ML or quantum themes
+
+**Database Schema:**
+
+```sql
+CREATE TABLE company_seeds (
+    id UUID PRIMARY KEY,
+    sector TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    mission TEXT,
+    vision TEXT,
+    target_market TEXT,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+```
+
+### 8. Scheduler & SCRUM Meetings
 
 The scheduler manages recurring tasks and SCRUM ceremonies:
 
@@ -572,9 +615,11 @@ files/ai-corp/
 │   ├── websocket.go         # WebSocket handling
 │   ├── orchestrator.go      # Workflow engine
 │   ├── organization.go      # Organization structure (CEO, divisions, employees)
+│   ├── pipeline.go          # Product pipeline manager and lifecycle
 │   ├── board.go             # Board of Directors, meetings, decisions
 │   ├── scheduler.go         # Task scheduler, SCRUM meetings
-│   ├── roles.go             # Role agent definitions
+│   ├── providers.go         # LLM provider abstraction
+│   ├── storage.go           # File storage operations
 │   ├── providers/
 │   │   ├── provider.go      # Provider interface
 │   │   ├── openai.go        # OpenAI/ChatGPT

@@ -316,16 +316,47 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req LLMRequest) (*LLMRespo
 		}
 	}
 
+	// Enable extended thinking for Claude 4.5+ Sonnet models
+	enableThinking := strings.Contains(model, "claude-sonnet-4") || strings.Contains(model, "claude-3-5-sonnet") || strings.Contains(model, "claude-3-7-sonnet")
+	
+	// Set max_tokens - optimize based on request size and thinking needs
+	maxTokens := req.MaxTokens
+	if maxTokens == 0 {
+		if enableThinking {
+			// Reduce thinking budget for efficiency: 5k thinking + 3k output = 8k total
+			maxTokens = 8000
+		} else {
+			maxTokens = 4000 // Default for non-thinking requests
+		}
+	}
+	
+	// Enforce minimum max_tokens when thinking is enabled (must be > thinking budget)
+	if enableThinking && maxTokens <= 5000 {
+		maxTokens = 6000 // Minimum: 5k thinking + 1k output
+	}
+
 	body := map[string]interface{}{
 		"model":      model,
 		"messages":   messages,
-		"max_tokens": req.MaxTokens,
+		"max_tokens": maxTokens,
 	}
+	
+	if enableThinking {
+		body["thinking"] = map[string]interface{}{
+			"type":   "enabled",
+			"budget_tokens": 5000, // Reduced from 10k for cost efficiency
+		}
+		// When thinking is enabled, temperature must be 1 or omitted
+		body["temperature"] = 1.0
+	} else {
+		// Only set temperature if not using thinking mode
+		if req.Temperature > 0 {
+			body["temperature"] = req.Temperature
+		}
+	}
+	
 	if system != "" {
 		body["system"] = system
-	}
-	if req.Temperature > 0 {
-		body["temperature"] = req.Temperature
 	}
 
 	jsonData, _ := json.Marshal(body)

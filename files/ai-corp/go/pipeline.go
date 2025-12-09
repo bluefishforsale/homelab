@@ -308,26 +308,23 @@ IMPORTANT: We already have these products in development:
 Generate a DIFFERENT product idea that complements but does NOT overlap with existing products.`, strings.Join(existingIdeas, "\n"))
 	}
 	
-	prompt := fmt.Sprintf(`You are the CEO of %s, a %s company targeting %s.
+	prompt := fmt.Sprintf(`CEO of %s (%s sector, target: %s). Mission: %s. Vision: %s.%s
 
-Mission: %s
-Vision: %s
-%s
+Generate bootstrappable startup product idea.
 
-Generate a compelling, INNOVATIVE product or service idea. Be creative and think outside the box. 
-Consider different approaches: infrastructure, tools, platforms, services, or solutions.
+Rules: Small cap, NO AI/ML/quantum, tangible solution, small team viable.
 
-Respond in this EXACT format:
-PROBLEM: [What problem does this solve?]
-SOLUTION: [What is the product/service?]
-VALUE_PROP: [Why would customers choose this?]
-TARGET_CUSTOMER: [Who specifically buys this?]
-REVENUE_MODEL: [How does it make money?]`, 
+Format:
+PROBLEM: [issue solved]
+SOLUTION: [product/service]
+VALUE_PROP: [key benefit]
+TARGET_CUSTOMER: [buyer profile]
+REVENUE_MODEL: [monetization]`, 
 		seed.CompanyName, seed.Sector, seed.TargetMarket, seed.Mission, seed.Vision, existingContext)
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{{Role: "user", Content: prompt}},
-		MaxTokens: 800,
+		MaxTokens: 500, // Reduced from 800
 		Temperature: 0.8,
 	})
 	if err != nil {
