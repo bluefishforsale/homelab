@@ -148,7 +148,7 @@ interface Employee {
 
 interface PersonDetail {
   id: string
-  type: 'employee' | 'manager' | 'department_head' | 'board_member'
+  type: 'employee' | 'manager' | 'department_head' | 'board_member' | 'executive' | 'ceo' | 'director'
   name: string
   title: string
   boss?: { id: string; name: string; title: string }
@@ -157,6 +157,7 @@ interface PersonDetail {
   skill?: string
   status?: string
   style?: string
+  biography?: Biography
 }
 
 interface BoardMember {
@@ -1523,25 +1524,25 @@ function Runs() {
   )
 }
 
-// Organization page
+// Organization page with pyramid chart
 function OrganizationPage() {
-  const [divisions, setDivisions] = useState<Division[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [people, setPeople] = useState<Person[]>([])
   const [companyStatus, setCompanyStatus] = useState<CompanyStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedPerson, setSelectedPerson] = useState<PersonDetail | null>(null)
   const [loadingPerson, setLoadingPerson] = useState(false)
+  const [sidePanelOpen, setSidePanelOpen] = useState(false)
+  const [editingBio, setEditingBio] = useState(false)
+  const [bioText, setBioText] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [divisionsData, employeesData, statusData] = await Promise.all([
-          api.getDivisions(),
-          api.getEmployees(),
+        const [peopleData, statusData] = await Promise.all([
+          api.getPeople(),
           api.getOrgStatus()
         ])
-        setDivisions(divisionsData.divisions || [])
-        setEmployees(employeesData.employees || [])
+        setPeople(peopleData.people || [])
         setCompanyStatus(statusData)
       } finally {
         setLoading(false)
@@ -1554,110 +1555,172 @@ function OrganizationPage() {
 
   const handleSelectPerson = async (id: string) => {
     setLoadingPerson(true)
+    setSidePanelOpen(true)
+    setEditingBio(false)
     try {
       const detail = await api.getPersonDetail(id)
       setSelectedPerson(detail)
+      setBioText(detail.biography?.bio || '')
     } finally {
       setLoadingPerson(false)
     }
   }
+
+  const handleSaveBio = async () => {
+    if (!selectedPerson) return
+    // TODO: Add API call to save bio
+    console.log('Saving bio:', bioText)
+    setEditingBio(false)
+  }
+
+  // Group people by hierarchy level for pyramid layout
+  const orgLevels = [
+    { level: 'CEO', people: people.filter(p => p.type === 'ceo'), color: 'bg-purple-500' },
+    { level: 'C-Suite', people: people.filter(p => p.type === 'executive'), color: 'bg-blue-500' },
+    { level: 'Directors', people: people.filter(p => p.type === 'director'), color: 'bg-indigo-500' },
+    { level: 'Managers', people: people.filter(p => p.type === 'manager'), color: 'bg-cyan-500' },
+    { level: 'Employees', people: people.filter(p => p.type === 'employee'), color: 'bg-green-500' }
+  ].filter(level => level.people.length > 0)
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
   }
 
   return (
-    <div className="flex gap-6">
-      {/* Left column - Org structure */}
-      <div className="flex-1 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Organization Structure</h1>
-          <div className="flex items-center gap-2">
-            <span className={`w-3 h-3 rounded-full ${companyStatus?.status === 'running' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="text-sm capitalize">{companyStatus?.status}</span>
-          </div>
-        </div>
-
-        {/* Divisions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {divisions.map((div: Division) => (
-            <div key={div.id} className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Building2 className="w-5 h-5 text-purple-600" />
-                <h3 className="font-semibold">{div.name}</h3>
-              </div>
-              <p className="text-sm text-gray-500 mb-2">{div.description}</p>
-              <div className="text-xs text-primary-600">{div.departments} departments</div>
+    <div className="relative h-full">
+      {/* Main Content */}
+      <div className={`transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Organization Chart</h1>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold">{people.length}</span> people
             </div>
-          ))}
-        </div>
-
-        {/* Employee Stats */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Employee Distribution</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Object.entries(companyStatus?.stats?.by_skill || {}).map(([skill, count]) => (
-              <div key={skill} className="bg-gray-50 rounded p-3 text-center">
-                <div className="text-xl font-bold text-primary-600">{count as number}</div>
-                <div className="text-xs text-gray-500 capitalize">{skill.replace('_', ' ')}</div>
-              </div>
-            ))}
+            <div className="flex items-center gap-2">
+              <span className={`w-3 h-3 rounded-full ${companyStatus?.status === 'running' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+              <span className="text-sm capitalize">{companyStatus?.status}</span>
+            </div>
           </div>
         </div>
 
-        {/* Employee List */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b">
-            <h2 className="font-semibold">All Employees ({employees.length})</h2>
-          </div>
-          <div className="divide-y max-h-80 overflow-y-auto">
-            {employees.map((emp: Employee) => (
-              <div 
-                key={emp.id} 
-                className={`p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${selectedPerson?.id === emp.id ? 'bg-primary-50' : ''}`}
-                onClick={() => handleSelectPerson(emp.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <UserCircle className="w-8 h-8 text-gray-400" />
-                  <div>
-                    <div className="font-medium">{emp.name}</div>
-                    <div className="text-xs text-gray-500 capitalize">{emp.skill.replace('_', ' ')}</div>
-                  </div>
+        {/* Pyramid Org Chart */}
+        <div className="bg-white rounded-lg shadow p-8 overflow-auto">
+          <div className="flex flex-col items-center gap-8 min-w-max">
+            {orgLevels.map((level, levelIndex) => (
+              <div key={level.level} className="flex flex-col items-center gap-3" style={{ width: `${Math.min(100, (levelIndex + 1) * 20)}%` }}>
+                {/* Level Label */}
+                <div className="text-sm font-semibold text-gray-500 mb-2">{level.level}</div>
+                
+                {/* People Cards in This Level */}
+                <div className="flex flex-wrap justify-center gap-3">
+                  {level.people.map((person) => (
+                    <div
+                      key={person.id}
+                      onClick={() => handleSelectPerson(person.id)}
+                      className={`${level.color} text-white rounded-lg p-3 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-lg min-w-[140px] text-center`}
+                    >
+                      <UserCircle className="w-8 h-8 mx-auto mb-1 opacity-90" />
+                      <div className="text-sm font-medium">{person.name}</div>
+                      <div className="text-xs opacity-75 mt-1">{person.role}</div>
+                      {person.status && (
+                        <div className={`text-xs mt-1 px-2 py-0.5 rounded inline-block ${
+                          person.status === 'working' ? 'bg-yellow-400 text-yellow-900' :
+                          person.status === 'idle' ? 'bg-gray-300 text-gray-700' :
+                          'bg-white text-gray-800'
+                        }`}>
+                          {person.status}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{emp.work_count} tasks</span>
-                  <StatusBadge status={emp.status} />
-                </div>
+
+                {/* Connecting Lines */}
+                {levelIndex < orgLevels.length - 1 && (
+                  <svg className="w-full h-8" style={{ minWidth: '200px' }}>
+                    <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#cbd5e1" strokeWidth="2" />
+                  </svg>
+                )}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Right column - Person Detail Card */}
-      <div className="w-96">
-        <div className="bg-white rounded-lg shadow sticky top-6">
-          {loadingPerson ? (
-            <div className="p-8 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-500 mx-auto" />
+      {/* Sliding Side Panel */}
+      <div
+        className={`fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+          sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {loadingPerson ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+          </div>
+        ) : selectedPerson ? (
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-primary-500 to-primary-600 text-white">
+              <h2 className="text-lg font-bold">Person Details</h2>
+              <button
+                onClick={() => setSidePanelOpen(false)}
+                className="p-1 hover:bg-white/20 rounded transition-colors"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
             </div>
-          ) : selectedPerson ? (
-            <div className="p-4 space-y-4">
-              {/* Header */}
-              <div className="text-center border-b pb-4">
-                <UserCircle className="w-16 h-16 mx-auto text-primary-500 mb-2" />
-                <h2 className="text-xl font-bold">{selectedPerson.name}</h2>
-                <p className="text-sm text-gray-500">{selectedPerson.title}</p>
-                <span className="inline-block mt-2 px-2 py-1 text-xs bg-primary-100 text-primary-700 rounded capitalize">
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Profile Section */}
+              <div className="text-center pb-4 border-b">
+                <UserCircle className="w-20 h-20 mx-auto text-primary-500 mb-3" />
+                <h3 className="text-xl font-bold">{selectedPerson.name}</h3>
+                <p className="text-sm text-gray-600">{selectedPerson.title}</p>
+                <span className="inline-block mt-2 px-3 py-1 text-xs bg-primary-100 text-primary-700 rounded-full capitalize">
                   {selectedPerson.type.replace('_', ' ')}
                 </span>
               </div>
 
-              {/* Boss/Manager */}
+              {/* Biography Section */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Reports To</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-gray-700">Biography</h4>
+                  {!editingBio ? (
+                    <button
+                      onClick={() => setEditingBio(true)}
+                      className="text-primary-600 hover:text-primary-700 p-1"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSaveBio}
+                      className="text-green-600 hover:text-green-700 p-1"
+                    >
+                      <Save className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {editingBio ? (
+                  <textarea
+                    value={bioText}
+                    onChange={(e) => setBioText(e.target.value)}
+                    className="w-full p-2 border rounded text-sm min-h-[120px] focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Add biography..."
+                  />
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    {bioText || <span className="italic text-gray-400">No biography yet. Click edit to add one.</span>}
+                  </p>
+                )}
+              </div>
+
+              {/* Reports To */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Reports To</h4>
                 {selectedPerson.boss ? (
-                  <div 
+                  <div
                     className="flex items-center gap-2 p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSelectPerson(selectedPerson.boss!.id)}
                   >
@@ -1674,19 +1737,19 @@ function OrganizationPage() {
 
               {/* Direct Reports */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">
                   Direct Reports ({selectedPerson.direct_reports?.length || 0})
-                </h3>
+                </h4>
                 {selectedPerson.direct_reports && selectedPerson.direct_reports.length > 0 ? (
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
                     {selectedPerson.direct_reports.map((report: { id: string; name: string; title: string }) => (
-                      <div 
-                        key={report.id} 
+                      <div
+                        key={report.id}
                         className="flex items-center gap-2 p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
                         onClick={() => handleSelectPerson(report.id)}
                       >
                         <UserCircle className="w-5 h-5 text-gray-400" />
-                        <div>
+                        <div className="flex-1">
                           <div className="text-sm font-medium">{report.name}</div>
                           <div className="text-xs text-gray-500">{report.title}</div>
                         </div>
@@ -1700,7 +1763,7 @@ function OrganizationPage() {
 
               {/* Expectations */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Expectations</h3>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Expectations</h4>
                 {selectedPerson.expectations && selectedPerson.expectations.length > 0 ? (
                   <ul className="space-y-1">
                     {selectedPerson.expectations.map((exp: string, i: number) => (
@@ -1715,7 +1778,7 @@ function OrganizationPage() {
                 )}
               </div>
 
-              {/* Additional info */}
+              {/* Status */}
               {selectedPerson.status && (
                 <div className="pt-2 border-t">
                   <div className="flex justify-between text-sm">
@@ -1737,17 +1800,18 @@ function OrganizationPage() {
                 </div>
               )}
             </div>
-          ) : (
-            <div className="p-8 text-center text-gray-400">
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full p-8 text-center text-gray-400">
+            <div>
               <UserCircle className="w-16 h-16 mx-auto mb-2 opacity-50" />
-              <p>Select a person to view details</p>
+              <p className="font-medium">Select a person to view details</p>
               <p className="text-xs mt-2">
-                Click on any employee in the list to see their:<br/>
-                name, title, boss, reports & expectations
+                Click on any person in the org chart<br/>to see their details and edit their biography
               </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

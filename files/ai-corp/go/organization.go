@@ -853,28 +853,16 @@ func (org *Organization) generateProductIdeas(seed *CompanySeed) {
 		return
 	}
 	
-	prompt := fmt.Sprintf(`You are a product strategist for %s, a new company in the %s sector targeting %s.
+	prompt := fmt.Sprintf(`Product strategist for %s (%s sector, target: %s). Mission: %s. Vision: %s.
 
-Mission: %s
-Vision: %s
+Generate 3 product ideas. Rules: NO AI/ML/quantum, bootstrappable, tangible.
 
-Generate 3 innovative product or service ideas for this company. For each idea, provide:
-1. Name (short, memorable product name)
-2. Category (SaaS, Platform, API, Mobile App, Hardware, Service, Consulting, etc.)
-3. Description (2-3 sentences explaining the product)
-4. Value Proposition (1 sentence on key benefit)
-5. Key Features (comma-separated list of 3-5 features)
-
-Format your response EXACTLY like this, with each product separated by ---:
-
-PRODUCT: [Name]
-CATEGORY: [Category]
-DESCRIPTION: [Description]
-VALUE_PROP: [Value Proposition]
-FEATURES: [Feature1, Feature2, Feature3]
----
-PRODUCT: [Name]
-...`, seed.CompanyName, sectorName, seed.TargetMarket, seed.Mission, seed.Vision)
+Format (use --- separator):
+PRODUCT: [name]
+CATEGORY: [type]
+DESCRIPTION: [2 sentences]
+VALUE_PROP: [key benefit]
+FEATURES: [3-5 items]`, seed.CompanyName, sectorName, seed.TargetMarket, seed.Mission, seed.Vision)
 	
 	ctx, cancel := context.WithTimeout(org.ctx, 2*time.Minute)
 	defer cancel()
@@ -883,7 +871,7 @@ PRODUCT: [Name]
 		Messages: []LLMMessage{
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens:   1500,
+		MaxTokens:   1000, // Reduced from 1500
 		Temperature: 0.8,
 	})
 	

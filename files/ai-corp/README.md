@@ -92,14 +92,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design.
 
 ### Core Components
 
+- **Product Pipeline**: Automated product ideation through execution planning lifecycle
 - **Workflow Orchestrator**: Executes workflow definitions with step-by-step execution
 - **Role Agents**: LLM-backed virtual employees (Board, CEO, CTO, Marketing, Artist, Worker)
-- **Provider Abstraction**: Support for Claude, Gemini, ChatGPT, and local LLMs (llama.cpp)
+- **Provider Abstraction**: Support for Claude 4.5 Sonnet (with extended thinking), Gemini, ChatGPT, and local LLMs (llama.cpp)
+- **Extended Thinking**: Claude Sonnet 4.5 uses 5,000 token thinking budget + 3,000 token output (cost-optimized)
 - **Job Queue**: Redis-based async workflow processing
-- **Persistence**: PostgreSQL for workflow state and history
+- **Persistence**: PostgreSQL for workflow state, history, and seed configuration
 - **Organization**: Hierarchical structure with CEO, divisions, departments, managers, employees
 - **Scheduler**: Automated task scheduling with SCRUM ceremonies
 - **Meeting System**: Full meeting tracking with dialog, decisions, and action items
+- **Real-time Updates**: WebSocket broadcasting with frontend polling every 5 seconds
 
 ### Technology Stack
 
@@ -141,21 +144,71 @@ API keys are passed via environment variables:
 | Variable | Description |
 |----------|-------------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT-4 |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude (with extended thinking) |
 | `GOOGLE_API_KEY` | Google API key for Gemini |
 | `MIDJOURNEY_API_KEY` | Midjourney API key (if enabled) |
+
+**Extended Thinking**: Claude Sonnet 4.5 and newer models automatically enable extended thinking mode with a 5,000 token thinking budget and 8,000 total max tokens (5k thinking + 3k output). Optimized for cost efficiency while maintaining high-quality reasoning.
 
 ### Vault Configuration
 
 Add to `vault/secrets.yaml`:
 
 ```yaml
-ai_corp:
-  postgres_password: "secure-password"
-  openai_api_key: "sk-..."
-  anthropic_api_key: "sk-ant-..."
-  google_api_key: "AIza..."
+ai_services:
+  claude:
+    api_key: "sk-ant-..."  # Claude with extended thinking
+  ai_corp:
+    postgres_password: "secure-password"
+    # Optional: Add other LLM providers
+    # openai_api_key: "sk-..."
+    # google_api_key: "AIza..."
 ```
+
+## Product Pipeline
+
+The system includes an automated product development lifecycle that continuously generates and develops product ideas:
+
+### Pipeline Stages
+
+1. **Ideation** - CEO generates product idea via LLM
+2. **Work Packet** - Employees create:
+   - Market research
+   - Competitive analysis
+   - Business plan
+   - Financial projections
+   - Marketing strategy
+3. **C-Suite Review** - Executives review and approve/request revisions (max 3 revisions)
+4. **Board Vote** - Simulated board voting on viability
+5. **Execution Plan** - Detailed plan with phases, milestones, KPIs, budget
+6. **Launched** - Final approved product with downloadable execution plan (HTML)
+
+### Product Generation Constraints
+
+The AI Corporation enforces strict constraints on generated business ideas:
+
+- **Small cap / bootstrappable** - Realistic for startup funding, not requiring massive capital
+- **NO AI/ML products** - Absolutely no artificial intelligence, machine learning, or neural network themes
+- **NO quantum computing** - No quantum computing, quantum encryption, or any quantum-related products
+- **Tangible solutions** - Real products, services, or software that solve practical business problems
+- **Startup viable** - Must be executable by a small startup team with limited resources
+
+These constraints are hardcoded into both the initial seeding prompt and the continuous pipeline generation to ensure all product ideas remain practical and bootstrappable.
+
+### Continuous Operation
+
+- System maintains up to **5 concurrent pipelines**
+- Automatically generates new ideas every 15 seconds when capacity available
+- Persists seed configuration across restarts
+- Products diversify based on existing ideas to avoid duplicates
+
+### PDF Export
+
+Launched products include downloadable HTML execution plans that can be:
+
+- **Previewed in browser** - Direct view of formatted plan
+- **Downloaded as HTML** - Can be printed to PDF via browser
+- **Includes**: Full business plan, execution phases, milestones, KPIs, team structure
 
 ## Workflows
 
@@ -207,14 +260,33 @@ steps:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/api/v1/org/status` | Company status and employee statistics |
 | `GET` | `/api/v1/org/structure` | Get full organization structure |
 | `GET` | `/api/v1/org/divisions` | List all divisions |
 | `GET` | `/api/v1/org/employees` | List all employees |
 | `GET` | `/api/v1/org/employees/{id}/detail` | Get detailed employee info with activity log |
 | `GET` | `/api/v1/org/person/{id}` | Get person details (employee/manager/exec) |
 | `GET` | `/api/v1/org/people` | Search people across org |
+| `GET` | `/api/v1/org/deliverables` | List work deliverables with status breakdown |
 | `POST` | `/api/v1/org/pause` | Pause company operations |
 | `POST` | `/api/v1/org/resume` | Resume company operations |
+
+### Seed APIs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/org/seed` | Get current company seed configuration |
+| `POST` | `/api/v1/org/seed` | Set company seed (name, sector, mission, vision) |
+| `GET` | `/api/v1/org/sectors` | List available business sectors |
+
+### Product Pipeline APIs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/org/products` | List old product ideas (legacy) |
+| `GET` | `/api/v1/org/pipelines` | List all product pipelines with stage info |
+| `GET` | `/api/v1/org/pipelines/{id}/download` | Download execution plan HTML (preview in browser) |
+| `GET` | `/api/v1/org/pipelines/{id}/download?download=true` | Download execution plan HTML (force download) |
 
 ### Meeting APIs
 
@@ -227,7 +299,8 @@ steps:
 
 | Route | Page | Description |
 |-------|------|-------------|
-| `/` | Dashboard | System overview, health, active workflows |
+| `/` | Dashboard | Company status, product pipeline summary, active workers |
+| `/products` | Products | Product pipeline viewer with stage breakdown and downloads |
 | `/seed` | Seed Setup | Configure and seed the AI corporation |
 | `/workflows` | Workflows | View and launch workflow templates |
 | `/runs` | Runs | Monitor active and completed workflow runs |
