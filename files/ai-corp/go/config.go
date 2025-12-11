@@ -51,6 +51,7 @@ type Config struct {
 	MaxStepsPerWorkflow    int
 	RateLimitRPM           int
 	ContextCacheTTL        int
+	LLMTimeoutMinutes      int
 
 	// Storage
 	StorageType             StorageType
@@ -85,6 +86,7 @@ func LoadConfig(path string) (*Config, error) {
 		MaxStepsPerWorkflow:    50,
 		RateLimitRPM:           60,
 		ContextCacheTTL:        3600,
+		LLMTimeoutMinutes:      10,
 		Providers:              make(map[string]ProviderConfig),
 		Roles:                  make(map[RoleName]Role),
 		// Storage defaults (local for development)
@@ -204,6 +206,7 @@ func (c *Config) parseINI(cfg *ini.File) error {
 		c.MaxStepsPerWorkflow = sec.Key("max_steps_per_workflow").MustInt(c.MaxStepsPerWorkflow)
 		c.RateLimitRPM = sec.Key("rate_limit_rpm").MustInt(c.RateLimitRPM)
 		c.ContextCacheTTL = sec.Key("context_cache_ttl").MustInt(c.ContextCacheTTL)
+		c.LLMTimeoutMinutes = sec.Key("llm_timeout_minutes").MustInt(c.LLMTimeoutMinutes)
 	}
 
 	// [storage]

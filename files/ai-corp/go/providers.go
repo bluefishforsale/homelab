@@ -147,7 +147,7 @@ func NewOpenAICompatibleProvider(name, baseURL, model, apiKey string) *OpenAICom
 		model:   model,
 		apiKey:  apiKey,
 		httpClient: &http.Client{
-			Timeout: 300 * time.Second, // 5 minutes for slow LLM responses
+			Timeout: 900 * time.Second, // 15 minutes for slow/downclocked GPUs
 		},
 	}
 }

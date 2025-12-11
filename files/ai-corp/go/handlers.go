@@ -722,9 +722,17 @@ func (h *Handlers) ListEmployeesHandler(w http.ResponseWriter, r *http.Request) 
 	skillFilter := r.URL.Query().Get("skill")
 	statusFilter := r.URL.Query().Get("status")
 
+	// Copy employee list while holding org lock
 	h.app.org.mu.RLock()
-	employees := make([]map[string]interface{}, 0)
+	empList := make([]*Employee, 0, len(h.app.org.AllEmployees))
 	for _, emp := range h.app.org.AllEmployees {
+		empList = append(empList, emp)
+	}
+	h.app.org.mu.RUnlock()
+
+	// Now iterate without holding org lock (prevents deadlock)
+	employees := make([]map[string]interface{}, 0)
+	for _, emp := range empList {
 		emp.mu.RLock()
 		
 		// Apply filters
@@ -752,7 +760,6 @@ func (h *Handlers) ListEmployeesHandler(w http.ResponseWriter, r *http.Request) 
 		employees = append(employees, empData)
 		emp.mu.RUnlock()
 	}
-	h.app.org.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1024,20 +1031,27 @@ func (h *Handlers) ListManagersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Copy manager list while holding org lock
 	h.app.org.mu.RLock()
-	managers := make([]map[string]interface{}, 0, len(h.app.org.AllManagers))
+	mgrList := make([]*Manager, 0, len(h.app.org.AllManagers))
 	for _, mgr := range h.app.org.AllManagers {
+		mgrList = append(mgrList, mgr)
+	}
+	h.app.org.mu.RUnlock()
+
+	// Now iterate without holding org lock (prevents deadlock)
+	managers := make([]map[string]interface{}, 0, len(mgrList))
+	for _, mgr := range mgrList {
 		mgr.mu.RLock()
 		managers = append(managers, map[string]interface{}{
-			"id":            mgr.ID,
-			"name":          mgr.Name,
-			"specialty":     mgr.Specialty,
+			"id":             mgr.ID,
+			"name":           mgr.Name,
+			"specialty":      mgr.Specialty,
 			"employee_count": len(mgr.Employees),
-			"max_reports":   mgr.MaxReports,
+			"max_reports":    mgr.MaxReports,
 		})
 		mgr.mu.RUnlock()
 	}
-	h.app.org.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1969,25 +1983,49 @@ func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Copy all lists while holding org lock to prevent deadlock
+	h.app.org.mu.RLock()
+	var ceo *DepartmentHead
+	if h.app.org.CEO != nil {
+		ceo = h.app.org.CEO
+	}
+	divisions := make([]*Division, 0, len(h.app.org.Divisions))
+	for _, div := range h.app.org.Divisions {
+		divisions = append(divisions, div)
+	}
+	employees := make([]*Employee, 0, len(h.app.org.AllEmployees))
+	for _, emp := range h.app.org.AllEmployees {
+		employees = append(employees, emp)
+	}
+	managers := make([]*Manager, 0, len(h.app.org.AllManagers))
+	for _, mgr := range h.app.org.AllManagers {
+		managers = append(managers, mgr)
+	}
+	h.app.org.mu.RUnlock()
+
+	// Now iterate without holding org lock (prevents deadlock)
 	people := make([]map[string]interface{}, 0)
 
 	// Add CEO
-	h.app.org.mu.RLock()
-	if h.app.org.CEO != nil {
-		h.app.org.CEO.mu.RLock()
+	if ceo != nil {
+		ceo.mu.RLock()
 		people = append(people, map[string]interface{}{
-			"id":   h.app.org.CEO.ID,
+			"id":   ceo.ID,
 			"type": "ceo",
-			"name": h.app.org.CEO.Name,
-			"role": h.app.org.CEO.Title,
+			"name": ceo.Name,
+			"role": ceo.Title,
 		})
-		h.app.org.CEO.mu.RUnlock()
+		ceo.mu.RUnlock()
 	}
 
 	// Add department heads (executives)
-	for _, division := range h.app.org.Divisions {
+	for _, division := range divisions {
 		division.mu.RLock()
-		for _, head := range division.Heads {
+		heads := make([]*DepartmentHead, len(division.Heads))
+		copy(heads, division.Heads)
+		division.mu.RUnlock()
+		
+		for _, head := range heads {
 			head.mu.RLock()
 			people = append(people, map[string]interface{}{
 				"id":   head.ID,
@@ -1997,11 +2035,10 @@ func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) 
 			})
 			head.mu.RUnlock()
 		}
-		division.mu.RUnlock()
 	}
 
 	// Add employees
-	for _, emp := range h.app.org.AllEmployees {
+	for _, emp := range employees {
 		emp.mu.RLock()
 		people = append(people, map[string]interface{}{
 			"id":     emp.ID,
@@ -2014,7 +2051,7 @@ func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Add managers
-	for _, mgr := range h.app.org.AllManagers {
+	for _, mgr := range managers {
 		mgr.mu.RLock()
 		people = append(people, map[string]interface{}{
 			"id":   mgr.ID,
@@ -2024,7 +2061,6 @@ func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) 
 		})
 		mgr.mu.RUnlock()
 	}
-	h.app.org.mu.RUnlock()
 
 	// Add board members
 	if h.app.board != nil {

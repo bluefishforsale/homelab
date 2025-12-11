@@ -14,7 +14,8 @@ addr = redis:6379
 db = 0
 
 [providers]
-default = claude
+# default = claude
+default = local
 enable_mcp = false
 enable_midjourney = {{ ai_services.ai_corp.enable_midjourney | default('false') }}
 
@@ -96,6 +97,8 @@ max_concurrent_workflows = {{ ai_services.ai_corp.max_concurrent_workflows | def
 max_steps_per_workflow = 50
 rate_limit_rpm = {{ ai_services.ai_corp.rate_limit_rpm | default('60') }}
 context_cache_ttl = 3600
+# LLM timeout in minutes (increase for slow/downclocked GPUs)
+llm_timeout_minutes = {{ ai_services.ai_corp.llm_timeout_minutes | default('10') }}
 
 # Storage backend configuration
 # Supported types: local, s3, gcs, google_drive
