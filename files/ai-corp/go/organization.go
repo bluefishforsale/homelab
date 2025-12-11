@@ -888,6 +888,12 @@ FEATURES: [3-5 items]`, seed.CompanyName, sectorName, seed.TargetMarket, seed.Mi
 	ctx, cancel := context.WithTimeout(org.ctx, timeout)
 	defer cancel()
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"company":   seed.CompanyName,
+		"operation": "generate_product_ideas",
+	}).Info("Starting LLM request...")
+	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{
 			{Role: "user", Content: prompt},
@@ -897,10 +903,16 @@ FEATURES: [3-5 items]`, seed.CompanyName, sectorName, seed.TargetMarket, seed.Mi
 	})
 	
 	if err != nil {
-		log.WithError(err).Warn("Failed to generate product ideas, using placeholders")
+		log.WithError(err).WithField("duration_ms", time.Since(llmStart).Milliseconds()).Warn("Failed to generate product ideas, using placeholders")
 		org.createPlaceholderProducts(seed)
 		return
 	}
+	
+	log.WithFields(log.Fields{
+		"company":     seed.CompanyName,
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"length":      len(resp.Content),
+	}).Info("LLM request completed")
 	
 	// Parse the response
 	org.parseProductIdeas(seed, resp.Content)
@@ -2419,6 +2431,14 @@ Complete this task according to your role and skill. Provide only the output, no
 		}
 	}
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"employee_id":   emp.ID,
+		"employee_name": emp.Name,
+		"work_id":       work.ID,
+		"operation":     "execute_work",
+	}).Info("Starting LLM request...")
+	
 	resp, err := emp.provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{
 			{Role: "system", Content: emp.Persona},
@@ -2427,6 +2447,13 @@ Complete this task according to your role and skill. Provide only the output, no
 		MaxTokens:   2000,
 		Temperature: 0.7,
 	})
+	
+	log.WithFields(log.Fields{
+		"employee_id": emp.ID,
+		"work_id":     work.ID,
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"has_error":   err != nil,
+	}).Info("LLM request completed")
 	
 	result := &WorkResult{
 		ID:          uuid.New(),
@@ -2503,6 +2530,14 @@ Rate the quality and provide feedback. Respond in JSON format.`,
 	ctx, cancel := context.WithTimeout(mgr.ctx, timeout)
 	defer cancel()
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"manager_id":   mgr.ID,
+		"manager_name": mgr.Name,
+		"result_id":    result.ID,
+		"operation":    "review_work",
+	}).Info("Starting LLM request...")
+	
 	resp, err := mgr.provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{
 			{Role: "system", Content: mgr.Persona},
@@ -2511,6 +2546,13 @@ Rate the quality and provide feedback. Respond in JSON format.`,
 		MaxTokens:   500,
 		Temperature: 0.5,
 	})
+	
+	log.WithFields(log.Fields{
+		"manager_id":  mgr.ID,
+		"result_id":   result.ID,
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"has_error":   err != nil,
+	}).Info("LLM request completed")
 	
 	review := &QualityReview{
 		ID:         uuid.New(),
