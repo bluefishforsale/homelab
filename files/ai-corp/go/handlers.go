@@ -833,7 +833,7 @@ func (h *Handlers) ListPipelinesHandler(w http.ResponseWriter, r *http.Request) 
 			item["idea"] = p.Idea
 		}
 		if p.WorkPacket != nil {
-			item["has_work_packet"] = true
+			item["work_packet"] = p.WorkPacket
 		}
 		if p.CsuiteReview != nil {
 			item["csuite_review"] = p.CsuiteReview
@@ -1099,21 +1099,39 @@ func (h *Handlers) AssignWorkHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CompanyStatusHandler returns the current company status
+// CompanyStatusHandler returns the current company status (cached for instant response)
 func (h *Handlers) CompanyStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if h.app.org == nil {
 		writeError(w, "Organization not initialized", http.StatusServiceUnavailable)
 		return
 	}
 
+	// Try cache first for instant response
+	cacheKey := "company_status"
+	if cached, found := h.app.cache.Get(cacheKey); found {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Cache", "HIT")
+		w.Header().Set("Cache-Control", "public, max-age=2")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
+	// Cache miss - get fresh data
 	status := h.app.org.GetStatus()
 	stats := h.app.org.GetStats()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	
+	response := map[string]interface{}{
 		"status": status,
 		"stats":  stats,
-	})
+	}
+	
+	// Cache for 2 seconds
+	h.app.cache.Set(cacheKey, response, 2*time.Second)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.Header().Set("Cache-Control", "public, max-age=2")
+	json.NewEncoder(w).Encode(response)
 }
 
 // PauseCompanyHandler pauses the company
@@ -1740,7 +1758,38 @@ func (h *Handlers) GetPersonDetailHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	vars := mux.Vars(r)
-	personID, err := uuid.Parse(vars["id"])
+	id := vars["id"]
+	
+	// Check if it's a board member first (they use string IDs like "marketing", not UUIDs)
+	if h.app.board != nil {
+		for _, member := range h.app.board.GetAllMembers() {
+			if string(member.ID) == id {
+				result := map[string]interface{}{
+					"id":             id,
+					"name":           member.Name,
+					"title":          member.Title,
+					"type":           "board_member",
+					"expectations":   []string{
+						"Provide strategic guidance to the company",
+						"Review and vote on major decisions",
+						"Ensure company alignment with mission and vision",
+						"Represent shareholder interests",
+					},
+					"boss":           nil, // Board members don't report to anyone
+					"direct_reports": []map[string]string{}, // Board has no direct reports
+					"background":     member.Background,
+					"expertise":      member.Expertise,
+					"voting_style":   member.VotingStyle,
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(result)
+				return
+			}
+		}
+	}
+	
+	// For employees/managers/executives, parse as UUID
+	personID, err := uuid.Parse(id)
 	if err != nil {
 		writeError(w, "Invalid person ID", http.StatusBadRequest)
 		return
@@ -1861,10 +1910,24 @@ func (h *Handlers) GetPersonDetailHandler(w http.ResponseWriter, r *http.Request
 	// Check employees
 	for _, emp := range h.app.org.AllEmployees {
 		if emp.ID == personID {
+			// Load biography if exists
+			bioData := make(map[string]interface{})
+			if bio, exists := h.app.org.Biographies[emp.ID]; exists {
+				bioData = map[string]interface{}{
+					"bio":         bio.Bio,
+					"background":  bio.Background,
+					"personality": bio.Personality,
+					"goals":       bio.Goals,
+					"values":      bio.Values,
+					"quirks":      bio.Quirks,
+				}
+			}
+			
 			result["name"] = emp.Name
 			result["title"] = string(emp.Skill)
 			result["type"] = "employee"
 			result["status"] = string(emp.Status)
+			result["biography"] = bioData
 			result["expectations"] = []string{
 				"Complete assigned tasks on time",
 				"Maintain quality of work",
@@ -1890,17 +1953,54 @@ func (h *Handlers) GetPersonDetailHandler(w http.ResponseWriter, r *http.Request
 	writeError(w, "Person not found", http.StatusNotFound)
 }
 
-// ListAllPeopleHandler returns all people in the organization for biography editing
+// ListAllPeopleHandler returns all people in the organization (cached for instant response)
 func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) {
 	if h.app.org == nil {
 		writeError(w, "Organization not initialized", http.StatusServiceUnavailable)
 		return
 	}
 
+	// Try cache first for instant response
+	cacheKey := "all_people"
+	if cached, found := h.app.cache.Get(cacheKey); found {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Cache", "HIT")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
+
 	people := make([]map[string]interface{}, 0)
 
-	// Add employees
+	// Add CEO
 	h.app.org.mu.RLock()
+	if h.app.org.CEO != nil {
+		h.app.org.CEO.mu.RLock()
+		people = append(people, map[string]interface{}{
+			"id":   h.app.org.CEO.ID,
+			"type": "ceo",
+			"name": h.app.org.CEO.Name,
+			"role": h.app.org.CEO.Title,
+		})
+		h.app.org.CEO.mu.RUnlock()
+	}
+
+	// Add department heads (executives)
+	for _, division := range h.app.org.Divisions {
+		division.mu.RLock()
+		for _, head := range division.Heads {
+			head.mu.RLock()
+			people = append(people, map[string]interface{}{
+				"id":   head.ID,
+				"type": "executive",
+				"name": head.Name,
+				"role": head.Title,
+			})
+			head.mu.RUnlock()
+		}
+		division.mu.RUnlock()
+	}
+
+	// Add employees
 	for _, emp := range h.app.org.AllEmployees {
 		emp.mu.RLock()
 		people = append(people, map[string]interface{}{
@@ -1939,11 +2039,19 @@ func (h *Handlers) ListAllPeopleHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	response := map[string]interface{}{
 		"people": people,
 		"total":  len(people),
-	})
+	}
+	
+	// Cache for 2 seconds
+	h.app.cache.Set(cacheKey, response, 2*time.Second)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.Header().Set("Cache-Control", "public, max-age=2")
+	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, len(people)))
+	json.NewEncoder(w).Encode(response)
 }
 
 // ListMeetingsHandler returns all meetings

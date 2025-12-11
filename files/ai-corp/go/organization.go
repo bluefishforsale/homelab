@@ -456,7 +456,7 @@ func NewOrganization(config *Config, providers *ProviderManager, storage *Storag
 		status:        CompanyRunning,
 		pauseChan:     make(chan struct{}),
 		resumeChan:    make(chan struct{}),
-		llmSemaphore:  make(chan struct{}, 1), // Match LLM server parallelism (--parallel 1)
+		llmSemaphore:  make(chan struct{}, 5), // Allow 5 concurrent LLM requests for better throughput
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -497,16 +497,20 @@ func (org *Organization) GetStatus() CompanyStatus {
 // Pause pauses all company operations
 func (org *Organization) Pause() {
 	org.mu.Lock()
-	defer org.mu.Unlock()
-	
 	if org.status != CompanyRunning {
+		org.mu.Unlock()
 		return
 	}
-	
 	org.status = CompanyPaused
-	
-	// Pause all employees
+	// Copy employee list while holding lock
+	employees := make([]*Employee, 0, len(org.AllEmployees))
 	for _, emp := range org.AllEmployees {
+		employees = append(employees, emp)
+	}
+	org.mu.Unlock()
+	
+	// Pause employees without holding org lock
+	for _, emp := range employees {
 		emp.mu.Lock()
 		if emp.Status == EmployeeIdle {
 			emp.Status = EmployeePaused
@@ -520,16 +524,20 @@ func (org *Organization) Pause() {
 // Resume resumes company operations
 func (org *Organization) Resume() {
 	org.mu.Lock()
-	defer org.mu.Unlock()
-	
 	if org.status != CompanyPaused {
+		org.mu.Unlock()
 		return
 	}
-	
 	org.status = CompanyRunning
-	
-	// Resume all paused employees
+	// Copy employee list while holding lock
+	employees := make([]*Employee, 0, len(org.AllEmployees))
 	for _, emp := range org.AllEmployees {
+		employees = append(employees, emp)
+	}
+	org.mu.Unlock()
+	
+	// Resume employees without holding org lock
+	for _, emp := range employees {
 		emp.mu.Lock()
 		if emp.Status == EmployeePaused {
 			emp.Status = EmployeeIdle
@@ -560,11 +568,9 @@ func (org *Organization) GetBiography(personID uuid.UUID) (*Biography, bool) {
 
 // SetBiography creates or updates a biography
 func (org *Organization) SetBiography(bio *Biography) error {
-	org.mu.Lock()
-	defer org.mu.Unlock()
-	
 	now := time.Now()
 	
+	org.mu.Lock()
 	if existing, ok := org.Biographies[bio.PersonID]; ok {
 		// Update existing
 		existing.Name = bio.Name
@@ -583,11 +589,12 @@ func (org *Organization) SetBiography(bio *Biography) error {
 		bio.UpdatedAt = now
 		org.Biographies[bio.PersonID] = bio
 	}
+	org.mu.Unlock()
 	
-	// Update the person's persona based on biography
+	// Update the person's persona based on biography (acquires its own locks)
 	org.updatePersonaFromBio(bio)
 	
-	// Save to database
+	// Save to database (has its own timeout)
 	if org.db != nil {
 		org.saveBiography(bio)
 	}
@@ -701,14 +708,19 @@ func (org *Organization) GetSeed() *CompanySeed {
 
 // SetSeed sets the company seed and bootstraps the organization
 func (org *Organization) SetSeed(seed *CompanySeed) error {
-	org.mu.Lock()
-	defer org.mu.Unlock()
-	
 	now := time.Now()
 	seed.ID = uuid.New()
 	seed.CreatedAt = now
 	seed.UpdatedAt = now
 	seed.Active = true
+	
+	// Generate company mission and vision BEFORE acquiring lock (LLM call can be slow)
+	if seed.Mission == "" || seed.Vision == "" {
+		org.generateMissionVision(seed)
+	}
+	
+	// Now acquire lock for the quick state updates
+	org.mu.Lock()
 	
 	// Deactivate previous seed if exists
 	if org.Seed != nil {
@@ -717,11 +729,6 @@ func (org *Organization) SetSeed(seed *CompanySeed) error {
 	
 	org.Seed = seed
 	
-	// Generate company mission and vision if not provided
-	if seed.Mission == "" || seed.Vision == "" {
-		org.generateMissionVision(seed)
-	}
-	
 	// Notify the organization about new seed
 	log.WithFields(log.Fields{
 		"sector":      seed.Sector,
@@ -729,7 +736,10 @@ func (org *Organization) SetSeed(seed *CompanySeed) error {
 		"target":      seed.TargetMarket,
 	}).Info("Company seed configured")
 	
-	// Save to database
+	// Release lock before database and pipeline operations
+	org.mu.Unlock()
+	
+	// Save to database (has its own timeout)
 	if org.db != nil {
 		org.saveSeed(seed)
 	}
@@ -2285,6 +2295,39 @@ func (org *Organization) runEmployee(emp *Employee) {
 			org.Deliverables[deliverable.ID] = deliverable
 			org.mu.Unlock()
 			
+			// If this work is for a pipeline, notify the pipeline manager (AFTER releasing org lock to avoid deadlock)
+			if pipelineIDStr, ok := work.Inputs["pipeline_id"].(string); ok {
+				if field, ok := work.Inputs["field"].(string); ok {
+					if pipelineID, err := uuid.Parse(pipelineIDStr); err == nil && org.pipeline != nil {
+						// Call this in a goroutine to prevent blocking and avoid any lock ordering issues
+						log.WithFields(log.Fields{
+							"work_id":     work.ID,
+							"pipeline_id": pipelineID,
+							"field":       field,
+						}).Info("Notifying pipeline manager of work completion")
+						go org.pipeline.OnWorkComplete(work.ID, result.Output, pipelineID, field)
+					} else {
+						log.WithFields(log.Fields{
+							"work_id":          work.ID,
+							"pipeline_id_str":  pipelineIDStr,
+							"has_pipeline_mgr": org.pipeline != nil,
+							"parse_error":      err != nil,
+						}).Debug("Skipping pipeline notification")
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"work_id":         work.ID,
+						"has_field":       field != "",
+						"inputs_keys":     getInputKeys(work.Inputs),
+					}).Debug("Work inputs missing field")
+				}
+			} else {
+				log.WithFields(log.Fields{
+					"work_id":      work.ID,
+					"inputs_keys":  getInputKeys(work.Inputs),
+				}).Debug("Work not for pipeline")
+			}
+			
 			// Broadcast work_complete event
 			if org.wsHub != nil {
 				org.wsHub.Broadcast(WebSocketMessage{
@@ -2677,4 +2720,12 @@ func formatRevisions(revisions []string) string {
 		result += fmt.Sprintf("- %d. %s\n", i+1, rev)
 	}
 	return result
+}
+
+func getInputKeys(inputs map[string]interface{}) []string {
+	keys := make([]string, 0, len(inputs))
+	for k := range inputs {
+		keys = append(keys, k)
+	}
+	return keys
 }

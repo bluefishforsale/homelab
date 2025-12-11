@@ -148,9 +148,31 @@
         mode: '0644'
       notify: Restart ai-corp
 
-    - name: Build Docker image
+    - name: Stop ai-corp service before rebuild
+      ansible.builtin.systemd:
+        name: ai-corp
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove existing containers
       ansible.builtin.command:
-        cmd: docker compose build --no-cache ai-corp
+        cmd: docker compose down --remove-orphans
+        chdir: "{{ basedir }}"
+      changed_when: true
+
+    - name: Prune old Docker images
+      ansible.builtin.command:
+        cmd: docker image prune -af --filter "until=48h"
+      changed_when: true
+
+    - name: Prune Docker build cache
+      ansible.builtin.command:
+        cmd: docker builder prune -af --filter "until=48h"
+      changed_when: true
+
+    - name: Build Docker image (no cache for development)
+      ansible.builtin.command:
+        cmd: docker compose build --no-cache
         chdir: "{{ basedir }}"
       changed_when: true
 

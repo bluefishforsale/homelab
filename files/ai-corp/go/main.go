@@ -32,6 +32,7 @@ type App struct {
 	scheduler    *Scheduler
 	org          *Organization
 	wsHub        *WSHub
+	cache        *SimpleCache
 	startTime    time.Time
 }
 
@@ -40,6 +41,7 @@ func NewApp(config *Config) (*App, error) {
 	app := &App{
 		config:    config,
 		wsHub:     NewWSHub(),
+		cache:     NewSimpleCache(),
 		startTime: time.Now(),
 	}
 

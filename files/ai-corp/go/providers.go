@@ -280,7 +280,7 @@ func NewAnthropicProvider(name, model, apiKey string) *AnthropicProvider {
 		model:  model,
 		apiKey: apiKey,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: 180 * time.Second, // 3 minutes for extended thinking
 		},
 	}
 }
@@ -373,7 +373,24 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req LLMRequest) (*LLMRespo
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		llmRequests.WithLabelValues(p.name, "", "error").Inc()
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	
+	// Log the raw response for debugging
+	if respBody != nil && len(respBody) > 0 {
+		previewLen := 500
+		if len(respBody) < previewLen {
+			previewLen = len(respBody)
+		}
+		log.WithFields(log.Fields{
+			"status_code": resp.StatusCode,
+			"response_preview": string(respBody[:previewLen]),
+			"response_length": len(respBody),
+		}).Info("Anthropic API response")
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		llmRequests.WithLabelValues(p.name, "", "error").Inc()
@@ -382,7 +399,9 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req LLMRequest) (*LLMRespo
 
 	var result struct {
 		Content []struct {
-			Text string `json:"text"`
+			Type     string `json:"type"`
+			Text     string `json:"text"`
+			Thinking string `json:"thinking"`
 		} `json:"content"`
 		Usage struct {
 			InputTokens  int `json:"input_tokens"`
@@ -391,11 +410,28 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req LLMRequest) (*LLMRespo
 		Model string `json:"model"`
 	}
 
-	json.Unmarshal(respBody, &result)
-
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		log.WithError(err).WithField("response_body", string(respBody)).Error("Failed to unmarshal Anthropic response")
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	
 	if len(result.Content) == 0 {
+		log.WithField("response_body", string(respBody)).Error("Anthropic returned empty content array")
+		return nil, fmt.Errorf("empty content in response")
+	}
+
+	// Find the text content (skip thinking blocks)
+	var textContent string
+	for _, block := range result.Content {
+		if block.Type == "text" && block.Text != "" {
+			textContent = block.Text
+			break
+		}
+	}
+
+	if textContent == "" {
 		llmRequests.WithLabelValues(p.name, "", "error").Inc()
-		return nil, fmt.Errorf("no response from Claude")
+		return nil, fmt.Errorf("no text content in Claude response")
 	}
 
 	latency := int(time.Since(start).Milliseconds())
@@ -405,7 +441,7 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req LLMRequest) (*LLMRespo
 	llmTokensOutput.WithLabelValues(p.name).Add(float64(result.Usage.OutputTokens))
 
 	return &LLMResponse{
-		Content:      strings.TrimSpace(result.Content[0].Text),
+		Content:      strings.TrimSpace(textContent),
 		Model:        result.Model,
 		InputTokens:  result.Usage.InputTokens,
 		OutputTokens: result.Usage.OutputTokens,
@@ -492,7 +528,11 @@ func (p *GoogleProvider) Chat(ctx context.Context, req LLMRequest) (*LLMResponse
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		llmRequests.WithLabelValues(p.name, "", "error").Inc()
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		llmRequests.WithLabelValues(p.name, "", "error").Inc()
@@ -513,7 +553,10 @@ func (p *GoogleProvider) Chat(ctx context.Context, req LLMRequest) (*LLMResponse
 		} `json:"usageMetadata"`
 	}
 
-	json.Unmarshal(respBody, &result)
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		llmRequests.WithLabelValues(p.name, "", "error").Inc()
+		return nil, fmt.Errorf("failed to parse Gemini response: %w", err)
+	}
 
 	if len(result.Candidates) == 0 || len(result.Candidates[0].Content.Parts) == 0 {
 		llmRequests.WithLabelValues(p.name, "", "error").Inc()

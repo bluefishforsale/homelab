@@ -308,58 +308,163 @@ IMPORTANT: We already have these products in development:
 Generate a DIFFERENT product idea that complements but does NOT overlap with existing products.`, strings.Join(existingIdeas, "\n"))
 	}
 	
-	prompt := fmt.Sprintf(`CEO of %s (%s sector, target: %s). Mission: %s. Vision: %s.%s
+	prompt := fmt.Sprintf(`You are the CEO of %s, a company in the %s sector targeting %s.
 
-Generate bootstrappable startup product idea.
+Company Mission: %s
+Company Vision: %s
+%s
 
-Rules: Small cap, NO AI/ML/quantum, tangible solution, small team viable.
+Generate an innovative, bootstrappable product idea that is:
+- SPECIFIC and DEFENSIBLE: Clear unique value proposition with natural competitive moats
+- VALIDATED PAIN POINT: Solves a real, urgent problem that people will pay to fix
+- ECONOMICALLY VIABLE: Clear path to profitability with reasonable customer acquisition costs
+- PRAGMATICALLY BUILDABLE: Can be built by a small team (2-5 people) without massive capital
+- NOT GENERIC: Avoid obvious commodity solutions like "better project management" or "team chat app"
 
-Format:
-PROBLEM: [issue solved]
-SOLUTION: [product/service]
-VALUE_PROP: [key benefit]
-TARGET_CUSTOMER: [buyer profile]
-REVENUE_MODEL: [monetization]`, 
+Constraints:
+- NO AI/ML/LLM features (over-saturated market)
+- NO blockchain/crypto/quantum (speculative)
+- Focus on B2B SaaS, specialized tools, or niche vertical solutions
+- Target underserved niches where incumbents are weak or expensive
+
+Think about:
+- What manual processes are ripe for automation in specific industries?
+- What expensive enterprise tools could be unbundled for SMBs?
+- What new workflows have emerged that lack proper tooling?
+- What technical communities have unmet needs?
+
+Respond in this format:
+PROBLEM: [Specific problem statement - be concrete about who has this problem and why it matters]
+SOLUTION: [Your product/service - describe the core offering and key features]
+VALUE_PROP: [Why customers will pay - quantify time/money saved if possible]
+TARGET_CUSTOMER: [Specific buyer persona - role, company size, industry]
+REVENUE_MODEL: [Pricing strategy and unit economics]`, 
 		seed.CompanyName, seed.Sector, seed.TargetMarket, seed.Mission, seed.Vision, existingContext)
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{{Role: "user", Content: prompt}},
-		MaxTokens: 500, // Reduced from 800
-		Temperature: 0.8,
+		MaxTokens: 1000,
+		Temperature: 0.85,
 	})
 	if err != nil {
+		log.WithError(err).Error("Failed to generate C-Suite idea")
 		return err
 	}
 	
-	// Parse response
+	// Log the actual response for debugging
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"response": resp.Content,
+		"length": len(resp.Content),
+	}).Info("LLM response for C-Suite idea")
+	
+	// Parse response - handle multi-line values
 	idea := &IdeaContent{
 		GeneratedBy: pipeline.CreatedBy,
 		GeneratedAt: time.Now(),
 	}
 	
-	lines := strings.Split(resp.Content, "\n")
+	// Remove markdown formatting and split into lines
+	content := strings.ReplaceAll(resp.Content, "**", "")
+	lines := strings.Split(content, "\n")
+	
+	var currentField string
+	var currentValue strings.Builder
+	
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		
+		// Check if this is a new field header
 		if strings.HasPrefix(line, "PROBLEM:") {
-			idea.Problem = strings.TrimSpace(strings.TrimPrefix(line, "PROBLEM:"))
+			// Save previous field if any
+			if currentField != "" {
+				assignField(idea, currentField, currentValue.String())
+			}
+			currentField = "PROBLEM"
+			currentValue.Reset()
+			currentValue.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "PROBLEM:")))
 		} else if strings.HasPrefix(line, "SOLUTION:") {
-			idea.Solution = strings.TrimSpace(strings.TrimPrefix(line, "SOLUTION:"))
+			if currentField != "" {
+				assignField(idea, currentField, currentValue.String())
+			}
+			currentField = "SOLUTION"
+			currentValue.Reset()
+			currentValue.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "SOLUTION:")))
 		} else if strings.HasPrefix(line, "VALUE_PROP:") {
-			idea.ValueProp = strings.TrimSpace(strings.TrimPrefix(line, "VALUE_PROP:"))
+			if currentField != "" {
+				assignField(idea, currentField, currentValue.String())
+			}
+			currentField = "VALUE_PROP"
+			currentValue.Reset()
+			currentValue.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "VALUE_PROP:")))
 		} else if strings.HasPrefix(line, "TARGET_CUSTOMER:") {
-			idea.TargetCustomer = strings.TrimSpace(strings.TrimPrefix(line, "TARGET_CUSTOMER:"))
+			if currentField != "" {
+				assignField(idea, currentField, currentValue.String())
+			}
+			currentField = "TARGET_CUSTOMER"
+			currentValue.Reset()
+			currentValue.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "TARGET_CUSTOMER:")))
 		} else if strings.HasPrefix(line, "REVENUE_MODEL:") {
-			idea.RevenueModel = strings.TrimSpace(strings.TrimPrefix(line, "REVENUE_MODEL:"))
+			if currentField != "" {
+				assignField(idea, currentField, currentValue.String())
+			}
+			currentField = "REVENUE_MODEL"
+			currentValue.Reset()
+			currentValue.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "REVENUE_MODEL:")))
+		} else if currentField != "" && line != "" && !strings.HasPrefix(line, "#") {
+			// Continue accumulating multi-line value (skip empty lines and markdown headers)
+			if currentValue.Len() > 0 {
+				currentValue.WriteString(" ")
+			}
+			currentValue.WriteString(line)
 		}
+	}
+	
+	// Save the last field
+	if currentField != "" {
+		assignField(idea, currentField, currentValue.String())
+	}
+	
+	// Log what we parsed
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"problem": idea.Problem,
+		"solution": idea.Solution,
+		"value_prop": idea.ValueProp,
+		"target": idea.TargetCustomer,
+		"revenue": idea.RevenueModel,
+		"total_lines": len(lines),
+	}).Info("Parsed idea fields")
+	
+	// Validate critical fields
+	if idea.Problem == "" || idea.Solution == "" {
+		log.WithFields(log.Fields{
+			"pipeline_id": pipeline.ID,
+			"has_problem": idea.Problem != "",
+			"has_solution": idea.Solution != "",
+		}).Warn("Generated idea missing critical fields")
 	}
 	
 	pm.mu.Lock()
 	pipeline.Idea = idea
-	pipeline.Name = idea.Solution
-	if len(pipeline.Name) > 50 {
-		pipeline.Name = pipeline.Name[:50]
+	
+	// Set name with UTF-8 safe truncation and fallback
+	if idea.Solution != "" {
+		pipeline.Name = idea.Solution
+		if len([]rune(pipeline.Name)) > 50 {
+			pipeline.Name = string([]rune(pipeline.Name)[:50])
+		}
+	} else {
+		pipeline.Name = fmt.Sprintf("Product Idea %s", pipeline.ID.String()[:8])
 	}
-	pipeline.Description = idea.Problem
+	
+	// Set description with fallback
+	if idea.Problem != "" {
+		pipeline.Description = idea.Problem
+	} else {
+		pipeline.Description = "Product concept in development"
+	}
+	
 	pipeline.Stage = StageWorkPacket
 	pipeline.UpdatedAt = time.Now()
 	pm.mu.Unlock()
@@ -873,12 +978,13 @@ func (pm *PipelineManager) StartPipeline(pipeline *ProductPipeline) {
 	// The rest of the pipeline is triggered by callbacks
 }
 
-// Helper function to truncate strings
+// Helper function to truncate strings (UTF-8 safe)
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string(runes[:maxLen]) + "..."
 }
 
 // GenerateHTML generates an HTML document for the pipeline that can be printed to PDF
@@ -1141,4 +1247,21 @@ func cleanOutput(s string) string {
 	s = strings.ReplaceAll(s, "\n", "<br>")
 	
 	return s
+}
+
+// assignField assigns a parsed value to the appropriate IdeaContent field
+func assignField(idea *IdeaContent, field string, value string) {
+	value = strings.TrimSpace(value)
+	switch field {
+	case "PROBLEM":
+		idea.Problem = value
+	case "SOLUTION":
+		idea.Solution = value
+	case "VALUE_PROP":
+		idea.ValueProp = value
+	case "TARGET_CUSTOMER":
+		idea.TargetCustomer = value
+	case "REVENUE_MODEL":
+		idea.RevenueModel = value
+	}
 }
