@@ -921,7 +921,7 @@ function Dashboard() {
       {/* System Health Bar - Top of Page */}
       <div className="bg-gray-800 text-white rounded-lg shadow px-4 py-2 flex items-center gap-6 text-xs">
         <span className="flex items-center gap-1">
-          <span className={`w-2 h-2 rounded-full ${health?.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'}`} />
+          <span className={`w-2 h-2 rounded-full ${health && (health.status === 'healthy' || health.status === 'up') ? 'bg-green-400' : 'bg-red-400'}`} />
           <span className="font-medium">{health?.status || 'Unknown'}</span>
         </span>
         <span className="text-gray-400">|</span>
@@ -930,7 +930,7 @@ function Dashboard() {
         <span>Runs: {health?.active_runs || 0}</span>
         {health?.checks && Object.entries(health.checks).map(([name, check]) => (
           <span key={name} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${check.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${check.status === 'healthy' || check.status === 'up' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="capitalize">{name}</span>
           </span>
         ))}
@@ -1156,25 +1156,38 @@ function Dashboard() {
           </div>
           <div className="divide-y dark:divide-gray-700 max-h-80 overflow-y-auto font-mono text-xs">
             {activityLog.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">Waiting for activity...</div>
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">Waiting for activity...</div>
             ) : (
               activityLog.slice(0, 50).map(entry => (
-                <div key={entry.id} className={`px-3 py-2 ${
-                  entry.type === 'work_complete' && entry.metadata?.has_error ? 'bg-red-50' :
-                  entry.type === 'work_complete' ? 'bg-green-50' :
-                  entry.type === 'work_started' ? 'bg-blue-50' :
-                  entry.type === 'system' ? 'bg-gray-50' : ''
-                }`}>
+                <div
+                  key={entry.id}
+                  className={`px-3 py-2 ${
+                    entry.type === 'work_complete' && entry.metadata?.has_error
+                      ? 'bg-red-50 dark:bg-red-900/40'
+                      : entry.type === 'work_complete'
+                      ? 'bg-green-50 dark:bg-green-900/30'
+                      : entry.type === 'work_started'
+                      ? 'bg-blue-50 dark:bg-blue-900/30'
+                      : entry.type === 'system'
+                      ? 'bg-gray-50 dark:bg-gray-800'
+                      : 'bg-white dark:bg-gray-800'
+                  }`}
+                >
                   <div className="flex items-start gap-2">
                     <span className="text-gray-400 whitespace-nowrap">
                       {new Date(entry.timestamp).toLocaleTimeString()}
                     </span>
-                    <span className={`px-1 rounded text-[10px] uppercase ${
-                      entry.type === 'work_complete' ? 'bg-green-200 text-green-800' :
-                      entry.type === 'work_started' ? 'bg-blue-200 text-blue-800' :
-                      entry.type === 'employee_update' ? 'bg-purple-200 text-purple-800' :
-                      'bg-gray-200 text-gray-600'
-                    }`}>
+                    <span
+                      className={`px-1 rounded text-[10px] uppercase ${
+                        entry.type === 'work_complete'
+                          ? 'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-100'
+                          : entry.type === 'work_started'
+                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-700 dark:text-blue-100'
+                          : entry.type === 'employee_update'
+                          ? 'bg-purple-200 text-purple-800 dark:bg-purple-700 dark:text-purple-100'
+                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
+                      }`}
+                    >
                       {entry.type.replace('_', ' ')}
                     </span>
                     <span className="flex-1 truncate">{entry.title}</span>
@@ -2007,21 +2020,25 @@ function PeoplePage() {
     <div className="grid grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
       {/* People list */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50">
-          <h2 className="font-semibold">All People ({people.length})</h2>
+        <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">All People ({people.length})</h2>
         </div>
-        <div className="divide-y overflow-y-auto h-[calc(100%-3rem)]">
+        <div className="divide-y dark:divide-gray-700 overflow-y-auto h-[calc(100%-3rem)]">
           {people.map(person => (
             <button
               key={person.id}
               onClick={() => handleSelect(person)}
-              className={`w-full text-left p-3 hover:bg-gray-50 ${selectedPerson?.id === person.id ? 'bg-primary-50 border-l-4 border-primary-500' : ''}`}
+              className={`w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                selectedPerson?.id === person.id
+                  ? 'bg-primary-50 dark:bg-primary-900/40 border-l-4 border-primary-500'
+                  : ''
+              }`}
             >
               <div className="flex items-center gap-2">
                 <UserCircle className="w-8 h-8 text-gray-400" />
                 <div>
-                  <div className="font-medium">{person.name}</div>
-                  <div className="text-xs text-gray-500 capitalize">{person.type} - {person.role}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">{person.name}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{person.type} - {person.role}</div>
                 </div>
               </div>
             </button>
@@ -2033,10 +2050,10 @@ function PeoplePage() {
       <div className="col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {selectedPerson ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 flex items-center justify-between">
+            <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-between">
               <div>
-                <h2 className="font-semibold">{selectedPerson.name}</h2>
-                <p className="text-xs text-gray-500 capitalize">{selectedPerson.type} - {selectedPerson.role}</p>
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">{selectedPerson.name}</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{selectedPerson.type} - {selectedPerson.role}</p>
               </div>
               <button
                 onClick={handleSave}
@@ -2049,35 +2066,35 @@ function PeoplePage() {
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Bio</label>
                 <textarea
                   value={biography?.bio || ''}
                   onChange={e => setBiography(prev => prev ? {...prev, bio: e.target.value} : null)}
-                  className="w-full p-3 border rounded-lg h-24"
+                  className="w-full p-3 border rounded-lg h-24 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="A short description of who they are..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Background</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Background</label>
                 <textarea
                   value={biography?.background || ''}
                   onChange={e => setBiography(prev => prev ? {...prev, background: e.target.value} : null)}
-                  className="w-full p-3 border rounded-lg h-24"
-                  placeholder="Their history, experience, education..."
+                  className="w-full p-3 border rounded-lg h-24 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="Their experience and work history..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Personality</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Personality</label>
                 <textarea
                   value={biography?.personality || ''}
                   onChange={e => setBiography(prev => prev ? {...prev, personality: e.target.value} : null)}
-                  className="w-full p-3 border rounded-lg h-24"
+                  className="w-full p-3 border rounded-lg h-24 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="How they think, communicate, and make decisions..."
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">How Biography Affects Behavior</h3>
-                <p className="text-xs text-gray-500">
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">How Biography Affects Behavior</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   The biography you enter is used to create an LLM persona for this person. 
                   When they perform work or make decisions, their personality, background, and values 
                   will influence their output. Changes take effect immediately.
@@ -2086,7 +2103,7 @@ function PeoplePage() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
             <div className="text-center">
               <UserCircle className="w-16 h-16 mx-auto mb-2 opacity-50" />
               <p>Select a person to view and edit their biography</p>
@@ -2913,10 +2930,13 @@ function AdminPage() {
         <h2 className="text-lg font-semibold mb-4">System Status</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {(['database', 'redis', 'storage', 'providers', 'organization'] as const).map(service => (
-            <div key={service} className="text-center p-3 bg-gray-50 rounded">
+            <div
+              key={service}
+              className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded"
+            >
               <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${status?.[service] ? 'bg-green-500' : 'bg-red-500'}`} />
-              <div className="text-sm font-medium capitalize">{service}</div>
-              <div className="text-xs text-gray-500">{status?.[service] ? 'Connected' : 'Disconnected'}</div>
+              <div className="text-sm font-medium capitalize text-gray-800 dark:text-gray-100">{service}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{status?.[service] ? 'Connected' : 'Disconnected'}</div>
             </div>
           ))}
         </div>
@@ -2927,20 +2947,26 @@ function AdminPage() {
         <h2 className="text-lg font-semibold mb-4">Company Controls</h2>
         <div className="flex items-center gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Status:</span>
-            <span className={`px-2 py-1 rounded text-sm font-medium ${
-              status?.org_status === 'running' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
+            <span className="text-sm text-gray-600 dark:text-gray-300">Status:</span>
+            <span
+              className={`px-2 py-1 rounded text-sm font-medium ${
+                status?.org_status === 'running'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'
+              }`}
+            >
               {status?.org_status || 'Unknown'}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Seeded:</span>
-            <span className={`px-2 py-1 rounded text-sm ${
-              status?.seeded ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-            }`}>
+            <span className="text-sm text-gray-600 dark:text-gray-300">Seeded:</span>
+            <span
+              className={`px-2 py-1 rounded text-sm ${
+                status?.seeded
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+              }`}
+            >
               {status?.seeded ? 'Yes' : 'No'}
             </span>
           </div>
@@ -2970,21 +2996,21 @@ function AdminPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Organization Stats</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-gray-50 rounded">
-              <div className="text-2xl font-bold text-primary-600">{status.org_stats.total_employees}</div>
-              <div className="text-sm text-gray-500">Total Employees</div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-300">{status.org_stats.total_employees}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-300">Total Employees</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded">
-              <div className="text-2xl font-bold text-blue-600">{status.org_stats.by_status?.working || 0}</div>
-              <div className="text-sm text-gray-500">Working</div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{status.org_stats.by_status?.working || 0}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-300">Working</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded">
-              <div className="text-2xl font-bold text-green-600">{status.org_stats.by_status?.idle || 0}</div>
-              <div className="text-sm text-gray-500">Idle</div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-300">{status.org_stats.by_status?.idle || 0}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-300">Idle</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded">
-              <div className="text-2xl font-bold text-purple-600">{status.org_stats.divisions}</div>
-              <div className="text-sm text-gray-500">Divisions</div>
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">{status.org_stats.divisions}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-300">Divisions</div>
             </div>
           </div>
         </div>
@@ -3003,14 +3029,14 @@ function AdminPage() {
           </Link>
         </div>
         {status?.seed ? (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm text-gray-800 dark:text-gray-200">
             <div><span className="font-medium">Company:</span> {status.seed.company_name}</div>
             <div><span className="font-medium">Sector:</span> {status.seed.sector}</div>
             <div><span className="font-medium">Mission:</span> {status.seed.mission}</div>
             <div><span className="font-medium">Vision:</span> {status.seed.vision}</div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500">No seed configured. Click "Configure Seed" to set up your company.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">No seed configured. Click "Configure Seed" to set up your company.</p>
         )}
       </div>
 
@@ -3018,7 +3044,7 @@ function AdminPage() {
       {status?.config && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Configuration</h2>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-3 gap-4 text-sm text-gray-800 dark:text-gray-200">
             <div><span className="font-medium">Server Port:</span> {status.config.server_port}</div>
             <div><span className="font-medium">WebSocket Port:</span> {status.config.websocket_port}</div>
             <div><span className="font-medium">Provider:</span> {status.default_provider}</div>
@@ -3027,9 +3053,9 @@ function AdminPage() {
       )}
 
       {/* Danger Zone */}
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <h2 className="text-lg font-semibold text-red-800 mb-2">Danger Zone</h2>
-        <p className="text-sm text-red-600 mb-4">
+      <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <h2 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h2>
+        <p className="text-sm text-red-600 dark:text-red-300 mb-4">
           Reset will destroy all employees, divisions, restructuring history, and seed configuration.
           This action cannot be undone.
         </p>
@@ -3040,7 +3066,7 @@ function AdminPage() {
             className={`px-4 py-2 rounded font-medium ${
               confirmReset 
                 ? 'bg-red-600 text-white hover:bg-red-700' 
-                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/60 dark:text-red-200 dark:hover:bg-red-800'
             }`}
           >
             {resetting ? (
@@ -3127,10 +3153,37 @@ function ProductsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Products & Pipelines</h1>
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 border rounded-lg p-1">
-            <button onClick={() => setView('all')} className={`px-3 py-1 text-xs rounded ${view === 'all' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>All ({pipelines.length + products.length})</button>
-            <button onClick={() => setView('pipelines')} className={`px-3 py-1 text-xs rounded ${view === 'pipelines' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>Pipelines ({pipelines.length})</button>
-            <button onClick={() => setView('products')} className={`px-3 py-1 text-xs rounded ${view === 'products' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>Products ({products.length})</button>
+          <div className="flex gap-1 border rounded-lg p-1 border-gray-300 dark:border-gray-700">
+            <button
+              onClick={() => setView('all')}
+              className={`px-3 py-1 text-xs rounded ${
+                view === 'all'
+                  ? 'bg-primary-600 text-white'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              All ({pipelines.length + products.length})
+            </button>
+            <button
+              onClick={() => setView('pipelines')}
+              className={`px-3 py-1 text-xs rounded ${
+                view === 'pipelines'
+                  ? 'bg-primary-600 text-white'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              Pipelines ({pipelines.length})
+            </button>
+            <button
+              onClick={() => setView('products')}
+              className={`px-3 py-1 text-xs rounded ${
+                view === 'products'
+                  ? 'bg-primary-600 text-white'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              Products ({products.length})
+            </button>
           </div>
         </div>
       </div>
@@ -3138,23 +3191,29 @@ function ProductsPage() {
       {/* Pipeline Stages + Product Status */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-semibold mb-3 text-gray-700">Pipeline Stages</h3>
+          <h3 className="text-sm font-semibold mb-3 text-gray-700 dark:text-gray-200">Pipeline Stages</h3>
           <div className="grid grid-cols-3 gap-2">
             {Object.entries(stageNames).slice(0, 6).map(([key, name]) => (
-              <div key={key} className={`rounded p-2 text-center ${stageColors[key]?.replace('text-', 'bg-').replace('-700', '-50')}`}>
-                <div className="text-xl font-bold">{byStage[key] || 0}</div>
-                <div className="text-[9px]">{name}</div>
+              <div
+                key={key}
+                className="rounded p-2 text-center bg-gray-50 dark:bg-gray-900/40"
+              >
+                <div className={`text-xl font-bold ${stageColors[key]}`}>{byStage[key] || 0}</div>
+                <div className="text-[9px] text-gray-600 dark:text-gray-300">{name}</div>
               </div>
             ))}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <h3 className="text-sm font-semibold mb-3 text-gray-700">Product Status</h3>
+          <h3 className="text-sm font-semibold mb-3 text-gray-700 dark:text-gray-200">Product Status</h3>
           <div className="grid grid-cols-3 gap-2">
             {Object.entries({ideation: 'Ideation', development: 'Development', launched: 'Launched'}).map(([key, name]) => (
-              <div key={key} className="rounded p-2 text-center bg-green-50">
-                <div className="text-xl font-bold">{byStatus[key] || 0}</div>
-                <div className="text-[9px]">{name}</div>
+              <div
+                key={key}
+                className="rounded p-2 text-center bg-green-50 dark:bg-green-900/30"
+              >
+                <div className="text-xl font-bold text-green-700 dark:text-green-300">{byStatus[key] || 0}</div>
+                <div className="text-[9px] text-gray-600 dark:text-gray-300">{name}</div>
               </div>
             ))}
           </div>
