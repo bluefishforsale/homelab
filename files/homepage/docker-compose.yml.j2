@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    hostname: homepage
+    restart: unless-stopped
+
+    user: "{{ uid }}:{{ gid }}"
+
+    environment:
+      - TZ=America/Los_Angeles
+      - HOMEPAGE_ALLOWED_HOSTS=homepage.home,homepage.terrac.com,192.168.1.143,192.168.1.143:8089,localhost,127.0.0.1
+
+    ports:
+      - "{{ port_ext }}:{{ port_int }}"
+
+    volumes:
+      - {{ home }}/config:/app/config
+      - {{ home }}/images:/app/public/images
+      - /data01:/data01:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port_int }}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
