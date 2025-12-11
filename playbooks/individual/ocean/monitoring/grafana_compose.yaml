@@ -6,13 +6,14 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: grafana
     image: grafana/grafana
     version: 11.5.4
     port_int: 3000
-    port_ext: 8910
+    port_ext: "{{ service_ports.grafana.port }}"
     plugins: "marcusolsson-treemap-panel 2.0.0"
     data: /data01
     files: ../../../../files/grafana-compose

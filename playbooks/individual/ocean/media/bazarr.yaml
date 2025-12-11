@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     image: linuxserver/bazarr
     version: latest
@@ -12,7 +15,7 @@
     files: ../../../../files/ocean-bazarr
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
-    port: 6767
+    port: "{{ service_ports.bazarr.port }}"
     user: media
 
   tasks:

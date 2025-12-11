@@ -4,36 +4,39 @@
   become: true
   gather_facts: yes
 
+  vars_files:
+    - ../../../vars/vars_service_ports.yaml
+
   vars:
     cadvisor_service: cadvisor
     cadvisor_image: gcr.io/cadvisor/cadvisor
     cadvisor_version: latest
-    cadvisor_port: 8912
+    cadvisor_port: "{{ service_ports.cadvisor.port }}"
     cadvisor_home: "/data01/services/{{ cadvisor_service }}"
     cadvisor_files: "{{ playbook_dir }}/../../../files/node-exporter"
     node_exporter_service: node-exporter
     node_exporter_image: prom/node-exporter
     node_exporter_version: latest
-    node_exporter_port: 9100
+    node_exporter_port: "{{ service_ports.node_exporter.port }}"
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
     node_exporter_home: "/data01/services/{{ node_exporter_service }}"
     node_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
-    process_exporter_port: 9256
+    process_exporter_port: "{{ service_ports.process_exporter.port }}"
     # NVIDIA GPU Exporter (Docker Compose deployment)
     nvidia_gpu_exporter_service: nvidia-gpu-exporter
     nvidia_gpu_exporter_image: utkuozdemir/nvidia_gpu_exporter
     nvidia_gpu_exporter_version: 1.4.0
-    nvidia_gpu_exporter_port: 9445
+    nvidia_gpu_exporter_port: "{{ service_ports.nvidia_gpu_exporter.port }}"
     nvidia_gpu_exporter_home: "/data01/services/{{ nvidia_gpu_exporter_service }}"
     nvidia_gpu_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     # SMART monitoring (Docker Compose deployment)
     smart_exporter_service: smart-exporter
     smart_exporter_image: prometheuscommunity/smartctl-exporter
     smart_exporter_version: latest
-    smart_exporter_port: 9633
+    smart_exporter_port: "{{ service_ports.smart_exporter.port }}"
     smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"
     smart_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     uid: 1001  # Ocean user ID

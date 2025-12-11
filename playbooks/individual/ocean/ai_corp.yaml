@@ -10,10 +10,11 @@
     log_level: info
     # llamacpp connection (from playbooks/individual/ocean/ai/llamacpp.yaml)
     llamacpp_host: 192.168.1.143
-    llamacpp_port: 8080
+    llamacpp_port: "{{ service_ports.llamacpp.port }}"
     llamacpp_api_key: llamacpp-homelab-key
   vars_files:
     - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
   tasks:
     - name: Create AI Corp service directories
       ansible.builtin.file:

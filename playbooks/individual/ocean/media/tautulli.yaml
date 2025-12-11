@@ -6,17 +6,18 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: tautulli
     image: linuxserver/tautulli
     version: latest
-    tautulli_port: 8905
+    tautulli_port: "{{ service_ports.tautulli.port }}"
     tautulli_api_key: "{{ media_services.tautulli.api_key }}"
     exporter_service: tautulli-exporter
     exporter_image: nwalke/tautulli_exporter
     exporter_version: latest
-    exporter_port: 8913
+    exporter_port: "{{ service_ports.tautulli_exporter.port }}"
     data: /data01
     files: ../../../../files/tautulli-compose
     incoming: "{{ data }}/incoming"

@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     image: sctx/overseerr
     version: latest
@@ -11,7 +14,7 @@
     files: ../../../../files/ocean-overseerr
     data: /data01
     home: "{{ data }}/services/{{ service }}"
-    port: 5055
+    port: "{{ service_ports.overseerr.port }}"
     user: media
 
   tasks:
