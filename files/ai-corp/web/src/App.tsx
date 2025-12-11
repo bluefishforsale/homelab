@@ -563,6 +563,57 @@ const WSContext = createContext<WSContextValue>({
   companyStatus: null
 })
 
+// Theme context for dark/light mode
+type Theme = 'dark' | 'light'
+
+interface ThemeContextValue {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+  toggleTheme: () => void
+}
+
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: 'dark',
+  setTheme: () => {},
+  toggleTheme: () => {}
+})
+
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    // Load from localStorage, default to dark
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ai-corp-theme')
+      return (saved === 'light' || saved === 'dark') ? saved : 'dark'
+    }
+    return 'dark'
+  })
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme)
+    localStorage.setItem('ai-corp-theme', newTheme)
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark')
+  }
+
+  // Apply theme class to document
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark')
+    document.documentElement.classList.add(theme)
+  }, [theme])
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
+}
+
+function useTheme() {
+  return useContext(ThemeContext)
+}
+
 // Simple UUID generator for activity log IDs (fallback for browsers without crypto.randomUUID)
 function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -748,9 +799,7 @@ function Dashboard() {
   const { lastMessage, activityLog, orgStats } = useWS()
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [companyStatus, setCompanyStatus] = useState<CompanyStatus | null>(null)
-  const [divisions, setDivisions] = useState<Division[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [people, setPeople] = useState<Person[]>([])
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
   const [deliverableStats, setDeliverableStats] = useState<Record<string, number>>({})
   const [products, setProducts] = useState<ProductIdea[]>([])
@@ -758,9 +807,6 @@ function Dashboard() {
   const [_pipelines, setPipelines] = useState<Pipeline[]>([])  // Stored for future use
   const [pipelineStats, setPipelineStats] = useState<Record<string, number>>({})
   const [seed, setSeed] = useState<CompanySeed | null>(null)
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
-  const [biography, setBiography] = useState<Biography | null>(null)
-  const [bioEditing, setBioEditing] = useState(false)
   const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -791,9 +837,7 @@ function Dashboard() {
           setSeed(data.seed)
         }
       })
-      fetchWithTimeout(() => api.getDivisions(), { divisions: [], total: 0 }).then(data => setDivisions(data.divisions || []))
       fetchWithTimeout(() => api.getEmployees(), { employees: [], total: 0 }).then(data => setEmployees(data.employees || []))
-      fetchWithTimeout(() => api.getPeople(), { people: [], total: 0 }).then(data => setPeople(data.people || []))
       fetchWithTimeout(() => api.getDeliverables(), { deliverables: [], total: 0, by_status: { completed: 0, in_progress: 0, in_review: 0, approved: 0, rejected: 0 } }).then(data => {
         setDeliverables(data.deliverables || [])
         setDeliverableStats(data.by_status)
@@ -869,45 +913,31 @@ function Dashboard() {
     }
   }
 
-  const handleSelectPerson = async (person: Person) => {
-    setSelectedPerson(person)
-    try {
-      const bio = await api.getBiography(person.id)
-      setBiography(bio)
-    } catch {
-      setBiography({
-        person_id: person.id,
-        person_type: person.type,
-        name: person.name,
-        bio: '',
-        background: '',
-        personality: '',
-        goals: [],
-        values: [],
-        quirks: []
-      })
-    }
-    setBioEditing(false)
-  }
-
-  const handleSaveBiography = async () => {
-    if (!biography) return
-    setActionLoading(true)
-    try {
-      await api.updateBiography(biography)
-      setBioEditing(false)
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
   // Calculate metrics
   const workingEmployees = employees.filter(e => e.status === 'working').length
 
   return (
     <div className="space-y-4">
-      {/* Compact Header with Status and Controls */}
-      <div className="bg-white rounded-lg shadow p-4">
+      {/* System Health Bar - Top of Page */}
+      <div className="bg-gray-800 text-white rounded-lg shadow px-4 py-2 flex items-center gap-6 text-xs">
+        <span className="flex items-center gap-1">
+          <span className={`w-2 h-2 rounded-full ${health?.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'}`} />
+          <span className="font-medium">{health?.status || 'Unknown'}</span>
+        </span>
+        <span className="text-gray-400">|</span>
+        <span>Queue: {health?.queue_depth || 0}</span>
+        <span>Uptime: {Math.floor((health?.uptime_seconds || 0) / 3600)}h {Math.floor(((health?.uptime_seconds || 0) % 3600) / 60)}m</span>
+        <span>Runs: {health?.active_runs || 0}</span>
+        {health?.checks && Object.entries(health.checks).map(([name, check]) => (
+          <span key={name} className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded-full ${check.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className="capitalize">{name}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* Company Header with Controls */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <h1 className="text-xl font-bold">{seed ? seed.company_name : 'AI Corporation'}</h1>
@@ -924,9 +954,6 @@ function Dashboard() {
                 <span>{employees.length}</span>
                 <span className="text-gray-500 text-xs">working</span>
               </span>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-500">Queue: {health?.queue_depth || 0}</span>
-              <span className="text-gray-500">Uptime: {Math.floor((health?.uptime_seconds || 0) / 3600)}h</span>
             </div>
           </div>
           <button
@@ -950,7 +977,7 @@ function Dashboard() {
       </div>
 
       {/* Product Pipeline - Main Focus */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-purple-600" />
@@ -961,26 +988,26 @@ function Dashboard() {
         
         {/* Pipeline stages */}
         <div className="grid grid-cols-4 gap-2 mb-4">
-          <div className="bg-purple-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-purple-600">{(pipelineStats?.ideation || 0)}</div>
-            <div className="text-xs text-purple-700">Ideation</div>
+          <div className="bg-purple-50 dark:bg-purple-900/30 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{(pipelineStats?.ideation || 0)}</div>
+            <div className="text-xs text-purple-700 dark:text-purple-300">Ideation</div>
           </div>
-          <div className="bg-blue-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-blue-600">{(pipelineStats?.work_packet || 0)}</div>
-            <div className="text-xs text-blue-700">WIP</div>
+          <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{(pipelineStats?.work_packet || 0)}</div>
+            <div className="text-xs text-blue-700 dark:text-blue-300">WIP</div>
           </div>
-          <div className="bg-yellow-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{(pipelineStats?.csuite_review || 0)}</div>
-            <div className="text-xs text-yellow-700">C-Suite</div>
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{(pipelineStats?.csuite_review || 0)}</div>
+            <div className="text-xs text-yellow-700 dark:text-yellow-300">C-Suite</div>
           </div>
-          <div className="bg-green-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-green-600">{(productStats?.launched || 0)}</div>
-            <div className="text-xs text-green-700">Launched</div>
+          <div className="bg-green-50 dark:bg-green-900/30 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{(productStats?.launched || 0)}</div>
+            <div className="text-xs text-green-700 dark:text-green-300">Launched</div>
           </div>
         </div>
 
         {products.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 border rounded">
+          <div className="p-4 text-center text-gray-500 dark:text-gray-400 border dark:border-gray-700 rounded">
             {seed ? (
               <>Products are being generated for <strong>{seed.company_name}</strong>. Check back in a moment...</>
             ) : (
@@ -988,7 +1015,7 @@ function Dashboard() {
             )}
           </div>
         ) : (
-          <div className="border rounded divide-y max-h-48 overflow-y-auto">
+          <div className="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 max-h-48 overflow-y-auto">
             {products.slice(0, 5).map(p => (
               <div key={p.id} className="p-3 flex items-center justify-between">
                 <div>
@@ -1014,7 +1041,7 @@ function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* Work Deliverables */}
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-indigo-600" />
@@ -1024,36 +1051,36 @@ function Dashboard() {
           </div>
           
           <div className="grid grid-cols-5 gap-1 mb-3">
-            <div className="bg-green-50 rounded p-2 text-center">
-              <div className="text-lg font-bold text-green-600">{deliverableStats?.completed || 0}</div>
-              <div className="text-[9px] text-green-700">Done</div>
+            <div className="bg-green-50 dark:bg-green-900/30 rounded p-2 text-center">
+              <div className="text-lg font-bold text-green-600 dark:text-green-400">{deliverableStats?.completed || 0}</div>
+              <div className="text-[9px] text-green-700 dark:text-green-300">Done</div>
             </div>
-            <div className="bg-blue-50 rounded p-2 text-center">
-              <div className="text-lg font-bold text-blue-600">{deliverableStats?.in_review || 0}</div>
-              <div className="text-[9px] text-blue-700">Review</div>
+            <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-2 text-center">
+              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{deliverableStats?.in_review || 0}</div>
+              <div className="text-[9px] text-blue-700 dark:text-blue-300">Review</div>
             </div>
-            <div className="bg-emerald-50 rounded p-2 text-center">
-              <div className="text-lg font-bold text-emerald-600">{deliverableStats?.approved || 0}</div>
-              <div className="text-[9px] text-emerald-700">OK</div>
+            <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded p-2 text-center">
+              <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{deliverableStats?.approved || 0}</div>
+              <div className="text-[9px] text-emerald-700 dark:text-emerald-300">OK</div>
             </div>
-            <div className="bg-red-50 rounded p-2 text-center">
-              <div className="text-lg font-bold text-red-600">{deliverableStats?.rejected || 0}</div>
-              <div className="text-[9px] text-red-700">Fail</div>
+            <div className="bg-red-50 dark:bg-red-900/30 rounded p-2 text-center">
+              <div className="text-lg font-bold text-red-600 dark:text-red-400">{deliverableStats?.rejected || 0}</div>
+              <div className="text-[9px] text-red-700 dark:text-red-300">Fail</div>
             </div>
-            <div className="bg-yellow-50 rounded p-2 text-center">
-              <div className="text-lg font-bold text-yellow-600">{deliverableStats?.in_progress || 0}</div>
-              <div className="text-[9px] text-yellow-700">WIP</div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded p-2 text-center">
+              <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{deliverableStats?.in_progress || 0}</div>
+              <div className="text-[9px] text-yellow-700 dark:text-yellow-300">WIP</div>
             </div>
           </div>
 
-          <div className="border rounded divide-y max-h-48 overflow-y-auto">
+          <div className="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 max-h-48 overflow-y-auto">
             {deliverables.length === 0 ? (
               <div className="p-4 text-center text-gray-500 text-sm">No deliverables yet</div>
             ) : (
               deliverables.slice(0, 5).map(d => (
                 <div 
                   key={d.id} 
-                  className={`p-2 cursor-pointer hover:bg-gray-50 ${selectedDeliverable?.id === d.id ? 'bg-blue-50' : ''}`}
+                  className={`p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${selectedDeliverable?.id === d.id ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
                   onClick={() => setSelectedDeliverable(selectedDeliverable?.id === d.id ? null : d)}
                 >
                   <div className="flex items-center justify-between">
@@ -1071,8 +1098,8 @@ function Dashboard() {
                     </span>
                   </div>
                   {selectedDeliverable?.id === d.id && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                      <div className="whitespace-pre-wrap text-gray-600 max-h-24 overflow-y-auto">{d.output || 'No output'}</div>
+                    <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-xs">
+                      <div className="whitespace-pre-wrap text-gray-600 dark:text-gray-300 max-h-24 overflow-y-auto">{d.output || 'No output'}</div>
                     </div>
                   )}
                 </div>
@@ -1082,7 +1109,7 @@ function Dashboard() {
         </div>
 
         {/* Working Employees */}
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
@@ -1091,7 +1118,7 @@ function Dashboard() {
             <span className="text-sm text-gray-500">{workingEmployees} active</span>
           </div>
           
-          <div className="border rounded divide-y max-h-64 overflow-y-auto">
+          <div className="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 max-h-64 overflow-y-auto">
             {employees.filter(e => e.status === 'working').length === 0 ? (
               <div className="p-4 text-center text-gray-500 text-sm">No employees currently working</div>
             ) : (
@@ -1114,161 +1141,20 @@ function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* Corporate Structure Pane */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-purple-600" />
-            <h2 className="font-semibold">Corporate Structure</h2>
-          </div>
-          <div className="p-4 max-h-64 overflow-y-auto">
-            {divisions.length === 0 ? (
-              <div className="text-center text-gray-500">No divisions found</div>
-            ) : (
-              <div className="space-y-3">
-                {divisions.map(div => (
-                  <div key={div.id} className="bg-gray-50 rounded p-3">
-                    <div className="font-medium">{div.name}</div>
-                    <div className="text-xs text-gray-500">{div.description}</div>
-                    <div className="text-xs text-primary-600 mt-1">{div.departments} departments</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 pt-3 border-t">
-              <div className="text-sm font-medium mb-2">Employee Distribution</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {Object.entries(companyStatus?.stats?.by_skill || {}).map(([skill, count]) => (
-                  <div key={skill} className="flex justify-between bg-gray-50 rounded p-2">
-                    <span className="capitalize">{skill}</span>
-                    <span className="font-medium">{count as number}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Employee Details with Biography Pane */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b flex items-center gap-2">
-            <UserCircle className="w-5 h-5 text-orange-600" />
-            <h2 className="font-semibold">Employee Details & Biography</h2>
-          </div>
-          <div className="grid grid-cols-3 divide-x h-80">
-            {/* People list */}
-            <div className="overflow-y-auto">
-              {people.map(person => (
-                <button
-                  key={person.id}
-                  onClick={() => handleSelectPerson(person)}
-                  className={`w-full text-left p-2 text-xs hover:bg-gray-50 border-b ${
-                    selectedPerson?.id === person.id ? 'bg-primary-50' : ''
-                  }`}
-                >
-                  <div className="font-medium truncate">{person.name}</div>
-                  <div className="text-gray-500 capitalize">{person.type}</div>
-                </button>
-              ))}
-            </div>
-            
-            {/* Biography editor */}
-            <div className="col-span-2 p-3 overflow-y-auto">
-              {selectedPerson ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold">{selectedPerson.name}</div>
-                      <div className="text-xs text-gray-500 capitalize">{selectedPerson.role}</div>
-                    </div>
-                    {bioEditing ? (
-                      <button
-                        onClick={handleSaveBiography}
-                        disabled={actionLoading}
-                        className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-                      >
-                        {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                        Save
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setBioEditing(true)}
-                        className="flex items-center gap-1 px-3 py-1 bg-primary-500 text-white text-xs rounded hover:bg-primary-600"
-                      >
-                        <Edit3 className="w-3 h-3" /> Edit
-                      </button>
-                    )}
-                  </div>
-                  
-                  {bioEditing ? (
-                    <div className="space-y-2">
-                      <div>
-                        <label className="text-xs font-medium">Bio</label>
-                        <textarea
-                          value={biography?.bio || ''}
-                          onChange={e => setBiography(prev => prev ? {...prev, bio: e.target.value} : null)}
-                          className="w-full p-2 border rounded text-xs h-16"
-                          placeholder="Short description..."
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium">Background</label>
-                        <textarea
-                          value={biography?.background || ''}
-                          onChange={e => setBiography(prev => prev ? {...prev, background: e.target.value} : null)}
-                          className="w-full p-2 border rounded text-xs h-16"
-                          placeholder="Experience, education..."
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium">Personality</label>
-                        <textarea
-                          value={biography?.personality || ''}
-                          onChange={e => setBiography(prev => prev ? {...prev, personality: e.target.value} : null)}
-                          className="w-full p-2 border rounded text-xs h-16"
-                          placeholder="How they think and act..."
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 text-xs">
-                      {biography?.bio && (
-                        <div><span className="font-medium">Bio:</span> {biography.bio}</div>
-                      )}
-                      {biography?.background && (
-                        <div><span className="font-medium">Background:</span> {biography.background}</div>
-                      )}
-                      {biography?.personality && (
-                        <div><span className="font-medium">Personality:</span> {biography.personality}</div>
-                      )}
-                      {!biography?.bio && !biography?.background && !biography?.personality && (
-                        <div className="text-gray-400 italic">No biography set. Click Edit to add one.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                  Select a person to view/edit their biography
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Activity Log and Working Employees - Full Width */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Live Activity Log */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-green-600" />
               <h2 className="font-semibold">Live Activity Log</h2>
             </div>
             <span className="text-xs text-gray-400">{activityLog.length} events</span>
           </div>
-          <div className="divide-y max-h-80 overflow-y-auto font-mono text-xs">
+          <div className="divide-y dark:divide-gray-700 max-h-80 overflow-y-auto font-mono text-xs">
             {activityLog.length === 0 ? (
               <div className="p-4 text-center text-gray-500">Waiting for activity...</div>
             ) : (
@@ -1300,8 +1186,8 @@ function Dashboard() {
         </div>
 
         {/* Working Employees */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
               <h2 className="font-semibold">Working Employees</h2>
@@ -1310,7 +1196,7 @@ function Dashboard() {
               {orgStats?.by_status?.working || employees.filter(e => e.status === 'working').length} active
             </span>
           </div>
-          <div className="divide-y max-h-80 overflow-y-auto">
+          <div className="divide-y dark:divide-gray-700 max-h-80 overflow-y-auto">
             {employees.filter(e => e.status === 'working').length === 0 ? (
               <div className="p-4 text-center text-gray-500">No employees currently working</div>
             ) : (
@@ -1335,14 +1221,14 @@ function Dashboard() {
 
       {/* Component health */}
       {health?.checks && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700 flex items-center gap-2">
             <RefreshCw className="w-5 h-5 text-gray-600" />
             <h2 className="font-semibold">System Health</h2>
           </div>
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {Object.entries(health.checks).map(([name, check]) => (
-              <div key={name} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+              <div key={name} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm">
                 <span className="font-medium capitalize">{name}</span>
                 <span className={`flex items-center gap-1 ${check.status === 'up' ? 'text-green-600' : 'text-red-600'}`}>
                   {check.status === 'up' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
@@ -1391,12 +1277,12 @@ function Workflows() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {workflows.length === 0 ? (
-          <div className="col-span-2 bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <div className="col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500">
             No workflow templates found. Add YAML files to the workflows directory.
           </div>
         ) : (
           workflows.map(wf => (
-            <div key={wf.id} className="bg-white rounded-lg shadow p-4">
+            <div key={wf.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <h3 className="font-semibold text-lg">{wf.name}</h3>
@@ -1470,7 +1356,7 @@ function RunDetail() {
         <StatusBadge status={run.status} />
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <h2 className="font-semibold mb-2">Details</h2>
         <dl className="grid grid-cols-2 gap-2 text-sm">
           <dt className="text-gray-500">Run ID</dt>
@@ -1489,8 +1375,8 @@ function RunDetail() {
       </div>
 
       {run.steps && run.steps.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Steps</h2>
           </div>
           <div className="divide-y">
@@ -1556,7 +1442,7 @@ function Runs() {
       {loading ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
       ) : (
-        <div className="bg-white rounded-lg shadow divide-y">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow divide-y">
           {runs.length === 0 ? (
             <div className="p-8 text-center text-gray-500">No runs found</div>
           ) : (
@@ -1621,7 +1507,7 @@ function OrgNode({ person, onSelect, getColor, getStatusColor }: OrgNodeProps) {
         {hasChildren && (
           <button
             onClick={(e) => { e.stopPropagation(); setCollapsed(!collapsed) }}
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 z-10"
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 bg-white dark:bg-gray-800 border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 z-10"
           >
             <span className="text-xs font-bold">{collapsed ? '+' : '−'}</span>
           </button>
@@ -1808,7 +1694,7 @@ function OrganizationPage() {
       case 'meeting': return 'bg-purple-400 text-purple-900'
       case 'voting': return 'bg-orange-400 text-orange-900'
       case 'idle': return 'bg-gray-300 text-gray-700'
-      default: return 'bg-white text-gray-800'
+      default: return 'bg-white dark:bg-gray-800 text-gray-800'
     }
   }
 
@@ -1821,7 +1707,7 @@ function OrganizationPage() {
   return (
     <div className="relative h-full overflow-hidden flex flex-col">
       {/* Header */}
-      <div className={`flex-shrink-0 transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''} px-6 py-4 border-b bg-white`}>
+      <div className={`flex-shrink-0 transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''} px-6 py-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800`}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Organization Chart</h1>
           <div className="flex items-center gap-4">
@@ -1843,7 +1729,7 @@ function OrganizationPage() {
             
             {/* Board of Directors at Top */}
             {boardMembers.length > 0 && (
-              <div className="mb-6 md:mb-8 bg-white rounded-lg shadow p-3 md:p-4">
+              <div className="mb-6 md:mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-3 md:p-4">
                 <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide text-center mb-3 flex items-center justify-center gap-2">
                   <span className="hidden md:inline">🏛️</span>
                   Board of Directors
@@ -1873,7 +1759,7 @@ function OrganizationPage() {
             )}
 
             {/* Department Legend on Mobile */}
-            <div className="md:hidden mb-4 bg-white rounded-lg shadow p-3">
+            <div className="md:hidden mb-4 bg-white dark:bg-gray-800 rounded-lg shadow p-3">
               <div className="text-xs font-semibold text-gray-700 mb-2">Departments:</div>
               <div className="flex flex-wrap gap-2 text-[10px]">
                 {Object.keys(groupByDepartment()).map(dept => (
@@ -1900,7 +1786,7 @@ function OrganizationPage() {
 
       {/* Sliding Side Panel */}
       <div
-        className={`fixed right-0 top-0 h-full w-96 bg-white border-l border-gray-200 shadow-2xl transform transition-transform duration-300 ease-in-out z-[60] ${
+        className={`fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-800 border-l border-gray-200 shadow-2xl transform transition-transform duration-300 ease-in-out z-[60] ${
           sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -1911,11 +1797,11 @@ function OrganizationPage() {
         ) : selectedPerson ? (
           <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-primary-500 to-primary-600 text-white">
+            <div className="p-4 border-b dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-primary-500 to-primary-600 text-white">
               <h2 className="text-lg font-bold">Person Details</h2>
               <button
                 onClick={() => setSidePanelOpen(false)}
-                className="p-1 hover:bg-white/20 rounded transition-colors"
+                className="p-1 hover:bg-white dark:bg-gray-800/20 rounded transition-colors"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
@@ -1924,7 +1810,7 @@ function OrganizationPage() {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Profile Section */}
-              <div className="text-center pb-4 border-b">
+              <div className="text-center pb-4 border-b dark:border-gray-700">
                 <UserCircle className="w-20 h-20 mx-auto text-primary-500 mb-3" />
                 <h3 className="text-xl font-bold">{selectedPerson.name}</h3>
                 <p className="text-sm text-gray-600">{selectedPerson.title}</p>
@@ -2120,8 +2006,8 @@ function PeoplePage() {
   return (
     <div className="grid grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
       {/* People list */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50">
           <h2 className="font-semibold">All People ({people.length})</h2>
         </div>
         <div className="divide-y overflow-y-auto h-[calc(100%-3rem)]">
@@ -2144,10 +2030,10 @@ function PeoplePage() {
       </div>
 
       {/* Biography editor */}
-      <div className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
+      <div className="col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {selectedPerson ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+            <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 flex items-center justify-between">
               <div>
                 <h2 className="font-semibold">{selectedPerson.name}</h2>
                 <p className="text-xs text-gray-500 capitalize">{selectedPerson.type} - {selectedPerson.role}</p>
@@ -2289,7 +2175,7 @@ function SeedSetupPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6 space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
         <div className="flex items-center gap-2 text-lg font-semibold">
           <Target className="w-5 h-5 text-primary-600" />
           {seed ? 'Update Business Configuration' : 'Select Business Sector'}
@@ -2457,19 +2343,19 @@ function EmployeeDetailPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
           <div className="text-2xl font-bold text-primary-600">{employee.stats.completed_tasks}</div>
           <div className="text-xs text-gray-500">Completed Tasks</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
           <div className="text-2xl font-bold text-blue-600">{employee.stats.total_work_time}</div>
           <div className="text-xs text-gray-500">Total Work Time</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
           <div className="text-2xl font-bold text-green-600">{employee.stats.average_task_time}</div>
           <div className="text-xs text-gray-500">Avg Task Time</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
           <div className="text-2xl font-bold text-purple-600">{employee.stats.activity_count}</div>
           <div className="text-xs text-gray-500">Activity Count</div>
         </div>
@@ -2477,7 +2363,7 @@ function EmployeeDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Current Work */}
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Current Work</h2>
           {employee.current_work ? (
             <div className="space-y-3">
@@ -2518,7 +2404,7 @@ function EmployeeDetailPage() {
         </div>
 
         {/* Employee Info */}
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Employee Info</h2>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
@@ -2553,8 +2439,8 @@ function EmployeeDetailPage() {
       </div>
 
       {/* Activity Log */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-4 py-3 border-b">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="px-4 py-3 border-b dark:border-gray-700">
           <h2 className="font-semibold">Activity Log ({employee.activity_log?.length || 0})</h2>
         </div>
         <div className="divide-y max-h-96 overflow-y-auto">
@@ -2581,8 +2467,8 @@ function EmployeeDetailPage() {
       </div>
 
       {/* Work History */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-4 py-3 border-b">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="px-4 py-3 border-b dark:border-gray-700">
           <h2 className="font-semibold">Work History ({employee.work_history?.length || 0})</h2>
         </div>
         <div className="divide-y max-h-96 overflow-y-auto">
@@ -2652,7 +2538,7 @@ function MeetingsPage() {
       </div>
 
       {meetings.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-400">
           <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>No meetings recorded yet</p>
           <p className="text-xs mt-2">Meetings will appear here as they are scheduled and conducted</p>
@@ -2662,7 +2548,7 @@ function MeetingsPage() {
           {meetings.map((meeting) => (
             <div 
               key={meeting.id}
-              className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
+              className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => navigate(`/meetings/${meeting.id}`)}
             >
               <div className="flex items-start justify-between">
@@ -2776,13 +2662,13 @@ function MeetingDetailPage() {
       {(meeting.summary || meeting.key_decisions?.length > 0 || meeting.action_items?.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {meeting.summary && (
-            <div className="bg-white rounded-lg shadow p-4 lg:col-span-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 lg:col-span-3">
               <h2 className="font-semibold mb-2">Summary</h2>
               <p className="text-gray-700">{meeting.summary}</p>
             </div>
           )}
           {meeting.key_decisions?.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <h2 className="font-semibold mb-2 text-green-700">Key Decisions ({meeting.key_decisions.length})</h2>
               <ul className="space-y-1">
                 {meeting.key_decisions.map((decision, i) => (
@@ -2795,7 +2681,7 @@ function MeetingDetailPage() {
             </div>
           )}
           {meeting.action_items?.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <h2 className="font-semibold mb-2 text-blue-700">Action Items ({meeting.action_items.length})</h2>
               <ul className="space-y-1">
                 {meeting.action_items.map((item, i) => (
@@ -2808,7 +2694,7 @@ function MeetingDetailPage() {
             </div>
           )}
           {meeting.attendees?.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
               <h2 className="font-semibold mb-2 text-purple-700">Attendees ({meeting.attendees.length})</h2>
               <div className="flex flex-wrap gap-2">
                 {meeting.attendees.map((attendee, i) => (
@@ -2824,8 +2710,8 @@ function MeetingDetailPage() {
 
       {/* Decisions */}
       {meeting.decisions?.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Board Decisions ({meeting.decisions.length})</h2>
           </div>
           <div className="divide-y">
@@ -2846,7 +2732,7 @@ function MeetingDetailPage() {
                     <div className="text-xs font-medium text-gray-500 mb-2">Votes</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {decision.votes.map((vote, i) => (
-                        <div key={i} className="text-xs bg-white rounded p-2">
+                        <div key={i} className="text-xs bg-white dark:bg-gray-800 rounded p-2">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium capitalize">{vote.member_id.replace('_', ' ')}</span>
                             <span className={`px-1.5 py-0.5 rounded ${
@@ -2870,8 +2756,8 @@ function MeetingDetailPage() {
       )}
 
       {/* Dialog */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-4 py-3 border-b">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="px-4 py-3 border-b dark:border-gray-700">
           <h2 className="font-semibold">Meeting Dialog ({meeting.dialog?.length || 0})</h2>
         </div>
         <div className="divide-y max-h-[600px] overflow-y-auto">
@@ -2910,8 +2796,8 @@ function MeetingDetailPage() {
 
       {/* Agenda */}
       {meeting.agenda?.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-4 py-3 border-b">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Agenda ({meeting.agenda.length} items)</h2>
           </div>
           <div className="divide-y">
@@ -2938,6 +2824,7 @@ function MeetingDetailPage() {
 
 // Admin page
 function AdminPage() {
+  const { theme, setTheme } = useTheme()
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [resetting, setResetting] = useState(false)
@@ -2991,8 +2878,38 @@ function AdminPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Administration</h1>
 
+      {/* Theme Settings */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold mb-4">Appearance</h2>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Theme:</span>
+          <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+            <button
+              onClick={() => setTheme('dark')}
+              className={`px-4 py-2 text-sm font-medium ${
+                theme === 'dark'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Dark
+            </button>
+            <button
+              onClick={() => setTheme('light')}
+              className={`px-4 py-2 text-sm font-medium ${
+                theme === 'light'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Light
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* System Status */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold mb-4">System Status</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {(['database', 'redis', 'storage', 'providers', 'organization'] as const).map(service => (
@@ -3006,7 +2923,7 @@ function AdminPage() {
       </div>
 
       {/* Company Controls */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold mb-4">Company Controls</h2>
         <div className="flex items-center gap-4 mb-4">
           <div className="flex items-center gap-2">
@@ -3050,7 +2967,7 @@ function AdminPage() {
 
       {/* Organization Stats */}
       {status?.org_stats && (
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Organization Stats</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-gray-50 rounded">
@@ -3073,22 +2990,33 @@ function AdminPage() {
         </div>
       )}
 
-      {/* Seed Info */}
-      {status?.seed && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">Current Seed</h2>
+      {/* Seed Configuration */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Seed Configuration</h2>
+          <Link 
+            to="/seed" 
+            className="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 font-medium flex items-center gap-2"
+          >
+            <Rocket className="w-4 h-4" />
+            {status?.seeded ? 'Change Seed' : 'Configure Seed'}
+          </Link>
+        </div>
+        {status?.seed ? (
           <div className="space-y-2 text-sm">
             <div><span className="font-medium">Company:</span> {status.seed.company_name}</div>
             <div><span className="font-medium">Sector:</span> {status.seed.sector}</div>
             <div><span className="font-medium">Mission:</span> {status.seed.mission}</div>
             <div><span className="font-medium">Vision:</span> {status.seed.vision}</div>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-gray-500">No seed configured. Click "Configure Seed" to set up your company.</p>
+        )}
+      </div>
 
       {/* Config Info */}
       {status?.config && (
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Configuration</h2>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div><span className="font-medium">Server Port:</span> {status.config.server_port}</div>
@@ -3209,7 +3137,7 @@ function ProductsPage() {
       
       {/* Pipeline Stages + Product Status */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Pipeline Stages</h3>
           <div className="grid grid-cols-3 gap-2">
             {Object.entries(stageNames).slice(0, 6).map(([key, name]) => (
@@ -3220,7 +3148,7 @@ function ProductsPage() {
             ))}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Product Status</h3>
           <div className="grid grid-cols-3 gap-2">
             {Object.entries({ideation: 'Ideation', development: 'Development', launched: 'Launched'}).map(([key, name]) => (
@@ -3234,8 +3162,8 @@ function ProductsPage() {
       </div>
       
       {/* Combined list */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-4 py-3 border-b flex justify-between items-center">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
           <h2 className="font-semibold">All Items</h2>
           <span className="text-xs text-gray-500">{pipelines.length} in progress, {products.length} completed</span>
         </div>
@@ -3442,7 +3370,7 @@ function MobileNav({ navItems }: { navItems: Array<{ path: string; icon: any; la
       {/* Overflow Menu */}
       {showOverflow && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setShowOverflow(false)}>
-          <div className="absolute bottom-16 right-4 bg-white rounded-lg shadow-xl p-2 min-w-[200px]" onClick={e => e.stopPropagation()}>
+          <div className="absolute bottom-16 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-2 min-w-[200px]" onClick={e => e.stopPropagation()}>
             {overflowItems.map(item => (
               <Link
                 key={item.path}
@@ -3463,7 +3391,7 @@ function MobileNav({ navItems }: { navItems: Array<{ path: string; icon: any; la
       )}
       
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 z-30">
         <div className="flex justify-around items-center h-16">
           {primaryItems.map(item => (
             <Link
@@ -3494,26 +3422,41 @@ function MobileNav({ navItems }: { navItems: Array<{ path: string; icon: any; la
 
 // Main App
 export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  )
+}
+
+function AppContent() {
   const location = useLocation()
   const isMobile = useIsMobile()
+  const { theme } = useTheme()
 
   const navItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/products', icon: Target, label: 'Products' },
-    { path: '/seed', icon: Rocket, label: 'Seed' },
+    { path: '/org', icon: Building2, label: 'Organization' },
+    { path: '/people', icon: Users, label: 'People' },
+    { path: '/meetings', icon: Calendar, label: 'Meetings' },
     { path: '/workflows', icon: Briefcase, label: 'Workflows' },
     { path: '/runs', icon: Activity, label: 'Runs' },
-    { path: '/org', icon: Building2, label: 'Organization' },
-    { path: '/meetings', icon: Calendar, label: 'Meetings' },
-    { path: '/people', icon: Users, label: 'People' },
     { path: '/admin', icon: Settings, label: 'Admin' },
   ]
 
   const { companyStatus } = useWS()
 
+  // Theme-aware classes
+  const isDark = theme === 'dark'
+  const bgMain = isDark ? 'bg-gray-900' : 'bg-gray-100'
+  const bgCard = isDark ? 'bg-gray-800' : 'bg-white dark:bg-gray-800'
+  const textPrimary = isDark ? 'text-white' : 'text-gray-900'
+  const borderColor = isDark ? 'border-gray-700' : 'border-gray-200'
+
   return (
     <WSProvider>
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className={`min-h-screen flex flex-col md:flex-row ${bgMain} ${textPrimary}`}>
       {/* Mobile Header */}
       {isMobile && (
         <header className="bg-gray-900 text-white p-3 flex items-center justify-between sticky top-0 z-20">
@@ -3528,7 +3471,7 @@ export default function App() {
       {/* Desktop Sidebar */}
       {!isMobile && (
         <aside className="w-64 bg-gray-900 text-white flex flex-col fixed h-screen">
-          <div className="p-4 border-b border-gray-800">
+          <div className="p-4 border-b dark:border-gray-700 border-gray-800">
             <h1 className="text-xl font-bold">AI Corporation</h1>
             <p className="text-xs text-gray-400">Workflow Engine</p>
           </div>
@@ -3568,10 +3511,10 @@ export default function App() {
 
       {/* Desktop Top Header Bar */}
       {!isMobile && (
-        <header className="fixed top-0 left-64 right-0 bg-white border-b border-gray-200 z-10 shadow-sm">
+        <header className={`fixed top-0 left-64 right-0 ${bgCard} border-b dark:border-gray-700 ${borderColor} z-10 shadow-sm`}>
           <div className="px-6 py-3 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>
                 {navItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
               </h2>
             </div>

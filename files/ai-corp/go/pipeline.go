@@ -329,6 +329,13 @@ TARGET_CUSTOMER: [Buyer persona: role, company size, industry - 1 sentence]
 REVENUE_MODEL: [Pricing strategy - 1 sentence]`, 
 		seed.CompanyName, seed.Sector, seed.TargetMarket, seed.Mission, seed.Vision, existingContext)
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"provider":    pm.org.config.DefaultProvider,
+		"operation":   "generate_csuite_idea",
+	}).Info("Starting LLM request...")
+	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{{Role: "user", Content: prompt}},
 		MaxTokens: 1000,
@@ -342,9 +349,9 @@ REVENUE_MODEL: [Pricing strategy - 1 sentence]`,
 	// Log the actual response for debugging
 	log.WithFields(log.Fields{
 		"pipeline_id": pipeline.ID,
-		"response": resp.Content,
-		"length": len(resp.Content),
-	}).Info("LLM response for C-Suite idea")
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"length":      len(resp.Content),
+	}).Info("LLM request completed")
 	
 	// Parse response - handle multi-line values
 	idea := &IdeaContent{
@@ -709,15 +716,28 @@ SUGGESTIONS: [Comma-separated list of suggestions for improvement]`,
 	ctx, cancel := context.WithTimeout(pm.org.ctx, timeout)
 	defer cancel()
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"provider":    pm.org.config.DefaultProvider,
+		"operation":   "csuite_review",
+	}).Info("Starting LLM request...")
+	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{{Role: "user", Content: prompt}},
 		MaxTokens: 600,
 		Temperature: 0.3,
 	})
 	if err != nil {
-		log.WithError(err).Error("C-Suite review failed")
+		log.WithError(err).WithField("duration_ms", time.Since(llmStart).Milliseconds()).Error("C-Suite review failed")
 		return
 	}
+	
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"length":      len(resp.Content),
+	}).Info("LLM request completed")
 	
 	// Parse response
 	review := &ReviewContent{
@@ -884,15 +904,28 @@ Respond in this EXACT JSON format:
 	ctx, cancel := context.WithTimeout(pm.org.ctx, timeout)
 	defer cancel()
 	
+	llmStart := time.Now()
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"provider":    pm.org.config.DefaultProvider,
+		"operation":   "generate_execution_plan",
+	}).Info("Starting LLM request...")
+	
 	resp, err := provider.Chat(ctx, LLMRequest{
 		Messages: []LLMMessage{{Role: "user", Content: prompt}},
 		MaxTokens: 1500,
 		Temperature: 0.4,
 	})
 	if err != nil {
-		log.WithError(err).Error("Execution plan generation failed")
+		log.WithError(err).WithField("duration_ms", time.Since(llmStart).Milliseconds()).Error("Execution plan generation failed")
 		return
 	}
+	
+	log.WithFields(log.Fields{
+		"pipeline_id": pipeline.ID,
+		"duration_ms": time.Since(llmStart).Milliseconds(),
+		"length":      len(resp.Content),
+	}).Info("LLM request completed")
 	
 	// Parse JSON response
 	plan := &ExecutionPlanContent{
