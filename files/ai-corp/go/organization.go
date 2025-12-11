@@ -436,6 +436,7 @@ type Organization struct {
 
 // NewOrganization creates a new organizational structure
 func NewOrganization(config *Config, providers *ProviderManager, storage *StorageManager, db *Database) *Organization {
+	orgStart := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	
 	org := &Organization{
@@ -462,16 +463,24 @@ func NewOrganization(config *Config, providers *ProviderManager, storage *Storag
 	}
 	
 	// Load biographies from database
+	phaseStart := time.Now()
 	org.loadBiographies()
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Debug("Biographies loaded from database")
 	
 	// Load seed from database if exists
+	phaseStart = time.Now()
 	org.loadSeed()
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Debug("Seed loaded from database")
 	
 	// Initialize default structure
+	phaseStart = time.Now()
 	org.initializeStructure()
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Organization structure initialized")
 	
 	// Initialize pipeline manager
+	phaseStart = time.Now()
 	org.pipeline = NewPipelineManager(org)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Debug("Pipeline manager initialized")
 	
 	// Start pipeline if we have a seed loaded from database
 	if org.Seed != nil {
@@ -479,6 +488,7 @@ func NewOrganization(config *Config, providers *ProviderManager, storage *Storag
 		org.pipeline.StartContinuousOperation()
 	}
 	
+	log.WithField("total_duration_ms", time.Since(orgStart).Milliseconds()).Debug("Organization creation complete")
 	return org
 }
 

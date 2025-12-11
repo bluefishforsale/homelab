@@ -38,6 +38,9 @@ type App struct {
 
 // NewApp creates a new application instance
 func NewApp(config *Config) (*App, error) {
+	appStart := time.Now()
+	log.Info("Initializing application components...")
+	
 	app := &App{
 		config:    config,
 		wsHub:     NewWSHub(),
@@ -46,45 +49,70 @@ func NewApp(config *Config) (*App, error) {
 	}
 
 	// Initialize database
+	phaseStart := time.Now()
+	log.Info("Connecting to PostgreSQL...")
 	db, err := NewDatabase(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 	app.db = db
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Database connection established")
 
 	// Initialize Redis
+	phaseStart = time.Now()
+	log.Info("Connecting to Redis...")
 	redis, err := NewRedisClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Redis: %w", err)
 	}
 	app.redis = redis
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Redis connection established")
 
 	// Initialize storage manager
+	phaseStart = time.Now()
+	log.Info("Initializing storage manager...")
 	storage, err := NewStorageManager(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 	app.storage = storage
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Storage initialized")
 
 	// Initialize provider manager
+	phaseStart = time.Now()
+	log.Info("Initializing LLM providers...")
 	app.providers = NewProviderManager(config)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Providers initialized")
 
 	// Initialize orchestrator
+	phaseStart = time.Now()
+	log.Info("Initializing orchestrator...")
 	app.orchestrator = NewOrchestrator(config, db, redis, app.providers, storage)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Orchestrator initialized")
 
 	// Initialize board of directors (12 members)
+	phaseStart = time.Now()
+	log.Info("Initializing board of directors...")
 	app.board = NewBoard(config, app.providers, db)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Board initialized")
 
 	// Initialize scheduler
+	phaseStart = time.Now()
+	log.Info("Initializing scheduler...")
 	app.scheduler = NewScheduler(db, redis)
 	app.scheduler.SetBoard(app.board)
 	app.scheduler.SetOrchestrator(app.orchestrator)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Scheduler initialized")
 
 	// Initialize organization (employees as goroutines)
+	phaseStart = time.Now()
+	log.Info("Initializing organization structure...")
 	app.org = NewOrganization(config, app.providers, storage, db)
 	app.org.SetWSHub(app.wsHub) // Connect WebSocket hub for live updates
 	app.scheduler.SetOrganization(app.org)
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Organization initialized")
 
+	log.WithField("total_duration_ms", time.Since(appStart).Milliseconds()).Info("Application initialization complete")
 	return app, nil
 }
 
@@ -141,14 +169,20 @@ func main() {
 	defer app.Close()
 
 	// Start orchestrator
+	phaseStart := time.Now()
+	log.Info("Starting orchestrator...")
 	if err := app.orchestrator.Start(); err != nil {
 		log.Fatalf("Failed to start orchestrator: %v", err)
 	}
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Orchestrator started")
 
 	// Start scheduler
+	phaseStart = time.Now()
+	log.Info("Starting scheduler...")
 	if err := app.scheduler.Start(); err != nil {
 		log.Fatalf("Failed to start scheduler: %v", err)
 	}
+	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Scheduler started")
 
 	log.Infof("Board initialized with %d members", len(app.board.GetAllMembers()))
 
