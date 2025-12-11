@@ -32,7 +32,7 @@ Private network: 172.26.0.0/16
 
 ```bash
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/wordpress.yaml --ask-vault-pass
+  playbooks/individual/ocean/services/blog_saetnere_com_wp.yaml --ask-vault-pass
 ```
 
 ---
@@ -110,4 +110,5 @@ docker exec wordpress-db mysqldump -u wordpress -p wordpress > backup.sql
 ## Related Documentation
 
 - [playbooks/individual/ocean/services/wordpress.yaml](/playbooks/individual/ocean/services/wordpress.yaml)
+  playbooks/individual/ocean/services/blog_saetnere_com_wp.yaml
 - [docs/architecture/ocean-services.md](/docs/architecture/ocean-services.md)
