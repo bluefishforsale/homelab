@@ -314,31 +314,19 @@ Company Mission: %s
 Company Vision: %s
 %s
 
-Generate an innovative, bootstrappable product idea that is:
-- SPECIFIC and DEFENSIBLE: Clear unique value proposition with natural competitive moats
-- VALIDATED PAIN POINT: Solves a real, urgent problem that people will pay to fix
-- ECONOMICALLY VIABLE: Clear path to profitability with reasonable customer acquisition costs
-- PRAGMATICALLY BUILDABLE: Can be built by a small team (2-5 people) without massive capital
-- NOT GENERIC: Avoid obvious commodity solutions like "better project management" or "team chat app"
+Generate ONE innovative, bootstrappable product idea. Requirements:
+- Solves a real urgent problem people will pay to fix
+- Can be built by a small team without massive capital
+- NO AI/ML/LLM features, NO blockchain/crypto/quantum
+- Focus on B2B SaaS or niche vertical solutions
 
-Constraints:
-- NO AI/ML/LLM features (over-saturated market)
-- NO blockchain/crypto/quantum (speculative)
-- Focus on B2B SaaS, specialized tools, or niche vertical solutions
-- Target underserved niches where incumbents are weak or expensive
+IMPORTANT: Output ONLY the structured response below. Do NOT include any thinking, reasoning, or explanation. Start directly with PROBLEM:
 
-Think about:
-- What manual processes are ripe for automation in specific industries?
-- What expensive enterprise tools could be unbundled for SMBs?
-- What new workflows have emerged that lack proper tooling?
-- What technical communities have unmet needs?
-
-Respond in this format:
-PROBLEM: [Specific problem statement - be concrete about who has this problem and why it matters]
-SOLUTION: [Your product/service - describe the core offering and key features]
-VALUE_PROP: [Why customers will pay - quantify time/money saved if possible]
-TARGET_CUSTOMER: [Specific buyer persona - role, company size, industry]
-REVENUE_MODEL: [Pricing strategy and unit economics]`, 
+PROBLEM: [Who has this problem and why it matters - 1-2 sentences]
+SOLUTION: [Your product name and what it does - 1-2 sentences]
+VALUE_PROP: [Why customers will pay - 1 sentence]
+TARGET_CUSTOMER: [Buyer persona: role, company size, industry - 1 sentence]
+REVENUE_MODEL: [Pricing strategy - 1 sentence]`, 
 		seed.CompanyName, seed.Sector, seed.TargetMarket, seed.Mission, seed.Vision, existingContext)
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
@@ -364,8 +352,13 @@ REVENUE_MODEL: [Pricing strategy and unit economics]`,
 		GeneratedAt: time.Now(),
 	}
 	
-	// Remove markdown formatting and split into lines
-	content := strings.ReplaceAll(resp.Content, "**", "")
+	// Remove markdown formatting and thinking tags, split into lines
+	content := resp.Content
+	// Strip <think>...</think> blocks (local LLM reasoning)
+	if idx := strings.Index(content, "</think>"); idx != -1 {
+		content = content[idx+8:]
+	}
+	content = strings.ReplaceAll(content, "**", "")
 	lines := strings.Split(content, "\n")
 	
 	var currentField string
@@ -712,7 +705,8 @@ SUGGESTIONS: [Comma-separated list of suggestions for improvement]`,
 		truncate(pipeline.WorkPacket.FinancialProjections, 500),
 		truncate(pipeline.WorkPacket.MarketingStrategy, 500))
 	
-	ctx, cancel := context.WithTimeout(pm.org.ctx, 3*time.Minute)
+	timeout := time.Duration(pm.org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(pm.org.ctx, timeout)
 	defer cancel()
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
@@ -886,7 +880,8 @@ Respond in this EXACT JSON format:
 }`,
 		pipeline.Name, pipeline.Idea.Problem, pipeline.Idea.Solution, pipeline.Idea.RevenueModel)
 	
-	ctx, cancel := context.WithTimeout(pm.org.ctx, 3*time.Minute)
+	timeout := time.Duration(pm.org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(pm.org.ctx, timeout)
 	defer cancel()
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
@@ -960,7 +955,8 @@ Respond in this EXACT JSON format:
 
 // StartPipeline kicks off the full pipeline process
 func (pm *PipelineManager) StartPipeline(pipeline *ProductPipeline) {
-	ctx, cancel := context.WithTimeout(pm.org.ctx, 5*time.Minute)
+	timeout := time.Duration(pm.org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(pm.org.ctx, timeout)
 	defer cancel()
 	
 	// Step 1: Generate C-Suite idea

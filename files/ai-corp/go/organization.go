@@ -874,7 +874,8 @@ DESCRIPTION: [2 sentences]
 VALUE_PROP: [key benefit]
 FEATURES: [3-5 items]`, seed.CompanyName, sectorName, seed.TargetMarket, seed.Mission, seed.Vision)
 	
-	ctx, cancel := context.WithTimeout(org.ctx, 2*time.Minute)
+	timeout := time.Duration(org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(org.ctx, timeout)
 	defer cancel()
 	
 	resp, err := provider.Chat(ctx, LLMRequest{
@@ -2391,7 +2392,8 @@ Complete this task according to your role and skill. Provide only the output, no
 		formatObjectives(work.Objectives),
 	)
 	
-	ctx, cancel := context.WithTimeout(emp.ctx, 5*time.Minute)
+	timeout := time.Duration(org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(emp.ctx, timeout)
 	defer cancel()
 	
 	// Check if provider is available
@@ -2487,7 +2489,8 @@ Rate the quality and provide feedback. Respond in JSON format.`,
 		result.Output,
 	)
 	
-	ctx, cancel := context.WithTimeout(mgr.ctx, 2*time.Minute)
+	timeout := time.Duration(org.config.LLMTimeoutMinutes) * time.Minute
+	ctx, cancel := context.WithTimeout(mgr.ctx, timeout)
 	defer cancel()
 	
 	resp, err := mgr.provider.Chat(ctx, LLMRequest{
@@ -2671,20 +2674,24 @@ func (org *Organization) scaleUp(skill EmployeeSkill) *Employee {
 
 // GetStats returns organization statistics
 func (org *Organization) GetStats() map[string]interface{} {
+	// Copy employee list while holding lock
 	org.mu.RLock()
-	defer org.mu.RUnlock()
-	
 	stats := map[string]interface{}{
-		"divisions":     len(org.Divisions),
-		"managers":      len(org.AllManagers),
+		"divisions":       len(org.Divisions),
+		"managers":        len(org.AllManagers),
 		"total_employees": len(org.AllEmployees),
 	}
+	employees := make([]*Employee, 0, len(org.AllEmployees))
+	for _, emp := range org.AllEmployees {
+		employees = append(employees, emp)
+	}
+	org.mu.RUnlock()
 	
-	// Count by status
+	// Now iterate employees without holding org lock (prevents deadlock)
 	statusCounts := make(map[EmployeeStatus]int)
 	skillCounts := make(map[EmployeeSkill]int)
 	
-	for _, emp := range org.AllEmployees {
+	for _, emp := range employees {
 		emp.mu.RLock()
 		statusCounts[emp.Status]++
 		skillCounts[emp.Skill]++
