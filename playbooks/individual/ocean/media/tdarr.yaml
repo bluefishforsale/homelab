@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     image: ghcr.io/haveagitgat/tdarr
     version: latest
@@ -11,9 +14,9 @@
     node_image: ghcr.io/haveagitgat/tdarr_node
     node_version: latest
     service_node: tdarr-node
-    tdarr_port_web: 8265
-    tdarr_port_api: 8266
-    node_port: 8267
+    tdarr_port_web: "{{ service_ports.tdarr.port }}"   # host-facing web UI
+    tdarr_port_api: 8266                                # internal only
+    node_port: 8267                                     # internal only
     path_complete: /data01/complete
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"

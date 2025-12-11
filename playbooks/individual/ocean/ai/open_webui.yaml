@@ -4,11 +4,14 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     service: open-webui
     image: ghcr.io/open-webui/open-webui
     version: main
-    port: 3000
+    port: "{{ service_ports.open_webui.port }}"
     data: /data01
     files: ../../../../files/open-webui
     home: "{{ data }}/services/{{ service }}"

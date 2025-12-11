@@ -6,12 +6,13 @@
 
   vars_files:
     - ../../../../vars/vars_comfyui_models.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: comfyui
     image: yanwk/comfyui-boot
     version: cu126-slim
-    port: 8188
+    port: "{{ service_ports.comfyui.port }}"
     data: /data01
     files: ../../../../files/comfyui
     home: "{{ data }}/services/{{ service }}"

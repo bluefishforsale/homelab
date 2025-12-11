@@ -6,15 +6,16 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: frigate
     image: ghcr.io/blakeblackshear/frigate
     version: stable
-    port_ext: 5000
-    rtmp_port: 1935
-    rtsp_port: 8554
-    webrtc_port: 8555
+    port_ext: "{{ service_ports.frigate.port }}"
+    rtmp_port: "{{ service_ports.frigate.rtmp }}"
+    rtsp_port: "{{ service_ports.frigate.rtsp }}"
+    webrtc_port: "{{ service_ports.frigate.webrtc }}"
     data: /data01
     files: ../../../../files/frigate
     home: "{{ data }}/services/{{ service }}"

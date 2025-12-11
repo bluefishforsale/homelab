@@ -1,0 +1,197 @@
+---
+# Centralized service port configuration
+# All host-facing ports for homelab services in one place
+# Use: vars_files: - vars/vars_service_ports.yaml
+#
+# Key conventions:
+#   port          - single host port (mapped to same container port)
+#   external      - host-mapped port (when different from internal)
+#   tcp/udp       - lists for multi-port services (host side)
+
+service_ports:
+  # =============================================================================
+  # Infrastructure
+  # =============================================================================
+  nginx:
+    http: 80
+    https: 443
+
+  mysql:
+    port: 3306
+
+  # =============================================================================
+  # Monitoring & Metrics
+  # =============================================================================
+  prometheus:
+    port: 9090
+
+  alertmanager:
+    port: 9093
+
+  karma:
+    port: 8181
+
+  grafana:
+    port: 8910
+
+  loki:
+    port: 3100
+
+  # =============================================================================
+  # Exporters
+  # =============================================================================
+  blackbox_exporter:
+    port: 9115
+
+  ndt_exporter:
+    port: 9140
+
+  cadvisor:
+    port: 8912
+
+  node_exporter:
+    port: 9100
+
+  process_exporter:
+    port: 9256
+
+  nvidia_gpu_exporter:
+    port: 9445
+
+  smart_exporter:
+    port: 9633
+
+  zfs_exporter:
+    port: 9150
+
+  fail2ban_exporter:
+    port: 9191
+
+  unpoller:
+    port: 9130
+
+  plex_exporter:
+    port: 9594
+
+  jellyfin_exporter:
+    port: 9027
+
+  tautulli_exporter:
+    port: 8913
+
+  sonarr_exporter:
+    port: 9708
+
+  radarr_exporter:
+    port: 9707
+
+  prowlarr_exporter:
+    port: 9710
+
+  nzbget_exporter:
+    port: 9452
+
+  # =============================================================================
+  # Log Anomaly Detection (host APIs only)
+  # =============================================================================
+  log_anomaly_detector:
+    port: 8086
+
+  log_anomaly_ml:
+    port: 8087
+
+  # =============================================================================
+  # AI/ML Services
+  # =============================================================================
+  llamacpp:
+    port: 8080
+
+  open_webui:
+    port: 3000
+
+  comfyui:
+    port: 8188
+
+  ai_corp:
+    port: 8088
+
+  # =============================================================================
+  # Media Services
+  # =============================================================================
+  plex:
+    port: 32400
+    tcp:
+      - 3005
+      - 8324
+      - 32400
+      - 32469
+    udp:
+      - 32410
+      - "32412-34414"
+
+  jellyfin:
+    port: 8096
+    https: 8920
+    tcp:
+      - 8096
+      - 8920
+    udp:
+      - 7359
+      - 1900
+
+  jellystat:
+    port: 8097
+
+  tautulli:
+    port: 8905
+
+  sonarr:
+    port: 8902
+
+  radarr:
+    port: 8903
+
+  bazarr:
+    port: 6767
+
+  prowlarr:
+    port: 9696
+
+  overseerr:
+    port: 5055
+
+  nzbget:
+    port: 8901
+
+  tdarr:
+    port: 8265
+
+  navidrome:
+    port: 4533
+
+  spotube:
+    port: 3002
+
+  # =============================================================================
+  # Cloud Services (host ports only)
+  # =============================================================================
+  nextcloud:
+    port: 8081
+
+  tinacms:
+    port: 8084
+
+  homepage:
+    port: 8089
+
+  wordpress:
+    port: 8085
+
+  # =============================================================================
+  # NVR / Security
+  # =============================================================================
+  frigate:
+    port: 5000
+    rtmp: 1935
+    rtsp: 8554
+    webrtc: 8555

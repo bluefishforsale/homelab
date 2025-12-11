@@ -25,6 +25,7 @@
   
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: plex
@@ -33,14 +34,8 @@
     plex_claim: "{{ media_services.plex.claim_token }}"
     plex_api_key: "{{ media_services.plex.api_key }}"
     plex_token: "{{ media_services.plex.plex_token }}"
-    plex_ports_tcp:
-    - 3005
-    - 8324
-    - 32400
-    - 32469
-    plex_ports_udp:
-    - 32410
-    - "32412-34414"
+    plex_ports_tcp: "{{ service_ports.plex.tcp }}"
+    plex_ports_udp: "{{ service_ports.plex.udp }}"
     devices:
     - /dev/nvidia-modeset
     - /dev/nvidia0
@@ -48,7 +43,7 @@
     exporter_service: plex-exporter
     exporter_image: ghcr.io/axsuul/plex-media-server-exporter
     exporter_version: latest
-    exporter_port: 9594
+    exporter_port: "{{ service_ports.plex_exporter.port }}"
     meta_manager_service: plex-meta-manager
     meta_manager_image: meisnate12/plex-meta-manager
     meta_manager_version: latest

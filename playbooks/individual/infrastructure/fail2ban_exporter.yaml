@@ -4,11 +4,14 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - ../../../vars/vars_service_ports.yaml
+
   vars:
     fail2ban_exporter_service: fail2ban-exporter
     fail2ban_exporter_image: registry.gitlab.com/hctrdev/fail2ban-prometheus-exporter
     fail2ban_exporter_version: latest
-    fail2ban_exporter_port: 9191
+    fail2ban_exporter_port: "{{ service_ports.fail2ban_exporter.port }}"
     fail2ban_exporter_home: "/var/lib/services/{{ fail2ban_exporter_service }}"
     fail2ban_exporter_files: "{{ playbook_dir }}/../../../files/fail2ban-exporter"
     uid: 1001  # media user

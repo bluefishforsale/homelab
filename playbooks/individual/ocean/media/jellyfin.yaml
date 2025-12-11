@@ -1,0 +1,124 @@
+---
+# Jellyfin Media Server deployment using Docker Compose + systemd
+#
+# Tags:
+#   --tags config    Deploy only config files (compose/env/service)
+#   --tags service   Deploy only systemd service definition
+#   --tags setup     Create only directories
+#   --skip-tags restart  Prevent service restarts (use with --tags config)
+#
+# Usage:
+#   ansible-playbook playbooks/individual/ocean/media/jellyfin.yaml
+#   ansible-playbook playbooks/individual/ocean/media/jellyfin.yaml --tags config --skip-tags restart
+#
+- name: Jellyfin docker-compose systemd service
+  hosts: ocean
+  become: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: jellyfin
+    image: jellyfin/jellyfin
+    version: latest
+    data: /data01
+    files: ../../../../files/ocean-jellyfin
+    complete: "{{ data }}/complete"
+    jellyfin_home: "{{ data }}/services/{{ service }}"
+    ramdisk: /mnt/ramdisk
+    user: media
+    uid: 1001
+
+    jellyfin_ports_tcp: "{{ service_ports.jellyfin.tcp }}"
+    jellyfin_ports_udp: "{{ service_ports.jellyfin.udp }}"
+
+    devices:
+      - /dev/nvidia-modeset
+      - /dev/nvidia0
+      - /dev/nvidiactl
+
+    jellyfin_exporter_service: jellyfin-exporter
+    jellyfin_exporter_image: drkhsh/jellyfin-exporter
+    jellyfin_exporter_version: dev
+    jellyfin_exporter_port: "{{ service_ports.jellyfin_exporter.port }}"
+    jellyfin_exporter_api_key: "{{ media_services.jellyfin.api_key | default('changeme') }}"
+
+    jellystat_image: cyfershepard/jellystat
+    jellystat_version: latest
+    jellystat_port: "{{ service_ports.jellystat.port }}"
+    jellystat_db_image: postgres:15.2
+    jellystat_db_name: jfstat
+    jellystat_db_user: postgres
+    jellystat_db_password: "{{ media_services.jellystat.db_password | default('changeme') }}"
+    jellystat_jwt_secret: "{{ media_services.jellystat.jwt_secret | default('changeme') }}"
+
+  tasks:
+
+  - name: Ensure basedir exists
+    ansible.builtin.file:
+      path: "{{ jellyfin_home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags: [always, setup]
+
+  - name: Ensure subdirs exist
+    ansible.builtin.file:
+      path: "{{ jellyfin_home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    loop:
+      - config
+      - cache
+      - jellystat-db-data
+      - jellystat-backup-data
+    tags: [always, setup]
+
+  - name: Create Jellyfin docker-compose files
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item.src }}"
+      dest: "{{ jellyfin_home }}/{{ item.dest }}"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    loop:
+      - { src: "jellyfin-compose.yml.j2", dest: "docker-compose.yml" }
+      - { src: "jellyfin-compose.env.j2",  dest: ".env" }
+    notify:
+      - Reload systemd daemon
+      - Restart jellyfin service
+    tags: [config]
+
+  - name: Create Jellyfin docker-compose systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/jellyfin-compose.service.j2"
+      dest: "/etc/systemd/system/jellyfin.service"
+      mode: '0644'
+    notify:
+      - Reload systemd daemon
+      - Restart jellyfin service
+    tags: [service]
+
+  - name: Ensure Jellyfin service is enabled and started
+    ansible.builtin.systemd:
+      name: jellyfin.service
+      enabled: true
+      state: started
+    tags: [service]
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+    tags: [restart, service]
+
+  - name: Restart jellyfin service
+    ansible.builtin.systemd:
+      name: jellyfin.service
+      state: restarted
+    tags: [restart]
