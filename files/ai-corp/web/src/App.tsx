@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
-import { Routes, Route, Link, useLocation, useParams, useNavigate } from 'react-router-dom'
+import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { 
   Home, 
   Play, 
@@ -10,17 +10,24 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Loader2,
   Building2,
+  Briefcase,
+  FileText,
+  Rocket,
+  Target,
+  TrendingUp,
+  DollarSign,
+  Megaphone,
+  Code,
+  AlertTriangle,
+  ChevronLeft,
+  MoreVertical,
+  Calendar,
   UserCircle,
-  BarChart3,
   Edit3,
   Save,
   RefreshCw,
-  Rocket,
-  Target,
-  ChevronLeft,
-  FileText
+  Loader2
 } from 'lucide-react'
 
 // Types
@@ -251,7 +258,16 @@ interface Pipeline {
     target_customer: string
     revenue_model: string
   }
-  has_work_packet?: boolean
+  work_packet?: {
+    market_research: string
+    competitive_analysis: string
+    business_plan: string
+    financial_projections: string
+    marketing_strategy: string
+    technical_overview: string
+    risk_analysis: string
+    assembled_at: string
+  }
   csuite_review?: {
     approved: boolean
     feedback: string
@@ -525,24 +541,26 @@ const api = {
 
 // WebSocket message types
 interface WSMessage {
-  type: 'org_update' | 'employee_update' | 'work_complete' | 'seed_update' | 'work_assigned' | 'work_started' | 'work_failed'
+  type: 'org_update' | 'employee_update' | 'work_complete' | 'seed_update' | 'work_assigned' | 'work_started' | 'work_failed' | 'pipeline_update' | 'pipeline_complete' | 'product_created'
   payload: unknown
   timestamp?: string
 }
 
 // WebSocket context for sharing live updates
-interface WSContextType {
+interface WSContextValue {
   connected: boolean
   lastMessage: WSMessage | null
   orgStats: OrgStats | null
   activityLog: ActivityLogEntry[]
+  companyStatus: 'running' | 'paused' | 'stopped' | null
 }
 
-const WSContext = createContext<WSContextType>({
+const WSContext = createContext<WSContextValue>({
   connected: false,
   lastMessage: null,
   orgStats: null,
-  activityLog: []
+  activityLog: [],
+  companyStatus: null
 })
 
 // Simple UUID generator for activity log IDs (fallback for browsers without crypto.randomUUID)
@@ -582,6 +600,7 @@ function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null)
   const [orgStats, setOrgStats] = useState<OrgStats | null>(null)
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([])
+  const [companyStatus, setCompanyStatus] = useState<'running' | 'paused' | 'stopped' | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -660,6 +679,20 @@ function useWebSocket() {
 
   useEffect(() => {
     connect()
+    
+    // Poll company status every 5 seconds to keep it updated
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch('/api/v1/org/status')
+        const data: CompanyStatus = await response.json()
+        setCompanyStatus(data.status)
+      } catch (err) {
+        console.error('Failed to fetch company status:', err)
+      }
+    }
+    
+    fetchStatus() // Initial fetch
+    const statusInterval = setInterval(fetchStatus, 5000)
 
     return () => {
       if (wsRef.current) {
@@ -668,10 +701,11 @@ function useWebSocket() {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
+      clearInterval(statusInterval)
     }
   }, [connect])
 
-  return { connected, lastMessage, orgStats, activityLog }
+  return { connected, lastMessage, orgStats, activityLog, companyStatus }
 }
 
 // WebSocket provider component
@@ -718,9 +752,11 @@ function Dashboard() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
-  const [deliverableStats, setDeliverableStats] = useState<DeliverablesResponse['by_status'] | null>(null)
+  const [deliverableStats, setDeliverableStats] = useState<Record<string, number>>({})
   const [products, setProducts] = useState<ProductIdea[]>([])
-  const [productStats, setProductStats] = useState<ProductsResponse['by_status'] | null>(null)
+  const [productStats, setProductStats] = useState<Record<string, number>>({})
+  const [_pipelines, setPipelines] = useState<Pipeline[]>([])  // Stored for future use
+  const [pipelineStats, setPipelineStats] = useState<Record<string, number>>({})
   const [seed, setSeed] = useState<CompanySeed | null>(null)
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [biography, setBiography] = useState<Biography | null>(null)
@@ -766,6 +802,10 @@ function Dashboard() {
         setProducts(data.products || [])
         setProductStats(data.by_status)
       })
+      fetchWithTimeout(() => api.getPipelines(), { pipelines: [], total: 0, by_stage: {} }).then(data => {
+        setPipelines(data.pipelines || [])
+        setPipelineStats(data.by_stage)
+      })
     }
     
     // Initial fetch
@@ -780,17 +820,36 @@ function Dashboard() {
     }
   }, [])
 
-  // Update employees and deliverables when we get WebSocket messages
+  // Update data when we get WebSocket messages
   useEffect(() => {
-    if (lastMessage?.type === 'employee_update' || lastMessage?.type === 'work_complete') {
-      // Refresh employees list on work updates
+    if (!lastMessage) return
+    
+    // Refresh employees on work updates
+    if (lastMessage.type === 'employee_update' || lastMessage.type === 'work_complete' || lastMessage.type === 'work_started') {
       api.getEmployees().then(data => setEmployees(data.employees || []))
     }
-    if (lastMessage?.type === 'work_complete') {
-      // Refresh deliverables when work completes
+    
+    // Refresh deliverables on work completion
+    if (lastMessage.type === 'work_complete') {
       api.getDeliverables().then(data => {
         setDeliverables(data.deliverables || [])
         setDeliverableStats(data.by_status)
+      })
+    }
+    
+    // Refresh pipelines on pipeline events
+    if (lastMessage.type === 'pipeline_update' || lastMessage.type === 'pipeline_complete') {
+      api.getPipelines().then(data => {
+        setPipelines(data.pipelines || [])
+        setPipelineStats(data.by_stage)
+      })
+    }
+    
+    // Refresh products on product creation
+    if (lastMessage.type === 'product_created') {
+      api.getProducts().then(data => {
+        setProducts(data.products || [])
+        setProductStats(data.by_status)
       })
     }
   }, [lastMessage])
@@ -903,19 +962,19 @@ function Dashboard() {
         {/* Pipeline stages */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="bg-purple-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-purple-600">{productStats?.ideation || 0}</div>
+            <div className="text-2xl font-bold text-purple-600">{(pipelineStats?.ideation || 0)}</div>
             <div className="text-xs text-purple-700">Ideation</div>
           </div>
           <div className="bg-blue-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-blue-600">{productStats?.development || 0}</div>
-            <div className="text-xs text-blue-700">Development</div>
+            <div className="text-2xl font-bold text-blue-600">{(pipelineStats?.work_packet || 0)}</div>
+            <div className="text-xs text-blue-700">WIP</div>
           </div>
           <div className="bg-yellow-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{productStats?.review || 0}</div>
-            <div className="text-xs text-yellow-700">Review</div>
+            <div className="text-2xl font-bold text-yellow-600">{(pipelineStats?.csuite_review || 0)}</div>
+            <div className="text-xs text-yellow-700">C-Suite</div>
           </div>
           <div className="bg-green-50 rounded p-3 text-center">
-            <div className="text-2xl font-bold text-green-600">{(productStats?.approved || 0) + (productStats?.launched || 0)}</div>
+            <div className="text-2xl font-bold text-green-600">{(productStats?.launched || 0)}</div>
             <div className="text-xs text-green-700">Launched</div>
           </div>
         </div>
@@ -1524,9 +1583,86 @@ function Runs() {
   )
 }
 
-// Organization page with pyramid chart
+// Recursive org node component
+interface OrgNodeProps {
+  person: Person & { children?: Person[] }
+  onSelect: (id: string) => void
+  getColor: (type: string) => string
+  getStatusColor: (status?: string) => string
+}
+
+function OrgNode({ person, onSelect, getColor, getStatusColor }: OrgNodeProps) {
+  const hasChildren = person.children && person.children.length > 0
+  const [collapsed, setCollapsed] = useState(false)
+  
+  return (
+    <div className="flex flex-col items-center">
+      {/* Person Card */}
+      <div className="relative">
+        <div
+          onClick={() => onSelect(person.id)}
+          onMouseEnter={() => {
+            // Prefetch on hover
+            fetch(`/api/v1/org/person/${person.id}`).catch(() => {})
+          }}
+          className={`${getColor(person.type)} text-white rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center mb-2`}
+        >
+          <UserCircle className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1 opacity-90" />
+          <div className="text-[10px] md:text-xs font-medium truncate">{person.name}</div>
+          <div className="text-[8px] md:text-[10px] opacity-75 mt-0.5 truncate">{person.role}</div>
+          {person.status && (
+            <div className={`text-[8px] md:text-[9px] mt-1 px-1 md:px-1.5 py-0.5 rounded inline-block ${getStatusColor(person.status)}`}>
+              {person.status}
+            </div>
+          )}
+        </div>
+        
+        {/* Collapse/Expand button for nodes with children */}
+        {hasChildren && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setCollapsed(!collapsed) }}
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 z-10"
+          >
+            <span className="text-xs font-bold">{collapsed ? '+' : '−'}</span>
+          </button>
+        )}
+      </div>
+      
+      {/* Children */}
+      {hasChildren && !collapsed && (
+        <>
+          {/* Connecting line down */}
+          <svg className="w-8 h-3 md:h-4" viewBox="0 0 32 16">
+            <line x1="16" y1="0" x2="16" y2="16" stroke="#cbd5e1" strokeWidth="2" />
+          </svg>
+          
+          {/* Children container - wrap on mobile */}
+          <div className="flex flex-wrap justify-center gap-2 md:gap-4 max-w-full">
+            {person.children!.map((child, idx) => (
+              <div key={child.id} className="flex flex-col items-center">
+                {/* Horizontal line for multiple children */}
+                {person.children!.length > 1 && (
+                  <svg className="hidden md:block w-full h-4 -mb-4" viewBox="0 0 100 16" preserveAspectRatio="none">
+                    {idx === 0 && <line x1="50" y1="0" x2="100" y2="0" stroke="#cbd5e1" strokeWidth="2" />}
+                    {idx === person.children!.length - 1 && <line x1="0" y1="0" x2="50" y2="0" stroke="#cbd5e1" strokeWidth="2" />}
+                    {idx > 0 && idx < person.children!.length - 1 && <line x1="0" y1="0" x2="100" y2="0" stroke="#cbd5e1" strokeWidth="2" />}
+                    <line x1="50" y1="0" x2="50" y2="16" stroke="#cbd5e1" strokeWidth="2" />
+                  </svg>
+                )}
+                <OrgNode person={child} onSelect={onSelect} getColor={getColor} getStatusColor={getStatusColor} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Organization page with hierarchical chart
 function OrganizationPage() {
   const [people, setPeople] = useState<Person[]>([])
+  const [boardMembers, setBoardMembers] = useState<BoardMember[]>([])
   const [companyStatus, setCompanyStatus] = useState<CompanyStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedPerson, setSelectedPerson] = useState<PersonDetail | null>(null)
@@ -1536,31 +1672,60 @@ function OrganizationPage() {
   const [bioText, setBioText] = useState('')
 
   useEffect(() => {
+    let isSubscribed = true
     const fetchData = async () => {
       try {
-        const [peopleData, statusData] = await Promise.all([
+        const [peopleData, boardData, statusData] = await Promise.all([
           api.getPeople(),
+          api.getBoardMembers(),
           api.getOrgStatus()
         ])
-        setPeople(peopleData.people || [])
-        setCompanyStatus(statusData)
+        if (isSubscribed) {
+          setPeople(peopleData.people || [])
+          setBoardMembers(boardData.members || [])
+          setCompanyStatus(statusData)
+        }
+      } catch (err) {
+        console.error('Fetch error:', err)
       } finally {
-        setLoading(false)
+        if (isSubscribed) setLoading(false)
       }
     }
+    
+    // Immediate fetch
     fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
+    
+    // Only poll every 30s, rely on WebSocket for updates
+    const interval = setInterval(fetchData, 30000)
+    
+    // Prefetch person details for visible people (on idle)
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        people.slice(0, 10).forEach(person => {
+          fetch(`/api/v1/org/person/${person.id}`).catch(() => {})
+        })
+      })
+    }
+    
+    return () => {
+      isSubscribed = false
+      clearInterval(interval)
+    }
   }, [])
 
   const handleSelectPerson = async (id: string) => {
-    setLoadingPerson(true)
+    // Optimistic UI - open panel immediately
     setSidePanelOpen(true)
+    setLoadingPerson(true)
     setEditingBio(false)
+    
     try {
       const detail = await api.getPersonDetail(id)
       setSelectedPerson(detail)
       setBioText(detail.biography?.bio || '')
+    } catch (err) {
+      console.error('Failed to load person:', err)
+      setSidePanelOpen(false)
     } finally {
       setLoadingPerson(false)
     }
@@ -1573,24 +1738,91 @@ function OrganizationPage() {
     setEditingBio(false)
   }
 
-  // Group people by hierarchy level for pyramid layout
-  const orgLevels = [
-    { level: 'CEO', people: people.filter(p => p.type === 'ceo'), color: 'bg-purple-500' },
-    { level: 'C-Suite', people: people.filter(p => p.type === 'executive'), color: 'bg-blue-500' },
-    { level: 'Directors', people: people.filter(p => p.type === 'director'), color: 'bg-indigo-500' },
-    { level: 'Managers', people: people.filter(p => p.type === 'manager'), color: 'bg-cyan-500' },
-    { level: 'Employees', people: people.filter(p => p.type === 'employee'), color: 'bg-green-500' }
-  ].filter(level => level.people.length > 0)
+  // Group employees by skill/department
+  const groupByDepartment = () => {
+    const departments: Record<string, Person[]> = {}
+    
+    people.forEach(person => {
+      if (person.type === 'employee') {
+        // Extract department from role (e.g., "marketing Worker 13" -> "marketing")
+        const match = person.role.match(/^(\w+)\s+Worker/i)
+        const dept = match ? match[1] : 'general'
+        if (!departments[dept]) departments[dept] = []
+        departments[dept].push(person)
+      }
+    })
+    
+    return departments
+  }
+
+  // Build hierarchical tree structure with departments - stable sort by ID
+  const buildOrgTree = () => {
+    const ceos = people.filter(p => p.type === 'ceo').sort((a, b) => a.id.localeCompare(b.id)).map(p => ({ ...p, children: [] as (Person & { children?: Person[] })[] }))
+    const execs = people.filter(p => p.type === 'executive').sort((a, b) => a.id.localeCompare(b.id)).map(p => ({ ...p, children: [] as (Person & { children?: Person[] })[] }))
+    const managers = people.filter(p => p.type === 'manager').sort((a, b) => a.id.localeCompare(b.id)).map(p => ({ ...p, children: [] as (Person & { children?: Person[] })[] }))
+    
+    // Group employees by department and sort
+    const departments = groupByDepartment()
+    const deptNames = Object.keys(departments).sort()
+    
+    // Sort employees within each department by ID
+    Object.keys(departments).forEach(dept => {
+      departments[dept].sort((a, b) => a.id.localeCompare(b.id))
+    })
+    
+    // Distribute departments to managers (stable assignment)
+    managers.forEach((m, idx) => {
+      const deptName = deptNames[idx % deptNames.length]
+      if (deptName && departments[deptName]) {
+        m.children = departments[deptName].map(e => ({ ...e, children: [] }))
+      }
+    })
+    
+    // Distribute managers to executives
+    const managersPerExec = Math.ceil(managers.length / Math.max(execs.length, 1))
+    execs.forEach((e, idx) => {
+      e.children = managers.slice(idx * managersPerExec, (idx + 1) * managersPerExec)
+    })
+    
+    ceos.forEach(c => c.children = execs)
+    
+    return ceos.length > 0 ? ceos : execs.length > 0 ? execs : managers
+  }
+
+  const getPersonColor = (type: string) => {
+    switch (type) {
+      case 'board_member': return 'bg-purple-700'
+      case 'ceo': return 'bg-purple-500'
+      case 'executive': return 'bg-blue-500'
+      case 'director': return 'bg-indigo-500'
+      case 'manager': return 'bg-cyan-500'
+      case 'employee': return 'bg-green-500'
+      default: return 'bg-gray-500'
+    }
+  }
+
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'working': return 'bg-yellow-400 text-yellow-900'
+      case 'reviewing': return 'bg-blue-400 text-blue-900'
+      case 'meeting': return 'bg-purple-400 text-purple-900'
+      case 'voting': return 'bg-orange-400 text-orange-900'
+      case 'idle': return 'bg-gray-300 text-gray-700'
+      default: return 'bg-white text-gray-800'
+    }
+  }
+
+  const orgRoots = buildOrgTree()
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
   }
 
   return (
-    <div className="relative h-full">
-      {/* Main Content */}
-      <div className={`transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''}`}>
-        <div className="flex items-center justify-between mb-6">
+    <div className="relative h-full overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className={`flex-shrink-0 transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''} px-6 py-4 border-b bg-white`}>
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Organization Chart</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
@@ -1602,54 +1834,73 @@ function OrganizationPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Pyramid Org Chart */}
-        <div className="bg-white rounded-lg shadow p-8 overflow-auto">
-          <div className="flex flex-col items-center gap-8 min-w-max">
-            {orgLevels.map((level, levelIndex) => (
-              <div key={level.level} className="flex flex-col items-center gap-3" style={{ width: `${Math.min(100, (levelIndex + 1) * 20)}%` }}>
-                {/* Level Label */}
-                <div className="text-sm font-semibold text-gray-500 mb-2">{level.level}</div>
-                
-                {/* People Cards in This Level */}
-                <div className="flex flex-wrap justify-center gap-3">
-                  {level.people.map((person) => (
+      {/* Hierarchical Org Chart - Scrollable */}
+      <div className={`flex-1 overflow-auto transition-all duration-300 ${sidePanelOpen ? 'mr-96' : ''}`}>
+        <div className="p-3 md:p-6 min-h-full">
+          <div className="w-full max-w-7xl mx-auto">
+            
+            {/* Board of Directors at Top */}
+            {boardMembers.length > 0 && (
+              <div className="mb-6 md:mb-8 bg-white rounded-lg shadow p-3 md:p-4">
+                <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide text-center mb-3 flex items-center justify-center gap-2">
+                  <span className="hidden md:inline">🏛️</span>
+                  Board of Directors
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {boardMembers.sort((a, b) => a.id.localeCompare(b.id)).map((member) => (
                     <div
-                      key={person.id}
-                      onClick={() => handleSelectPerson(person.id)}
-                      className={`${level.color} text-white rounded-lg p-3 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-lg min-w-[140px] text-center`}
+                      key={member.id}
+                      onClick={() => handleSelectPerson(member.id)}
+                      className="bg-purple-700 text-white rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center"
                     >
-                      <UserCircle className="w-8 h-8 mx-auto mb-1 opacity-90" />
-                      <div className="text-sm font-medium">{person.name}</div>
-                      <div className="text-xs opacity-75 mt-1">{person.role}</div>
-                      {person.status && (
-                        <div className={`text-xs mt-1 px-2 py-0.5 rounded inline-block ${
-                          person.status === 'working' ? 'bg-yellow-400 text-yellow-900' :
-                          person.status === 'idle' ? 'bg-gray-300 text-gray-700' :
-                          'bg-white text-gray-800'
-                        }`}>
-                          {person.status}
-                        </div>
-                      )}
+                      <UserCircle className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1 opacity-90" />
+                      <div className="text-[10px] md:text-xs font-medium truncate">{member.name}</div>
+                      <div className="text-[8px] md:text-[10px] opacity-75 mt-0.5 truncate">{member.title}</div>
+                      <div className="text-[8px] md:text-[9px] mt-1 px-1 md:px-1.5 py-0.5 rounded inline-block bg-green-400 text-green-900">
+                        active
+                      </div>
                     </div>
                   ))}
                 </div>
-
-                {/* Connecting Lines */}
-                {levelIndex < orgLevels.length - 1 && (
-                  <svg className="w-full h-8" style={{ minWidth: '200px' }}>
-                    <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#cbd5e1" strokeWidth="2" />
+                <div className="flex justify-center my-2">
+                  <svg className="w-8 h-4 md:h-6" viewBox="0 0 32 24">
+                    <line x1="16" y1="0" x2="16" y2="24" stroke="#cbd5e1" strokeWidth="2" />
                   </svg>
-                )}
+                </div>
               </div>
-            ))}
+            )}
+
+            {/* Department Legend on Mobile */}
+            <div className="md:hidden mb-4 bg-white rounded-lg shadow p-3">
+              <div className="text-xs font-semibold text-gray-700 mb-2">Departments:</div>
+              <div className="flex flex-wrap gap-2 text-[10px]">
+                {Object.keys(groupByDepartment()).map(dept => (
+                  <span key={dept} className="px-2 py-1 bg-gray-100 rounded capitalize">{dept}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Recursive Organization Tree */}
+            <div className="flex flex-col items-center overflow-x-auto">
+              {orgRoots.map(person => (
+                <OrgNode 
+                  key={person.id} 
+                  person={person} 
+                  onSelect={handleSelectPerson}
+                  getColor={getPersonColor}
+                  getStatusColor={getStatusColor}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Sliding Side Panel */}
       <div
-        className={`fixed right-0 top-0 h-full w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+        className={`fixed right-0 top-0 h-full w-96 bg-white border-l border-gray-200 shadow-2xl transform transition-transform duration-300 ease-in-out z-[60] ${
           sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -2891,22 +3142,28 @@ function AdminPage() {
 // Products Pipeline Page
 function ProductsPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [products, setProducts] = useState<ProductIdea[]>([])
   const [byStage, setByStage] = useState<Record<string, number>>({})
+  const [byStatus, setByStatus] = useState<Record<string, number>>({})
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
+  const [view, setView] = useState<'pipelines' | 'products' | 'all'>('all')
   
   useEffect(() => {
-    api.getPipelines().then(data => {
-      setPipelines(data.pipelines || [])
-      setByStage(data.by_stage || {})
-    })
+    const fetchData = async () => {
+      const [pipelineData, productData] = await Promise.all([
+        api.getPipelines(),
+        api.getProducts()
+      ])
+      setPipelines(pipelineData.pipelines || [])
+      setByStage(pipelineData.by_stage || {})
+      setProducts(productData.products || [])
+      setByStatus(productData.by_status || {})
+    }
+    
+    fetchData()
     
     // Refresh every 10 seconds
-    const interval = setInterval(() => {
-      api.getPipelines().then(data => {
-        setPipelines(data.pipelines || [])
-        setByStage(data.by_stage || {})
-      })
-    }, 10000)
+    const interval = setInterval(fetchData, 10000)
     
     return () => clearInterval(interval)
   }, [])
@@ -2935,141 +3192,191 @@ function ProductsPage() {
     rejected: 'Rejected',
   }
   
+  const displayItems = view === 'pipelines' ? pipelines : view === 'products' ? products : [...pipelines, ...products]
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Product Pipeline</h1>
-        <span className="text-sm text-gray-500">{pipelines.length} products</span>
-      </div>
-      
-      {/* Stage summary */}
-      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
-        {Object.entries(stageNames).map(([key, name]) => (
-          <div key={key} className={`rounded p-3 text-center ${stageColors[key]?.replace('text-', 'bg-').replace('-700', '-50')}`}>
-            <div className="text-2xl font-bold">{byStage[key] || 0}</div>
-            <div className="text-[10px]">{name}</div>
+        <h1 className="text-2xl font-bold">Products & Pipelines</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 border rounded-lg p-1">
+            <button onClick={() => setView('all')} className={`px-3 py-1 text-xs rounded ${view === 'all' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>All ({pipelines.length + products.length})</button>
+            <button onClick={() => setView('pipelines')} className={`px-3 py-1 text-xs rounded ${view === 'pipelines' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>Pipelines ({pipelines.length})</button>
+            <button onClick={() => setView('products')} className={`px-3 py-1 text-xs rounded ${view === 'products' ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>Products ({products.length})</button>
           </div>
-        ))}
+        </div>
       </div>
       
-      {/* Pipeline list */}
+      {/* Pipeline Stages + Product Status */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-sm font-semibold mb-3 text-gray-700">Pipeline Stages</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(stageNames).slice(0, 6).map(([key, name]) => (
+              <div key={key} className={`rounded p-2 text-center ${stageColors[key]?.replace('text-', 'bg-').replace('-700', '-50')}`}>
+                <div className="text-xl font-bold">{byStage[key] || 0}</div>
+                <div className="text-[9px]">{name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-sm font-semibold mb-3 text-gray-700">Product Status</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries({ideation: 'Ideation', development: 'Development', launched: 'Launched'}).map(([key, name]) => (
+              <div key={key} className="rounded p-2 text-center bg-green-50">
+                <div className="text-xl font-bold">{byStatus[key] || 0}</div>
+                <div className="text-[9px]">{name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Combined list */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-4 py-3 border-b">
-          <h2 className="font-semibold">All Products</h2>
+        <div className="px-4 py-3 border-b flex justify-between items-center">
+          <h2 className="font-semibold">All Items</h2>
+          <span className="text-xs text-gray-500">{pipelines.length} in progress, {products.length} completed</span>
         </div>
         <div className="divide-y">
-          {pipelines.length === 0 ? (
+          {displayItems.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              No products yet. Seed the company to start generating product ideas.
+              No items yet. Seed the company to start generating product ideas.
             </div>
           ) : (
-            pipelines.map(p => (
-              <div 
-                key={p.id} 
-                className={`p-4 cursor-pointer hover:bg-gray-50 ${selectedPipeline?.id === p.id ? 'bg-blue-50' : ''}`}
-                onClick={() => setSelectedPipeline(selectedPipeline?.id === p.id ? null : p)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold">{p.name}</span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${stageColors[p.stage]}`}>
-                        {stageNames[p.stage]}
-                      </span>
-                      {p.revision_count > 0 && (
-                        <span className="text-xs text-orange-600">Rev {p.revision_count}</span>
-                      )}
+            displayItems.map((item: any) => (
+              <div key={item.id} className="p-4">
+                {'stage' in item ? (
+                  <div>
+                    <div className={`cursor-pointer hover:bg-gray-50 rounded-lg p-3 ${selectedPipeline?.id === item.id ? 'bg-blue-50' : ''}`} onClick={() => setSelectedPipeline(selectedPipeline?.id === item.id ? null : item)}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Pipeline</span>
+                        <span className="font-semibold">{item.name}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${stageColors[item.stage]}`}>
+                          {stageNames[item.stage]}
+                        </span>
+                        {item.work_packet && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Work Packet Ready</span>}
+                      </div>
+                      {item.idea && <div className="text-sm text-gray-600">{item.idea.solution}</div>}
+                      <div className="text-xs text-gray-400 mt-1">Updated {new Date(item.updated_at).toLocaleString()}</div>
                     </div>
-                    {p.idea && (
-                      <div className="text-sm text-gray-600 mt-1">{p.idea.solution}</div>
-                    )}
-                    <div className="text-xs text-gray-400 mt-1">
-                      {p.category} • {p.target_market} • Updated {new Date(p.updated_at).toLocaleString()}
-                    </div>
-                  </div>
-                  {p.stage === 'launched' && (
-                    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                      <a 
-                        href={`/api/v1/org/pipelines/${p.id}/download`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                      >
-                        Preview
-                      </a>
-                      <a 
-                        href={`/api/v1/org/pipelines/${p.id}/download?download=true`}
-                        className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
-                      >
-                        Download
-                      </a>
-                    </div>
-                  )}
-                </div>
-                
-                {selectedPipeline?.id === p.id && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded space-y-4">
-                    {p.idea && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Executive Summary</h4>
-                        <div className="text-sm space-y-2">
-                          <p><strong>Problem:</strong> {p.idea.problem}</p>
-                          <p><strong>Solution:</strong> {p.idea.solution}</p>
-                          <p><strong>Value Prop:</strong> {p.idea.value_proposition}</p>
-                          <p><strong>Target:</strong> {p.idea.target_customer}</p>
-                          <p><strong>Revenue:</strong> {p.idea.revenue_model}</p>
+                    
+                    {/* Expanded Work Packet Details */}
+                    {selectedPipeline?.id === item.id && item.work_packet && (
+                      <div className="mt-4 border-t pt-4 space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          {item.work_packet.market_research && (
+                            <div className="bg-blue-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4" />Market Research
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.market_research}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.competitive_analysis && (
+                            <div className="bg-purple-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Target className="w-4 h-4" />Competitive Analysis
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.competitive_analysis}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.financial_projections && (
+                            <div className="bg-green-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" />Financial Projections
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.financial_projections}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.marketing_strategy && (
+                            <div className="bg-yellow-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Megaphone className="w-4 h-4" />Marketing Strategy
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.marketing_strategy}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.business_plan && (
+                            <div className="bg-indigo-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <FileText className="w-4 h-4" />Business Plan
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.business_plan}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.technical_overview && (
+                            <div className="bg-cyan-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <Code className="w-4 h-4" />Technical Overview
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.technical_overview}</div>
+                            </div>
+                          )}
+                          
+                          {item.work_packet.risk_analysis && (
+                            <div className="bg-red-50 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" />Risk Analysis
+                              </h4>
+                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.risk_analysis}</div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                    
-                    {p.has_work_packet && (
-                      <div className="text-sm">
-                        <span className="text-green-600">✓</span> Work packet completed
-                      </div>
-                    )}
-                    
-                    {p.csuite_review && (
-                      <div className="text-sm">
-                        <strong>C-Suite:</strong> {p.csuite_review.approved ? '✓ Approved' : '✗ Needs Work'}
-                        {p.csuite_review.feedback && (
-                          <p className="text-gray-600 mt-1">{p.csuite_review.feedback}</p>
+                        
+                        {item.idea && (
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <h4 className="font-semibold text-sm mb-3">Original Idea</h4>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <span className="font-medium text-gray-600">Problem:</span>
+                                <div className="text-gray-700 mt-1">{item.idea.problem}</div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Solution:</span>
+                                <div className="text-gray-700 mt-1">{item.idea.solution}</div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Value Prop:</span>
+                                <div className="text-gray-700 mt-1">{item.idea.value_proposition}</div>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Target Customer:</span>
+                                <div className="text-gray-700 mt-1">{item.idea.target_customer}</div>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="font-medium text-gray-600">Revenue Model:</span>
+                                <div className="text-gray-700 mt-1">{item.idea.revenue_model}</div>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
-                    
-                    {p.board_decision && (
-                      <div className="text-sm">
-                        <strong>Board:</strong> {p.board_decision.approved ? '✓ Approved' : '✗ Rejected'}
-                        <span className="ml-2 text-gray-500">
-                          ({p.board_decision.votes_for} for / {p.board_decision.votes_against} against)
-                        </span>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Product</span>
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded capitalize">{item.status}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-2">{item.description}</div>
+                    {item.deliverables && item.deliverables.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-500">Deliverables:</span>
+                        {item.deliverables.map((d: string, i: number) => (
+                          <span key={i} className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">{d}</span>
+                        ))}
                       </div>
                     )}
-                    
-                    {p.execution_plan && (
-                      <div className="text-sm">
-                        <strong>Execution Plan:</strong> {p.execution_plan.timeline} • {p.execution_plan.budget}
-                      </div>
-                    )}
-                    
-                    {p.stage === 'launched' && (
-                      <div className="flex gap-3">
-                        <a 
-                          href={`/api/v1/org/pipelines/${p.id}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                        >
-                          Preview in Browser
-                        </a>
-                        <a 
-                          href={`/api/v1/org/pipelines/${p.id}/download?download=true`}
-                          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                        >
-                          Download HTML
-                        </a>
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-400 mt-1">{item.category} • {item.target_market}</div>
                   </div>
                 )}
               </div>
@@ -3083,63 +3390,200 @@ function ProductsPage() {
 
 // Connection status indicator
 function ConnectionIndicator() {
-  const { connected } = useWS()
+  const { connected, companyStatus } = useWS()
+  
+  const getStatusColor = () => {
+    if (!connected) return 'bg-red-500'
+    if (companyStatus === 'running') return 'bg-green-500 animate-pulse'
+    if (companyStatus === 'paused') return 'bg-yellow-500'
+    return 'bg-gray-500'
+  }
+  
+  const getStatusText = () => {
+    if (!connected) return 'Disconnected'
+    if (companyStatus === 'running') return 'Live'
+    if (companyStatus === 'paused') return 'Paused'
+    return 'Stopped'
+  }
+  
   return (
     <div className="flex items-center gap-2 px-4 py-2 text-xs">
-      <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-      <span className="text-gray-400">{connected ? 'Live' : 'Connecting...'}</span>
+      <span className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+      <span className="text-gray-400">{getStatusText()}</span>
     </div>
+  )
+}
+
+// Mobile detection hook
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}
+
+// Mobile bottom navigation
+function MobileNav({ navItems }: { navItems: Array<{ path: string; icon: any; label: string }> }) {
+  const location = useLocation()
+  const [showOverflow, setShowOverflow] = useState(false)
+  
+  // Show first 4 items in bottom nav, rest in overflow menu
+  const primaryItems = navItems.slice(0, 4)
+  const overflowItems = navItems.slice(4)
+  
+  return (
+    <>
+      {/* Overflow Menu */}
+      {showOverflow && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setShowOverflow(false)}>
+          <div className="absolute bottom-16 right-4 bg-white rounded-lg shadow-xl p-2 min-w-[200px]" onClick={e => e.stopPropagation()}>
+            {overflowItems.map(item => (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setShowOverflow(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded ${
+                  location.pathname === item.path
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
+        <div className="flex justify-around items-center h-16">
+          {primaryItems.map(item => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex flex-col items-center justify-center flex-1 h-full ${
+                location.pathname === item.path
+                  ? 'text-primary-600'
+                  : 'text-gray-600'
+              }`}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="text-[10px] mt-1">{item.label}</span>
+            </Link>
+          ))}
+          <button
+            onClick={() => setShowOverflow(!showOverflow)}
+            className="flex flex-col items-center justify-center flex-1 h-full text-gray-600"
+          >
+            <MoreVertical className="w-6 h-6" />
+            <span className="text-[10px] mt-1">More</span>
+          </button>
+        </div>
+      </nav>
+    </>
   )
 }
 
 // Main App
 export default function App() {
   const location = useLocation()
+  const isMobile = useIsMobile()
 
   const navItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/products', icon: Target, label: 'Products' },
     { path: '/seed', icon: Rocket, label: 'Seed' },
-    { path: '/workflows', icon: Play, label: 'Workflows' },
+    { path: '/workflows', icon: Briefcase, label: 'Workflows' },
     { path: '/runs', icon: Activity, label: 'Runs' },
     { path: '/org', icon: Building2, label: 'Organization' },
-    { path: '/meetings', icon: BarChart3, label: 'Meetings' },
+    { path: '/meetings', icon: Calendar, label: 'Meetings' },
     { path: '/people', icon: Users, label: 'People' },
     { path: '/admin', icon: Settings, label: 'Admin' },
   ]
 
+  const { companyStatus } = useWS()
+
   return (
     <WSProvider>
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="p-4 border-b border-gray-800">
-          <h1 className="text-xl font-bold">AI Corporation</h1>
-          <p className="text-xs text-gray-400">Workflow Engine</p>
-        </div>
-        <nav className="p-2 flex-1">
-          {navItems.map(item => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-4 py-2 rounded mb-1 ${
-                location.pathname === item.path
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="border-t border-gray-800">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      {isMobile && (
+        <header className="bg-gray-900 text-white p-3 flex items-center justify-between sticky top-0 z-20">
+          <div>
+            <h1 className="text-lg font-bold">AI Corporation</h1>
+            <p className="text-[10px] text-gray-400">Workflow Engine</p>
+          </div>
           <ConnectionIndicator />
-        </div>
-      </aside>
+        </header>
+      )}
+      
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <aside className="w-64 bg-gray-900 text-white flex flex-col fixed h-screen">
+          <div className="p-4 border-b border-gray-800">
+            <h1 className="text-xl font-bold">AI Corporation</h1>
+            <p className="text-xs text-gray-400">Workflow Engine</p>
+          </div>
+          <nav className="p-2 flex-1 overflow-y-auto">
+            {navItems.map(item => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-2 rounded mb-1 ${
+                  location.pathname === item.path
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800'
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="flex-1">{item.label}</span>
+                {item.path === '/' && companyStatus === 'running' && (
+                  <span className="flex items-center gap-1 text-green-400 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    Live
+                  </span>
+                )}
+                {item.path === '/' && companyStatus === 'paused' && (
+                  <span className="flex items-center gap-1 text-yellow-400 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                    Paused
+                  </span>
+                )}
+              </Link>
+            ))}
+          </nav>
+          <div className="border-t border-gray-800">
+            <ConnectionIndicator />
+          </div>
+        </aside>
+      )}
+
+      {/* Desktop Top Header Bar */}
+      {!isMobile && (
+        <header className="fixed top-0 left-64 right-0 bg-white border-b border-gray-200 z-10 shadow-sm">
+          <div className="px-6 py-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                {navItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <ConnectionIndicator />
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Main content */}
-      <main className="flex-1 p-6">
+      <main className={`flex-1 ${isMobile ? 'p-3 pb-20' : 'ml-64 mt-[57px] p-6'} overflow-x-hidden`}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/products" element={<ProductsPage />} />
@@ -3155,6 +3599,9 @@ export default function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </main>
+      
+      {/* Mobile Bottom Navigation */}
+      {isMobile && <MobileNav navItems={navItems} />}
     </div>
     </WSProvider>
   )

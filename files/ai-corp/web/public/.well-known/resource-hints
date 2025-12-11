@@ -1,0 +1,10 @@
+# DNS Prefetch
+dns-prefetch: //192.168.1.143
+
+# Preconnect to API
+preconnect: http://192.168.1.143:8088
+
+# Prefetch critical API endpoints
+prefetch: /api/v1/org/status
+prefetch: /api/v1/org/people
+prefetch: /api/v1/board/members
