@@ -430,6 +430,7 @@ type Organization struct {
 	llmSemaphore    chan struct{}
 	
 	mu              sync.RWMutex
+	deliverablesMu  sync.RWMutex // Separate lock for deliverables to reduce contention
 	ctx             context.Context
 	cancel          context.CancelFunc
 	wg              sync.WaitGroup
@@ -2342,9 +2343,9 @@ func (org *Organization) runEmployee(emp *Employee) {
 				Metadata:     result.Metadata,
 			}
 			
-			org.mu.Lock()
+			org.deliverablesMu.Lock()
 			org.Deliverables[deliverable.ID] = deliverable
-			org.mu.Unlock()
+			org.deliverablesMu.Unlock()
 			
 			// If this work is for a pipeline, notify the pipeline manager (AFTER releasing org lock to avoid deadlock)
 			if pipelineIDStr, ok := work.Inputs["pipeline_id"].(string); ok {

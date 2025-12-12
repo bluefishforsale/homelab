@@ -927,7 +927,7 @@ func (h *Handlers) ListDeliverablesHandler(w http.ResponseWriter, r *http.Reques
 	statusFilter := r.URL.Query().Get("status")
 	skillFilter := r.URL.Query().Get("skill")
 
-	h.app.org.mu.RLock()
+	h.app.org.deliverablesMu.RLock()
 	deliverables := make([]map[string]interface{}, 0)
 	
 	// Count by status for summary
@@ -972,7 +972,7 @@ func (h *Handlers) ListDeliverablesHandler(w http.ResponseWriter, r *http.Reques
 		}
 		deliverables = append(deliverables, deliverable)
 	}
-	h.app.org.mu.RUnlock()
+	h.app.org.deliverablesMu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
