@@ -3257,7 +3257,8 @@ function ProductsPage() {
     rejected: 'Rejected',
   }
   
-  const displayItems = view === 'pipelines' ? pipelines : view === 'products' ? products : [...pipelines, ...products]
+  const displayItems = (view === 'pipelines' ? pipelines : view === 'products' ? products : [...pipelines, ...products])
+    .sort((a: any, b: any) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
   
   return (
     <div className="space-y-6">
