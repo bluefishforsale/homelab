@@ -384,6 +384,22 @@ interface MeetingSummary {
   summary?: string
 }
 
+interface Sprint {
+  id: string
+  name: string
+  number: number
+  start_date: string
+  end_date: string
+  goals: string[]
+  status: string
+  committed_points: number
+  completed_points: number
+  open_items: number
+  risks?: string[]
+  created_at: string
+  completed_at?: string
+}
+
 interface Meeting {
   id: string
   type: string
@@ -399,6 +415,7 @@ interface Meeting {
   key_decisions: string[]
   action_items: string[]
   attendees: string[]
+  current_sprint?: Sprint
 }
 
 // API functions
@@ -773,11 +790,11 @@ function useWS() {
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-800',
+    pending: 'bg-amber-900 text-amber-100 border border-amber-700',
+    running: 'bg-indigo-900 text-indigo-100 border border-indigo-700',
+    completed: 'bg-emerald-900 text-emerald-100 border border-emerald-700',
+    failed: 'bg-red-900 text-red-100 border border-red-700',
+    cancelled: 'bg-gray-800 text-gray-200 border border-gray-700',
   }
   const icons: Record<string, React.ReactNode> = {
     pending: <Clock className="w-3 h-3" />,
@@ -787,7 +804,7 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: <XCircle className="w-3 h-3" />,
   }
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100'}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${colors[status] || 'bg-gray-800 text-gray-200'}`}>
       {icons[status]}
       {status}
     </span>
@@ -1460,7 +1477,7 @@ function Runs() {
             <div className="p-8 text-center text-gray-500">No runs found</div>
           ) : (
             runs.map(run => (
-              <Link key={run.id} to={`/runs/${run.id}`} className="block p-4 hover:bg-gray-50">
+              <Link key={run.id} to={`/runs/${run.id}`} className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">{run.template_id}</div>
@@ -1504,7 +1521,7 @@ function OrgNode({ person, onSelect, getColor, getStatusColor }: OrgNodeProps) {
             // Prefetch on hover
             fetch(`/api/v1/org/person/${person.id}`).catch(() => {})
           }}
-          className={`${getColor(person.type)} text-white rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center mb-2`}
+          className={`${getColor(person.type)} rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center mb-2`}
         >
           <UserCircle className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1 opacity-90" />
           <div className="text-[10px] md:text-xs font-medium truncate">{person.name}</div>
@@ -1690,24 +1707,24 @@ function OrganizationPage() {
 
   const getPersonColor = (type: string) => {
     switch (type) {
-      case 'board_member': return 'bg-purple-700'
-      case 'ceo': return 'bg-purple-500'
-      case 'executive': return 'bg-blue-500'
-      case 'director': return 'bg-indigo-500'
-      case 'manager': return 'bg-cyan-500'
-      case 'employee': return 'bg-green-500'
-      default: return 'bg-gray-500'
+      case 'board_member': return 'bg-purple-900 text-purple-100'
+      case 'ceo': return 'bg-indigo-900 text-indigo-100'
+      case 'executive': return 'bg-blue-900 text-blue-100'
+      case 'director': return 'bg-teal-900 text-teal-100'
+      case 'manager': return 'bg-emerald-900 text-emerald-100'
+      case 'employee': return 'bg-green-900 text-green-100'
+      default: return 'bg-gray-800 text-gray-100'
     }
   }
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'working': return 'bg-yellow-400 text-yellow-900'
-      case 'reviewing': return 'bg-blue-400 text-blue-900'
-      case 'meeting': return 'bg-purple-400 text-purple-900'
-      case 'voting': return 'bg-orange-400 text-orange-900'
-      case 'idle': return 'bg-gray-300 text-gray-700'
-      default: return 'bg-white dark:bg-gray-800 text-gray-800'
+      case 'working': return 'bg-amber-800 text-amber-100'
+      case 'reviewing': return 'bg-blue-800 text-blue-100'
+      case 'meeting': return 'bg-purple-800 text-purple-100'
+      case 'voting': return 'bg-orange-800 text-orange-100'
+      case 'idle': return 'bg-gray-700 text-gray-200'
+      default: return 'bg-gray-700 text-gray-200'
     }
   }
 
@@ -1752,12 +1769,12 @@ function OrganizationPage() {
                     <div
                       key={member.id}
                       onClick={() => handleSelectPerson(member.id)}
-                      className="bg-purple-700 text-white rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center"
+                      className="bg-purple-900 text-purple-100 rounded-lg p-2 md:p-2.5 cursor-pointer hover:opacity-90 transition-all hover:scale-105 shadow-md w-24 md:w-32 text-center"
                     >
                       <UserCircle className="w-5 h-5 md:w-6 md:h-6 mx-auto mb-1 opacity-90" />
                       <div className="text-[10px] md:text-xs font-medium truncate">{member.name}</div>
                       <div className="text-[8px] md:text-[10px] opacity-75 mt-0.5 truncate">{member.title}</div>
-                      <div className="text-[8px] md:text-[9px] mt-1 px-1 md:px-1.5 py-0.5 rounded inline-block bg-green-400 text-green-900">
+                      <div className="text-[8px] md:text-[9px] mt-1 px-1 md:px-1.5 py-0.5 rounded inline-block bg-emerald-800 text-emerald-100">
                         active
                       </div>
                     </div>
@@ -2675,22 +2692,107 @@ function MeetingDetailPage() {
         </div>
       </div>
 
+      {/* Sprint Summary */}
+      {meeting.current_sprint && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg shadow-md border border-blue-200 dark:border-blue-800 p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-1">
+                {meeting.current_sprint.name}
+              </h2>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-blue-700 dark:text-blue-300 font-medium">
+                  {new Date(meeting.current_sprint.start_date).toLocaleDateString()} → {new Date(meeting.current_sprint.end_date).toLocaleDateString()}
+                </span>
+                <span className="px-2 py-0.5 bg-blue-600 dark:bg-blue-700 text-white text-xs rounded-full font-medium">
+                  {(() => {
+                    const remaining = Math.ceil((new Date(meeting.current_sprint.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    return remaining > 0 ? `${remaining} days remaining` : 'Completed';
+                  })()}
+                </span>
+                <span className="px-2 py-0.5 bg-white dark:bg-gray-800 text-blue-900 dark:text-blue-100 text-xs rounded border border-blue-300 dark:border-blue-700 font-medium capitalize">
+                  {meeting.current_sprint.status.replace('_', ' ')}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sprint Goals */}
+          {meeting.current_sprint.goals && meeting.current_sprint.goals.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Sprint Goals</h3>
+              <ul className="space-y-1.5">
+                {meeting.current_sprint.goals.map((goal: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-blue-800 dark:text-blue-200">
+                    <Target className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>{goal}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* Sprint Metrics */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Progress</div>
+              <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                {meeting.current_sprint.committed_points > 0 
+                  ? Math.round((meeting.current_sprint.completed_points / meeting.current_sprint.committed_points) * 100)
+                  : 0}%
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {meeting.current_sprint.completed_points} / {meeting.current_sprint.committed_points} pts
+              </div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Open Items</div>
+              <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                {meeting.current_sprint.open_items || 0}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">tasks</div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Risks</div>
+              <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                {meeting.current_sprint.risks?.length || 0}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">identified</div>
+            </div>
+          </div>
+          
+          {/* Risks (if any) */}
+          {meeting.current_sprint.risks && meeting.current_sprint.risks.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
+              <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">⚠️ Risks</h3>
+              <ul className="space-y-1">
+                {meeting.current_sprint.risks.map((risk: string, i: number) => (
+                  <li key={i} className="text-sm text-red-600 dark:text-red-400">
+                    • {risk}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Summary & Key Info */}
       {(meeting.summary || meeting.key_decisions?.length > 0 || meeting.action_items?.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {meeting.summary && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 lg:col-span-3">
-              <h2 className="font-semibold mb-2">Summary</h2>
-              <p className="text-gray-700">{meeting.summary}</p>
+              <h2 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Summary</h2>
+              <p className="text-gray-700 dark:text-gray-300">{meeting.summary}</p>
             </div>
           )}
           {meeting.key_decisions?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <h2 className="font-semibold mb-2 text-green-700">Key Decisions ({meeting.key_decisions.length})</h2>
+            <div className="rounded-lg shadow p-4 bg-emerald-900 text-emerald-100 border border-emerald-700">
+              <h2 className="font-semibold mb-2">Key Decisions ({meeting.key_decisions.length})</h2>
               <ul className="space-y-1">
                 {meeting.key_decisions.map((decision, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="w-4 h-4 text-emerald-300 mt-0.5 flex-shrink-0" />
                     <span>{decision}</span>
                   </li>
                 ))}
@@ -2698,12 +2800,12 @@ function MeetingDetailPage() {
             </div>
           )}
           {meeting.action_items?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <h2 className="font-semibold mb-2 text-blue-700">Action Items ({meeting.action_items.length})</h2>
+            <div className="rounded-lg shadow p-4 bg-indigo-900 text-indigo-100 border border-indigo-700">
+              <h2 className="font-semibold mb-2">Action Items ({meeting.action_items.length})</h2>
               <ul className="space-y-1">
                 {meeting.action_items.map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <Target className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <Target className="w-4 h-4 text-indigo-300 mt-0.5 flex-shrink-0" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -2711,11 +2813,11 @@ function MeetingDetailPage() {
             </div>
           )}
           {meeting.attendees?.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-              <h2 className="font-semibold mb-2 text-purple-700">Attendees ({meeting.attendees.length})</h2>
+            <div className="rounded-lg shadow p-4 bg-purple-900 text-purple-100 border border-purple-700">
+              <h2 className="font-semibold mb-2">Attendees ({meeting.attendees.length})</h2>
               <div className="flex flex-wrap gap-2">
                 {meeting.attendees.map((attendee, i) => (
-                  <span key={i} className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">
+                  <span key={i} className="px-2 py-1 bg-purple-800 text-purple-100 rounded text-xs border border-purple-600">
                     {attendee}
                   </span>
                 ))}
@@ -2929,16 +3031,25 @@ function AdminPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold mb-4">System Status</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {(['database', 'redis', 'storage', 'providers', 'organization'] as const).map(service => (
-            <div
-              key={service}
-              className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded"
-            >
-              <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${status?.[service] ? 'bg-green-500' : 'bg-red-500'}`} />
-              <div className="text-sm font-medium capitalize text-gray-800 dark:text-gray-100">{service}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{status?.[service] ? 'Connected' : 'Disconnected'}</div>
-            </div>
-          ))}
+          {(['database', 'redis', 'storage', 'providers', 'organization'] as const).map((service, idx) => {
+            const colors = [
+              'bg-teal-900 text-teal-100 border border-teal-700',
+              'bg-orange-900 text-orange-100 border border-orange-700',
+              'bg-emerald-900 text-emerald-100 border border-emerald-700',
+              'bg-indigo-900 text-indigo-100 border border-indigo-700',
+              'bg-purple-900 text-purple-100 border border-purple-700'
+            ]
+            return (
+              <div
+                key={service}
+                className={`text-center p-3 rounded ${colors[idx]}`}
+              >
+                <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${status?.[service] ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                <div className="text-sm font-medium capitalize">{service}</div>
+                <div className="text-xs opacity-75">{status?.[service] ? 'Connected' : 'Disconnected'}</div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -2996,21 +3107,21 @@ function AdminPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-4">Organization Stats</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
-              <div className="text-2xl font-bold text-primary-600 dark:text-primary-300">{status.org_stats.total_employees}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-300">Total Employees</div>
+            <div className="text-center p-3 rounded bg-indigo-900 text-indigo-100 border border-indigo-700">
+              <div className="text-2xl font-bold">{status.org_stats.total_employees}</div>
+              <div className="text-sm opacity-75">Total Employees</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{status.org_stats.by_status?.working || 0}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-300">Working</div>
+            <div className="text-center p-3 rounded bg-amber-900 text-amber-100 border border-amber-700">
+              <div className="text-2xl font-bold">{status.org_stats.by_status?.working || 0}</div>
+              <div className="text-sm opacity-75">Working</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-300">{status.org_stats.by_status?.idle || 0}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-300">Idle</div>
+            <div className="text-center p-3 rounded bg-green-900 text-green-100 border border-green-700">
+              <div className="text-2xl font-bold">{status.org_stats.by_status?.idle || 0}</div>
+              <div className="text-sm opacity-75">Idle</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">{status.org_stats.divisions}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-300">Divisions</div>
+            <div className="text-center p-3 rounded bg-purple-900 text-purple-100 border border-purple-700">
+              <div className="text-2xl font-bold">{status.org_stats.divisions}</div>
+              <div className="text-sm opacity-75">Divisions</div>
             </div>
           </div>
         </div>
@@ -3123,15 +3234,15 @@ function ProductsPage() {
   }, [])
   
   const stageColors: Record<string, string> = {
-    ideation: 'bg-purple-100 text-purple-700',
-    work_packet: 'bg-blue-100 text-blue-700',
-    csuite_review: 'bg-yellow-100 text-yellow-700',
-    board_vote: 'bg-orange-100 text-orange-700',
-    execution_plan: 'bg-cyan-100 text-cyan-700',
-    production: 'bg-teal-100 text-teal-700',
-    final_review: 'bg-indigo-100 text-indigo-700',
-    launched: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
+    ideation: 'bg-purple-900 text-purple-100',
+    work_packet: 'bg-indigo-900 text-indigo-100',
+    csuite_review: 'bg-amber-900 text-amber-100',
+    board_vote: 'bg-orange-900 text-orange-100',
+    execution_plan: 'bg-teal-900 text-teal-100',
+    production: 'bg-green-900 text-green-100',
+    final_review: 'bg-blue-900 text-blue-100',
+    launched: 'bg-emerald-900 text-emerald-100',
+    rejected: 'bg-red-900 text-red-100',
   }
   
   const stageNames: Record<string, string> = {
@@ -3196,10 +3307,10 @@ function ProductsPage() {
             {Object.entries(stageNames).slice(0, 6).map(([key, name]) => (
               <div
                 key={key}
-                className="rounded p-2 text-center bg-gray-50 dark:bg-gray-900/40"
+                className={`rounded p-2 text-center ${stageColors[key]}`}
               >
-                <div className={`text-xl font-bold ${stageColors[key]}`}>{byStage[key] || 0}</div>
-                <div className="text-[9px] text-gray-600 dark:text-gray-300">{name}</div>
+                <div className="text-xl font-bold">{byStage[key] || 0}</div>
+                <div className="text-[10px] uppercase tracking-wide opacity-80">{name}</div>
               </div>
             ))}
           </div>

@@ -68,6 +68,15 @@
       mode: '0644'
     register: homepage_widgets_config
 
+  - name: Create Homepage settings configuration
+    ansible.builtin.template:
+      src: "{{ files }}/config/settings.yaml.j2"
+      dest: "{{ home }}/config/settings.yaml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: homepage_settings_config
+
   - name: Create Homepage systemd service
     ansible.builtin.template:
       src: "{{ files }}/homepage.service.j2"
@@ -85,7 +94,7 @@
     ansible.builtin.systemd:
       name: homepage.service
       state: restarted
-    when: homepage_compose.changed or homepage_services_config.changed or homepage_widgets_config.changed or homepage_service_unit.changed
+    when: homepage_compose.changed or homepage_services_config.changed or homepage_widgets_config.changed or homepage_settings_config.changed or homepage_service_unit.changed
 
   - name: Ensure Homepage service is started
     ansible.builtin.systemd:
