@@ -712,6 +712,7 @@ func (h *Handlers) CreateDivisionHandler(w http.ResponseWriter, r *http.Request)
 }
 
 // ListEmployeesHandler returns all employees
+// Uses TryRLock to avoid blocking on employee locks
 func (h *Handlers) ListEmployeesHandler(w http.ResponseWriter, r *http.Request) {
 	if h.app.org == nil {
 		writeError(w, "Organization not initialized", http.StatusServiceUnavailable)
@@ -722,18 +723,15 @@ func (h *Handlers) ListEmployeesHandler(w http.ResponseWriter, r *http.Request) 
 	skillFilter := r.URL.Query().Get("skill")
 	statusFilter := r.URL.Query().Get("status")
 
-	// Copy employee list while holding org lock
+	// Build employee list while holding org lock, using TryRLock to avoid blocking
 	h.app.org.mu.RLock()
-	empList := make([]*Employee, 0, len(h.app.org.AllEmployees))
+	employees := make([]map[string]interface{}, 0, len(h.app.org.AllEmployees))
 	for _, emp := range h.app.org.AllEmployees {
-		empList = append(empList, emp)
-	}
-	h.app.org.mu.RUnlock()
-
-	// Now iterate without holding org lock (prevents deadlock)
-	employees := make([]map[string]interface{}, 0)
-	for _, emp := range empList {
-		emp.mu.RLock()
+		// Use TryRLock to avoid indefinite blocking
+		if !emp.mu.TryRLock() {
+			// Skip employees with held locks - they're likely being modified
+			continue
+		}
 		
 		// Apply filters
 		if skillFilter != "" && string(emp.Skill) != skillFilter {
@@ -760,6 +758,7 @@ func (h *Handlers) ListEmployeesHandler(w http.ResponseWriter, r *http.Request) 
 		employees = append(employees, empData)
 		emp.mu.RUnlock()
 	}
+	h.app.org.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
