@@ -9,10 +9,21 @@
       - audible-download.service
 
   tasks:
-    - name: Install audible-cli via pip
-      ansible.builtin.pip:
-        name: audible-cli
+    - name: Install pipx
+      ansible.builtin.apt:
+        name: pipx
         state: present
+        update_cache: yes
+
+    - name: Ensure pipx path is configured
+      ansible.builtin.command: pipx ensurepath
+      changed_when: false
+
+    - name: Install audible-cli via pipx
+      ansible.builtin.command: pipx install audible-cli
+      register: pipx_install
+      changed_when: "'installed package' in pipx_install.stdout"
+      failed_when: pipx_install.rc != 0 and 'already installed' not in pipx_install.stderr
 
     - name: Check if directory exists
       ansible.builtin.stat:
