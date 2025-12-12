@@ -1409,7 +1409,7 @@ function RunDetail() {
           <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Steps</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y dark:divide-gray-700">
             {run.steps.map(step => (
               <div key={step.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -1472,7 +1472,7 @@ function Runs() {
       {loading ? (
         <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow divide-y">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow divide-y dark:divide-gray-700">
           {runs.length === 0 ? (
             <div className="p-8 text-center text-gray-500">No runs found</div>
           ) : (
@@ -2477,7 +2477,7 @@ function EmployeeDetailPage() {
         <div className="px-4 py-3 border-b dark:border-gray-700">
           <h2 className="font-semibold">Activity Log ({employee.activity_log?.length || 0})</h2>
         </div>
-        <div className="divide-y max-h-96 overflow-y-auto">
+        <div className="divide-y dark:divide-gray-700 max-h-96 overflow-y-auto">
           {employee.activity_log && employee.activity_log.length > 0 ? (
             [...employee.activity_log].reverse().map((entry: ActivityLogEntry) => (
               <div key={entry.id} className="p-3 flex gap-3">
@@ -2505,7 +2505,7 @@ function EmployeeDetailPage() {
         <div className="px-4 py-3 border-b dark:border-gray-700">
           <h2 className="font-semibold">Work History ({employee.work_history?.length || 0})</h2>
         </div>
-        <div className="divide-y max-h-96 overflow-y-auto">
+        <div className="divide-y dark:divide-gray-700 max-h-96 overflow-y-auto">
           {employee.work_history && employee.work_history.length > 0 ? (
             [...employee.work_history].reverse().map((result: WorkResult) => (
               <div key={result.id} className="p-3">
@@ -2833,7 +2833,7 @@ function MeetingDetailPage() {
           <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Board Decisions ({meeting.decisions.length})</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y dark:divide-gray-700">
             {meeting.decisions.map((decision) => (
               <div key={decision.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -2919,7 +2919,7 @@ function MeetingDetailPage() {
           <div className="px-4 py-3 border-b dark:border-gray-700">
             <h2 className="font-semibold">Agenda ({meeting.agenda.length} items)</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y dark:divide-gray-700">
             {meeting.agenda.map((item) => (
               <div key={item.id} className="p-3">
                 <div className="flex items-center justify-between">
@@ -3337,7 +3337,7 @@ function ProductsPage() {
           <h2 className="font-semibold">All Items</h2>
           <span className="text-xs text-gray-500">{pipelines.length} in progress, {products.length} completed</span>
         </div>
-        <div className="divide-y">
+        <div className="divide-y dark:divide-gray-700">
           {displayItems.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               No items yet. Seed the company to start generating product ideas.
@@ -3347,110 +3347,110 @@ function ProductsPage() {
               <div key={item.id} className="p-4">
                 {'stage' in item ? (
                   <div>
-                    <div className={`cursor-pointer hover:bg-gray-50 rounded-lg p-3 ${selectedPipeline?.id === item.id ? 'bg-blue-50' : ''}`} onClick={() => setSelectedPipeline(selectedPipeline?.id === item.id ? null : item)}>
+                    <div className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg p-3 ${selectedPipeline?.id === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`} onClick={() => setSelectedPipeline(selectedPipeline?.id === item.id ? null : item)}>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Pipeline</span>
+                        <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">Pipeline</span>
                         <span className="font-semibold">{item.name}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${stageColors[item.stage]}`}>
                           {stageNames[item.stage]}
                         </span>
-                        {item.work_packet && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Work Packet Ready</span>}
+                        {item.work_packet && <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Work Packet Ready</span>}
                       </div>
-                      {item.idea && <div className="text-sm text-gray-600">{item.idea.solution}</div>}
+                      {item.idea && <div className="text-sm text-gray-600 dark:text-gray-300">{item.idea.solution}</div>}
                       <div className="text-xs text-gray-400 mt-1">Updated {new Date(item.updated_at).toLocaleString()}</div>
                     </div>
                     
                     {/* Expanded Work Packet Details */}
                     {selectedPipeline?.id === item.id && item.work_packet && (
-                      <div className="mt-4 border-t pt-4 space-y-4">
+                      <div className="mt-4 border-t dark:border-gray-700 pt-4 space-y-4">
                         <div className="grid grid-cols-1 gap-4">
                           {item.work_packet.market_research && (
-                            <div className="bg-blue-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-blue-800 dark:text-blue-200">
                                 <TrendingUp className="w-4 h-4" />Market Research
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.market_research}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.market_research}</div>
                             </div>
                           )}
                           
                           {item.work_packet.competitive_analysis && (
-                            <div className="bg-purple-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-purple-800 dark:text-purple-200">
                                 <Target className="w-4 h-4" />Competitive Analysis
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.competitive_analysis}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.competitive_analysis}</div>
                             </div>
                           )}
                           
                           {item.work_packet.financial_projections && (
-                            <div className="bg-green-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-green-800 dark:text-green-200">
                                 <DollarSign className="w-4 h-4" />Financial Projections
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.financial_projections}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.financial_projections}</div>
                             </div>
                           )}
                           
                           {item.work_packet.marketing_strategy && (
-                            <div className="bg-yellow-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                                 <Megaphone className="w-4 h-4" />Marketing Strategy
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.marketing_strategy}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.marketing_strategy}</div>
                             </div>
                           )}
                           
                           {item.work_packet.business_plan && (
-                            <div className="bg-indigo-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-indigo-50 dark:bg-indigo-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-indigo-800 dark:text-indigo-200">
                                 <FileText className="w-4 h-4" />Business Plan
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.business_plan}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.business_plan}</div>
                             </div>
                           )}
                           
                           {item.work_packet.technical_overview && (
-                            <div className="bg-cyan-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-cyan-50 dark:bg-cyan-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-cyan-800 dark:text-cyan-200">
                                 <Code className="w-4 h-4" />Technical Overview
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.technical_overview}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.technical_overview}</div>
                             </div>
                           )}
                           
                           {item.work_packet.risk_analysis && (
-                            <div className="bg-red-50 rounded-lg p-4">
-                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-4">
+                              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-red-800 dark:text-red-200">
                                 <AlertTriangle className="w-4 h-4" />Risk Analysis
                               </h4>
-                              <div className="text-sm text-gray-700 whitespace-pre-wrap">{item.work_packet.risk_analysis}</div>
+                              <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{item.work_packet.risk_analysis}</div>
                             </div>
                           )}
                         </div>
                         
                         {item.idea && (
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <h4 className="font-semibold text-sm mb-3">Original Idea</h4>
+                          <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4">
+                            <h4 className="font-semibold text-sm mb-3 text-gray-800 dark:text-gray-200">Original Idea</h4>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
-                                <span className="font-medium text-gray-600">Problem:</span>
-                                <div className="text-gray-700 mt-1">{item.idea.problem}</div>
+                                <span className="font-medium text-gray-600 dark:text-gray-400">Problem:</span>
+                                <div className="text-gray-700 dark:text-gray-200 mt-1">{item.idea.problem}</div>
                               </div>
                               <div>
-                                <span className="font-medium text-gray-600">Solution:</span>
-                                <div className="text-gray-700 mt-1">{item.idea.solution}</div>
+                                <span className="font-medium text-gray-600 dark:text-gray-400">Solution:</span>
+                                <div className="text-gray-700 dark:text-gray-200 mt-1">{item.idea.solution}</div>
                               </div>
                               <div>
-                                <span className="font-medium text-gray-600">Value Prop:</span>
-                                <div className="text-gray-700 mt-1">{item.idea.value_proposition}</div>
+                                <span className="font-medium text-gray-600 dark:text-gray-400">Value Prop:</span>
+                                <div className="text-gray-700 dark:text-gray-200 mt-1">{item.idea.value_proposition}</div>
                               </div>
                               <div>
-                                <span className="font-medium text-gray-600">Target Customer:</span>
-                                <div className="text-gray-700 mt-1">{item.idea.target_customer}</div>
+                                <span className="font-medium text-gray-600 dark:text-gray-400">Target Customer:</span>
+                                <div className="text-gray-700 dark:text-gray-200 mt-1">{item.idea.target_customer}</div>
                               </div>
                               <div className="col-span-2">
-                                <span className="font-medium text-gray-600">Revenue Model:</span>
-                                <div className="text-gray-700 mt-1">{item.idea.revenue_model}</div>
+                                <span className="font-medium text-gray-600 dark:text-gray-400">Revenue Model:</span>
+                                <div className="text-gray-700 dark:text-gray-200 mt-1">{item.idea.revenue_model}</div>
                               </div>
                             </div>
                           </div>
@@ -3459,18 +3459,18 @@ function ProductsPage() {
                     )}
                   </div>
                 ) : (
-                  <div>
+                  <div className="rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Product</span>
+                      <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Product</span>
                       <span className="font-semibold">{item.name}</span>
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded capitalize">{item.status}</span>
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded capitalize">{item.status}</span>
                     </div>
-                    <div className="text-sm text-gray-600 mb-2">{item.description}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">{item.description}</div>
                     {item.deliverables && item.deliverables.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
-                        <span className="text-xs text-gray-500">Deliverables:</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Deliverables:</span>
                         {item.deliverables.map((d: string, i: number) => (
-                          <span key={i} className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">{d}</span>
+                          <span key={i} className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">{d}</span>
                         ))}
                       </div>
                     )}
