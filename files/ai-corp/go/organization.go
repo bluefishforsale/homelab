@@ -407,6 +407,7 @@ type Organization struct {
 	Deliverables map[uuid.UUID]*Deliverable `json:"deliverables"`
 	Seed        *CompanySeed             `json:"seed"`
 	Restructuring *RestructuringHistory  `json:"restructuring"`
+	CurrentSprint *Sprint                 `json:"current_sprint,omitempty"`
 	
 	config      *Config
 	providers   *ProviderManager

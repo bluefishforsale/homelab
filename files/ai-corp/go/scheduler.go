@@ -725,6 +725,36 @@ func (s *Scheduler) handleSprintPlanning(ctx context.Context, task *ScheduledTas
 	s.board.AddDialogEntry(meeting.ID, "Scrum Master", "", "chair",
 		"Sprint goal is set. Let's execute! Daily standups at 9 AM.", "decision")
 	
+	// Create new sprint
+	if s.org != nil {
+		s.org.mu.Lock()
+		sprintNum := 1
+		if s.org.CurrentSprint != nil {
+			sprintNum = s.org.CurrentSprint.Number + 1
+		}
+		
+		now := time.Now()
+		s.org.CurrentSprint = &Sprint{
+			ID:              uuid.New(),
+			Name:            fmt.Sprintf("Sprint %d", sprintNum),
+			Number:          sprintNum,
+			StartDate:       now,
+			EndDate:         now.Add(14 * 24 * time.Hour), // 2-week sprint
+			Goals:           []string{"Launch new onboarding A/B test", "Reduce signup error rate < 0.5%", "Implement user feedback system"},
+			Status:          SprintActive,
+			CommittedPoints: 34,
+			CompletedPoints: 0,
+			OpenItems:       pendingCount,
+			Risks:           []string{},
+			CreatedAt:       now,
+		}
+		s.org.mu.Unlock()
+		log.WithFields(log.Fields{
+			"sprint_id":     s.org.CurrentSprint.ID,
+			"sprint_number": sprintNum,
+		}).Info("New sprint created")
+	}
+	
 	s.board.EndMeeting(meeting.ID,
 		"Sprint planning completed. Teams committed to sprint backlog.",
 		[]string{"Sprint backlog defined", "Team capacity allocated", "Sprint goal established"},

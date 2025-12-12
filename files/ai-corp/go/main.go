@@ -110,6 +110,7 @@ func NewApp(config *Config) (*App, error) {
 	app.org = NewOrganization(config, app.providers, storage, db)
 	app.org.SetWSHub(app.wsHub) // Connect WebSocket hub for live updates
 	app.scheduler.SetOrganization(app.org)
+	app.board.SetOrganization(app.org) // Connect board to org for sprint context
 	log.WithField("duration_ms", time.Since(phaseStart).Milliseconds()).Info("Organization initialized")
 
 	log.WithField("total_duration_ms", time.Since(appStart).Milliseconds()).Info("Application initialization complete")

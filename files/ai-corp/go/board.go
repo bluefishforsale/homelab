@@ -106,6 +106,7 @@ type BoardMeeting struct {
 	Minutes      string                `json:"minutes"`
 	Attendees    []string              `json:"attendees"`
 	Status       string                `json:"status"` // scheduled, in_progress, completed, cancelled
+	CurrentSprint *Sprint              `json:"current_sprint,omitempty"`
 }
 
 // AgendaItem represents an item on the meeting agenda
@@ -153,6 +154,7 @@ type Board struct {
 	config    *Config
 	providers *ProviderManager
 	db        *Database
+	org       *Organization
 	mu        sync.RWMutex
 }
 
@@ -620,8 +622,17 @@ func (b *Board) CreateMeeting(meetingType, title string, scheduledAt time.Time) 
 // GetMeeting retrieves a meeting by ID
 func (b *Board) GetMeeting(id uuid.UUID) *BoardMeeting {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.meetings[id]
+	meeting := b.meetings[id]
+	b.mu.RUnlock()
+	
+	// Populate current sprint if available
+	if meeting != nil && b.org != nil {
+		b.org.mu.RLock()
+		meeting.CurrentSprint = b.org.CurrentSprint
+		b.org.mu.RUnlock()
+	}
+	
+	return meeting
 }
 
 // ListMeetings returns all meetings sorted by date (newest first)
