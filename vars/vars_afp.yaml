@@ -1,0 +1,25 @@
+# AFP (Apple Filing Protocol) Server Configuration
+# Netatalk-based AFP exports for macOS clients
+
+# List of AFP shares to export
+# Each share requires:
+#   - name: Share name visible to macOS clients
+#   - path: Local filesystem path to export
+#   - options: (optional) List of afp.conf options for this share
+afp_exports:
+  - name: "complete"
+    path: "/data01/complete"
+    options:
+      - "time machine = no"
+      - "read only = no"
+
+# Global AFP server settings
+afp_global:
+  # Server name visible to macOS clients (defaults to hostname)
+  server_name: "{{ inventory_hostname }}"
+  # Log level: default, info, debug, maxdebug
+  log_level: "default"
+  # UAM (User Authentication Modules) - recommended for security
+  uam_list: "uams_dhx2.so"
+  # Guest access: yes or no
+  guest_access: "no"
