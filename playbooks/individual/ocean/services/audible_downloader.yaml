@@ -15,6 +15,16 @@
         state: present
         update_cache: yes
 
+    - name: Install ffmpeg for AAXtoMP3 conversions
+      ansible.builtin.apt:
+        name:
+          - ffmpeg
+          - bc
+          - x264
+          - x265
+        state: present
+        update_cache: yes
+
     - name: Ensure pipx path is configured
       ansible.builtin.command: pipx ensurepath
       changed_when: false
