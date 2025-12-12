@@ -521,12 +521,15 @@ func (org *Organization) Pause() {
 	org.mu.Unlock()
 	
 	// Pause employees without holding org lock
+	// Use defer pattern to ensure unlock even on panic
 	for _, emp := range employees {
-		emp.mu.Lock()
-		if emp.Status == EmployeeIdle {
-			emp.Status = EmployeePaused
-		}
-		emp.mu.Unlock()
+		func() {
+			emp.mu.Lock()
+			defer emp.mu.Unlock()
+			if emp.Status == EmployeeIdle {
+				emp.Status = EmployeePaused
+			}
+		}()
 	}
 	
 	log.Info("Company paused")
@@ -548,12 +551,15 @@ func (org *Organization) Resume() {
 	org.mu.Unlock()
 	
 	// Resume employees without holding org lock
+	// Use defer pattern to ensure unlock even on panic
 	for _, emp := range employees {
-		emp.mu.Lock()
-		if emp.Status == EmployeePaused {
-			emp.Status = EmployeeIdle
-		}
-		emp.mu.Unlock()
+		func() {
+			emp.mu.Lock()
+			defer emp.mu.Unlock()
+			if emp.Status == EmployeePaused {
+				emp.Status = EmployeeIdle
+			}
+		}()
 	}
 	
 	log.Info("Company resumed")
@@ -2240,14 +2246,30 @@ func (org *Organization) getEmployeePersona(skill EmployeeSkill) string {
 func (org *Organization) runEmployee(emp *Employee) {
 	defer org.wg.Done()
 	
+	// Panic recovery to prevent deadlocks from held locks
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithFields(log.Fields{
+				"employee_id": emp.ID,
+				"panic":       r,
+			}).Error("Employee goroutine panicked, recovering")
+			// Mark employee as terminated to prevent further work assignment
+			emp.mu.Lock()
+			emp.Status = EmployeeTerminated
+			emp.mu.Unlock()
+		}
+	}()
+	
 	log.WithField("employee_id", emp.ID).Debug("Employee started")
 	
 	for {
 		select {
 		case <-emp.ctx.Done():
-			emp.mu.Lock()
-			emp.Status = EmployeeTerminated
-			emp.mu.Unlock()
+			func() {
+				emp.mu.Lock()
+				defer emp.mu.Unlock()
+				emp.Status = EmployeeTerminated
+			}()
 			log.WithField("employee_id", emp.ID).Debug("Employee terminated")
 			return
 			
@@ -2258,10 +2280,12 @@ func (org *Organization) runEmployee(emp *Employee) {
 				"work_title":    work.Title,
 			}).Info("Employee received work, starting execution")
 			
-			emp.mu.Lock()
-			emp.Status = EmployeeWorking
-			emp.CurrentWork = work
-			emp.mu.Unlock()
+			func() {
+				emp.mu.Lock()
+				defer emp.mu.Unlock()
+				emp.Status = EmployeeWorking
+				emp.CurrentWork = work
+			}()
 			
 			// Broadcast work_started event
 			if org.wsHub != nil {
@@ -2287,11 +2311,14 @@ func (org *Organization) runEmployee(emp *Employee) {
 				"has_error":     hasError,
 			}).Info("Employee completed work")
 			
-			emp.mu.Lock()
-			emp.Status = EmployeeIdle
-			emp.CurrentWork = nil
-			workCount := atomic.AddInt64(&emp.workCount, 1)
-			emp.mu.Unlock()
+			var workCount int64
+			func() {
+				emp.mu.Lock()
+				defer emp.mu.Unlock()
+				emp.Status = EmployeeIdle
+				emp.CurrentWork = nil
+				workCount = atomic.AddInt64(&emp.workCount, 1)
+			}()
 			
 			// Create deliverable from completed work
 			completedAt := time.Now()
@@ -2726,6 +2753,7 @@ func (org *Organization) scaleUp(skill EmployeeSkill) *Employee {
 }
 
 // GetStats returns organization statistics
+// Uses snapshot approach to avoid lock contention issues
 func (org *Organization) GetStats() map[string]interface{} {
 	// Copy employee list while holding lock
 	org.mu.RLock()
@@ -2734,22 +2762,27 @@ func (org *Organization) GetStats() map[string]interface{} {
 		"managers":        len(org.AllManagers),
 		"total_employees": len(org.AllEmployees),
 	}
-	employees := make([]*Employee, 0, len(org.AllEmployees))
-	for _, emp := range org.AllEmployees {
-		employees = append(employees, emp)
-	}
-	org.mu.RUnlock()
 	
-	// Now iterate employees without holding org lock (prevents deadlock)
+	// Pre-compute status/skill counts while holding org lock
+	// by reading employee fields that don't require emp.mu
+	// This avoids the nested lock acquisition that can cause deadlocks
 	statusCounts := make(map[EmployeeStatus]int)
 	skillCounts := make(map[EmployeeSkill]int)
 	
-	for _, emp := range employees {
-		emp.mu.RLock()
-		statusCounts[emp.Status]++
-		skillCounts[emp.Skill]++
-		emp.mu.RUnlock()
+	for _, emp := range org.AllEmployees {
+		// Use TryRLock to avoid blocking - skip employees with held locks
+		if emp.mu.TryRLock() {
+			statusCounts[emp.Status]++
+			skillCounts[emp.Skill]++
+			emp.mu.RUnlock()
+		} else {
+			// Employee lock is held, count as "unknown" status
+			// This prevents indefinite blocking
+			statusCounts[EmployeeWorking]++ // Assume working if lock held
+			skillCounts[emp.Skill]++        // Skill doesn't change, safe to read
+		}
 	}
+	org.mu.RUnlock()
 	
 	stats["by_status"] = statusCounts
 	stats["by_skill"] = skillCounts
