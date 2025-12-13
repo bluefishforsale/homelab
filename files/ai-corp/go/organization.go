@@ -2669,10 +2669,8 @@ func (org *Organization) handleRejectedWork(mgr *Manager, result *WorkResult, re
 
 // AssignWork assigns work to an available employee
 func (org *Organization) AssignWork(skill EmployeeSkill, work *WorkItem) error {
+	// First pass: try to find an idle employee (read lock only)
 	org.mu.RLock()
-	defer org.mu.RUnlock()
-	
-	// Find an idle employee with the right skill
 	for _, emp := range org.AllEmployees {
 		emp.mu.RLock()
 		if emp.Skill == skill && emp.Status == EmployeeIdle {
@@ -2682,6 +2680,7 @@ func (org *Organization) AssignWork(skill EmployeeSkill, work *WorkItem) error {
 			
 			select {
 			case emp.workQueue <- work:
+				org.mu.RUnlock()
 				log.WithFields(log.Fields{
 					"employee_id": emp.ID,
 					"work_id":     work.ID,
@@ -2694,8 +2693,11 @@ func (org *Organization) AssignWork(skill EmployeeSkill, work *WorkItem) error {
 			emp.mu.RUnlock()
 		}
 	}
+	org.mu.RUnlock()
 	
-	// No idle employees, check if we should scale up
+	// No idle employees found - check if we should scale up
+	// Note: scaleUp calls CreateEmployee which needs write lock,
+	// so we must NOT hold any read lock here to avoid deadlock
 	if org.shouldScaleUp(skill) {
 		emp := org.scaleUp(skill)
 		if emp != nil {
