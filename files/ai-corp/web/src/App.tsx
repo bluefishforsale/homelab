@@ -2191,20 +2191,20 @@ function SeedSetupPage() {
       </div>
 
       {seed && seed.active && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-green-400 font-medium mb-2">
             <CheckCircle className="w-5 h-5" />
             Company Seeded
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="text-gray-500">Company:</span> {seed.company_name}</div>
-            <div><span className="text-gray-500">Sector:</span> {seed.sector === 'custom' ? seed.custom_sector : seed.sector}</div>
-            <div><span className="text-gray-500">Target:</span> {seed.target_market}</div>
-            <div><span className="text-gray-500">Since:</span> {seed.created_at ? new Date(seed.created_at).toLocaleDateString() : 'N/A'}</div>
+          <div className="grid grid-cols-2 gap-4 text-sm text-gray-200">
+            <div><span className="text-gray-400">Company:</span> {seed.company_name}</div>
+            <div><span className="text-gray-400">Sector:</span> {seed.sector === 'custom' ? seed.custom_sector : seed.sector}</div>
+            <div><span className="text-gray-400">Target:</span> {seed.target_market}</div>
+            <div><span className="text-gray-400">Since:</span> {seed.created_at ? new Date(seed.created_at).toLocaleDateString() : 'N/A'}</div>
           </div>
-          <div className="mt-3 pt-3 border-t border-green-200">
-            <div className="text-sm"><span className="text-gray-500">Mission:</span> {seed.mission}</div>
-            <div className="text-sm mt-1"><span className="text-gray-500">Vision:</span> {seed.vision}</div>
+          <div className="mt-3 pt-3 border-t border-green-700">
+            <div className="text-sm text-gray-200"><span className="text-gray-400">Mission:</span> {seed.mission}</div>
+            <div className="text-sm mt-1 text-gray-200"><span className="text-gray-400">Vision:</span> {seed.vision}</div>
           </div>
         </div>
       )}
@@ -2223,24 +2223,24 @@ function SeedSetupPage() {
               onClick={() => setForm(f => ({ ...f, sector: sector.id }))}
               className={`text-left p-3 rounded-lg border-2 transition-colors ${
                 form.sector === sector.id
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-primary-500 bg-primary-900/50 text-primary-300'
+                  : 'border-gray-600 hover:border-gray-500 bg-gray-800/50'
               }`}
             >
-              <div className="font-medium text-sm">{sector.name}</div>
-              <div className="text-xs text-gray-500 mt-1">{sector.description}</div>
+              <div className="font-medium text-sm text-gray-200">{sector.name}</div>
+              <div className="text-xs text-gray-400 mt-1">{sector.description}</div>
             </button>
           ))}
         </div>
 
         {form.sector === 'custom' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Custom Sector</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Custom Sector</label>
             <input
               type="text"
               value={form.custom_sector}
               onChange={e => setForm(f => ({ ...f, custom_sector: e.target.value }))}
-              className="w-full p-3 border rounded-lg"
+              className="w-full p-3 border border-gray-600 rounded-lg bg-gray-800 text-gray-200 placeholder-gray-500"
               placeholder="Describe your business sector..."
             />
           </div>
@@ -2248,43 +2248,43 @@ function SeedSetupPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Company Name *</label>
             <input
               type="text"
               value={form.company_name}
               onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
-              className="w-full p-3 border rounded-lg"
+              className="w-full p-3 border border-gray-600 rounded-lg bg-gray-800 text-gray-200 placeholder-gray-500"
               placeholder="AI Ventures Inc."
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Target Market</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Target Market</label>
             <input
               type="text"
               value={form.target_market}
               onChange={e => setForm(f => ({ ...f, target_market: e.target.value }))}
-              className="w-full p-3 border rounded-lg"
+              className="w-full p-3 border border-gray-600 rounded-lg bg-gray-800 text-gray-200 placeholder-gray-500"
               placeholder="e.g., Young professionals, Enterprise, SMBs"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Mission Statement (optional, auto-generated if blank)</label>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Mission Statement (optional, auto-generated if blank)</label>
           <textarea
             value={form.mission}
             onChange={e => setForm(f => ({ ...f, mission: e.target.value }))}
-            className="w-full p-3 border rounded-lg h-20"
+            className="w-full p-3 border border-gray-600 rounded-lg bg-gray-800 text-gray-200 placeholder-gray-500 h-20"
             placeholder="Leave blank to auto-generate with AI..."
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Vision Statement (optional, auto-generated if blank)</label>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Vision Statement (optional, auto-generated if blank)</label>
           <textarea
             value={form.vision}
             onChange={e => setForm(f => ({ ...f, vision: e.target.value }))}
-            className="w-full p-3 border rounded-lg h-20"
+            className="w-full p-3 border border-gray-600 rounded-lg bg-gray-800 text-gray-200 placeholder-gray-500 h-20"
             placeholder="Leave blank to auto-generate with AI..."
           />
         </div>
@@ -2301,8 +2301,8 @@ function SeedSetupPage() {
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-        <h3 className="font-medium text-gray-800 mb-2">How the seed works</h3>
+      <div className="bg-gray-800/50 rounded-lg p-4 text-sm text-gray-400">
+        <h3 className="font-medium text-gray-300 mb-2">How the seed works</h3>
         <ul className="space-y-1 list-disc list-inside">
           <li>The business sector determines the types of projects and ideas the AI will generate</li>
           <li>All employees and board members will make decisions aligned with this sector</li>
