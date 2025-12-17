@@ -320,13 +320,21 @@ Generate ONE innovative, bootstrappable product idea. Requirements:
 - NO AI/ML/LLM features, NO blockchain/crypto/quantum
 - Focus on B2B SaaS or niche vertical solutions
 
-IMPORTANT: Output ONLY the structured response below. Do NOT include any thinking, reasoning, or explanation. Start directly with PROBLEM:
+CRITICAL: Output ONLY the 5 fields below. No thinking, no preamble, no markdown. Start with PROBLEM: on line 1.
 
-PROBLEM: [Who has this problem and why it matters - 1-2 sentences]
-SOLUTION: [Your product name and what it does - 1-2 sentences]
-VALUE_PROP: [Why customers will pay - 1 sentence]
-TARGET_CUSTOMER: [Buyer persona: role, company size, industry - 1 sentence]
-REVENUE_MODEL: [Pricing strategy - 1 sentence]`, 
+PROBLEM: Small business owners waste 10+ hours weekly on manual invoice reconciliation and payment tracking, leading to cash flow issues and missed revenue.
+SOLUTION: PayFlow Pro - An automated invoicing platform that syncs with bank accounts to match payments, send reminders, and flag discrepancies in real-time.
+VALUE_PROP: Reduces accounts receivable time by 80%% and recovers an average of $5,000/month in missed payments.
+TARGET_CUSTOMER: CFOs and finance managers at companies with 10-200 employees in professional services, construction, and wholesale distribution.
+REVENUE_MODEL: Tiered SaaS pricing: $49/month (Starter), $149/month (Pro), $399/month (Enterprise) with 14-day free trial.
+
+Now generate YOUR OWN unique idea following the exact same format:
+
+PROBLEM:
+SOLUTION:
+VALUE_PROP:
+TARGET_CUSTOMER:
+REVENUE_MODEL:`, 
 		seed.CompanyName, seed.Sector, seed.TargetMarket, seed.Mission, seed.Vision, existingContext)
 	
 	llmStart := time.Now()
@@ -436,14 +444,30 @@ REVENUE_MODEL: [Pricing strategy - 1 sentence]`,
 		"total_lines": len(lines),
 	}).Info("Parsed idea fields")
 	
-	// Validate critical fields
-	if idea.Problem == "" || idea.Solution == "" {
-		log.WithFields(log.Fields{
-			"pipeline_id": pipeline.ID,
-			"has_problem": idea.Problem != "",
-			"has_solution": idea.Solution != "",
-		}).Warn("Generated idea missing critical fields")
+	// Validate and provide fallbacks for critical fields
+	if idea.Problem == "" {
+		idea.Problem = fmt.Sprintf("Businesses in the %s sector struggle with inefficient processes and outdated solutions that waste time and money.", seed.Sector)
+		log.WithField("pipeline_id", pipeline.ID).Warn("Using fallback problem statement")
 	}
+	if idea.Solution == "" {
+		idea.Solution = fmt.Sprintf("%s Solution - A streamlined platform for %s", seed.CompanyName, seed.TargetMarket)
+		log.WithField("pipeline_id", pipeline.ID).Warn("Using fallback solution")
+	}
+	if idea.ValueProp == "" {
+		idea.ValueProp = "Saves time, reduces costs, and improves operational efficiency"
+	}
+	if idea.TargetCustomer == "" {
+		idea.TargetCustomer = fmt.Sprintf("Decision-makers and managers at companies in %s", seed.TargetMarket)
+	}
+	if idea.RevenueModel == "" {
+		idea.RevenueModel = "SaaS subscription with tiered pricing based on usage and features"
+	}
+	
+	log.WithFields(log.Fields{
+		"pipeline_id":  pipeline.ID,
+		"has_problem":  idea.Problem != "",
+		"has_solution": idea.Solution != "",
+	}).Info("Idea validation complete")
 	
 	pm.mu.Lock()
 	pipeline.Idea = idea
