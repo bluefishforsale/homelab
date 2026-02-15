@@ -6,13 +6,14 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: tinacms
     image: bluefishforsale/tinacms-nextjs
     version: sha-70ff8b7
     port_int: 3000
-    port_ext: 8084
+    port_ext: "{{ service_ports.tinacms.port }}"
     data: /data01
     files: ../../../../files/tinacms
     home: "{{ data }}/services/{{ service }}"

@@ -4,8 +4,7 @@ After=network.target
 
 [Service]
 Type=forking
-StandardError=syslog
-StandardOutput=file:/tmp/audible-download-and-compress.log
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=/data01/services/audible-downloader
 ExecStartPre=/usr/bin/flock -n /var/lock/audible-downloader.lock -c "true"
 ExecStart=/usr/bin/flock -n /var/lock/audible-downloader.lock /bin/bash -c "/data01/services/audible-downloader/download_and_compress.sh &"

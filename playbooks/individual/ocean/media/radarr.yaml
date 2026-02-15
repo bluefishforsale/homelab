@@ -2,15 +2,18 @@
 - name: Configure systemd service for radarr
   hosts: ocean
   become: true
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     service: radarr
     image: linuxserver/radarr
     version: latest
-    radarr_port: 8903
+    radarr_port: "{{ service_ports.radarr.port }}"
     exporter_service: radarr-exporter
     exporter_image: ghcr.io/onedr0p/exportarr
     exporter_version: latest
-    exporter_port: 9707
+    exporter_port: "{{ service_ports.radarr_exporter.port }}"
     data: /data01
     files: ../../../../files/ocean-radarr
     incoming: "{{ data }}/incoming"

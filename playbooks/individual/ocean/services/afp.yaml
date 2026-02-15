@@ -1,0 +1,175 @@
+---
+- name: Configure AFP (Netatalk) server for macOS file sharing
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vars/vars_afp.yaml
+
+  vars:
+    files: ../../../../files/netatalk
+    netatalk_version: "4.3.2"
+    netatalk_tag: "netatalk-{{ netatalk_version | replace('.', '-') }}"
+    netatalk_src: "/tmp/netatalk-{{ netatalk_version }}"
+
+  tasks:
+
+    - name: Check if Netatalk is already installed
+      ansible.builtin.command: afpd -V
+      register: netatalk_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Install Netatalk build dependencies
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - meson
+          - ninja-build
+          - bison
+          - flex
+          - libssl-dev
+          - libgcrypt20-dev
+          - libpam0g-dev
+          - libwrap0-dev
+          - libdb-dev
+          - avahi-daemon
+          - libavahi-client-dev
+          - libacl1-dev
+          - libevent-dev
+          - libglib2.0-dev
+          - libdbus-1-dev
+          - libiniparser-dev
+        state: present
+        update_cache: yes
+      when: netatalk_installed.rc != 0
+
+    - name: Remove old Netatalk source directory
+      ansible.builtin.file:
+        path: "{{ netatalk_src }}"
+        state: absent
+      when: netatalk_installed.rc != 0
+
+    - name: Download Netatalk source
+      ansible.builtin.get_url:
+        url: "https://github.com/Netatalk/netatalk/releases/download/{{ netatalk_tag }}/netatalk-{{ netatalk_version }}.tar.xz"
+        dest: "/tmp/netatalk-{{ netatalk_version }}.tar.xz"
+        mode: '0644'
+      when: netatalk_installed.rc != 0
+
+    - name: Extract Netatalk source
+      ansible.builtin.unarchive:
+        src: "/tmp/netatalk-{{ netatalk_version }}.tar.xz"
+        dest: /tmp
+        remote_src: yes
+      when: netatalk_installed.rc != 0
+
+    - name: Verify meson.build exists
+      ansible.builtin.stat:
+        path: "{{ netatalk_src }}/meson.build"
+      register: meson_build_check
+      when: netatalk_installed.rc != 0
+
+    - name: Fail if source extraction failed
+      ansible.builtin.fail:
+        msg: "Netatalk source extraction failed - meson.build not found in {{ netatalk_src }}"
+      when: netatalk_installed.rc != 0 and not meson_build_check.stat.exists
+
+    - name: Configure Netatalk with meson
+      ansible.builtin.command:
+        cmd: meson setup build -Dwith-init-style=systemd
+        chdir: "{{ netatalk_src }}"
+        creates: "{{ netatalk_src }}/build/build.ninja"
+      when: netatalk_installed.rc != 0
+
+    - name: Build Netatalk
+      ansible.builtin.command:
+        cmd: meson compile -C build
+        chdir: "{{ netatalk_src }}"
+      when: netatalk_installed.rc != 0
+
+    - name: Install Netatalk
+      ansible.builtin.command:
+        cmd: meson install -C build
+        chdir: "{{ netatalk_src }}"
+      when: netatalk_installed.rc != 0
+      notify:
+        - Reload systemd daemon
+
+    - name: Run ldconfig
+      ansible.builtin.command: ldconfig
+      when: netatalk_installed.rc != 0
+
+    - name: Validate export paths exist
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      register: path_checks
+      loop: "{{ afp_exports }}"
+      loop_control:
+        label: "{{ item.name }}: {{ item.path }}"
+
+    - name: Log warning for missing export paths
+      ansible.builtin.debug:
+        msg: "WARNING: AFP export path missing - name={{ item.item.name }} path={{ item.item.path }}"
+      when: not item.stat.exists
+      loop: "{{ path_checks.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Build list of validated paths
+      ansible.builtin.set_fact:
+        validated_paths: "{{ path_checks.results | selectattr('stat.exists', 'equalto', true) | map(attribute='item.path') | list }}"
+
+    - name: Show validated exports
+      ansible.builtin.debug:
+        msg: "AFP exports with valid paths: {{ validated_paths }}"
+
+    - name: Ensure Netatalk config directory exists
+      ansible.builtin.file:
+        path: /usr/local/etc
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create Netatalk configuration
+      ansible.builtin.template:
+        src: "{{ files }}/afp.conf.j2"
+        dest: /usr/local/etc/afp.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: yes
+      notify:
+        - Restart netatalk service
+
+    - name: Enable netatalk service at boot
+      ansible.builtin.systemd:
+        name: netatalk
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Start netatalk service if not running
+      ansible.builtin.systemd:
+        name: netatalk
+        state: started
+
+    - name: Verify netatalk service is active
+      ansible.builtin.systemd:
+        name: netatalk
+      register: netatalk_status
+
+    - name: Show service status
+      ansible.builtin.debug:
+        msg: "Netatalk service status: {{ netatalk_status.status.ActiveState }}"
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart netatalk service
+      ansible.builtin.systemd:
+        name: netatalk
+        state: restarted

@@ -1,6 +1,9 @@
 - name: Deploy Loki Log Aggregation System
   become: true
   hosts: ocean
+  vars_files:
+    - ../../../vars/vars_service_ports.yaml
+
   vars:
     service_name: loki
     basedir: /data01/services/{{ service_name }}

@@ -2,15 +2,18 @@
 - name: Configure systemd service for sonarr
   hosts: ocean
   become: true
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     service: sonarr
     image: linuxserver/sonarr
     version: latest
-    sonarr_port: 8902
+    sonarr_port: "{{ service_ports.sonarr.port }}"
     exporter_service: sonarr-exporter
     exporter_image: ghcr.io/onedr0p/exportarr
     exporter_version: latest
-    exporter_port: 9708
+    exporter_port: "{{ service_ports.sonarr_exporter.port }}"
     data: /data01
     files: ../../../../files/ocean-sonarr
     incoming: "{{ data }}/incoming"

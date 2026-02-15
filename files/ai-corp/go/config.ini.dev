@@ -1,0 +1,33 @@
+# Development configuration
+# Used for local Docker development
+
+[server]
+port = 8088
+websocket_port = 8089
+host = 0.0.0.0
+
+[database]
+host = postgres
+port = 5432
+name = ai_corp
+user = ai_corp
+password = devpassword
+
+[redis]
+addr = redis:6379
+password = 
+db = 0
+
+[workflows]
+dir = /app/workflows
+
+[storage]
+type = local
+path = /app/artifacts
+
+[logging]
+level = debug
+
+[providers]
+# Default provider for development
+default = dummy

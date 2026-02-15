@@ -1,0 +1,122 @@
+services:
+  jellyfin:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: always
+    runtime: nvidia
+    environment:
+      TZ: America/Los_Angeles
+      JELLYFIN_PublishedServerUrl: "http://{{ ansible_default_ipv4.address }}:8096"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    devices:
+{% for dev in devices %}
+      - {{ dev }}:{{ dev }}
+{% endfor %}
+      - /dev/dri:/dev/dri
+    group_add:
+      - "104"  # render group for DRI device access
+    ports:
+      - "8096:8096/tcp"  # Jellyfin HTTP UI/API
+      - "8920:8920/tcp"  # Jellyfin HTTPS (optional)
+    volumes:
+      - {{ jellyfin_home }}/config:/config
+      - {{ jellyfin_home }}/cache:/cache
+      - {{ complete }}/tv:/media/tv
+      - {{ complete }}/movies:/media/movies
+      - {{ complete }}/music:/media/music
+      - {{ ramdisk }}:/transcode
+      - {{ data }}:/data01:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 8G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8096/ || nc -z localhost 8096"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  jellystat-db:
+    image: {{ jellystat_db_image }}
+    container_name: jellystat-db
+    hostname: jellystat-db
+    restart: unless-stopped
+    shm_size: '1gb'
+    environment:
+      POSTGRES_USER: {{ jellystat_db_user }}
+      POSTGRES_PASSWORD: {{ jellystat_db_password }}
+      POSTGRES_DB: {{ jellystat_db_name }}
+    volumes:
+      - {{ jellyfin_home }}/jellystat-db-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ jellystat_db_user }} -d {{ jellystat_db_name }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  jellystat:
+    image: {{ jellystat_image }}:{{ jellystat_version }}
+    container_name: jellystat
+    hostname: jellystat
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: {{ jellystat_db_user }}
+      POSTGRES_PASSWORD: {{ jellystat_db_password }}
+      POSTGRES_IP: jellystat-db
+      POSTGRES_PORT: 5432
+      JWT_SECRET: "{{ jellystat_jwt_secret }}"
+      TZ: America/Los_Angeles
+    volumes:
+      - {{ jellyfin_home }}/jellystat-backup-data:/app/backend/backup-data
+    ports:
+      - "{{ jellystat_port }}:3000"
+    depends_on:
+      - jellystat-db
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ || nc -z localhost 3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+  jellyfin-exporter:
+    image: {{ jellyfin_exporter_image }}:{{ jellyfin_exporter_version }}
+    container_name: {{ jellyfin_exporter_service }}
+    hostname: {{ jellyfin_exporter_service }}
+    restart: always
+    environment:
+      JELLYFIN_BASEURL: "http://{{ ansible_default_ipv4.address }}:8096"
+      JELLYFIN_APIKEY: "{{ jellyfin_exporter_api_key }}"
+    ports:
+      - "{{ jellyfin_exporter_port }}:9027"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9027/metrics || nc -z localhost 9027"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true

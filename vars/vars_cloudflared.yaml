@@ -52,6 +52,11 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:80"
 
+        # Admin dashboard (Homepage)
+        - hostname: "homepage.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
         # Management services (running on ocean - 192.168.1.143)
         - hostname: "portainer.terrac.com"
           service_type: "http"

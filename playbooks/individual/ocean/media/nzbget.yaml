@@ -2,15 +2,18 @@
 - name: Configure systemd service for nzbget
   hosts: ocean
   become: true
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     service: nzbget
     image: linuxserver/nzbget
     version: latest
-    nzbget_port: 8901
+    nzbget_port: "{{ service_ports.nzbget.port }}"
     exporter_service: nzbget-exporter
     exporter_image: frebib/nzbget-exporter
     exporter_version: latest
-    exporter_port: 9452
+    exporter_port: "{{ service_ports.nzbget_exporter.port }}"
     data: /data01
     files: ../../../../files/ocean-nzbget
     incoming: "{{ data }}/incoming"

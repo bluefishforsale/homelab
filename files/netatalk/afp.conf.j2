@@ -1,0 +1,39 @@
+;
+; Netatalk AFP Server Configuration
+; Managed by Ansible - DO NOT EDIT MANUALLY
+;
+
+[Global]
+; Server identification
+hostname = {{ afp_global.server_name | default(inventory_hostname) }}
+
+; Authentication
+uam list = {{ afp_global.uam_list | default('uams_dhx2.so') }}
+
+; Logging
+log level = {{ afp_global.log_level | default('default') }}
+log file = /var/log/netatalk.log
+
+; Guest access
+{% if afp_global.guest_access | default('no') == 'yes' %}
+uam list = uams_dhx2.so uams_guest.so
+{% endif %}
+
+; Performance and compatibility
+afp listen = 0.0.0.0
+max connections = 20
+save password = no
+set password = no
+
+{% for share in afp_exports %}
+{% if share.path in validated_paths %}
+[{{ share.name }}]
+path = {{ share.path }}
+{% if share.options is defined %}
+{% for option in share.options %}
+{{ option }}
+{% endfor %}
+{% endif %}
+
+{% endif %}
+{% endfor %}

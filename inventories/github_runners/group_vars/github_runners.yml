@@ -190,7 +190,7 @@ github_runners_service_name: "github-docker-runners"
 #
 # github_scope: "org"
 # github_org: "bluefishforsale"
-# github_registration_token: "{{ development.github.vault_github_registration_token }}"
+# github_registration_token: "{{ development.github.github_registration_token }}"
 # github_runner_labels:
 #   - self-hosted
 #   - homelab
@@ -206,7 +206,7 @@ github_runners_service_name: "github-docker-runners"
 #
 # github_scope: "repo"
 # github_repo: "bluefishforsale/homelab"
-# github_registration_token: "{{ development.github.vault_github_registration_token }}"
+# github_registration_token: "{{ development.github.github_registration_token }}"
 # github_runner_labels:
 #   - self-hosted
 #   - homelab

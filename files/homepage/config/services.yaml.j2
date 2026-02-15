@@ -1,0 +1,135 @@
+# Homepage services configuration (templated)
+# Service names are KEYS, not 'name:' properties
+
+- Network:
+    - nginx:
+        icon: nginx
+        href: http://homepage.home
+        description: Reverse proxy
+
+- AI / ML:
+    - Open WebUI:
+        icon: openai
+        href: http://open-webui.home
+    - llama.cpp API:
+        icon: cpu-64-bit
+        href: http://llama.home
+    - ComfyUI:
+        icon: palette
+        href: http://comfyui.home
+
+- Media:
+    - Plex:
+        icon: plex
+        href: http://plex.home
+        widget:
+          type: plex
+          url: http://192.168.1.143:{{ service_ports.plex.port }}
+          key: "{{ media_services.plex.api_key }}"
+
+    - Jellyfin:
+        icon: jellyfin
+        href: http://jellyfin.home
+
+    - Sonarr:
+        icon: sonarr
+        href: http://sonarr.home
+        widget:
+          type: sonarr
+          url: http://192.168.1.143:{{ service_ports.sonarr.port }}
+          key: "{{ media_services.sonarr.api_key }}"
+
+    - Radarr:
+        icon: radarr
+        href: http://radarr.home
+        widget:
+          type: radarr
+          url: http://192.168.1.143:{{ service_ports.radarr.port }}
+          key: "{{ media_services.radarr.api_key }}"
+
+    - Prowlarr:
+        icon: prowlarr
+        href: http://prowlarr.home
+        widget:
+          type: prowlarr
+          url: http://192.168.1.143:{{ service_ports.prowlarr.port }}
+          key: "{{ media_services.prowlarr.api_key }}"
+
+    - Bazarr:
+        icon: bazarr
+        href: http://bazarr.home
+
+    - NZBGet:
+        icon: nzbget
+        href: http://nzbget.home
+        widget:
+          type: nzbget
+          url: http://192.168.1.143:{{ service_ports.nzbget.port }}
+          username: nzbget
+          password: "{{ media_services.nzbget.control_password }}"
+
+    - Overseerr:
+        icon: overseerr
+        href: http://overseerr.home
+
+    - Tautulli:
+        icon: tautulli
+        href: http://tautulli.home
+
+    - Tdarr:
+        icon: tdarr
+        href: http://tdarr.home
+        widget:
+          type: tdarr
+          url: http://192.168.1.143:{{ service_ports.tdarr.port }}
+
+- Monitoring:
+    - Grafana:
+        icon: grafana
+        href: http://grafana.home
+        widget:
+          type: grafana
+          url: http://192.168.1.143:{{ service_ports.grafana.port }}
+          username: admin
+          password: "{{ monitoring.grafana.admin_password }}"
+
+    - Prometheus:
+        icon: prometheus
+        href: http://prometheus.home
+        widget:
+          type: prometheus
+          url: http://192.168.1.143:{{ service_ports.prometheus.port }}
+
+    - Loki:
+        icon: loki
+        href: http://loki.home
+
+    - UnPoller:
+        icon: unifi
+        href: http://unpoller.home
+
+- Cloud & Apps:
+    - NextCloud:
+        icon: nextcloud
+        href: http://nextcloud.home
+        widget:
+          type: nextcloud
+          url: http://192.168.1.143:{{ service_ports.nextcloud.port }}
+          username: "{{ cloud_services.nextcloud.admin_user }}"
+          password: "{{ cloud_services.nextcloud.admin_password }}"
+
+    - TinaCMS:
+        icon: note-text-outline
+        href: http://tina.home
+
+    - Frigate NVR:
+        icon: cctv
+        href: http://frigate.home
+
+    - Home Assistant:
+        icon: home-assistant
+        href: http://homeassistant.home
+
+    - Saetnere Blog:
+        icon: wordpress
+        href: http://saetnere.home

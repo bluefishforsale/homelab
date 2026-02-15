@@ -1,0 +1,67 @@
+# SSH Configuration for OpenClaw agents
+# Managed by Ansible — do not edit manually
+
+# Global defaults
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+    ConnectTimeout 10
+
+# Proxmox hosts
+Host node005
+    HostName 192.168.1.105
+    User root
+
+Host node006
+    HostName 192.168.1.106
+    User root
+
+# VMs
+Host ocean
+    HostName 192.168.1.143
+    User terrac
+
+Host dns01
+    HostName 192.168.1.2
+    User debian
+
+Host gitlab
+    HostName 192.168.1.5
+    User debian
+
+Host pihole
+    HostName 192.168.1.9
+    User debian
+
+Host gh-runner-01
+    HostName 192.168.1.20
+    User debian
+
+Host metrics
+    HostName 192.168.1.30
+    User debian
+
+Host openclaw
+    HostName 192.168.1.31
+    User debian
+
+# Kubernetes nodes
+Host kube501
+    HostName 192.168.1.101
+    User debian
+
+Host kube502
+    HostName 192.168.1.102
+    User debian
+
+Host kube503
+    HostName 192.168.1.103
+    User debian
+
+Host kube511
+    HostName 192.168.1.111
+    User debian

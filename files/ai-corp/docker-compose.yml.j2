@@ -1,0 +1,124 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-corp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_corp
+      POSTGRES_USER: ai_corp
+      POSTGRES_PASSWORD: "{{ ai_services.ai_corp.postgres_password | default('changeme') }}"
+    volumes:
+      - {{ basedir }}/postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_corp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-corp-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - {{ basedir }}/redis-data:/data
+    ports:
+      - "127.0.0.1:6381:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ai-corp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-corp
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - TZ=America/Los_Angeles
+      - PORT=8088
+      - HOST=0.0.0.0
+      - LOG_LEVEL={{ log_level | default('info') }}
+      - CONFIG_PATH=/app/config.ini
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=ai_corp
+      - POSTGRES_USER=ai_corp
+      - POSTGRES_PASSWORD={{ ai_services.ai_corp.postgres_password | default('changeme') }}
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+      - WORKFLOWS_DIR=/app/workflows
+      # LLM Provider API Keys (optional)
+      - OPENAI_API_KEY={{ ai_services.ai_corp.openai_api_key | default('') }}
+      - ANTHROPIC_API_KEY={{ ai_services.claude.api_key | default('') }}
+      - GOOGLE_API_KEY={{ ai_services.ai_corp.google_api_key | default('') }}
+      - MIDJOURNEY_API_KEY={{ ai_services.ai_corp.midjourney_api_key | default('') }}
+    volumes:
+      - {{ basedir }}/config.ini:/app/config.ini:ro
+      - {{ basedir }}/workflows:/app/workflows:ro
+      - {{ basedir }}/artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

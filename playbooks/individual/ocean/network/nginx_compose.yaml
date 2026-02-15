@@ -5,6 +5,7 @@
   gather_facts: true
 
   vars:
+    foo: bar
     service: nginx
     image: nginx
     version: 1.27.3-alpine

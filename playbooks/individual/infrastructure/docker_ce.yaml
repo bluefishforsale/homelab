@@ -192,6 +192,14 @@
       state: started
       daemon_reload: yes
 
+  - name: Create hourly image prune cron job
+    ansible.builtin.cron:
+      name: "Docker image force prune"
+      minute: "0"
+      job: "/usr/bin/docker image prune -af --filter 'until=1h' >/dev/null 2>&1"
+      user: root
+      state: present
+
   - name: Truncate large existing Docker logs
     ansible.builtin.shell: |
       for log in $(find /var/lib/docker/containers -name '*-json.log' -size +10M 2>/dev/null); do

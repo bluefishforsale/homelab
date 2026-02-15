@@ -517,7 +517,7 @@ validate_extra_files() {
 save_metadata() {
   local media_file
   media_file="$1"
-  "$FFPROBE" -i "$media_file" 2> "$metadata_file"
+  "$FFPROBE" ${decrypt_param} -i "$media_file" 2> "$metadata_file"
   if [[ $(type -P mediainfo) ]]; then
     echo "Mediainfo data START" >> "$metadata_file"
     # Mediainfo output is structured like ffprobe, so we append it to the metadata file and then parse it with get_metadata_value()
