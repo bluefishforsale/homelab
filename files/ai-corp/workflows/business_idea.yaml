@@ -1,0 +1,185 @@
+name: Business Idea Pipeline
+description: Generate and evaluate a business idea end-to-end
+version: "1.0"
+
+inputs:
+  - name: domain
+    type: string
+    description: Business domain to explore (e.g., "fintech", "healthcare", "education")
+    required: true
+  - name: budget
+    type: string
+    description: Budget constraints
+    default: "bootstrapped"
+  - name: timeline
+    type: string
+    description: Target launch timeline
+    default: "6 months"
+
+steps:
+  - id: ideation
+    name: Generate Ideas
+    role: board
+    action: generate
+    prompt_template: |
+      Generate 3 innovative business ideas in the {{.domain}} domain.
+      
+      Constraints:
+      - Budget: {{.budget}}
+      - Timeline: {{.timeline}}
+      
+      For each idea, provide in JSON format:
+      {
+        "ideas": [
+          {
+            "name": "...",
+            "tagline": "...",
+            "target_audience": "...",
+            "problem_solved": "...",
+            "revenue_model": "...",
+            "unique_value": "..."
+          }
+        ]
+      }
+    outputs:
+      - name: ideas
+        type: json
+    timeout: 120
+
+  - id: ceo_select
+    name: CEO Selection
+    role: ceo
+    action: decide
+    depends_on: [ideation]
+    prompt_template: |
+      As CEO, review these business ideas and select the most promising one:
+      
+      {{.ideation.response}}
+      
+      Consider:
+      1. Market potential
+      2. Execution feasibility
+      3. Competitive advantage
+      4. Team alignment
+      
+      Provide your response in JSON format:
+      {
+        "selected_idea": "<name of selected idea>",
+        "rationale": "<why this idea>",
+        "key_risks": ["<risk1>", "<risk2>"],
+        "success_factors": ["<factor1>", "<factor2>"]
+      }
+    outputs:
+      - name: selected_idea
+        type: json
+      - name: rationale
+        type: text
+    timeout: 120
+
+  - id: technical_review
+    name: Technical Feasibility
+    role: cto
+    action: analyze
+    depends_on: [ceo_select]
+    prompt_template: |
+      As CTO, analyze the technical feasibility of:
+      
+      {{.ceo_select.response}}
+      
+      Provide a detailed technical assessment in JSON format:
+      {
+        "tech_stack": {
+          "frontend": ["<tech>"],
+          "backend": ["<tech>"],
+          "database": ["<tech>"],
+          "infrastructure": ["<tech>"]
+        },
+        "mvp_features": ["<feature1>", "<feature2>"],
+        "mvp_timeline_weeks": <number>,
+        "team_needed": ["<role1>", "<role2>"],
+        "technical_risks": ["<risk1>", "<risk2>"],
+        "complexity_score": <1-10>,
+        "recommendation": "<build|buy|partner>"
+      }
+    outputs:
+      - name: tech_analysis
+        type: json
+    timeout: 120
+
+  - id: market_analysis
+    name: Market Analysis
+    role: marketing
+    action: analyze
+    depends_on: [ceo_select]
+    prompt_template: |
+      As Marketing Director, analyze the market opportunity for:
+      
+      {{.ceo_select.response}}
+      
+      Provide a market analysis in JSON format:
+      {
+        "target_segments": [
+          {"name": "<segment>", "size": "<estimate>", "willingness_to_pay": "<$X-$Y/mo>"}
+        ],
+        "positioning_statement": "<statement>",
+        "key_differentiators": ["<diff1>", "<diff2>"],
+        "competitors": [
+          {"name": "<competitor>", "strengths": ["<s1>"], "weaknesses": ["<w1>"]}
+        ],
+        "go_to_market": {
+          "channels": ["<channel1>", "<channel2>"],
+          "initial_strategy": "<strategy>",
+          "customer_acquisition_cost_estimate": "<$X>"
+        },
+        "market_score": <1-10>
+      }
+    outputs:
+      - name: market_analysis
+        type: json
+    timeout: 120
+
+  - id: board_approval
+    name: Board Approval
+    role: board
+    action: decide
+    depends_on: [technical_review, market_analysis]
+    prompt_template: |
+      As the Board of Directors, review and make a final decision on this business opportunity:
+      
+      CEO Selection:
+      {{.ceo_select.response}}
+      
+      Technical Analysis:
+      {{.technical_review.response}}
+      
+      Market Analysis:
+      {{.market_analysis.response}}
+      
+      Provide your decision in JSON format:
+      {
+        "decision": "approve" | "reject" | "conditional",
+        "vote_breakdown": {"approve": <n>, "reject": <n>, "abstain": <n>},
+        "conditions": ["<condition1>"],
+        "next_steps": ["<step1>", "<step2>"],
+        "investment_recommendation": "<seed|bootstrap|defer>",
+        "key_concerns": ["<concern1>"],
+        "summary": "<executive summary>"
+      }
+    outputs:
+      - name: decision
+        type: enum
+        values: [approve, reject, conditional]
+      - name: conditions
+        type: text
+    timeout: 120
+
+on_success:
+  - action: log
+    message: "Business idea pipeline completed successfully"
+
+on_failure:
+  - action: log
+    message: "Business idea pipeline failed"
+  - action: retry
+    max_attempts: 2
+    backoff: exponential

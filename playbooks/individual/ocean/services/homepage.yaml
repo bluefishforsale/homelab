@@ -1,0 +1,102 @@
+---
+- name: Configure Homepage dashboard using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: homepage
+    port_ext: "{{ service_ports.homepage.port }}"
+    port_int: 3000
+    data: /data01
+    files: ../../../../files/homepage
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
+
+  tasks:
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+
+  - name: Ensure Homepage subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    loop:
+      - config
+      - images
+      - logs
+
+  - name: Create docker-compose.yml from template
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: homepage_compose
+
+  - name: Create Homepage services configuration
+    ansible.builtin.template:
+      src: "{{ files }}/config/services.yaml.j2"
+      dest: "{{ home }}/config/services.yaml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: homepage_services_config
+
+  - name: Create Homepage widgets configuration
+    ansible.builtin.template:
+      src: "{{ files }}/config/widgets.yaml.j2"
+      dest: "{{ home }}/config/widgets.yaml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: homepage_widgets_config
+
+  - name: Create Homepage settings configuration
+    ansible.builtin.template:
+      src: "{{ files }}/config/settings.yaml.j2"
+      dest: "{{ home }}/config/settings.yaml"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: homepage_settings_config
+
+  - name: Create Homepage systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/homepage.service.j2"
+      dest: "/etc/systemd/system/homepage.service"
+      mode: '0644'
+    register: homepage_service_unit
+
+  - name: Enable Homepage service
+    ansible.builtin.systemd:
+      name: homepage.service
+      enabled: yes
+      daemon_reload: yes
+
+  - name: Restart Homepage service if configuration changed
+    ansible.builtin.systemd:
+      name: homepage.service
+      state: restarted
+    when: homepage_compose.changed or homepage_services_config.changed or homepage_widgets_config.changed or homepage_settings_config.changed or homepage_service_unit.changed
+
+  - name: Ensure Homepage service is started
+    ansible.builtin.systemd:
+      name: homepage.service
+      state: started

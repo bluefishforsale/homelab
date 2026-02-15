@@ -6,12 +6,13 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     service: nextcloud
     image: nextcloud
     version: 28-apache
-    port_ext: 8081
+    port_ext: "{{ service_ports.nextcloud.port }}"
     port_int: 80
     data: /data01
     files: ../../../../files/nextcloud
@@ -144,24 +145,6 @@
       docker exec nextcloud chmod 644 /var/www/html/config/* || true
     register: permission_fix
     failed_when: false
-
-  handlers:
-  - name: Reload systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
-  - name: Restart nextcloud service
-    ansible.builtin.systemd:
-      name: nextcloud.service
-      state: restarted
-
-  - name: Recreate containers if config changed
-    ansible.builtin.shell: |
-      cd {{ home }}
-      echo "Recreating containers due to configuration changes..."
-      docker compose down --timeout 30
-      docker compose up -d --force-recreate
-      echo "Container recreation completed"
-    when: mariadb_config.changed or docker_compose_config.changed or nextcloud_env.changed
 
   handlers:
   - name: Reload systemd daemon

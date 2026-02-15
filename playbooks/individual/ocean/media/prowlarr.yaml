@@ -2,15 +2,18 @@
 - name: Configure systemd service for prowlarr
   hosts: ocean
   become: true
+  vars_files:
+    - ../../../../vars/vars_service_ports.yaml
+
   vars:
     service: prowlarr
     image: lscr.io/linuxserver/prowlarr
     version: latest
-    prowlarr_port: 9696
+    prowlarr_port: "{{ service_ports.prowlarr.port }}"
     exporter_service: prowlarr-exporter
     exporter_image: ghcr.io/onedr0p/exportarr
     exporter_version: latest
-    exporter_port: 9710
+    exporter_port: "{{ service_ports.prowlarr_exporter.port }}"
     data: /data01
     files: ../../../../files/ocean-prowlarr
     incoming: "{{ data }}/incoming"

@@ -8,14 +8,14 @@
     - ../../../../vault/secrets.yaml
 
   vars:
-    service: wordpress
+    service: blog_saetnere_com_wp
     image: wordpress
     version: latest
     port_ext: 8085
     port_int: 80
     data: /data01
     files: ../../../../files/wordpress
-    home: "{{ data }}/services/{{ service }}"
+    home: "/data01/services/wordpress"
     user: media
     uid: 1001
     gid: 1001

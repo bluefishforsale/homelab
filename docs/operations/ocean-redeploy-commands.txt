@@ -106,7 +106,7 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml
 
 # WordPress (if deployed)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/wordpress.yaml
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/blog_saetnere_com_wp.yaml
 
 # Home Assistant (if deployed)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/homeassistant_compose.yaml

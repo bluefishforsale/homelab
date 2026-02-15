@@ -6,6 +6,7 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     path_data01: /data01/services
@@ -16,7 +17,7 @@
     unpoller_service: unpoller
     unpoller_image: golift/unifi-poller
     unpoller_version: latest
-    unpoller_port: 9130
+    unpoller_port: "{{ service_ports.unpoller.port }}"
     unpoller_home: "{{ path_data01 }}/{{ unpoller_service }}"
     unpoller_files: "files/unpoller"
     

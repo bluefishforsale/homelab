@@ -1,0 +1,192 @@
+---
+- name: Deploy AI Corporation Workflow Engine
+  become: true
+  hosts: ocean
+  vars:
+    service_name: ai-corp
+    basedir: /data01/services/{{ service_name }}
+    user: media
+    group: media
+    log_level: info
+    # llamacpp connection (from playbooks/individual/ocean/ai/llamacpp.yaml)
+    llamacpp_host: 192.168.1.143
+    llamacpp_port: "{{ service_ports.llamacpp.port }}"
+    llamacpp_api_key: llamacpp-homelab-key
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
+  tasks:
+    - name: Create AI Corp service directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        mode: '0755'
+      loop:
+        - "{{ basedir }}"
+        - "{{ basedir }}/go"
+        - "{{ basedir }}/workflows"
+        - "{{ basedir }}/artifacts"
+        - "{{ basedir }}/web"
+
+    - name: Create PostgreSQL data directory
+      ansible.builtin.file:
+        path: "{{ basedir }}/postgres-data"
+        state: directory
+        owner: "999"
+        group: "999"
+        mode: '0700'
+
+    - name: Create Redis data directory
+      ansible.builtin.file:
+        path: "{{ basedir }}/redis-data"
+        state: directory
+        owner: "999"
+        group: "999"
+        mode: '0755'
+
+    - name: Create Go source archive locally
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        cmd: tar --exclude='.DS_Store' --exclude='._*' -czf /tmp/ai-corp-go.tar.gz -C ../../../files/ai-corp go
+        chdir: "{{ playbook_dir }}"
+      changed_when: true
+
+    - name: Deploy Go source archive
+      ansible.builtin.unarchive:
+        src: /tmp/ai-corp-go.tar.gz
+        dest: "{{ basedir }}/"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+      notify: Restart ai-corp
+
+    - name: Create web source archive locally
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        cmd: tar --exclude='node_modules' --exclude='dist' --exclude='.DS_Store' --exclude='._*' -czf /tmp/ai-corp-web.tar.gz -C ../../../files/ai-corp web
+        chdir: "{{ playbook_dir }}"
+      changed_when: true
+
+    - name: Deploy web source archive
+      ansible.builtin.unarchive:
+        src: /tmp/ai-corp-web.tar.gz
+        dest: "{{ basedir }}/"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+      notify: Restart ai-corp
+
+    - name: Copy Dockerfile
+      ansible.builtin.copy:
+        src: ../../../files/ai-corp/Dockerfile
+        dest: "{{ basedir }}/Dockerfile"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        mode: '0644'
+      notify: Restart ai-corp
+
+    - name: Copy .dockerignore
+      ansible.builtin.copy:
+        src: ../../../files/ai-corp/.dockerignore
+        dest: "{{ basedir }}/.dockerignore"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        mode: '0644'
+
+    - name: Create workflows archive locally
+      delegate_to: localhost
+      become: false
+      ansible.builtin.command:
+        cmd: tar --exclude='.DS_Store' --exclude='._*' -czf /tmp/ai-corp-workflows.tar.gz -C ../../../files/ai-corp workflows
+        chdir: "{{ playbook_dir }}"
+      changed_when: true
+
+    - name: Deploy workflows archive
+      ansible.builtin.unarchive:
+        src: /tmp/ai-corp-workflows.tar.gz
+        dest: "{{ basedir }}/"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+      notify: Restart ai-corp
+
+    - name: Cleanup local archives
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ai-corp-go.tar.gz
+        - /tmp/ai-corp-web.tar.gz
+        - /tmp/ai-corp-workflows.tar.gz
+
+    - name: Deploy configuration file
+      ansible.builtin.template:
+        src: ../../../files/ai-corp/config.ini.j2
+        dest: "{{ basedir }}/config.ini"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        mode: '0644'
+      notify: Restart ai-corp
+
+    - name: Deploy docker-compose file
+      ansible.builtin.template:
+        src: ../../../files/ai-corp/docker-compose.yml.j2
+        dest: "{{ basedir }}/docker-compose.yml"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        mode: '0644'
+      notify: Restart ai-corp
+
+    - name: Deploy systemd service
+      ansible.builtin.template:
+        src: ../../../files/ai-corp/ai-corp.service.j2
+        dest: /etc/systemd/system/ai-corp.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart ai-corp
+
+    - name: Stop ai-corp service before rebuild
+      ansible.builtin.systemd:
+        name: ai-corp
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove existing containers
+      ansible.builtin.command:
+        cmd: docker compose down --remove-orphans
+        chdir: "{{ basedir }}"
+      changed_when: true
+
+    - name: Prune old Docker images
+      ansible.builtin.command:
+        cmd: docker image prune -af --filter "until=48h"
+      changed_when: true
+
+    - name: Prune Docker build cache
+      ansible.builtin.command:
+        cmd: docker builder prune -af --filter "until=48h"
+      changed_when: true
+
+    - name: Build Docker image (no cache for development)
+      ansible.builtin.command:
+        cmd: docker compose build --no-cache
+        chdir: "{{ basedir }}"
+      changed_when: true
+
+    - name: Enable and start AI Corp service
+      ansible.builtin.systemd:
+        name: ai-corp
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+    - name: Restart ai-corp
+      ansible.builtin.systemd:
+        name: ai-corp
+        state: restarted
+        daemon_reload: yes

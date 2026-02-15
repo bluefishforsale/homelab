@@ -190,6 +190,11 @@
         state: present
       notify: Restart pihole-FTL
 
+    - name: Restart pihole-FTL to apply dnsmasq config
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        state: restarted
+
     - name: Check if Pi-hole is already installed
       ansible.builtin.stat:
         path: /usr/local/bin/pihole

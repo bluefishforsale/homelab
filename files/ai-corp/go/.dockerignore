@@ -1,0 +1,32 @@
+# Binaries
+ai-corp
+ai-corp-*
+*.exe
+
+# Test artifacts
+coverage.out
+coverage.html
+*.test
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+README*
+
+# Development files
+.air.toml
+config.ini.dev
+
+# OS files
+.DS_Store
+Thumbs.db

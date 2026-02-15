@@ -6,12 +6,13 @@
 
   vars_files:
     - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
 
   vars:
     image: prom/prometheus
     version: latest
     service: prometheus
-    prom_port: 9090
+    prom_port: "{{ service_ports.prometheus.port }}"
     prom_retention: 180d
     prom_config: prometheus.yml
     path_data01: /data01/services
@@ -22,23 +23,23 @@
     blackbox_exporter_service: blackbox-exporter
     blackbox_exporter_image: prom/blackbox-exporter
     blackbox_exporter_version: master
-    blackbox_exporter_port: 9115
+    blackbox_exporter_port: "{{ service_ports.blackbox_exporter.port }}"
     ndt_exporter_service: ndt-exporter
     ndt_exporter_image: bluefishforsale/ndt-speedtest-exporter
     ndt_exporter_version: latest
-    ndt_exporter_port: 9140
+    ndt_exporter_port: "{{ service_ports.ndt_exporter.port }}"
     # Alertmanager (Docker Compose deployment)
     alertmanager_service: alertmanager
     alertmanager_image: prom/alertmanager
     alertmanager_version: latest
-    alertmanager_port: 9093
+    alertmanager_port: "{{ service_ports.alertmanager.port }}"
     alertmanager_home: "{{ path_data01 }}/{{ alertmanager_service }}"
     alertmanager_files: "../../../../files/ocean-prometheus"
     # Karma (Alertmanager Dashboard)
     karma_service: karma
     karma_image: ghcr.io/prymitive/karma
     karma_version: latest
-    karma_port: 8181
+    karma_port: "{{ service_ports.karma.port }}"
     karma_home: "{{ path_data01 }}/{{ karma_service }}"
     karma_files: "../../../../files/ocean-prometheus"
 

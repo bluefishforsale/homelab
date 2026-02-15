@@ -1,0 +1,128 @@
+[server]
+port = 8088
+host = 0.0.0.0
+log_level = {{ log_level | default('info') }}
+
+[database]
+host = postgres
+port = 5432
+name = ai_corp
+user = ai_corp
+
+[redis]
+addr = redis:6379
+db = 0
+
+[providers]
+# default = claude
+default = local
+enable_mcp = false
+enable_midjourney = {{ ai_services.ai_corp.enable_midjourney | default('false') }}
+
+# Local LLM provider (llamacpp on ocean)
+# See: playbooks/individual/ocean/ai/llamacpp.yaml
+[providers.local]
+type = openai_compatible
+url = http://{{ llamacpp_host | default('192.168.1.143') }}:{{ llamacpp_port | default('8080') }}
+api_key = {{ llamacpp_api_key | default('llamacpp-homelab-key') }}
+model = default
+
+{% if ai_services.ai_corp.openai_api_key is defined and ai_services.ai_corp.openai_api_key %}
+[providers.openai]
+type = openai
+api_key = ${OPENAI_API_KEY}
+model = gpt-4o
+{% endif %}
+
+{% if ai_services.claude.api_key is defined and ai_services.claude.api_key %}
+[providers.claude]
+type = anthropic
+api_key = ${ANTHROPIC_API_KEY}
+model = claude-sonnet-4-5-20250929
+
+[providers.anthropic]
+type = anthropic
+api_key = ${ANTHROPIC_API_KEY}
+model = claude-sonnet-4-5-20250929
+{% endif %}
+
+{% if ai_services.ai_corp.google_api_key is defined and ai_services.ai_corp.google_api_key %}
+[providers.google]
+type = google
+api_key = ${GOOGLE_API_KEY}
+model = gemini-1.5-pro
+{% endif %}
+
+[midjourney]
+enabled = {{ ai_services.ai_corp.enable_midjourney | default('false') }}
+api_url = {{ ai_services.ai_corp.midjourney_url | default('') }}
+api_key = ${MIDJOURNEY_API_KEY}
+webhook_url = http://192.168.1.143:8088/webhook/midjourney
+
+[roles.board]
+name = Board of Directors
+provider = {{ ai_services.ai_corp.board_provider | default('claude') }}
+persona = You are the Board of Directors. You set strategic direction, evaluate major decisions, and approve or reject proposals. Focus on long-term value, risk assessment, and market positioning. Respond with structured JSON when asked.
+
+[roles.ceo]
+name = CEO
+provider = {{ ai_services.ai_corp.ceo_provider | default('claude') }}
+persona = You are the CEO. You make executive decisions, prioritize initiatives, and coordinate between departments. Balance innovation with practicality. Respond with structured JSON when asked.
+
+[roles.cto]
+name = CTO
+provider = {{ ai_services.ai_corp.cto_provider | default('claude') }}
+persona = You are the CTO. You evaluate technical feasibility, estimate effort, identify risks, and propose architecture. Be specific about technologies and timelines. Respond with structured JSON when asked.
+
+[roles.marketing]
+name = Marketing Director
+provider = {{ ai_services.ai_corp.marketing_provider | default('claude') }}
+persona = You are the Marketing Director. You analyze market fit, craft positioning, write copy, and plan go-to-market strategies. Focus on audience and differentiation. Respond with structured JSON when asked.
+
+[roles.artist]
+name = Creative Director
+provider = midjourney
+persona = You create visual assets. Translate concepts into image prompts and manage visual brand identity.
+
+[roles.worker]
+name = Task Worker
+provider = {{ ai_services.ai_corp.worker_provider | default('claude') }}
+persona = You execute specific tasks as assigned. Be thorough, follow instructions precisely, and report results clearly. Respond with structured JSON when asked.
+
+[workflows]
+templates_dir = /app/workflows
+
+[limits]
+max_concurrent_workflows = {{ ai_services.ai_corp.max_concurrent_workflows | default('5') }}
+max_steps_per_workflow = 50
+rate_limit_rpm = {{ ai_services.ai_corp.rate_limit_rpm | default('60') }}
+context_cache_ttl = 3600
+# LLM timeout in minutes (increase for slow/downclocked GPUs)
+llm_timeout_minutes = {{ ai_services.ai_corp.llm_timeout_minutes | default('10') }}
+
+# Storage backend configuration
+# Supported types: local, s3, gcs, google_drive
+[storage]
+type = {{ ai_services.ai_corp.storage_type | default('local') }}
+base_path = /app/artifacts
+
+{% if ai_services.ai_corp.storage_type | default('local') == 's3' %}
+[storage.s3]
+endpoint = {{ ai_services.ai_corp.s3_endpoint | default('') }}
+bucket = {{ ai_services.ai_corp.s3_bucket | default('') }}
+region = {{ ai_services.ai_corp.s3_region | default('us-east-1') }}
+access_key = ${S3_ACCESS_KEY}
+secret_key = ${S3_SECRET_KEY}
+{% endif %}
+
+{% if ai_services.ai_corp.storage_type | default('local') == 'gcs' %}
+[storage.gcs]
+bucket = {{ ai_services.ai_corp.gcs_bucket | default('') }}
+credentials_file = /app/credentials/gcs-credentials.json
+{% endif %}
+
+{% if ai_services.ai_corp.storage_type | default('local') == 'google_drive' %}
+[storage.google_drive]
+folder_id = {{ ai_services.ai_corp.google_drive_folder_id | default('') }}
+credentials = ${GOOGLE_DRIVE_CREDENTIALS}
+{% endif %}

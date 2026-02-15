@@ -1,0 +1,292 @@
+---
+name: PR - Dry-run Changed Playbooks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - master
+    paths:
+      - "playbooks/**/*.yaml"
+      - "files/**"
+      - "vars/**/*.yaml"
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
+
+jobs:
+  detect-changes:
+    name: Detect Changed Playbooks
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      playbooks: ${{ steps.detect.outputs.playbooks }}
+      playbook_count: ${{ steps.detect.outputs.playbook_count }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed playbooks
+        id: detect
+        run: |
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Find playbooks that need deployment
+          PLAYBOOKS=()
+
+          # Direct playbook changes
+          while IFS= read -r file; do
+            if [[ "$file" =~ ^playbooks/individual/.*\.yaml$ ]]; then
+              # Check if it has a hosts directive (is a real playbook, not tasks)
+              if grep -q "^- name:" "$file" 2>/dev/null && grep -q "hosts:" "$file" 2>/dev/null; then
+                PLAYBOOKS+=("$file")
+                echo "  → Playbook: $file"
+              fi
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # Check for supporting file changes that affect playbooks
+          SHARED_CHANGED=false
+          while IFS= read -r file; do
+            if [[ "$file" =~ ^files/ ]] || [[ "$file" =~ ^vars/ ]]; then
+              SHARED_CHANGED=true
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # If shared files changed, find related playbooks
+          if [ "$SHARED_CHANGED" = true ]; then
+            echo "Shared files changed, detecting affected playbooks..."
+            
+            # Map files/ directories to playbooks
+            while IFS= read -r file; do
+              case "$file" in
+                files/nginx-compose/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/network/nginx_compose.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/network/nginx_compose.yaml")
+                    echo "  → Affected: nginx_compose.yaml (via $file)"
+                  fi
+                  ;;
+                files/cloudflared/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/network/cloudflared.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/network/cloudflared.yaml")
+                    echo "  → Affected: cloudflared.yaml (via $file)"
+                  fi
+                  ;;
+                files/ocean-plex/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/media/plex.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/media/plex.yaml")
+                    echo "  → Affected: plex.yaml (via $file)"
+                  fi
+                  ;;
+                files/grafana-compose/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/monitoring/grafana_compose.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/monitoring/grafana_compose.yaml")
+                    echo "  → Affected: grafana_compose.yaml (via $file)"
+                  fi
+                  ;;
+                files/comfyui/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/ai/comfyui.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/ai/comfyui.yaml")
+                    echo "  → Affected: comfyui.yaml (via $file)"
+                  fi
+                  ;;
+                files/llamacpp/*)
+                  if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/ai/llamacpp.yaml" ]]; then
+                    PLAYBOOKS+=("playbooks/individual/ocean/ai/llamacpp.yaml")
+                    echo "  → Affected: llamacpp.yaml (via $file)"
+                  fi
+                  ;;
+              esac
+            done <<< "$CHANGED_FILES"
+          fi
+
+          # Remove duplicates and create JSON array
+          UNIQUE_PLAYBOOKS=($(printf '%s\n' "${PLAYBOOKS[@]}" | sort -u))
+          PLAYBOOK_COUNT=${#UNIQUE_PLAYBOOKS[@]}
+
+          # Convert to JSON
+          if [ $PLAYBOOK_COUNT -gt 0 ]; then
+            PLAYBOOKS_JSON=$(printf '%s\n' "${UNIQUE_PLAYBOOKS[@]}" | jq -R . | jq -sc .)
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            PLAYBOOKS_JSON="[]"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "playbooks=${PLAYBOOKS_JSON}" >> $GITHUB_OUTPUT
+          echo "playbook_count=${PLAYBOOK_COUNT}" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "  DETECTED $PLAYBOOK_COUNT PLAYBOOK(S)"
+          echo "════════════════════════════════════════"
+          echo "$PLAYBOOKS_JSON" | jq -r '.[]' 2>/dev/null || echo "None"
+
+  validate:
+    name: Validate Playbooks
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible pyyaml
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Validate changed playbooks
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
+
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+          echo "$PLAYBOOKS" | jq -r '.[]' | while read playbook; do
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Validating: $playbook"
+            
+            # YAML syntax
+            python3 -c "import yaml; yaml.safe_load(open('$playbook'))"
+            echo "  ✓ YAML valid"
+            
+            # Ansible syntax
+            ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
+            echo "  ✓ Ansible syntax valid"
+          done
+
+          rm -f /tmp/.vault_pass
+          echo ""
+          echo "✅ All playbooks validated"
+
+  deploy:
+    name: Dry-run (${{ matrix.playbook }})
+    needs: [detect-changes, validate]
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: [self-hosted, homelab, ansible]
+    environment: production
+    strategy:
+      matrix:
+        playbook: ${{ fromJson(needs.detect-changes.outputs.playbooks) }}
+      fail-fast: true
+      max-parallel: 1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible pyyaml
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.OCEAN_SSH_KEY }}
+        run: |
+          mkdir -p ${{ runner.temp }}/.ssh
+          chmod 700 ${{ runner.temp }}/.ssh
+          
+          # Debug: Check if key is base64 encoded or raw
+          if echo "$SSH_PRIVATE_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            # Key is already in PEM format (not base64 encoded)
+            echo "$SSH_PRIVATE_KEY" > ${{ runner.temp }}/.ssh/id_rsa
+          else
+            # Key is base64 encoded
+            echo "$SSH_PRIVATE_KEY" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+          fi
+          chmod 600 ${{ runner.temp }}/.ssh/id_rsa
+
+          # Verify key format
+          if ! ssh-keygen -l -f ${{ runner.temp }}/.ssh/id_rsa >/dev/null 2>&1; then
+            echo "❌ SSH key format invalid after decoding"
+            head -n 1 ${{ runner.temp }}/.ssh/id_rsa
+            exit 1
+          fi
+
+          # Create SSH config for ansible
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
+          Host *
+            IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ${{ runner.temp }}/.ssh/config
+
+          echo "✅ SSH key configured and verified"
+
+      - name: Dry-run playbook
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ANSIBLE_SSH_PRIVATE_KEY_FILE: ${{ runner.temp }}/.ssh/id_rsa
+          ANSIBLE_SSH_ARGS: "-F ${{ runner.temp }}/.ssh/config"
+          SSH_AUTH_SOCK: ""
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "🔍 Dry-running: ${{ matrix.playbook }}"
+
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+          ansible-playbook \
+            --check --diff \
+            --vault-password-file=/tmp/.vault_pass \
+            -i inventories/production/hosts.ini \
+            "${{ matrix.playbook }}"
+
+          rm -f /tmp/.vault_pass
+          echo "✅ Dry-run completed successfully"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -rf ${{ runner.temp }}/.ssh
+
+  summary:
+    name: Dry-run Summary
+    needs: [detect-changes, validate, deploy]
+    if: always() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Generate summary
+        run: |
+          echo "════════════════════════════════════════"
+          echo "  PR DRY-RUN SUMMARY"
+          echo "════════════════════════════════════════"
+          echo ""
+          echo "Playbooks: ${{ needs.detect-changes.outputs.playbook_count }}"
+          echo "Validation: ${{ needs.validate.result }}"
+          echo "Dry-run: ${{ needs.deploy.result }}"
+          echo ""
+
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "✅ All playbooks validated successfully (dry-run mode)"
+          elif [ "${{ needs.deploy.result }}" = "failure" ]; then
+            echo "❌ Dry-run failed - check logs above"
+          elif [ "${{ needs.deploy.result }}" = "skipped" ]; then
+            echo "⏭️ Dry-run skipped (previous step failed)"
+          fi
+
+  no-changes:
+    name: No Changes
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'false'
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Report
+        run: |
+          echo "ℹ️ No deployable playbook changes detected in this PR"

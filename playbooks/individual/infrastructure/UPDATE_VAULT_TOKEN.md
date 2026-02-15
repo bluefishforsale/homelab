@@ -63,7 +63,7 @@ Update:
 ```yaml
 development:
   github:
-    vault_github_registration_token: "AXXXX..."
+    github_registration_token: "AXXXX..."
 ```
 
 ---

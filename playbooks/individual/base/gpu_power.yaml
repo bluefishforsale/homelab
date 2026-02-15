@@ -1,0 +1,78 @@
+---
+- name: GPU Power Management
+  become: true
+  hosts: all
+  strategy: free
+  tasks:
+    - name: Check if nvidia-smi exists
+      ansible.builtin.stat:
+        path: /usr/bin/nvidia-smi
+      register: nvidia_smi_stat
+
+    - name: Check if GPU is present
+      ansible.builtin.command:
+        cmd: nvidia-smi --query-gpu=name --format=csv,noheader
+      register: gpu_check
+      changed_when: false
+      failed_when: false
+      when: nvidia_smi_stat.stat.exists
+
+    - name: Set GPU presence fact
+      ansible.builtin.set_fact:
+        has_gpu: "{{ nvidia_smi_stat.stat.exists and gpu_check.rc | default(1) == 0 }}"
+
+    - name: Show GPU detection result
+      ansible.builtin.debug:
+        msg: "GPU detected: {{ has_gpu }}{% if has_gpu %} ({{ gpu_check.stdout | default('unknown') }}){% endif %}"
+
+    - name: GPU power management
+      when: has_gpu | bool
+      block:
+        - name: Write GPU power limit script
+          ansible.builtin.copy:
+            force: true
+            dest: /etc/systemd/system/gpu-power-limit.sh
+            mode: '0755'
+            content: |
+              #!/bin/bash
+              # Set GPU power limit to 100W
+              # Enable persistence mode first
+              /usr/bin/nvidia-smi -pm 1
+              # Set power limit for all GPUs
+              /usr/bin/nvidia-smi -pl 100
+
+        - name: Write GPU power limit service
+          ansible.builtin.copy:
+            force: true
+            dest: /etc/systemd/system/gpu-power-limit.service
+            content: |
+              [Unit]
+              Description=Set GPU Power Limit to 100W
+              After=nvidia-persistenced.service
+              Wants=nvidia-persistenced.service
+
+              [Service]
+              Type=oneshot
+              ExecStart=/bin/bash /etc/systemd/system/gpu-power-limit.sh
+              RemainAfterExit=true
+              StandardOutput=journal
+
+              [Install]
+              WantedBy=multi-user.target
+
+        - name: Enable and start GPU power limit service
+          ansible.builtin.systemd:
+            name: gpu-power-limit
+            state: started
+            enabled: true
+            daemon_reload: true
+
+        - name: Verify GPU power limit
+          ansible.builtin.command:
+            cmd: nvidia-smi --query-gpu=power.limit --format=csv,noheader
+          register: power_limit_check
+          changed_when: false
+
+        - name: Show current power limit
+          ansible.builtin.debug:
+            msg: "GPU power limit set to: {{ power_limit_check.stdout }}"
