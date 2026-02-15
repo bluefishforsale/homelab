@@ -1,5 +1,5 @@
 ---
-name: PR - Deploy Changed Playbooks
+name: PR - Dry-run Changed Playbooks
 
 on:
   pull_request:
@@ -175,7 +175,7 @@ jobs:
           echo "✅ All playbooks validated"
 
   deploy:
-    name: Deploy (${{ matrix.playbook }})
+    name: Dry-run (${{ matrix.playbook }})
     needs: [detect-changes, validate]
     if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
@@ -207,26 +207,27 @@ jobs:
 
           echo "✅ SSH key configured"
 
-      - name: Deploy playbook
+      - name: Dry-run playbook
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
           ANSIBLE_PRIVATE_KEY_FILE: ${{ runner.temp }}/.ssh/id_rsa
           ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=${{ runner.temp }}/.ssh/known_hosts"
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          echo "🚀 Deploying: ${{ matrix.playbook }}"
+          echo "🔍 Dry-running: ${{ matrix.playbook }}"
 
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
 
           ansible-playbook \
+            --check --diff \
             --vault-password-file=/tmp/.vault_pass \
             --private-key=${{ runner.temp }}/.ssh/id_rsa \
             -i inventories/production/hosts.ini \
             "${{ matrix.playbook }}"
 
           rm -f /tmp/.vault_pass
-          echo "✅ Deployed successfully"
+          echo "✅ Dry-run completed successfully"
 
       - name: Cleanup SSH key
         if: always()
@@ -234,7 +235,7 @@ jobs:
           rm -rf ${{ runner.temp }}/.ssh
 
   summary:
-    name: Deployment Summary
+    name: Dry-run Summary
     needs: [detect-changes, validate, deploy]
     if: always() && needs.detect-changes.outputs.has_changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
@@ -242,20 +243,20 @@ jobs:
       - name: Generate summary
         run: |
           echo "════════════════════════════════════════"
-          echo "  PR DEPLOYMENT SUMMARY"
+          echo "  PR DRY-RUN SUMMARY"
           echo "════════════════════════════════════════"
           echo ""
           echo "Playbooks: ${{ needs.detect-changes.outputs.playbook_count }}"
           echo "Validation: ${{ needs.validate.result }}"
-          echo "Deploy: ${{ needs.deploy.result }}"
+          echo "Dry-run: ${{ needs.deploy.result }}"
           echo ""
 
           if [ "${{ needs.deploy.result }}" = "success" ]; then
-            echo "✅ All playbooks deployed successfully"
+            echo "✅ All playbooks validated successfully (dry-run mode)"
           elif [ "${{ needs.deploy.result }}" = "failure" ]; then
-            echo "❌ Deployment failed - check logs above"
+            echo "❌ Dry-run failed - check logs above"
           elif [ "${{ needs.deploy.result }}" = "skipped" ]; then
-            echo "⏭️ Deployment skipped (previous step failed)"
+            echo "⏭️ Dry-run skipped (previous step failed)"
           fi
 
   no-changes:
