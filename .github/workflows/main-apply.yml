@@ -27,6 +27,7 @@ jobs:
       playbooks: ${{ steps.find-playbooks.outputs.playbooks }}
       has-changes: ${{ steps.find-playbooks.outputs.has-changes }}
       playbook-count: ${{ steps.find-playbooks.outputs.count }}
+      targets: ${{ steps.find-playbooks.outputs.targets }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -68,6 +69,18 @@ jobs:
             PLAYBOOK_COUNT=$(echo "$PLAYBOOKS" | wc -l | tr -d ' ')
           fi
 
+          # Determine which targets to health-check
+          TARGETS="[]"
+          if echo "$PLAYBOOKS" | grep -qE 'ocean|03_ocean'; then
+            TARGETS=$(echo "$TARGETS" | jq '. + ["ocean"]')
+          fi
+          if echo "$PLAYBOOKS" | grep -qE 'dns|bind9|dhcp|02_core'; then
+            TARGETS=$(echo "$TARGETS" | jq '. + ["dns"]')
+          fi
+          if echo "$PLAYBOOKS" | grep -qE 'github.*runner'; then
+            TARGETS=$(echo "$TARGETS" | jq '. + ["runners"]')
+          fi
+
           echo "Playbooks to apply:"
           echo "$PLAYBOOKS"
           echo ""
@@ -79,8 +92,10 @@ jobs:
             echo "has-changes=false" >> $GITHUB_OUTPUT
           fi
           echo "count=$PLAYBOOK_COUNT" >> $GITHUB_OUTPUT
+          echo "targets=$TARGETS" >> $GITHUB_OUTPUT
 
           echo "Found $PLAYBOOK_COUNT playbook(s) to apply"
+          echo "Health check targets: $TARGETS"
 
   apply-playbooks:
     name: Apply Playbooks to Production
@@ -88,6 +103,10 @@ jobs:
     if: needs.detect-changes.outputs.has-changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
     environment: Github Actions CI
+    outputs:
+      total: ${{ steps.apply.outputs.total }}
+      passed: ${{ steps.apply.outputs.passed }}
+      failed: ${{ steps.apply.outputs.failed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -271,3 +290,121 @@ jobs:
           rm -f /tmp/apply-results.txt
           rm -f /tmp/failed-playbooks.txt
           rm -f /tmp/playbook-*.log
+
+  # Post-deployment health verification
+  verify-deployment:
+    name: Verify Deployment Health
+    needs: [detect-changes, apply-playbooks]
+    if: always() && needs.apply-playbooks.result == 'success'
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-key: ${{ secrets.PROXMOX_SSH_KEY }}
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "⏳ Waiting 30 seconds for services to stabilize..."
+          sleep 30
+
+      - name: Verify Ocean services
+        if: contains(needs.detect-changes.outputs.targets, 'ocean')
+        id: ocean
+        continue-on-error: true
+        run: |
+          echo "🔍 Verifying Ocean services..."
+
+          SERVICES=(
+            "nginx:80"
+            "plex:32400"
+            "prometheus:9090"
+            "grafana:3000"
+          )
+
+          HEALTHY=0
+          FAILED=0
+
+          for svc in "${SERVICES[@]}"; do
+            NAME="${svc%%:*}"
+            PORT="${svc##*:}"
+            
+            # Try up to 3 times with 5s delay
+            for attempt in 1 2 3; do
+              if timeout 5 bash -c "echo >/dev/tcp/192.168.1.143/$PORT" 2>/dev/null; then
+                echo "✅ $NAME (port $PORT) responding"
+                HEALTHY=$((HEALTHY + 1))
+                break
+              fi
+              [ $attempt -lt 3 ] && sleep 5
+            done
+
+            if [ $attempt -eq 3 ]; then
+              echo "❌ $NAME (port $PORT) NOT responding after 3 attempts"
+              FAILED=$((FAILED + 1))
+            fi
+          done
+
+          echo "Ocean: $HEALTHY healthy, $FAILED failed"
+          [ $FAILED -gt 0 ] && exit 1 || exit 0
+
+      - name: Verify DNS services
+        if: contains(needs.detect-changes.outputs.targets, 'dns')
+        id: dns
+        continue-on-error: true
+        run: |
+          echo "🔍 Verifying DNS services..."
+
+          # Test internal DNS
+          if dig @192.168.1.2 ocean.home +short +time=5 | grep -q "192.168"; then
+            echo "✅ Internal DNS resolution working"
+          else
+            echo "❌ Internal DNS resolution FAILED"
+            exit 1
+          fi
+
+          # Test external forwarding
+          if dig @192.168.1.2 google.com +short +time=5 | grep -qE "^[0-9]"; then
+            echo "✅ External DNS forwarding working"
+          else
+            echo "❌ External DNS forwarding FAILED"
+            exit 1
+          fi
+
+          echo "DNS: All checks passed"
+
+      - name: Generate verification summary
+        if: always()
+        run: |
+          OCEAN_STATUS="${{ steps.ocean.outcome || 'skipped' }}"
+          DNS_STATUS="${{ steps.dns.outcome || 'skipped' }}"
+
+          # Determine overall status
+          if [ "$OCEAN_STATUS" = "failure" ] || [ "$DNS_STATUS" = "failure" ]; then
+            OVERALL="⚠️ DEGRADED"
+          elif [ "$OCEAN_STATUS" = "success" ] || [ "$DNS_STATUS" = "success" ]; then
+            OVERALL="✅ HEALTHY"
+          else
+            OVERALL="ℹ️ NOT VERIFIED"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+
+          ---
+
+          ## 🏥 Post-Deployment Health Check
+
+          **Overall Status:** $OVERALL
+
+          | Target | Status |
+          |--------|--------|
+          | Ocean Services | $OCEAN_STATUS |
+          | DNS Services | $DNS_STATUS |
+
+          Health verification completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          EOF
+
+          echo "Post-deployment verification: $OVERALL"
