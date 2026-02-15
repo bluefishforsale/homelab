@@ -191,7 +191,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible
+          python3 -m pip install --user --quiet ansible pyyaml
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Setup SSH key
@@ -199,19 +199,42 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.OCEAN_SSH_KEY }}
         run: |
           mkdir -p ${{ runner.temp }}/.ssh
-          echo "$SSH_PRIVATE_KEY" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+          chmod 700 ${{ runner.temp }}/.ssh
+          
+          # Debug: Check if key is base64 encoded or raw
+          if echo "$SSH_PRIVATE_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            # Key is already in PEM format (not base64 encoded)
+            echo "$SSH_PRIVATE_KEY" > ${{ runner.temp }}/.ssh/id_rsa
+          else
+            # Key is base64 encoded
+            echo "$SSH_PRIVATE_KEY" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+          fi
           chmod 600 ${{ runner.temp }}/.ssh/id_rsa
 
-          # Add host key to known_hosts
-          ssh-keyscan -H 192.168.1.143 >> ${{ runner.temp }}/.ssh/known_hosts 2>/dev/null || true
+          # Verify key format
+          if ! ssh-keygen -l -f ${{ runner.temp }}/.ssh/id_rsa >/dev/null 2>&1; then
+            echo "❌ SSH key format invalid after decoding"
+            head -n 1 ${{ runner.temp }}/.ssh/id_rsa
+            exit 1
+          fi
 
-          echo "✅ SSH key configured"
+          # Create SSH config for ansible
+          cat > ${{ runner.temp }}/.ssh/config <<EOF
+          Host *
+            IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ${{ runner.temp }}/.ssh/config
+
+          echo "✅ SSH key configured and verified"
 
       - name: Dry-run playbook
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          ANSIBLE_PRIVATE_KEY_FILE: ${{ runner.temp }}/.ssh/id_rsa
-          ANSIBLE_SSH_ARGS: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=${{ runner.temp }}/.ssh/known_hosts"
+          ANSIBLE_SSH_PRIVATE_KEY_FILE: ${{ runner.temp }}/.ssh/id_rsa
+          ANSIBLE_SSH_ARGS: "-F ${{ runner.temp }}/.ssh/config"
+          SSH_AUTH_SOCK: ""
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           echo "🔍 Dry-running: ${{ matrix.playbook }}"
@@ -222,7 +245,6 @@ jobs:
           ansible-playbook \
             --check --diff \
             --vault-password-file=/tmp/.vault_pass \
-            --private-key=${{ runner.temp }}/.ssh/id_rsa \
             -i inventories/production/hosts.ini \
             "${{ matrix.playbook }}"
 
