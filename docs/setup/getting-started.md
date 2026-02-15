@@ -14,7 +14,6 @@ Complete setup guide for the homelab infrastructure.
 | dns01 | 192.168.1.2 | BIND9 DNS |
 | pihole | 192.168.1.9 | DNS filtering |
 | gitlab | 192.168.1.5 | GitLab CI/CD |
-| metrics | 192.168.1.30 | Prometheus/Grafana |
 
 ---
 

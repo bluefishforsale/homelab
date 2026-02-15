@@ -15,7 +15,6 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 | pihole | 192.168.1.9 | VM on node005 | DNS filtering |
 | gitlab | 192.168.1.5 | VM on node005 | CI/CD |
 | gh-runner-01 | 192.168.1.20 | VM on node005 | GitHub Actions runners |
-| metrics | 192.168.1.30 | VM on node005 | Metrics collection |
 
 **Storage**: 64TB ZFS raidz2 pool (`data01`) on node006, passed through to ocean. All services mount `/data01/services/<name>/`.
 
