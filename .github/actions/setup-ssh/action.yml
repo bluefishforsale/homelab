@@ -1,0 +1,79 @@
+---
+name: Setup SSH
+description: Configure SSH access for Proxmox and homelab hosts
+
+inputs:
+  ssh-key:
+    description: Base64-encoded SSH private key
+    required: true
+  known-hosts:
+    description: Additional known hosts entries
+    required: false
+    default: ""
+
+outputs:
+  ssh-config:
+    description: Path to SSH config file
+    value: ${{ steps.setup.outputs.ssh_config }}
+  ssh-key-file:
+    description: Path to SSH key file
+    value: ${{ steps.setup.outputs.ssh_key_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup SSH credentials
+      id: setup
+      shell: bash
+      run: |
+        # Create SSH directory in runner temp
+        mkdir -p ${{ runner.temp }}/.ssh
+        chmod 700 ${{ runner.temp }}/.ssh
+
+        # Decode and write SSH key
+        echo "${{ inputs.ssh-key }}" | base64 -d > ${{ runner.temp }}/.ssh/id_rsa
+        chmod 600 ${{ runner.temp }}/.ssh/id_rsa
+
+        # Create SSH config
+        cat > ${{ runner.temp }}/.ssh/config <<EOF
+        Host node005.home
+          User root
+          IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+
+        Host node006.home
+          User root
+          IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+
+        Host ocean ocean.home
+          User terrac
+          IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+
+        Host dns01 dns01.home
+          User debian
+          IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+
+        Host *
+          IdentityFile ${{ runner.temp }}/.ssh/id_rsa
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+        EOF
+        chmod 600 ${{ runner.temp }}/.ssh/config
+
+        # Output paths
+        echo "ssh_config=${{ runner.temp }}/.ssh/config" >> $GITHUB_OUTPUT
+        echo "ssh_key_file=${{ runner.temp }}/.ssh/id_rsa" >> $GITHUB_OUTPUT
+
+        # Set environment variables for use by other steps
+        echo "SSH_CONFIG=${{ runner.temp }}/.ssh/config" >> $GITHUB_ENV
+        echo "SSH_KEY_FILE=${{ runner.temp }}/.ssh/id_rsa" >> $GITHUB_ENV
+        echo "ANSIBLE_SSH_PRIVATE_KEY_FILE=${{ runner.temp }}/.ssh/id_rsa" >> $GITHUB_ENV
+
+        echo "✅ SSH credentials configured"
