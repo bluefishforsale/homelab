@@ -149,3 +149,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for full guide.
 - [playbooks/README.md](playbooks/README.md) - Playbook reference
 - [docs/README.md](docs/README.md) - Full documentation index
 - [.github/SETUP.md](.github/SETUP.md) - GitHub Actions setup
+
+---
+
+<!-- GitOps CI/CD Test - 2026-02-15 -->
+_This change tests the end-to-end GitOps deployment cycle with health checks._
