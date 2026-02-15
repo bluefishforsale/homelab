@@ -1,0 +1,252 @@
+---
+name: Health Check - Service Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target to check"
+        required: true
+        type: choice
+        options:
+          - all
+          - ocean
+          - dns
+          - runners
+      verbose:
+        description: "Show detailed output"
+        required: false
+        type: boolean
+        default: false
+
+  # Can be called by other workflows
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      verbose:
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      status:
+        description: "Overall health status"
+        value: ${{ jobs.check.outputs.status }}
+      details:
+        description: "Health check details (JSON)"
+        value: ${{ jobs.check.outputs.details }}
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  check:
+    name: Check Service Health
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      details: ${{ steps.result.outputs.details }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-key: ${{ secrets.PROXMOX_SSH_KEY }}
+
+      - name: Check Ocean services
+        id: ocean
+        if: inputs.target == 'ocean' || inputs.target == 'all'
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking Ocean (192.168.1.143) services..."
+
+          # Define services to check
+          SERVICES=(
+            "nginx:80"
+            "plex:32400"
+            "sonarr:8989"
+            "radarr:7878"
+            "prowlarr:9696"
+            "grafana:3000"
+            "prometheus:9090"
+          )
+
+          HEALTHY=0
+          UNHEALTHY=0
+          RESULTS=""
+
+          for svc in "${SERVICES[@]}"; do
+            NAME="${svc%%:*}"
+            PORT="${svc##*:}"
+            
+            if timeout 5 bash -c "echo >/dev/tcp/192.168.1.143/$PORT" 2>/dev/null; then
+              HEALTHY=$((HEALTHY + 1))
+              RESULTS="${RESULTS}✅ $NAME (port $PORT)\n"
+              [ "${{ inputs.verbose }}" = "true" ] && echo "✅ $NAME responding on port $PORT"
+            else
+              UNHEALTHY=$((UNHEALTHY + 1))
+              RESULTS="${RESULTS}❌ $NAME (port $PORT)\n"
+              echo "❌ $NAME NOT responding on port $PORT"
+            fi
+          done
+
+          echo "healthy=$HEALTHY" >> $GITHUB_OUTPUT
+          echo "unhealthy=$UNHEALTHY" >> $GITHUB_OUTPUT
+          echo -e "$RESULTS" > /tmp/ocean-results.txt
+
+          echo ""
+          echo "Ocean: $HEALTHY healthy, $UNHEALTHY unhealthy"
+
+      - name: Check DNS services
+        id: dns
+        if: inputs.target == 'dns' || inputs.target == 'all'
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking DNS (192.168.1.2) services..."
+
+          # Test DNS resolution
+          HEALTHY=0
+          UNHEALTHY=0
+          RESULTS=""
+
+          # Internal DNS
+          if dig @192.168.1.2 ocean.home +short +time=5 | grep -q "192.168"; then
+            HEALTHY=$((HEALTHY + 1))
+            RESULTS="${RESULTS}✅ Internal DNS (ocean.home)\n"
+          else
+            UNHEALTHY=$((UNHEALTHY + 1))
+            RESULTS="${RESULTS}❌ Internal DNS (ocean.home)\n"
+          fi
+
+          # External DNS forwarding
+          if dig @192.168.1.2 google.com +short +time=5 | grep -qE "^[0-9]"; then
+            HEALTHY=$((HEALTHY + 1))
+            RESULTS="${RESULTS}✅ External DNS forwarding\n"
+          else
+            UNHEALTHY=$((UNHEALTHY + 1))
+            RESULTS="${RESULTS}❌ External DNS forwarding\n"
+          fi
+
+          # DHCP server check
+          if ssh -F $SSH_CONFIG dns01.home "systemctl is-active isc-dhcp-server" 2>/dev/null | grep -q "active"; then
+            HEALTHY=$((HEALTHY + 1))
+            RESULTS="${RESULTS}✅ DHCP Server\n"
+          else
+            UNHEALTHY=$((UNHEALTHY + 1))
+            RESULTS="${RESULTS}❌ DHCP Server\n"
+          fi
+
+          echo "healthy=$HEALTHY" >> $GITHUB_OUTPUT
+          echo "unhealthy=$UNHEALTHY" >> $GITHUB_OUTPUT
+          echo -e "$RESULTS" > /tmp/dns-results.txt
+
+          echo ""
+          echo "DNS: $HEALTHY healthy, $UNHEALTHY unhealthy"
+
+      - name: Check GitHub Runners
+        id: runners
+        if: inputs.target == 'runners' || inputs.target == 'all'
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking GitHub Runners (192.168.1.250)..."
+
+          HEALTHY=0
+          UNHEALTHY=0
+          RESULTS=""
+
+          # Check if we can reach the runner host
+          if timeout 5 bash -c "echo >/dev/tcp/192.168.1.250/22" 2>/dev/null; then
+            HEALTHY=$((HEALTHY + 1))
+            RESULTS="${RESULTS}✅ Runner host reachable\n"
+            
+            # Check runner containers
+            RUNNER_COUNT=$(ssh -F $SSH_CONFIG 192.168.1.250 "docker ps --filter 'name=github-runner' --format '{{.Names}}' | wc -l" 2>/dev/null || echo "0")
+            if [ "$RUNNER_COUNT" -ge 1 ]; then
+              HEALTHY=$((HEALTHY + 1))
+              RESULTS="${RESULTS}✅ GitHub runners running ($RUNNER_COUNT containers)\n"
+            else
+              UNHEALTHY=$((UNHEALTHY + 1))
+              RESULTS="${RESULTS}❌ No GitHub runner containers found\n"
+            fi
+          else
+            UNHEALTHY=$((UNHEALTHY + 2))
+            RESULTS="${RESULTS}❌ Runner host unreachable\n"
+          fi
+
+          echo "healthy=$HEALTHY" >> $GITHUB_OUTPUT
+          echo "unhealthy=$UNHEALTHY" >> $GITHUB_OUTPUT
+          echo -e "$RESULTS" > /tmp/runners-results.txt
+
+          echo ""
+          echo "Runners: $HEALTHY healthy, $UNHEALTHY unhealthy"
+
+      - name: Aggregate results
+        id: result
+        run: |
+          TOTAL_HEALTHY=0
+          TOTAL_UNHEALTHY=0
+          ALL_RESULTS=""
+
+          # Ocean
+          if [ -f /tmp/ocean-results.txt ]; then
+            TOTAL_HEALTHY=$((TOTAL_HEALTHY + ${{ steps.ocean.outputs.healthy || 0 }}))
+            TOTAL_UNHEALTHY=$((TOTAL_UNHEALTHY + ${{ steps.ocean.outputs.unhealthy || 0 }}))
+            ALL_RESULTS="${ALL_RESULTS}### Ocean Services\n$(cat /tmp/ocean-results.txt)\n"
+          fi
+
+          # DNS
+          if [ -f /tmp/dns-results.txt ]; then
+            TOTAL_HEALTHY=$((TOTAL_HEALTHY + ${{ steps.dns.outputs.healthy || 0 }}))
+            TOTAL_UNHEALTHY=$((TOTAL_UNHEALTHY + ${{ steps.dns.outputs.unhealthy || 0 }}))
+            ALL_RESULTS="${ALL_RESULTS}### DNS Services\n$(cat /tmp/dns-results.txt)\n"
+          fi
+
+          # Runners
+          if [ -f /tmp/runners-results.txt ]; then
+            TOTAL_HEALTHY=$((TOTAL_HEALTHY + ${{ steps.runners.outputs.healthy || 0 }}))
+            TOTAL_UNHEALTHY=$((TOTAL_UNHEALTHY + ${{ steps.runners.outputs.unhealthy || 0 }}))
+            ALL_RESULTS="${ALL_RESULTS}### GitHub Runners\n$(cat /tmp/runners-results.txt)\n"
+          fi
+
+          # Determine overall status
+          if [ $TOTAL_UNHEALTHY -eq 0 ]; then
+            STATUS="healthy"
+            EMOJI="✅"
+          elif [ $TOTAL_HEALTHY -gt $TOTAL_UNHEALTHY ]; then
+            STATUS="degraded"
+            EMOJI="⚠️"
+          else
+            STATUS="unhealthy"
+            EMOJI="❌"
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "details={\"healthy\":$TOTAL_HEALTHY,\"unhealthy\":$TOTAL_UNHEALTHY}" >> $GITHUB_OUTPUT
+
+          # Generate summary
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # $EMOJI Health Check Results
+
+          **Target:** ${{ inputs.target }}  
+          **Status:** $STATUS  
+          **Healthy:** $TOTAL_HEALTHY  
+          **Unhealthy:** $TOTAL_UNHEALTHY
+
+          ---
+
+          $(echo -e "$ALL_RESULTS")
+          EOF
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "$EMOJI Overall Status: $STATUS"
+          echo "   Healthy: $TOTAL_HEALTHY"
+          echo "   Unhealthy: $TOTAL_UNHEALTHY"
+          echo "════════════════════════════════════════"
+
+          # Exit with error if unhealthy
+          [ $TOTAL_UNHEALTHY -gt 0 ] && exit 1 || exit 0

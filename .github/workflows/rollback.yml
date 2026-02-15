@@ -1,0 +1,217 @@
+---
+name: Rollback - Revert to Previous Commit
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_commit:
+        description: "Commit SHA to rollback to (leave empty for HEAD~1)"
+        required: false
+        type: string
+      playbook:
+        description: "Specific playbook to rollback (leave empty for all changed)"
+        required: false
+        type: choice
+        options:
+          - auto-detect
+          - playbooks/01_base_system.yaml
+          - playbooks/02_core_infrastructure.yaml
+          - playbooks/03_ocean_services.yaml
+      dry_run:
+        description: "Dry-run mode (check only)"
+        required: false
+        type: boolean
+        default: true
+      confirm:
+        description: "Type 'ROLLBACK' to confirm (required for non-dry-run)"
+        required: false
+        type: string
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  validate-rollback:
+    name: Validate Rollback Request
+    runs-on: [self-hosted, homelab, ansible]
+    outputs:
+      target-commit: ${{ steps.resolve.outputs.commit }}
+      playbooks: ${{ steps.detect.outputs.playbooks }}
+    steps:
+      - name: Safety check
+        if: inputs.dry_run == false && inputs.confirm != 'ROLLBACK'
+        run: |
+          echo "❌ ROLLBACK NOT CONFIRMED"
+          echo ""
+          echo "To perform a real rollback, you must:"
+          echo "1. Set 'Dry-run mode' to false"
+          echo "2. Type 'ROLLBACK' in the confirmation field"
+          echo ""
+          echo "This prevents accidental production rollbacks."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 20 # Get enough history for rollback
+
+      - name: Resolve target commit
+        id: resolve
+        run: |
+          if [ -n "${{ inputs.target_commit }}" ]; then
+            TARGET="${{ inputs.target_commit }}"
+            # Verify commit exists
+            if ! git cat-file -e "$TARGET^{commit}" 2>/dev/null; then
+              echo "❌ Commit $TARGET not found in history"
+              exit 1
+            fi
+          else
+            TARGET=$(git rev-parse HEAD~1)
+          fi
+
+          echo "commit=$TARGET" >> $GITHUB_OUTPUT
+          echo "📍 Rollback target: $TARGET"
+          echo ""
+          git log -1 --format="Commit: %H%nAuthor: %an%nDate: %ad%nMessage: %s" "$TARGET"
+
+      - name: Detect affected playbooks
+        id: detect
+        run: |
+          TARGET="${{ steps.resolve.outputs.commit }}"
+
+          if [ "${{ inputs.playbook }}" = "auto-detect" ]; then
+            # Find what changed between target and current
+            PLAYBOOKS=$(git diff --name-only "$TARGET"..HEAD | grep -E '^playbooks/.*\.yaml$' || true)
+            
+            if [ -z "$PLAYBOOKS" ]; then
+              echo "⚠️ No playbook changes detected between commits"
+              PLAYBOOKS="playbooks/03_ocean_services.yaml"
+              echo "Using default: $PLAYBOOKS"
+            fi
+          else
+            PLAYBOOKS="${{ inputs.playbook }}"
+          fi
+
+          PLAYBOOK_JSON=$(echo "$PLAYBOOKS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "playbooks=$PLAYBOOK_JSON" >> $GITHUB_OUTPUT
+          
+          echo "📋 Playbooks to re-apply:"
+          echo "$PLAYBOOKS" | sed 's/^/  - /'
+
+  rollback:
+    name: Execute Rollback
+    needs: validate-rollback
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-rollback.outputs.target-commit }}
+
+      - name: Display rollback info
+        run: |
+          echo "════════════════════════════════════════════"
+          echo "  ROLLBACK OPERATION"
+          echo "════════════════════════════════════════════"
+          echo ""
+          echo "Target Commit: ${{ needs.validate-rollback.outputs.target-commit }}"
+          echo "Dry-run: ${{ inputs.dry_run }}"
+          echo ""
+          
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "⚠️  DRY-RUN MODE - No changes will be applied"
+          else
+            echo "🔴 LIVE ROLLBACK - Changes WILL be applied"
+          fi
+          echo ""
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Apply rollback playbooks
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e
+
+          PLAYBOOKS='${{ needs.validate-rollback.outputs.playbooks }}'
+          INVENTORY="inventories/production/hosts.ini"
+          CHECK_FLAG=""
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            CHECK_FLAG="--check"
+            echo "Running in CHECK MODE (dry-run)..."
+          fi
+
+          TOTAL=0
+          PASSED=0
+          FAILED=0
+
+          for PLAYBOOK in $(echo "$PLAYBOOKS" | jq -r '.[]'); do
+            TOTAL=$((TOTAL + 1))
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "Rolling back: $PLAYBOOK"
+            echo "════════════════════════════════════════"
+            
+            if ansible-playbook \
+              -i "$INVENTORY" \
+              --vault-password-file=/tmp/.vault_pass \
+              $CHECK_FLAG \
+              "$PLAYBOOK"; then
+              PASSED=$((PASSED + 1))
+              echo "✅ SUCCESS: $PLAYBOOK"
+            else
+              FAILED=$((FAILED + 1))
+              echo "❌ FAILED: $PLAYBOOK"
+            fi
+          done
+
+          rm -f /tmp/.vault_pass
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "Rollback Summary"
+          echo "════════════════════════════════════════"
+          echo "Total: $TOTAL | Passed: $PASSED | Failed: $FAILED"
+
+          if [ $FAILED -gt 0 ]; then
+            echo "❌ Rollback had failures"
+            exit 1
+          fi
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo ""
+            echo "✅ Dry-run completed successfully"
+            echo "Re-run with dry_run=false and confirm='ROLLBACK' to apply"
+          else
+            echo ""
+            echo "✅ Rollback completed successfully"
+          fi
+
+      - name: Generate summary
+        if: always()
+        run: |
+          MODE="${{ inputs.dry_run == 'true' && 'DRY-RUN' || 'LIVE' }}"
+          
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 🔄 Rollback Operation
+
+          **Mode:** $MODE  
+          **Target Commit:** \`${{ needs.validate-rollback.outputs.target-commit }}\`  
+          **Triggered by:** ${{ github.actor }}
+
+          ## Playbooks Applied
+
+          ${{ needs.validate-rollback.outputs.playbooks }}
+
+          ---
+
+          ⚠️ If this was a live rollback, verify services are working correctly.
+          EOF

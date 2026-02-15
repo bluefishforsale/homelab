@@ -22,6 +22,7 @@ on:
       - "playbooks/**/*.yml"
       - "files/**"
       - "vars/**/*.yaml"
+      - ".github/workflows/**"
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
