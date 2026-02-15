@@ -1,0 +1,50 @@
+[Unit]
+Description=OpenClaw AI Assistant with Docker Compose
+Documentation=https://github.com/openclaw/openclaw
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User={{ user }}
+Group={{ user }}
+WorkingDirectory={{ home }}
+
+# Environment
+Environment=COMPOSE_PROJECT_NAME={{ service }}
+Environment=COMPOSE_HTTP_TIMEOUT=60
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+# Pre-start (idempotent cleanup)
+ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down --remove-orphans'
+ExecStartPre=-/bin/bash -c '/usr/bin/docker image prune -f'
+
+# Start
+ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
+
+# Stop
+ExecStop=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
+
+# Reload
+ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
+
+# Service behavior
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+# Security
+NoNewPrivileges=true
+ReadWritePaths={{ home }}
+ReadOnlyPaths=/var/run/docker.sock
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ service }}
+
+[Install]
+WantedBy=multi-user.target

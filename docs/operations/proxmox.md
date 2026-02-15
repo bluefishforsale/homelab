@@ -395,6 +395,16 @@ qm resize 6000 scsi0 +100G
 qm start 6000
 ```
 
+#### openclaw (VMID 7000)
+
+```bash
+qm clone 9999 7000
+qm set 7000 --name openclaw --ipconfig0 ip=192.168.1.31/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 7000 --cores 4 --memory 4096
+qm resize 7000 scsi0 +16G
+qm start 7000
+```
+
 #### Kubernetes Cluster (VMIDs 501-513)
 
 ```bash

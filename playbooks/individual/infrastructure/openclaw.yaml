@@ -1,0 +1,457 @@
+---
+# =============================================================================
+# OpenClaw AI Assistant — VM Creation + Service Deployment
+# =============================================================================
+# Creates a dedicated VM on node005 (Proxmox) and deploys OpenClaw in Docker.
+# VM isolation provides stronger containment than running on shared ocean host.
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/openclaw.yaml
+#
+# Force recreate VM:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/openclaw.yaml --tags force
+#
+# Skip VM creation (service only):
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/openclaw.yaml --tags install
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Play 1: Create VM on Proxmox (idempotent)
+# -----------------------------------------------------------------------------
+- name: Create OpenClaw VM on Proxmox
+  hosts: openclaw
+  gather_facts: false
+  vars:
+    vm_id: 7000
+    template_id: 9999
+    vm_cores: 4
+    vm_memory: 4096
+    vm_disk_size: "+16G"
+  tasks:
+    - name: Check if running on a VM with bare_metal_host defined
+      set_fact:
+        is_proxmox_vm: "{{ bare_metal_host is defined }}"
+      tags: ['always']
+
+    - name: VM creation tasks
+      when: is_proxmox_vm | bool
+      delegate_to: "{{ bare_metal_host }}"
+      become: true
+      block:
+        - name: Check if VM already exists
+          ansible.builtin.shell: "qm status {{ vm_id }} 2>/dev/null || echo 'not_found'"
+          register: vm_status
+          changed_when: false
+          failed_when: false
+          tags: ['always']
+
+        - name: Destroy existing VM if force tag is set
+          when:
+            - "'force' in ansible_run_tags"
+            - vm_status.stdout != 'not_found'
+          tags: ['force']
+          block:
+            - name: Stop VM if running
+              ansible.builtin.command: "qm stop {{ vm_id }}"
+              failed_when: false
+
+            - name: Unlock VM if locked
+              ansible.builtin.command: "qm unlock {{ vm_id }}"
+              failed_when: false
+
+            - name: Destroy VM with purge to remove all volumes
+              ansible.builtin.command: "qm destroy {{ vm_id }} --purge"
+
+            - name: Wait for VM to be fully destroyed
+              ansible.builtin.pause:
+                seconds: 5
+
+        - name: Create VM from template
+          when: vm_status.stdout == 'not_found' or 'force' in ansible_run_tags
+          tags: ['force', 'install']
+          block:
+            - name: Clean up orphaned LVM volumes if they exist
+              ansible.builtin.shell: |
+                set +e
+                for vol in $(lvs --noheadings -o lv_name pve 2>/dev/null | awk '{print $1}' | grep "^vm-{{ vm_id }}"); do
+                  echo "Removing orphaned volume: pve/$vol"
+                  lvremove -f pve/$vol
+                done
+                exit 0
+              register: cleanup_result
+              changed_when: cleanup_result.stdout | length > 0
+
+            - name: Display cleanup results
+              ansible.builtin.debug:
+                msg: "{{ cleanup_result.stdout_lines }}"
+              when: cleanup_result.stdout | length > 0
+
+            - name: Clone VM from template
+              ansible.builtin.command: "qm clone {{ template_id }} {{ vm_id }}"
+
+            - name: Set VM name
+              ansible.builtin.command: "qm set {{ vm_id }} --name {{ inventory_hostname }}"
+
+            - name: Configure network with multiqueue
+              ansible.builtin.command: "qm set {{ vm_id }} --net0 virtio,bridge=vmbr0,queues=64"
+
+            - name: Configure IP address
+              ansible.builtin.command: "qm set {{ vm_id }} --ipconfig0 ip={{ ansible_ssh_host }}/24,gw={{ gateway }}"
+
+            - name: Set nameserver
+              ansible.builtin.command: "qm set {{ vm_id }} --nameserver={{ nameserver }}"
+
+            - name: Enable onboot
+              ansible.builtin.command: "qm set {{ vm_id }} --onboot 1"
+
+            - name: Set CPU cores
+              ansible.builtin.command: "qm set {{ vm_id }} --cores {{ vm_cores }}"
+
+            - name: Set memory
+              ansible.builtin.command: "qm set {{ vm_id }} --memory {{ vm_memory }}"
+
+            - name: Resize disk
+              ansible.builtin.command: "qm resize {{ vm_id }} scsi0 {{ vm_disk_size }}"
+
+            - name: Set VM description
+              ansible.builtin.command: "qm set {{ vm_id }} --description 'OpenClaw AI Assistant — isolated sandbox VM'"
+
+            - name: Start VM
+              ansible.builtin.command: "qm start {{ vm_id }}"
+
+            - name: Wait for VM to boot and SSH to become available
+              ansible.builtin.wait_for:
+                host: "{{ ansible_ssh_host }}"
+                port: 22
+                delay: 10
+                timeout: 300
+                state: started
+              delegate_to: localhost
+              become: false
+
+            - name: Wait for SSH to be fully ready
+              ansible.builtin.pause:
+                seconds: 10
+
+# -----------------------------------------------------------------------------
+# Play 2: Install Docker + Deploy OpenClaw Service
+# -----------------------------------------------------------------------------
+- name: Deploy OpenClaw AI Assistant
+  hosts: openclaw
+  become: true
+  gather_facts: true
+  tags: ['force', 'install']
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: openclaw
+    version: local
+    port: "{{ service_ports.openclaw.port }}"
+    files: ../../../files/openclaw
+    home: "/opt/{{ service }}"
+    user: debian
+    uid: 1000
+    gid: 1000
+    docker_keyring_path: /etc/apt/keyrings/docker.asc
+    openclaw_repo: https://github.com/openclaw/openclaw.git
+    openclaw_branch: main
+
+  tasks:
+
+  # --- dpkg lock repair (shared task) ---
+  - name: Handle dpkg locks and repair
+    include_tasks: ../../tasks/dpkg_lock.yaml
+
+  # --- Docker CE installation (minimal, no GPU) ---
+  - name: Install prerequisite packages
+    ansible.builtin.apt:
+      name:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg
+        - lsb-release
+        - git
+      state: present
+      update_cache: yes
+
+  - name: Ensure /etc/apt/keyrings directory exists
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Docker APT key
+    ansible.builtin.get_url:
+      url: https://download.docker.com/linux/debian/gpg
+      dest: "{{ docker_keyring_path }}"
+      mode: '0644'
+
+  - name: Add Docker repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by={{ docker_keyring_path }}] https://download.docker.com/linux/debian bookworm stable"
+      state: present
+      filename: docker
+
+  - name: Install Docker packages
+    ansible.builtin.apt:
+      name:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-compose-plugin
+      state: present
+      update_cache: yes
+
+  - name: Ensure docker group exists
+    ansible.builtin.group:
+      name: docker
+      state: present
+
+  - name: Add debian user to docker group
+    ansible.builtin.user:
+      name: "{{ user }}"
+      groups: docker
+      append: yes
+
+  - name: Ensure Docker service is started and enabled
+    ansible.builtin.systemd:
+      name: docker
+      state: started
+      enabled: yes
+
+  # --- OpenClaw service deployment ---
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags:
+      - config
+
+  - name: Ensure subdirectories exist
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    with_items:
+    - data
+    - data/workspace
+    tags:
+      - config
+
+  - name: Ensure source directory exists
+    ansible.builtin.file:
+      path: "{{ home }}/source"
+      state: directory
+      mode: '0755'
+
+  - name: Clone OpenClaw repository
+    ansible.builtin.git:
+      repo: "{{ openclaw_repo }}"
+      dest: "{{ home }}/source"
+      version: "{{ openclaw_branch }}"
+      force: true
+      depth: 1
+    register: openclaw_git
+    tags:
+      - build
+
+  - name: Check if OpenClaw Docker image exists
+    ansible.builtin.shell: docker image inspect openclaw:{{ version }} > /dev/null 2>&1
+    register: image_check
+    changed_when: false
+    failed_when: false
+    tags:
+      - build
+
+  - name: Patch source — allow Control UI device-identity bypass over HTTP
+    ansible.builtin.replace:
+      path: "{{ home }}/source/src/gateway/server/ws-connection/message-handler.ts"
+      regexp: 'const canSkipDevice = sharedAuthOk;'
+      replace: 'const canSkipDevice = sharedAuthOk || allowControlUiBypass;'
+    register: patch_device
+    tags:
+      - build
+
+  - name: Patch source — allow Control UI auth bypass over HTTP
+    ansible.builtin.replace:
+      path: "{{ home }}/source/src/gateway/server/ws-connection/message-handler.ts"
+      regexp: 'if \(!authOk\) \{'
+      replace: 'if (!authOk && !allowControlUiBypass) {'
+    register: patch_auth
+    tags:
+      - build
+
+  - name: Patch source — grant operator scopes to bypassed Control UI
+    ansible.builtin.replace:
+      path: "{{ home }}/source/src/gateway/server/ws-connection/message-handler.ts"
+      regexp: 'if \(scopes\.length > 0\) \{\n\s*scopes = \[\];\n\s*connectParams\.scopes = scopes;\n\s*\}'
+      replace: |-
+        if (!device && allowControlUiBypass) { scopes = ["operator.admin", "operator.read", "operator.write", "operator.approvals", "operator.pairing"]; connectParams.scopes = scopes; } else if (scopes.length > 0) {
+                    scopes = [];
+                    connectParams.scopes = scopes;
+                  }
+    register: patch_scopes
+    tags:
+      - build
+
+  - name: Patch source — auto-approve all device pairing requests
+    ansible.builtin.replace:
+      path: "{{ home }}/source/src/gateway/server/ws-connection/message-handler.ts"
+      regexp: 'if \(pairing\.request\.silent === true\) \{'
+      replace: 'if (true) {'
+    register: patch_pairing
+    tags:
+      - build
+
+  - name: Patch source — fix TS2345 string|undefined in qmd-scope.ts
+    ansible.builtin.replace:
+      path: "{{ home }}/source/src/memory/qmd-scope.ts"
+      regexp: 'function normalizeQmdSessionKey\(key: string\): string \| undefined \{'
+      replace: 'function normalizeQmdSessionKey(key?: string): string | undefined {\n  if (!key) {\n    return undefined;\n  }'
+    register: patch_qmd
+    tags:
+      - build
+
+  - name: Build OpenClaw Docker image
+    ansible.builtin.shell: |
+      cd {{ home }}/source && docker build --build-arg OPENCLAW_DOCKER_APT_PACKAGES="chromium fonts-liberation libatk-bridge2.0-0 libdrm2 libgbm1 libnss3 libxss1 libasound2" -t openclaw:{{ version }} -f Dockerfile .
+    when: openclaw_git.changed or image_check.rc != 0 or patch_device.changed or patch_auth.changed or patch_scopes.changed or patch_pairing.changed or patch_qmd.changed
+    tags:
+      - build
+    register: docker_build
+    changed_when: docker_build.rc == 0
+
+  - name: Create SSH directory for agent access
+    ansible.builtin.file:
+      path: "{{ home }}/ssh"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0700'
+    tags:
+      - config
+
+  - name: Deploy SSH private key from vault
+    ansible.builtin.copy:
+      content: "{{ infrastructure.ssh.automation_key }}"
+      dest: "{{ home }}/ssh/id_ed25519"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    no_log: true
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy SSH config for homelab hosts
+    ansible.builtin.copy:
+      src: "{{ files }}/ssh_config.j2"
+      dest: "{{ home }}/ssh/config"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy OpenClaw configuration
+    ansible.builtin.template:
+      src: "{{ files }}/openclaw.json.j2"
+      dest: "{{ home }}/data/openclaw.json"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Ensure workspace agent directories exist
+    ansible.builtin.file:
+      path: "{{ home }}/data/workspace/memory/agents"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags:
+      - config
+
+  - name: Deploy SOUL.md to workspace
+    ansible.builtin.template:
+      src: "{{ files }}/SOUL.md.j2"
+      dest: "{{ home }}/data/workspace/SOUL.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Create environment file
+    ansible.builtin.template:
+      src: "{{ files }}/openclaw.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Create openclaw systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/openclaw.service.j2"
+      dest: "/etc/systemd/system/openclaw.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Enable openclaw service
+    ansible.builtin.systemd:
+      name: openclaw.service
+      enabled: yes
+      daemon_reload: yes
+    tags:
+      - config
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart openclaw service
+    ansible.builtin.systemd:
+      name: openclaw.service
+      state: restarted

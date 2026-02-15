@@ -1,0 +1,58 @@
+services:
+  openclaw:
+    image: openclaw:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    ports:
+      - "{{ port }}:18789"  # host:80 → container:18789
+
+    volumes:
+      - {{ home }}/data:/home/node/.openclaw
+      - {{ home }}/ssh:/home/node/.ssh:ro
+
+    env_file:
+      - .env
+
+    environment:
+      - HOME=/home/node
+
+    user: "{{ uid }}:{{ gid }}"
+
+    # Security hardening — drop all caps, no privilege escalation
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+    # Resource limits — prevent runaway agent
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Writable temp areas (rootfs is image-default, not read-only)
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256M
+      - /home/node/.cache:rw,size=256M
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:18789/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
+
+    network_mode: bridge
