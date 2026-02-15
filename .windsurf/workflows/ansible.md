@@ -16,7 +16,7 @@ Run ad-hoc ansible commands against homelab infrastructure.
 
 - **Path**: `inventories/production/hosts.ini` (configured in `ansible.cfg`, no `-i` flag needed)
 - **Groups**: `proxmox`, `baremetal`, `vms`, `github_runners`, `dns`, `k8s`
-- **Key hosts**: `ocean` (192.168.1.143), `node005` (192.168.1.105), `node006` (192.168.1.106), `dns01` (192.168.1.2), `pihole` (192.168.1.9), `gitlab` (192.168.1.5), `gh-runner-01` (192.168.1.20), `metrics` (192.168.1.30)
+- **Key hosts**: `ocean` (192.168.1.143), `node005` (192.168.1.105), `node006` (192.168.1.106), `dns01` (192.168.1.2), `pihole` (192.168.1.9), `gitlab` (192.168.1.5), `gh-runner-01` (192.168.1.20)
 
 ## Steps
 
