@@ -85,7 +85,7 @@ jobs:
   provision-vm:
     name: Provision Test VM
     needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
+    if: needs.detect-changes.outputs.has-changes == 'true' && vars.ENABLE_VM_TESTS == 'true'
     runs-on: [self-hosted, homelab, ansible]
     outputs:
       vm-id: ${{ steps.calc-vmid.outputs.vmid }}
@@ -242,6 +242,7 @@ jobs:
   test-playbooks:
     name: Test Playbooks
     needs: [detect-changes, provision-vm]
+    if: needs.provision-vm.result == 'success' && !cancelled()
     runs-on: [self-hosted, homelab, ansible]
     environment: Github Actions CI
     steps:
