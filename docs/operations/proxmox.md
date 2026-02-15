@@ -14,7 +14,6 @@ Comprehensive guide for Proxmox VE operations, maintenance, and homelab-specific
 - pihole (192.168.1.9) - DNS filtering on node005
 - gitlab (192.168.1.5) - GitLab on node005
 - gh-runner-01 (192.168.1.250) - GitHub runner on node005
-- metrics (192.168.1.30) - Prometheus/Grafana on node005
 
 ---
 
@@ -389,7 +388,6 @@ zpool status data01
 
 ```bash
 qm clone 9999 6000
-qm set 6000 --name metrics --ipconfig0 ip=192.168.1.30/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
 qm set 6000 --cores 16 --memory 16384
 qm resize 6000 scsi0 +100G
 qm start 6000
