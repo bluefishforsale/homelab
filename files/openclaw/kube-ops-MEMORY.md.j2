@@ -1,0 +1,231 @@
+# MEMORY.md — Kube Ops
+
+Last updated: {{ ansible_date_time.date | default('deployment-time') }}
+
+---
+
+## Cluster Architecture
+
+### Overview
+- **Type**: kubeadm-managed, bare-metal (Proxmox VMs)
+- **Hypervisor**: Proxmox on node005 (Dell R620 — 56 cores, 128GB RAM)
+- **Nodes**: 3 control plane + 1 worker (all 14 cores, 32GB RAM each)
+- **CNI**: Calico
+- **Container runtime**: containerd
+- **DNS**: CoreDNS
+- **No GPU**: GPU workloads run on ocean (Docker), not Kubernetes
+
+### Node Map
+
+| Node | IP | Role | VM ID |
+|------|----|------|-------|
+| kube501 | 192.168.1.51 | Control plane | 501 |
+| kube502 | 192.168.1.52 | Control plane | 502 |
+| kube503 | 192.168.1.53 | Control plane | 503 |
+| kube511 | 192.168.1.61 | Worker | 511 |
+
+### Network
+- Flat subnet: 192.168.1.0/24
+- Pod CIDR: (check `kubectl cluster-info dump | grep -i cidr`)
+- Service CIDR: (check kubeadm-config)
+- DNS: CoreDNS for cluster DNS, BIND on dns01 (192.168.1.2) for external
+- No external ingress controller yet (services use NodePort or are internal-only)
+
+---
+
+## Known Issues & Lessons Learned
+
+### kubeadm Certificate Renewal
+- Certificates expire after 1 year by default
+- Check: `kubeadm certs check-expiration` (run on control plane node)
+- Renew: `kubeadm certs renew all` then restart control plane components
+- After renewal, update kubeconfig: `cp /etc/kubernetes/admin.conf ~/.kube/config`
+- Monitor via Prometheus: `(kubelet_certificate_manager_server_ttl_seconds / 86400) < 30`
+
+### etcd Maintenance
+- etcd runs on all 3 control plane nodes (stacked topology)
+- Check health: `kubectl -n kube-system exec etcd-kube501 -- etcdctl endpoint health --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key`
+- Quorum requires 2 of 3 nodes — losing 2 control plane nodes loses the cluster
+- Defrag periodically: `etcdctl defrag` if DB size grows large
+- Snapshot for backup: `etcdctl snapshot save /tmp/etcd-backup.db`
+
+### containerd Issues
+- If containerd hangs: `systemctl restart containerd` then `systemctl restart kubelet`
+- Check crictl: `crictl ps` to see running containers
+- Image cleanup: `crictl rmi --prune` to remove unused images
+
+### CoreDNS
+- Runs as Deployment in kube-system namespace (usually 2 replicas)
+- If DNS resolution fails inside pods: check CoreDNS pods first
+- Common fix: `kubectl rollout restart deployment/coredns -n kube-system`
+- Check upstream: CoreDNS forwards to dns01 (192.168.1.2) or pihole (192.168.1.9)
+
+### Node Pressure
+- MemoryPressure: kubelet starts evicting pods — find the memory hog
+- DiskPressure: usually /var/lib/containerd filling up — prune images
+- PIDPressure: rare — check for fork bombs or runaway processes
+- When pressure detected: `kubectl describe node <name>` for conditions and events
+
+---
+
+## Common Runbooks
+
+### Node NotReady
+1. SSH to node: `ssh kube5XX`
+2. Check kubelet: `systemctl status kubelet`
+3. Check containerd: `systemctl status containerd`
+4. Check journal: `journalctl -u kubelet --since '10 min ago'`
+5. If kubelet won't start: check certs, check disk space, check containerd
+6. Restart path: `systemctl restart containerd && systemctl restart kubelet`
+7. If still NotReady after 10 min: open issue, DM terrac
+
+### Pod CrashLoopBackOff
+1. Get pod details: `kubectl describe pod <name> -n <namespace>`
+2. Check logs: `kubectl logs <name> -n <namespace> --previous`
+3. Check events: `kubectl get events -n <namespace> --sort-by='.lastTimestamp'`
+4. Common causes:
+   - OOMKilled: increase memory limits in manifest
+   - Config error: check ConfigMaps and Secrets
+   - Image pull error: check image name/tag, registry access
+   - Dependency missing: check if dependent services are running
+5. Fix in manifest, open PR
+
+### Deployment Stuck
+1. Check rollout: `kubectl rollout status deployment/<name> -n <namespace>`
+2. Check events: `kubectl describe deployment/<name> -n <namespace>`
+3. Check pods: `kubectl get pods -n <namespace> -l app=<name>`
+4. Common causes:
+   - Insufficient resources: check `kubectl describe node` for allocatable
+   - Image pull failure: check image exists and is accessible
+   - Scheduling conflict: check nodeSelector, tolerations, affinity
+   - PVC pending: check `kubectl get pvc -n <namespace>`
+5. If stuck rollout: `kubectl rollout undo deployment/<name> -n <namespace>`
+
+### Certificate Expiry
+1. Check all certs: `ssh kube501 'sudo kubeadm certs check-expiration'`
+2. Renew all: `ssh kube501 'sudo kubeadm certs renew all'`
+3. Restart control plane:
+   ```
+   ssh kube501 'sudo systemctl restart kubelet'
+   # kube-apiserver, controller-manager, scheduler restart automatically as static pods
+   ```
+4. Update kubeconfig: `ssh kube501 'sudo cp /etc/kubernetes/admin.conf /home/debian/.kube/config'`
+5. Verify: `ssh kube501 'kubectl get nodes'`
+6. Open PR to document the renewal date
+
+### Disk Space Low on Node
+1. Check: `ssh kube5XX 'df -h'`
+2. Prune containerd images: `ssh kube5XX 'sudo crictl rmi --prune'`
+3. Clean completed pods: `kubectl delete pods --field-selector=status.phase==Succeeded --all-namespaces`
+4. Clean failed pods: `kubectl delete pods --field-selector=status.phase==Failed --all-namespaces`
+5. Check journal: `ssh kube5XX 'sudo journalctl --vacuum-size=500M'`
+
+### API Server Slow
+1. Check etcd: `etcdctl endpoint status` for latency
+2. Check node resources: `kubectl top nodes`
+3. Check API server logs: `kubectl logs -n kube-system kube-apiserver-kube501`
+4. If etcd slow: check disk I/O on control plane nodes
+5. If resource starved: check what else is running on the node
+
+---
+
+## Prometheus Metrics Cheat Sheet
+
+### Cluster Health
+```promql
+# Nodes ready
+kube_node_status_condition{condition="Ready",status="true"}
+
+# Pods by phase
+kube_pod_status_phase
+
+# Deployments with unavailable replicas
+kube_deployment_status_replicas_unavailable > 0
+
+# StatefulSets not at desired count
+kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas
+```
+
+### Resource Usage
+```promql
+# CPU usage per node (ratio)
+instance:node_cpu_utilisation:rate5m
+
+# Memory usage per node (ratio)
+instance:node_memory_utilisation:ratio
+
+# Pod CPU usage
+sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (pod, namespace)
+
+# Pod memory usage
+sum(container_memory_working_set_bytes{container!=""}) by (pod, namespace)
+
+# Resource requests vs limits vs actual
+kube_pod_container_resource_requests{resource="cpu"}
+kube_pod_container_resource_limits{resource="cpu"}
+kube_pod_container_resource_requests{resource="memory"}
+kube_pod_container_resource_limits{resource="memory"}
+```
+
+### etcd
+```promql
+# Leader exists
+etcd_server_has_leader
+
+# WAL fsync latency (should be < 10ms)
+histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m]))
+
+# DB size
+etcd_mvcc_db_total_size_in_bytes
+
+# Backend commit latency
+histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket[5m]))
+```
+
+### API Server
+```promql
+# Request latency p99
+histogram_quantile(0.99, rate(apiserver_request_duration_seconds_bucket{verb!="WATCH"}[5m]))
+
+# Request rate
+rate(apiserver_request_total[5m])
+
+# Error rate
+rate(apiserver_request_total{code=~"5.."}[5m])
+```
+
+---
+
+## SSH Access
+
+You have SSH keys mounted at `/home/node/.ssh/`. Access cluster nodes via:
+
+```bash
+# Control plane
+ssh kube501    # 192.168.1.51
+ssh kube502    # 192.168.1.52
+ssh kube503    # 192.168.1.53
+
+# Worker
+ssh kube511    # 192.168.1.61
+
+# Proxmox host (for VM management)
+ssh node005    # 192.168.1.105
+```
+
+kubectl config should be available via SSH to any control plane node:
+```bash
+ssh kube501 'kubectl get nodes'
+ssh kube501 'kubectl get pods --all-namespaces'
+```
+
+---
+
+## Supporting Infrastructure
+
+- **Hypervisor**: Proxmox on node005 (192.168.1.105)
+- **DNS**: BIND on dns01 (192.168.1.2) — serves .home domain
+- **Monitoring**: Prometheus on ocean (192.168.1.143:9090), Grafana at :8910
+- **Logging**: journald on nodes → (consider adding Promtail to cluster)
+- **CI/CD**: GitHub Actions with self-hosted runners on gh-runner-01 (192.168.1.20)
+- **Secrets**: Sealed Secrets or external-secrets (check current state)
