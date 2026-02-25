@@ -43,7 +43,6 @@
     with_items:
     - config
     - data
-    - plugins
 
   - name: Create tdarr config files
     ansible.builtin.template:
@@ -57,12 +56,12 @@
     - Reload systemd daemon
     - Restart tdarr service
 
-    - name: Git clone plugins and flows
-      ansible.builtin.git:
-        repo: "{{ github }}"
-        dest: "{{ path_home }}/plugins/"
-        depth: 1
-        update: yes
+  - name: Git clone plugins and flows
+    ansible.builtin.git:
+      repo: "{{ github }}"
+      dest: "{{ path_home }}/plugins/"
+      depth: 1
+      update: yes
 
   - name: Create tdarr service
     ansible.builtin.template:
@@ -75,6 +74,18 @@
     notify:
     - Reload systemd daemon
     - Restart tdarr service
+
+  - name: Enable and start tdarr service
+    ansible.builtin.systemd:
+      name: tdarr.service
+      enabled: true
+      state: started
+
+  - name: Enable and start tdarr_node service
+    ansible.builtin.systemd:
+      name: tdarr_node.service
+      enabled: true
+      state: started
 
   handlers:
   - name: Reload systemd daemon
