@@ -3,6 +3,7 @@
   hosts: ocean
   become: true
   vars_files:
+    - ../../../../vault/secrets.yaml
     - ../../../../vars/vars_service_ports.yaml
 
   vars:
@@ -42,11 +43,48 @@
     - config
     - scratch
     - scripts
+    - scripts/repos
+
+  - name: Remove stale script directories from broken ScriptDir paths
+    ansible.builtin.file:
+      path: "{{ home }}/scripts/{{ item }}"
+      state: absent
+    with_items:
+    - "GetScripts "
+    - "GetScripts,"
+    - "GetScripts;"
+    - "VideoSortExt"
+
+  - name: Move existing GetScripts repo to repos/ if needed
+    ansible.builtin.command:
+      cmd: "mv {{ home }}/scripts/GetScripts {{ home }}/scripts/repos/GetScripts"
+    args:
+      creates: "{{ home }}/scripts/repos/GetScripts"
+      removes: "{{ home }}/scripts/GetScripts"
+    when: not (home + '/scripts/repos/GetScripts') is directory
+    failed_when: false
+
+  - name: Move existing VideoSort repo to repos/ if needed
+    ansible.builtin.command:
+      cmd: "mv {{ home }}/scripts/VideoSort {{ home }}/scripts/repos/VideoSort"
+    args:
+      creates: "{{ home }}/scripts/repos/VideoSort"
+      removes: "{{ home }}/scripts/VideoSort"
+    when: not (home + '/scripts/repos/VideoSort') is directory
+    failed_when: false
+
+  - name: Configure git safe.directory for script repos
+    ansible.builtin.command:
+      cmd: "git config --global --add safe.directory {{ home }}/scripts/repos/{{ item }}"
+    with_items:
+    - GetScripts
+    - VideoSort
+    changed_when: false
 
   - name: Clone GetScripts repository
     ansible.builtin.git:
       repo: https://github.com/clinton-hall/GetScripts.git
-      dest: "{{ home }}/scripts/GetScripts"
+      dest: "{{ home }}/scripts/repos/GetScripts"
       version: master
       update: yes
       force: yes
@@ -57,7 +95,7 @@
   - name: Clone VideoSort repository
     ansible.builtin.git:
       repo: https://github.com/nzbget/VideoSort.git
-      dest: "{{ home }}/scripts/VideoSort"
+      dest: "{{ home }}/scripts/repos/VideoSort"
       version: master
       update: yes
       force: yes
@@ -65,11 +103,59 @@
     - Reload nzbget systemd daemon
     - Restart nzbget service
 
-  - name: Recursively set ownership on scripts/
+  - name: Create symlinks for GetScripts extensions
     ansible.builtin.file:
-      path: "{{ home }}/scripts/"
+      src: "repos/GetScripts/{{ item }}"
+      dest: "{{ home }}/scripts/{{ item }}"
+      state: link
+      force: yes
+    with_items:
+    - flatten.py
+    - DeleteSamples.py
+    - ResetDateTime.py
+    - SafeRename.py
+    - passwordList.py
+    notify:
+    - Reload nzbget systemd daemon
+    - Restart nzbget service
+
+  - name: Copy VideoSort extension directory
+    ansible.builtin.copy:
+      src: "{{ home }}/scripts/repos/VideoSort/VideoSort/"
+      dest: "{{ home }}/scripts/VideoSort/"
+      remote_src: yes
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: preserve
+    notify:
+    - Reload nzbget systemd daemon
+    - Restart nzbget service
+
+  - name: Clean up test files
+    ansible.builtin.file:
+      path: "{{ home }}/scripts/{{ item }}"
+      state: absent
+    with_items:
+    - flatten_test.py
+    - VideoSortTest
+
+  - name: Recursively set ownership on scripts/repos/
+    ansible.builtin.file:
+      path: "{{ home }}/scripts/repos/"
       state: directory
       recurse: yes
+      owner: "{{ user }}"
+      group: "{{ user }}"
+
+  - name: Ensure nzbget log file exists
+    ansible.builtin.file:
+      path: "{{ home }}/scratch/nzbget.log"
+      state: touch
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+      modification_time: preserve
+      access_time: preserve
 
   - name: Create config files
     ansible.builtin.template:
@@ -101,6 +187,16 @@
     notify:
     - Reload exporter systemd daemon
     - Restart exporter service
+
+  - name: Enable nzbget service
+    ansible.builtin.systemd:
+      name: nzbget.service
+      enabled: true
+
+  - name: Enable nzbget-exporter service
+    ansible.builtin.systemd:
+      name: nzbget-exporter.service
+      enabled: true
 
   handlers:
   - name: Reload nzbget systemd daemon
