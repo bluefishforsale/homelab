@@ -1,0 +1,147 @@
+# MEMORY.md — Homelab Ops
+
+Last updated: {{ ansible_date_time.date | default('deployment-time') }}
+
+---
+
+## Known Issues & Lessons Learned
+
+### Docker Networking
+- All services use **host IP:port** (192.168.1.143:PORT), never container hostnames
+- nginx uses a custom bridge network (172.25.0.0/16) with fixed gateway 172.25.0.1
+- nginx proxies to services via `proxy_pass http://172.25.0.1:PORT`
+- Container-to-container DNS is fragile — avoid it
+
+### Plex GPU Transcoding
+- Requires `LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/nvidia/current:/usr/lib/plexmediaserver/lib`
+- Without this, Plex silently falls back to CPU transcoding
+- Verify with: `docker exec plex bash -c "CUDA_VISIBLE_DEVICES=0 /usr/lib/plexmediaserver/Plex\ Transcoder -hide_banner -v error -init_hw_device cuda=cu:0 -f lavfi -i nullsrc=s=1920x1080 -t 1 -c:v h264_nvenc -f null /dev/null"`
+
+### Docker Logging
+- All containers use journald driver with container name tagging
+- Pipeline: Docker → journald → Promtail → Loki
+- No json-file log driver — don't add `max-size` or `max-file` options
+
+### Container Permissions
+- Redis: runs as UID 999:999 — data dirs must match
+- PostgreSQL: runs as UID 999:999 — data dirs need mode 0700
+- Most homelab services: UID 1001:1001 (media user)
+- Always check container's expected user before creating volume dirs
+
+### Ansible Vault
+- Nested structure, not flat: `{{ '{{' }} media_services.plex.api_key {{ '}}' }}` not `{{ '{{' }} vault_plex_api_key {{ '}}' }}`
+- Always use `| default('value')` for optional secrets
+- Vault password from environment (`ANSIBLE_VAULT_PASSWORD_FILE`), never `--ask-vault-pass`
+- Structure reference: `vault/secrets.yaml.template`
+
+### Cloudflare Access
+- Use PUT (not PATCH) when assigning reusable policies to applications
+- PATCH adds policies on top of auto-created legacy ones
+- PUT replaces all policies cleanly
+
+### ComfyUI
+- Uses yanwk/comfyui-boot:cu126-slim image (not ai-dock)
+- Runs as root (image default)
+- Single volume mount: /data01/services/comfyui:/root
+- CLI_ARGS: "--fast --use-pytorch-cross-attention"
+
+---
+
+## Port Reference
+
+| Category | Service | Port |
+|----------|---------|------|
+| Infrastructure | nginx | 80, 443 |
+| Infrastructure | mysql | 3306 |
+| Monitoring | prometheus | 9090 |
+| Monitoring | alertmanager | 9093 |
+| Monitoring | grafana | 8910 |
+| Monitoring | loki | 3100 |
+| Exporters | blackbox | 9115 |
+| Exporters | cadvisor | 8912 |
+| Exporters | node_exporter | 9100 |
+| Exporters | nvidia_gpu | 9445 |
+| Exporters | zfs | 9150 |
+| AI/ML | llamacpp | 8080 |
+| AI/ML | open_webui | 3000 |
+| AI/ML | comfyui | 8188 |
+| Media | plex | 32400 |
+| Media | sonarr | 8902 |
+| Media | radarr | 8903 |
+| Media | prowlarr | 9696 |
+| Media | bazarr | 6767 |
+| Media | nzbget | 8901 |
+| Media | overseerr | 5055 |
+| Media | tautulli | 8905 |
+| Media | tdarr | 8265 |
+| Cloud | nextcloud | 8081 |
+| Cloud | tinacms | 8084 |
+
+---
+
+## Common Runbooks
+
+### Service Won't Start
+1. `systemctl status <service>` — check systemd state
+2. `journalctl -u <service> --since "10 min ago"` — check logs
+3. `docker compose -f /data01/services/<service>/docker-compose.yml config` — validate compose
+4. `docker compose -f /data01/services/<service>/docker-compose.yml up` — try foreground start
+5. Check port conflicts: `ss -tlnp | grep <port>`
+6. Check disk space: `df -h /data01`
+
+### Container Crash Loop
+1. `docker logs <container> --tail 50` — recent logs
+2. `docker inspect <container> | jq '.[0].State'` — exit code and OOM status
+3. If OOMKilled: increase memory limit in docker-compose template
+4. If config error: check template rendering in `/data01/services/<service>/`
+5. If image issue: try pulling fresh: `docker compose pull`
+
+### Disk Space Low
+1. `docker system prune -f` — remove unused images/containers/networks
+2. `journalctl --vacuum-size=1G` — trim journal
+3. Check `/data01/services/*/` for oversized logs or data
+4. Check Plex transcoder temp: `/data01/services/plex/config/Library/Application Support/Plex Media Server/Cache/Transcode/`
+
+### GPU Issues
+1. `nvidia-smi` — check GPU state and utilization
+2. `nvidia-smi -r` — reset GPU if hung
+3. Check if multiple services competing: llama.cpp + Plex + ComfyUI can't all use GPU simultaneously
+4. `DCGM_FI_DEV_GPU_TEMP` in Prometheus — temperature trend
+
+### DNS/Tunnel Issues
+1. Check cloudflared: `systemctl status cloudflared` on ocean
+2. Check BIND: `dig @192.168.1.2 ocean.home` from any host
+3. Check Pi-hole: `dig @192.168.1.9 google.com`
+4. Cloudflare dashboard: https://dash.cloudflare.com/ for tunnel status
+
+### Ansible Deployment Failed
+1. Read the error message — usually a template rendering issue or missing var
+2. `ansible-playbook --syntax-check` — catch YAML errors
+3. `ansible-playbook --check` — dry run to catch logic errors
+4. Check `vault/secrets.yaml.template` if "dict object has no attribute" errors
+5. Common fix: add missing variable to vault with `| default()` fallback
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions workflows:
+- **ci-validate.yml**: Push/PR → YAML, Ansible syntax, template validation
+- **main-apply.yml**: Merge to main → deploy changed playbooks to production
+- **deploy-ocean-service.yml**: Manual → deploy individual ocean service
+- **deploy-critical-service.yml**: Manual → deploy DNS/DHCP/Plex (requires approval)
+
+Runners: 4 ephemeral self-hosted Docker runners on gh-runner-01 (192.168.1.20).
+Labels: `self-hosted`, `homelab`, `ansible`.
+
+---
+
+## SSH Access
+
+You have SSH keys mounted at `/home/node/.ssh/`. Use them to:
+- Run diagnostic commands on ocean: `ssh ocean.home <command>`
+- Check service status: `ssh ocean.home systemctl status <service>`
+- View logs: `ssh ocean.home journalctl -u <service> --since '10 min ago'`
+- Test ansible changes: `ssh ocean.home ansible-playbook --check ...`
+
+Hosts configured in SSH config: ocean, node005, node006, dns01, pihole, metrics.

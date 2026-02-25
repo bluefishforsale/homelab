@@ -11,12 +11,15 @@ services:
     volumes:
       - {{ home }}/data:/home/node/.openclaw
       - {{ home }}/ssh:/home/node/.ssh:ro
+      - {{ home }}/tools:/opt/tools:ro
 
     env_file:
       - .env
 
     environment:
       - HOME=/home/node
+      - PATH=/opt/tools/bin:/opt/tools/ansible-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - KUBECONFIG=/home/node/.openclaw/workspace-kube-ops/.kube/config
 
     user: "{{ uid }}:{{ gid }}"
 
@@ -32,7 +35,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: '4.0'
           memory: 2G
         reservations:
           cpus: '0.5'

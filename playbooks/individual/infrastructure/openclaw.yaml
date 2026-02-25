@@ -323,7 +323,7 @@
 
   - name: Build OpenClaw Docker image
     ansible.builtin.shell: |
-      cd {{ home }}/source && docker build --build-arg OPENCLAW_DOCKER_APT_PACKAGES="chromium fonts-liberation libatk-bridge2.0-0 libdrm2 libgbm1 libnss3 libxss1 libasound2" -t openclaw:{{ version }} -f Dockerfile .
+      cd {{ home }}/source && DOCKER_BUILDKIT=1 docker build --build-arg OPENCLAW_DOCKER_APT_PACKAGES="chromium fonts-liberation libatk-bridge2.0-0 libdrm2 libgbm1 libnss3 libxss1 libasound2" -t openclaw:{{ version }} -f Dockerfile .
     when: openclaw_git.changed or image_check.rc != 0 or patch_device.changed or patch_auth.changed or patch_scopes.changed or patch_pairing.changed or patch_qmd.changed
     tags:
       - build
@@ -378,17 +378,21 @@
     tags:
       - config
 
-  - name: Ensure workspace agent directories exist
+  - name: Create agent workspace directories
     ansible.builtin.file:
-      path: "{{ home }}/data/workspace/memory/agents"
+      path: "{{ home }}/data/{{ item }}/memory/agents"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
+    loop:
+      - workspace
+      - workspace-kube-ops
+      - workspace-homelab-ops
     tags:
       - config
 
-  - name: Deploy SOUL.md to workspace
+  - name: Deploy shared SOUL.md to assistant workspace
     ansible.builtin.template:
       src: "{{ files }}/SOUL.md.j2"
       dest: "{{ home }}/data/workspace/SOUL.md"
@@ -396,10 +400,237 @@
       group: "{{ user }}"
       mode: '0644'
     notify:
-    - Reload systemd daemon
     - Restart openclaw service
     tags:
       - config
+
+  - name: Deploy homelab-ops SOUL.md
+    ansible.builtin.template:
+      src: "{{ files }}/homelab-ops-SOUL.md.j2"
+      dest: "{{ home }}/data/workspace-homelab-ops/SOUL.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy homelab-ops MEMORY.md
+    ansible.builtin.template:
+      src: "{{ files }}/homelab-ops-MEMORY.md.j2"
+      dest: "{{ home }}/data/workspace-homelab-ops/MEMORY.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy homelab-ops TOOLS.md
+    ansible.builtin.template:
+      src: "{{ files }}/homelab-ops-TOOLS.md.j2"
+      dest: "{{ home }}/data/workspace-homelab-ops/TOOLS.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy kube-ops SOUL.md
+    ansible.builtin.template:
+      src: "{{ files }}/kube-ops-SOUL.md.j2"
+      dest: "{{ home }}/data/workspace-kube-ops/SOUL.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  - name: Deploy kube-ops MEMORY.md
+    ansible.builtin.template:
+      src: "{{ files }}/kube-ops-MEMORY.md.j2"
+      dest: "{{ home }}/data/workspace-kube-ops/MEMORY.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart openclaw service
+    tags:
+      - config
+
+  # ---------------------------------------------------------------------------
+  # Tools — volume-mounted into container at /opt/tools (no rebuild needed)
+  # ---------------------------------------------------------------------------
+
+  - name: Create tools directory
+    ansible.builtin.file:
+      path: "{{ home }}/tools/bin"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0755'
+    tags:
+      - tools
+
+  - name: Install gh CLI (v2.67.0)
+    ansible.builtin.shell: |
+      set -euo pipefail
+      TMP=$(mktemp -d)
+      curl -sL -o "${TMP}/gh.deb" "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_amd64.deb"
+      dpkg-deb -x "${TMP}/gh.deb" "${TMP}/extract"
+      cp "${TMP}/extract/usr/bin/gh" {{ home }}/tools/bin/gh
+      chmod 755 {{ home }}/tools/bin/gh
+      rm -rf "${TMP}"
+    args:
+      creates: "{{ home }}/tools/bin/gh"
+      executable: /bin/bash
+    tags:
+      - tools
+
+  - name: Install jq
+    ansible.builtin.get_url:
+      url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64"
+      dest: "{{ home }}/tools/bin/jq"
+      mode: '0755'
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      force: false
+    tags:
+      - tools
+
+  - name: Install yq
+    ansible.builtin.get_url:
+      url: "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
+      dest: "{{ home }}/tools/bin/yq"
+      mode: '0755'
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      force: false
+    tags:
+      - tools
+
+  - name: Ensure python3-venv is installed
+    ansible.builtin.apt:
+      name: python3-venv
+      state: present
+    tags:
+      - tools
+
+  - name: Install ansible via pip venv
+    ansible.builtin.shell: |
+      set -euo pipefail
+      python3 -m venv {{ home }}/tools/ansible-venv
+      {{ home }}/tools/ansible-venv/bin/pip install --quiet ansible-core
+      for bin in ansible ansible-playbook ansible-vault ansible-galaxy ansible-config; do
+        ln -sf {{ home }}/tools/ansible-venv/bin/${bin} {{ home }}/tools/bin/${bin}
+      done
+    args:
+      creates: "{{ home }}/tools/bin/ansible"
+      executable: /bin/bash
+    tags:
+      - tools
+
+  - name: Install kubectl
+    ansible.builtin.get_url:
+      url: "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+      dest: "{{ home }}/tools/bin/kubectl"
+      mode: '0755'
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      force: false
+    tags:
+      - tools
+
+  - name: Create kube-ops .kube directory
+    ansible.builtin.file:
+      path: "{{ home }}/data/workspace-kube-ops/.kube"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0700'
+    tags:
+      - config
+      - tools
+
+  - name: Deploy kubeconfig for kube-ops agent
+    ansible.builtin.copy:
+      content: "{{ infrastructure.kubeconfig | default('') }}"
+      dest: "{{ home }}/data/workspace-kube-ops/.kube/config"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    when: infrastructure.kubeconfig is defined and infrastructure.kubeconfig | length > 0
+    no_log: true
+    tags:
+      - config
+      - tools
+
+  - name: Install ripgrep (v14.1.1)
+    ansible.builtin.shell: |
+      set -euo pipefail
+      TMP=$(mktemp -d)
+      curl -sL -o "${TMP}/rg.deb" "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep_14.1.1-1_amd64.deb"
+      dpkg-deb -x "${TMP}/rg.deb" "${TMP}/extract"
+      cp "${TMP}/extract/usr/bin/rg" {{ home }}/tools/bin/rg
+      chmod 755 {{ home }}/tools/bin/rg
+      rm -rf "${TMP}"
+    args:
+      creates: "{{ home }}/tools/bin/rg"
+      executable: /bin/bash
+    tags:
+      - tools
+
+  - name: Install sysadmin tool packages
+    ansible.builtin.apt:
+      name:
+        - iputils-ping
+        - mtr-tiny
+        - dnsutils
+        - whois
+        - traceroute
+        - nmap
+        - netcat-openbsd
+        - iproute2
+        - tcpdump
+      state: present
+    tags:
+      - tools
+
+  - name: Copy sysadmin tools to tools/bin
+    ansible.builtin.shell: |
+      set -euo pipefail
+      for bin in ping mtr dig host nslookup whois traceroute nmap nc ss ip tcpdump; do
+        src=$(which ${bin} 2>/dev/null || true)
+        if [ -n "${src}" ] && [ ! -f {{ home }}/tools/bin/${bin} ]; then
+          cp "${src}" {{ home }}/tools/bin/${bin}
+          chmod 755 {{ home }}/tools/bin/${bin}
+        fi
+      done
+    args:
+      executable: /bin/bash
+    changed_when: false
+    tags:
+      - tools
+
+  - name: Set tools ownership
+    ansible.builtin.file:
+      path: "{{ home }}/tools"
+      state: directory
+      recurse: yes
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+    tags:
+      - tools
+
+  # ---------------------------------------------------------------------------
+  # Deploy — docker-compose, systemd, environment
+  # ---------------------------------------------------------------------------
 
   - name: Create docker-compose.yml
     ansible.builtin.template:

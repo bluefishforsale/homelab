@@ -2,11 +2,11 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "anthropic/claude-sonnet-4-20250514",
+        "primary": "anthropic/claude-sonnet-4-5-20250929",
         "fallbacks": [
-          "openai/gpt-4o",
-          "google/gemini-2.0-flash",
-          "llamacpp/auto"
+          "anthropic/claude-opus-4-6",
+          "google/gemini-3-pro-preview",
+          "llamacpp//models/Qwen3-14B-Q4_K_M.gguf"
         ]
       },
       "memorySearch": {
@@ -16,18 +16,60 @@
     },
     "list": [
       {
-        "id": "boss",
+        "id": "assistant",
         "default": true,
-        "name": "Boss",
+        "name": "Assistant",
         "identity": {
-          "name": "Boss",
-          "emoji": "🏗️"
+          "name": "Assistant",
+          "emoji": "💬"
+        },
+        "model": {
+          "primary": "anthropic/claude-sonnet-4-5-20250929",
+          "fallbacks": ["google/gemini-3-pro-preview", "llamacpp//models/Qwen3-14B-Q4_K_M.gguf"]
         },
         "subagents": {
           "allowAgents": ["*"],
           "model": {
-            "primary": "openai/gpt-4o",
-            "fallbacks": ["google/gemini-2.0-flash", "llamacpp/auto"]
+            "primary": "llamacpp//models/Qwen3-14B-Q4_K_M.gguf",
+            "fallbacks": ["anthropic/claude-sonnet-4-5-20250929"]
+          }
+        }
+      },
+      {
+        "id": "kube-ops",
+        "name": "Kube Ops",
+        "identity": {
+          "name": "Kube Ops",
+          "emoji": "☸️"
+        },
+        "model": {
+          "primary": "google/gemini-3-pro-preview",
+          "fallbacks": ["anthropic/claude-sonnet-4-5-20250929", "llamacpp//models/Qwen3-14B-Q4_K_M.gguf"]
+        },
+        "subagents": {
+          "allowAgents": ["*"],
+          "model": {
+            "primary": "google/gemini-3-pro-preview",
+            "fallbacks": ["anthropic/claude-sonnet-4-5-20250929"]
+          }
+        }
+      },
+      {
+        "id": "homelab-ops",
+        "name": "Homelab Ops",
+        "identity": {
+          "name": "Homelab Ops",
+          "emoji": "🔧"
+        },
+        "model": {
+          "primary": "google/gemini-3-pro-preview",
+          "fallbacks": ["anthropic/claude-sonnet-4-5-20250929", "llamacpp//models/Qwen3-14B-Q4_K_M.gguf"]
+        },
+        "subagents": {
+          "allowAgents": ["*"],
+          "model": {
+            "primary": "google/gemini-3-pro-preview",
+            "fallbacks": ["anthropic/claude-sonnet-4-5-20250929"]
           }
         }
       }
@@ -41,9 +83,9 @@
         "api": "openai-completions",
         "models": [
           {
-            "id": "auto",
-            "name": "Local LLM (llamacpp)",
-            "reasoning": false,
+            "id": "/models/Qwen3-14B-Q4_K_M.gguf",
+            "name": "Qwen3-14B (llamacpp)",
+            "reasoning": true,
             "input": ["text"],
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
             "contextWindow": 40960,

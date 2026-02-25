@@ -1,0 +1,357 @@
+# TOOLS.md — Homelab Ops
+
+Reference for all CLI tools, credentials, and operational commands available to you.
+
+---
+
+## SSH Access
+
+SSH keys are mounted at `/home/node/.ssh/`. Config is at `/home/node/.ssh/config`.
+
+### Host Map
+
+| Host | IP | User | Role |
+|------|----|------|------|
+| ocean | 192.168.1.143 | terrac | Primary Docker services host |
+| node005 | 192.168.1.105 | root | Proxmox — control VMs |
+| node006 | 192.168.1.106 | root | Proxmox — ocean VM host |
+| dns01 | 192.168.1.2 | debian | BIND DNS |
+| pihole | 192.168.1.9 | debian | DNS filtering |
+| gitlab | 192.168.1.5 | debian | CI/CD |
+| gh-runner-01 | 192.168.1.20 | debian | GitHub Actions runners |
+| metrics | 192.168.1.30 | debian | Metrics collection |
+| openclaw | 192.168.1.31 | debian | This VM (you run here) |
+| kube501 | 192.168.1.51 | debian | K8s control plane |
+| kube502 | 192.168.1.52 | debian | K8s control plane |
+| kube503 | 192.168.1.53 | debian | K8s control plane |
+| kube511 | 192.168.1.61 | debian | K8s worker |
+
+### SSH Examples
+
+```bash
+# Connect to ocean
+ssh ocean
+
+# Run a command remotely
+ssh ocean 'systemctl status plex'
+
+# Check disk space
+ssh ocean 'df -h /data01'
+
+# Tail service logs
+ssh ocean 'journalctl -u plex --since "5 min ago" --no-pager'
+
+# Check Docker containers
+ssh ocean 'docker ps --format "table {{"{{"}}.Names{{"}}"}}\t{{"{{"}}.Status{{"}}"}}\t{{"{{"}}.Ports{{"}}"}}"'
+
+# Restart a service
+ssh ocean 'sudo systemctl restart plex'
+
+# Check ZFS pool
+ssh ocean 'zpool status data01'
+
+# GPU status
+ssh ocean 'nvidia-smi'
+
+# Multiple commands
+ssh ocean 'docker ps -q | wc -l && free -h && uptime'
+```
+
+### SSH to Proxmox Hosts
+
+```bash
+# Node management (use carefully — these are hypervisors)
+ssh node005 'qm list'                    # List VMs
+ssh node005 'pvesh get /nodes/node005/status'  # Node status
+ssh node006 'qm list'
+```
+
+---
+
+## Ansible
+
+Ansible and its tools are in PATH via `/opt/tools/ansible-venv/bin/`.
+
+### Inventory
+
+The production inventory is at:
+```
+/home/node/.openclaw/workspace-homelab-ops/homelab/inventories/production/hosts.ini
+```
+
+**Groups:**
+- `proxmox` — node005, node006 (bare metal hypervisors)
+- `baremetal` — same as proxmox
+- `vms` — ocean, dns01, gitlab, pihole, gh-runner-01, metrics, openclaw
+- `github_runners` — gh-runner-01
+- `dns` — dns01
+- `k8s` — kube501, kube502, kube503, kube511
+
+### Running Playbooks
+
+```bash
+# Full infrastructure
+ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml
+
+# Ocean services only
+ansible-playbook -i inventories/production/hosts.ini playbooks/03_ocean_services.yaml
+
+# Single service
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml
+
+# Limit to specific host
+ansible-playbook -i inventories/production/hosts.ini playbooks/03_ocean_services.yaml -l ocean
+
+# Dry run (check mode)
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml --check
+
+# With specific tags
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml --tags models
+
+# Verbose output
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml -vv
+```
+
+### Ad-hoc Commands
+
+```bash
+# Ping all hosts
+ansible all -i inventories/production/hosts.ini -m ping
+
+# Ping specific group
+ansible vms -i inventories/production/hosts.ini -m ping
+
+# Run shell command on ocean
+ansible ocean -i inventories/production/hosts.ini -m shell -a 'systemctl status plex'
+
+# Check disk space on all VMs
+ansible vms -i inventories/production/hosts.ini -m shell -a 'df -h /'
+
+# Check uptime
+ansible all -i inventories/production/hosts.ini -m shell -a 'uptime'
+
+# Gather facts
+ansible ocean -i inventories/production/hosts.ini -m setup -a 'filter=ansible_memtotal_mb'
+
+# Check service status
+ansible ocean -i inventories/production/hosts.ini -m systemd -a 'name=plex'
+
+# Restart a service
+ansible ocean -i inventories/production/hosts.ini -m systemd -a 'name=plex state=restarted' --become
+
+# Copy a file
+ansible ocean -i inventories/production/hosts.ini -m copy -a 'src=/tmp/fix.conf dest=/etc/fix.conf' --become
+
+# Install a package
+ansible ocean -i inventories/production/hosts.ini -m apt -a 'name=htop state=present' --become
+```
+
+### Vault
+
+Secrets are in `vault/secrets.yaml` (ansible-vault encrypted). The vault password is available via `ANSIBLE_VAULT_PASSWORD_FILE` or `ANSIBLE_VAULT_PASSWORD` environment variable.
+
+```bash
+# View the entire vault
+ansible-vault view vault/secrets.yaml
+
+# View a specific key with yq
+ansible-vault view vault/secrets.yaml | yq -r '.cloudflare.api_token'
+
+# View all top-level keys
+ansible-vault view vault/secrets.yaml | yq -r 'keys'
+
+# Edit the vault (interactive)
+ansible-vault edit vault/secrets.yaml
+
+# Encrypt a string for use in playbooks
+ansible-vault encrypt_string 'my-secret-value' --name 'variable_name'
+```
+
+**Top-level vault keys:**
+- `cloudflare` — API credentials, tunnel certs, access email lists
+- `gitlab` — root credentials, tokens
+- `databases` — MySQL/PostgreSQL passwords
+- `media_services` — API keys for Plex, Sonarr, Radarr, Prowlarr, Bazarr, Tautulli, NZBGet
+- `ai_services` — llama.cpp, Open WebUI, Claude API keys, OpenClaw config
+- `cloud_services` — NextCloud credentials
+- `monitoring` — Grafana, Prometheus passwords
+- `smtp` — Gmail app password for alerts
+- `development` — GitHub token, Docker registry credentials
+- `infrastructure` — kubeconfig
+
+---
+
+## jq — JSON Processing
+
+```bash
+# Pretty-print JSON
+cat file.json | jq '.'
+
+# Extract a field
+cat file.json | jq '.key.subkey'
+
+# Filter arrays
+cat file.json | jq '.items[] | select(.status == "failed")'
+
+# Count items
+cat file.json | jq '.items | length'
+
+# Transform output
+cat file.json | jq -r '.items[] | "\(.name)\t\(.status)"'
+
+# Docker inspect with jq
+ssh ocean 'docker inspect plex' | jq '.[0].State'
+ssh ocean 'docker inspect plex' | jq '.[0].NetworkSettings.Ports'
+
+# Prometheus API with jq
+curl -s 'http://192.168.1.143:9090/api/v1/targets' | jq '.data.activeTargets[] | select(.health != "up") | .labels.job'
+
+# GitHub API with jq
+gh api repos/bluefishforsale/homelab/actions/runs --jq '.workflow_runs[:5] | .[] | "\(.name) \(.conclusion) \(.created_at)"'
+```
+
+---
+
+## yq — YAML Processing
+
+```bash
+# Read a YAML value
+yq -r '.service_ports.plex.port' vars/vars_service_ports.yaml
+
+# List all service ports
+yq -r '.service_ports | to_entries[] | "\(.key): \(.value.port)"' vars/vars_service_ports.yaml
+
+# Read docker-compose service names
+ssh ocean 'cat /data01/services/plex/docker-compose.yml' | yq -r '.services | keys[]'
+
+# Check a service image version
+ssh ocean 'cat /data01/services/plex/docker-compose.yml' | yq -r '.services[].image'
+
+# Read cloudflared tunnel config
+yq -r '.tunnel_ingress[] | "\(.hostname) → \(.service)"' vars/vars_cloudflared.yaml
+
+# Combine vault view with yq
+ansible-vault view vault/secrets.yaml | yq -r '.media_services | keys'
+ansible-vault view vault/secrets.yaml | yq -r '.databases.mysql.root_password'
+```
+
+---
+
+## Network Diagnostics
+
+```bash
+# Test connectivity to a service
+ping -c 3 192.168.1.143
+
+# DNS lookup
+dig @192.168.1.2 ocean.home
+dig @192.168.1.2 +short plex.home
+
+# Reverse DNS
+dig @192.168.1.2 +short -x 192.168.1.143
+
+# Trace network path
+mtr -r -c 5 192.168.1.143
+
+# Check if a port is open
+nc -zv 192.168.1.143 32400    # Plex
+nc -zv 192.168.1.143 8080     # llama.cpp
+nc -zv 192.168.1.143 9090     # Prometheus
+
+# Scan open ports on a host
+nmap -sT -p- 192.168.1.143 --open
+
+# Quick top-ports scan
+nmap -sT --top-ports 100 192.168.1.143
+
+# Check HTTP endpoint
+curl -s -o /dev/null -w "%{http_code}" http://192.168.1.143:9090/-/healthy
+
+# Whois lookup
+whois terrac.com
+```
+
+---
+
+## ripgrep — Fast Search
+
+```bash
+# Search for a string in the repo
+rg "plex" playbooks/
+
+# Search for a variable in templates
+rg "service_ports" files/ vars/
+
+# Search YAML files only
+rg -t yaml "nvidia" playbooks/
+
+# Case-insensitive
+rg -i "gpu" playbooks/
+
+# Show context around matches
+rg -C 3 "restart" playbooks/individual/ocean/media/plex.yaml
+```
+
+---
+
+## GitHub CLI
+
+```bash
+# List open issues
+gh issue list --repo bluefishforsale/homelab --state open
+
+# Create an issue
+gh issue create --repo bluefishforsale/homelab \
+  --title "[homelab-ops] Service down: plex" \
+  --body "Detected plex service down at $(date). Prometheus up metric = 0."
+
+# Create a PR
+gh pr create --repo bluefishforsale/homelab \
+  --title "[homelab-ops] Fix plex memory limits" \
+  --body "Fixes #123. Increased memory limit from 2G to 4G." \
+  --base main
+
+# Check CI status
+gh run list --repo bluefishforsale/homelab --limit 5
+
+# View a specific run
+gh run view <run-id> --repo bluefishforsale/homelab
+
+# Clone the repo (if needed)
+gh repo clone bluefishforsale/homelab /tmp/homelab-fix
+```
+
+---
+
+## Debugging Playbook Reference
+
+Quick reference for common debugging tasks:
+
+```bash
+# Service won't start — check everything
+ssh ocean 'systemctl status <service> && docker compose -f /data01/services/<service>/docker-compose.yml logs --tail 50'
+
+# Container crash loop — check OOM or config
+ssh ocean 'docker inspect <container> | jq ".[0].State"'
+ssh ocean 'journalctl -u <service> --since "1 hour ago" --no-pager | tail -100'
+
+# Disk space issue
+ssh ocean 'df -h && du -sh /data01/services/* | sort -h | tail -20'
+ssh ocean 'docker system df'
+
+# Memory pressure
+ssh ocean 'free -h && docker stats --no-stream --format "table {{"{{"}}.Name{{"}}"}}\t{{"{{"}}.MemUsage{{"}}"}}\t{{"{{"}}.MemPerc{{"}}"}}" | sort -k3 -rh | head -20'
+
+# GPU issues
+ssh ocean 'nvidia-smi && docker inspect llamacpp | jq ".[0].HostConfig.DeviceRequests"'
+
+# Network issues
+ssh ocean 'ss -tlnp | grep <port>'
+curl -s http://192.168.1.143:<port>/health
+
+# ZFS issues
+ssh ocean 'zpool status data01 && zfs list -o name,used,avail,refer data01'
+
+# Docker networking
+ssh ocean 'docker network ls && docker network inspect bridge | jq ".[0].Containers"'
+```
