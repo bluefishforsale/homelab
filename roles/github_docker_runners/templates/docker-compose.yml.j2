@@ -109,12 +109,12 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Logging
+    # Logging - uses journald for integration with Loki via Promtail
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "github-runner-{{ runner_index }}"
+        labels: "runner_name,runner_index"
     
     # Network mode
     network_mode: bridge

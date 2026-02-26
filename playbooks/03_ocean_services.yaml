@@ -91,6 +91,9 @@
 - name: Deploy TinaCMS Blog Platform
   ansible.builtin.import_playbook: individual/ocean/services/tinacms.yaml
 
+- name: Deploy terrac.com Static Website
+  ansible.builtin.import_playbook: individual/ocean/services/terrac_com_static.yaml
+
 - name: Deploy Audible Downloader
   ansible.builtin.import_playbook: individual/ocean/services/audible_downloader.yaml
 

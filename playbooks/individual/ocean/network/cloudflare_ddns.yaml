@@ -18,14 +18,15 @@
     cf_api_key: "{{ external_apis.ddns.cloudflare_token }}"
     cf_zone_id: "{{ cloudflare.terrac_com }}"
     cf_records:
-    - dns: terrac.com
-      api_key: "{{ cf_api_key }}"
-      zone_id: "{{ cf_zone_id }}"
-      record_id: 81fa8a096a6ceb11e264f0ccde2a4c86
+    # Removed terrac.com apex - now using CNAME to Cloudflare Tunnel instead of DDNS A record
+    # - dns: terrac.com
+    #   api_key: "{{ cf_api_key }}"
+    #   zone_id: "{{ cf_zone_id }}"
+    #   record_id: 81fa8a096a6ceb11e264f0ccde2a4c86
     - dns: home.terrac.com
       api_key: "{{ cf_api_key }}"
       zone_id: "{{ cf_zone_id }}"
-      record_id: 5c45e94490466b3fe4901d913c31a9b5
+      record_id: e784411c49566ab8fe5e5ab69490e6ac
 
   tasks:
 

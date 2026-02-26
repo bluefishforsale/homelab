@@ -20,5 +20,10 @@
   vars_files:
     - ../../../vault/secrets.yaml
   
+  vars:
+    github_pat_token: "{{ development.github.token }}"
+    github_scope: "repo"
+    github_repo: "bluefishforsale/homelab"
+  
   roles:
     - github_docker_runners

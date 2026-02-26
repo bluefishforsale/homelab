@@ -253,7 +253,7 @@
   # Define which services need NO authentication (bypass policy)
   - name: Define fully public services list (no authentication required)
     ansible.builtin.set_fact:
-      fully_public_services: ["blog"]
+      fully_public_services: ["blog", "terrac", "www"]
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined

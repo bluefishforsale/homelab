@@ -53,6 +53,15 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:80"
 
+        # Static website (running on ocean - 192.168.1.143)
+        # Route through nginx to serve static files from /data01/services/terrac_com
+        - hostname: "terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+        - hostname: "www.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
         # Admin dashboard (Homepage)
         - hostname: "homepage.terrac.com"
           service_type: "http"

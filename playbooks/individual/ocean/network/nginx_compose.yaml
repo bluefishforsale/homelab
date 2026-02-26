@@ -39,6 +39,39 @@
     - logs
     - conf.d
 
+  - name: Ensure terrac_com static website directory exists
+    ansible.builtin.file:
+      path: "{{ data }}/services/terrac_com"
+      state: directory
+      owner: media
+      group: media
+      mode: '0755'
+
+  - name: Create placeholder index.html if it doesn't exist
+    ansible.builtin.copy:
+      content: |
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>terrac.com</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+                h1 { color: #333; }
+            </style>
+        </head>
+        <body>
+            <h1>Welcome to terrac.com</h1>
+            <p>This is a placeholder page. Replace the contents of /data01/services/terrac_com/ with your static website files.</p>
+        </body>
+        </html>
+      dest: "{{ data }}/services/terrac_com/index.html"
+      owner: media
+      group: media
+      mode: '0644'
+      force: no
+
   - name: Create nginx main configuration
     ansible.builtin.template:
       src: "{{ files }}/nginx.conf.j2"
