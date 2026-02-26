@@ -1,0 +1,115 @@
+---
+# Add this file to terrac_com_2026 repository at:
+# .gitlab-ci.yml
+#
+# This GitLab CI pipeline builds the Vite app and commits the dist/ folder
+# so the homelab can deploy it via git pull
+
+stages:
+  - build
+  - deploy
+
+variables:
+  GIT_DEPTH: 0  # Full clone for commit history
+
+build_and_commit:
+  stage: build
+  image: node:20
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git
+    - git config --global user.name "GitLab CI"
+    - git config --global user.email "gitlab-ci@terrac.com"
+  script:
+    # Install dependencies
+    - npm ci
+    
+    # Build the application
+    - npm run build
+    
+    # Check if dist folder exists
+    - |
+      if [ ! -d "dist" ]; then
+        echo "❌ ERROR: dist/ folder not created by build"
+        exit 1
+      fi
+    
+    - echo "✅ Build completed successfully"
+    
+    # Remove dist from .gitignore if present
+    - sed -i '/^dist$/d' .gitignore || true
+    - sed -i '/^dist-ssr$/d' .gitignore || true
+    
+    # Configure git to use CI token for pushing
+    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+    
+    # Checkout the current branch (CI runs in detached HEAD)
+    - git checkout -B ${CI_COMMIT_REF_NAME}
+    
+    # Add and commit dist folder
+    - git add -f dist/
+    - git add .gitignore
+    
+    # Only commit if there are changes
+    - |
+      if ! git diff --cached --quiet; then
+        git commit -m "build: update dist folder [skip ci]" || true
+        git push origin ${CI_COMMIT_REF_NAME}
+        echo "✅ Dist folder committed and pushed"
+      else
+        echo "ℹ️ No changes to dist folder"
+      fi
+  
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  
+  only:
+    - main
+    - master
+  
+  # Don't run if commit message contains [skip ci]
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip ci\]/
+
+trigger_homelab_deployment:
+  stage: deploy
+  image: curlimages/curl:latest
+  script:
+    - |
+      echo "🚀 Triggering homelab deployment..."
+      
+      # Trigger repository_dispatch in homelab GitHub repo
+      curl -X POST \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${HOMELAB_DEPLOY_TOKEN}" \
+        https://api.github.com/repos/bluefishforsale/homelab/dispatches \
+        -d "{
+          \"event_type\": \"deploy-website\",
+          \"client_payload\": {
+            \"branch\": \"${CI_COMMIT_REF_NAME}\",
+            \"sha\": \"${CI_COMMIT_SHA}\",
+            \"commit_message\": \"${CI_COMMIT_MESSAGE}\",
+            \"force_clean\": false,
+            \"source\": \"gitlab\"
+          }
+        }"
+      
+      if [ $? -eq 0 ]; then
+        echo "✅ Homelab deployment triggered successfully"
+      else
+        echo "⚠️ Failed to trigger homelab deployment (check HOMELAB_DEPLOY_TOKEN variable)"
+        exit 0  # Don't fail the pipeline if webhook fails
+      fi
+  
+  needs:
+    - build_and_commit
+  
+  only:
+    - main
+    - master
+  
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip ci\]/

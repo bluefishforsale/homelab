@@ -1,0 +1,217 @@
+---
+# Deploy terrac.com static website from GitHub
+# 
+# NOTE: This playbook deploys pre-built static files from the repository.
+# The dist/ folder is built by GitHub Actions CI in the terrac_com_2026 repo.
+# 
+# This playbook always does a clean deployment (removes and re-clones the repo)
+# to avoid git ownership and permissions issues.
+#
+# Available tags:
+#   --tags setup        Create only directories
+#   --tags deploy       Deploy only from git (skip directory creation)
+#   --skip-tags git     Skip git operations (useful for testing)
+#
+# Usage examples:
+#   Deploy from main branch (default):
+#     ansible-playbook playbooks/individual/ocean/services/terrac_com_static.yaml
+#
+#   Deploy from specific branch:
+#     ansible-playbook playbooks/individual/ocean/services/terrac_com_static.yaml -e "git_branch=develop"
+#
+- name: Deploy terrac.com Static Website from GitHub
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+
+  vars:
+    service: terrac_com
+    git_repo: "{{ lookup('env', 'GIT_REPO') | default('git@github.com:bluefishforsale/terrac_com_2026.git', true) }}"
+    git_branch: "{{ lookup('env', 'GIT_BRANCH') | default('main', true) }}"
+    data: /data01
+    home: "{{ data }}/services/{{ service }}"
+    git_clone_path: "{{ home }}/repo"
+    web_root: "{{ home }}"
+    user: media
+    uid: 1001
+    gid: 1001
+    # Accept GitHub's host key automatically for git operations
+    accept_hostkey: yes
+
+  tasks:
+
+  - name: Display deployment information
+    ansible.builtin.debug:
+      msg:
+        - "Deploying terrac.com static website (clean deployment)"
+        - "Repository: {{ git_repo }}"
+        - "Branch: {{ git_branch }}"
+        - "Destination: {{ web_root }}"
+    tags: [always]
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags: [always, setup]
+
+  - name: Ensure repo directory exists
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: directory
+      owner: terrac
+      group: terrac
+      mode: '0755'
+    tags: [always, setup]
+
+  - name: Install required packages
+    ansible.builtin.apt:
+      name:
+        - git
+        - rsync
+      state: present
+      update_cache: no
+    tags: [setup]
+
+  - name: Always remove existing git repository for clean deployment
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: absent
+    tags: [deploy, git]
+
+  - name: Recreate repo directory with correct ownership
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: directory
+      owner: terrac
+      group: terrac
+      mode: '0755'
+    tags: [deploy, git]
+
+  - name: Clone git repository (fresh every time)
+    ansible.builtin.git:
+      repo: "{{ git_repo }}"
+      dest: "{{ git_clone_path }}"
+      version: "{{ git_branch }}"
+      force: yes
+      update: yes
+      accept_hostkey: "{{ accept_hostkey }}"
+    become_user: terrac
+    environment:
+      GIT_SSH_COMMAND: "ssh -i /home/terrac/.ssh/id_ed25519 -o StrictHostKeyChecking=no"
+    register: git_clone
+    tags: [deploy, git]
+
+  - name: Display git clone/update result
+    ansible.builtin.debug:
+      msg:
+        - "Git operation completed"
+        - "Before: {{ git_clone.before | default('N/A') }}"
+        - "After: {{ git_clone.after | default('N/A') }}"
+        - "Changed: {{ git_clone.changed }}"
+    when: git_clone is defined
+    tags: [deploy, git]
+
+  - name: Check if dist directory exists
+    ansible.builtin.stat:
+      path: "{{ git_clone_path }}/dist"
+    register: dist_dir
+    tags: [deploy, build]
+
+  - name: Set source directory for sync
+    ansible.builtin.set_fact:
+      sync_source: "{{ git_clone_path }}/dist" 
+    when: dist_dir.stat.exists and dist_dir.stat.isdir
+    tags: [deploy]
+
+  - name: Set source directory for sync (fallback to repo root)
+    ansible.builtin.set_fact:
+      sync_source: "{{ git_clone_path }}"
+    when: not (dist_dir.stat.exists and dist_dir.stat.isdir)
+    tags: [deploy]
+
+  - name: Create list of files to exclude from sync
+    ansible.builtin.set_fact:
+      rsync_excludes:
+        - '.git'
+        - '.gitignore'
+        - '.github'
+        - 'README.md'
+        - 'LICENSE'
+        - '.DS_Store'
+        - 'node_modules'
+        - '.next'
+        - '.cache'
+    tags: [deploy]
+
+  - name: Sync built files to web root (or repo if no build)
+    ansible.builtin.synchronize:
+      src: "{{ sync_source }}/"
+      dest: "{{ web_root }}/"
+      delete: yes
+      recursive: yes
+      rsync_opts:
+        - "--exclude=.git"
+        - "--exclude=.gitignore"
+        - "--exclude=.github"
+        - "--exclude=README.md"
+        - "--exclude=LICENSE"
+        - "--exclude=.DS_Store"
+        - "--exclude=node_modules"
+        - "--exclude=.next"
+        - "--exclude=.cache"
+        - "--exclude=repo"
+        - "--chown={{ uid }}:{{ gid }}"
+    delegate_to: "{{ inventory_hostname }}"
+    tags: [deploy]
+
+  - name: Ensure all files have correct ownership
+    ansible.builtin.file:
+      path: "{{ web_root }}"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+    tags: [deploy]
+
+  - name: Ensure all files have correct permissions
+    ansible.builtin.file:
+      path: "{{ web_root }}"
+      state: directory
+      mode: 'u=rwX,g=rX,o=rX'
+      recurse: yes
+    tags: [deploy]
+
+  - name: Verify index.html exists
+    ansible.builtin.stat:
+      path: "{{ web_root }}/index.html"
+    register: index_file
+    tags: [deploy]
+
+  - name: Display warning if index.html not found
+    ansible.builtin.debug:
+      msg: "WARNING: index.html not found in {{ web_root }}. The website may not load correctly."
+    when: not index_file.stat.exists
+    tags: [deploy]
+
+  - name: Display deployment success
+    ansible.builtin.debug:
+      msg:
+        - "Deployment completed successfully!"
+        - "Website root: {{ web_root }}"
+        - "Files deployed from branch: {{ git_branch }}"
+        - "Git commit: {{ git_clone.after | default('N/A') }}"
+        - ""
+        - "Access URLs:"
+        - "  - https://terrac.com"
+        - "  - https://www.terrac.com"
+        - ""
+        - "To redeploy from a different branch:"
+        - "  ansible-playbook playbooks/individual/ocean/services/terrac_com_static.yaml -e git_branch=develop"
+    when: git_clone is defined
+    tags: [always]

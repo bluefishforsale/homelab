@@ -1,0 +1,80 @@
+---
+# Add this file to terrac_com_2026 repository at:
+# .github/workflows/build-and-commit.yml
+#
+# This workflow builds the Vite app and commits the dist/ folder
+# so the homelab can deploy it via git pull
+
+name: Build and Commit Dist
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'dist/**'
+      - '.github/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Commit Distribution
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build application
+        run: npm run build
+        
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - name: Commit dist folder
+        run: |
+          # Remove dist from .gitignore if it exists there
+          sed -i '/^dist$/d' .gitignore || true
+          sed -i '/^dist-ssr$/d' .gitignore || true
+          
+          # Add dist folder
+          git add -f dist/
+          
+          # Commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "build: update dist folder [skip ci]"
+            git push
+            echo "✅ Dist folder committed"
+          else
+            echo "ℹ️ No changes to dist folder"
+          fi
+          
+      - name: Trigger homelab deployment
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.HOMELAB_DEPLOY_TOKEN }}" \
+            https://api.github.com/repos/bluefishforsale/homelab/dispatches \
+            -d '{
+              "event_type": "deploy-website",
+              "client_payload": {
+                "branch": "${{ github.ref_name }}",
+                "sha": "${{ github.sha }}",
+                "commit_message": "${{ github.event.head_commit.message }}",
+                "force_clean": false
+              }
+            }' || echo "⚠️ Could not trigger homelab deployment (HOMELAB_DEPLOY_TOKEN may not be set)"
