@@ -1,0 +1,206 @@
+---
+name: Deploy terrac.com Website
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      git_branch:
+        description: "Git branch to deploy"
+        required: false
+        default: "main"
+        type: string
+      force_clean:
+        description: "Force clean deployment (remove existing files)"
+        required: false
+        type: boolean
+        default: false
+
+  # Webhook trigger from terrac_com_2026 repository
+  repository_dispatch:
+    types: [deploy-website]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  deploy:
+    name: Deploy terrac.com Static Website
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify Ansible installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible --version
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Determine deployment parameters
+        id: params
+        run: |
+          # For repository_dispatch events, use payload data if available
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            BRANCH="${{ github.event.client_payload.branch || 'main' }}"
+            FORCE_CLEAN="${{ github.event.client_payload.force_clean || 'false' }}"
+            COMMIT_SHA="${{ github.event.client_payload.sha || 'unknown' }}"
+            COMMIT_MESSAGE="${{ github.event.client_payload.commit_message || 'Webhook deployment' }}"
+          else
+            # For workflow_dispatch, use inputs
+            BRANCH="${{ inputs.git_branch || 'main' }}"
+            FORCE_CLEAN="${{ inputs.force_clean || 'false' }}"
+            COMMIT_SHA="unknown"
+            COMMIT_MESSAGE="Manual deployment"
+          fi
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "force_clean=$FORCE_CLEAN" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+
+          echo "Deployment Parameters:"
+          echo "  Branch: $BRANCH"
+          echo "  Force Clean: $FORCE_CLEAN"
+          echo "  Commit SHA: $COMMIT_SHA"
+          echo "  Commit Message: $COMMIT_MESSAGE"
+
+      - name: Run deployment playbook
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          INVENTORY="inventories/production/hosts.ini"
+          PLAYBOOK="playbooks/individual/ocean/services/terrac_com_static.yaml"
+
+          echo "================================================"
+          echo "Deploying terrac.com static website"
+          echo "================================================"
+          echo ""
+          echo "Branch: ${{ steps.params.outputs.branch }}"
+          echo "Force Clean: ${{ steps.params.outputs.force_clean }}"
+          echo "Commit: ${{ steps.params.outputs.commit_sha }}"
+          echo "Message: ${{ steps.params.outputs.commit_message }}"
+          echo ""
+
+          START_TIME=$(date +%s)
+
+          # Build ansible-playbook command
+          CMD="ansible-playbook -i $INVENTORY --vault-password-file=/tmp/.vault_pass"
+          CMD="$CMD -e git_branch=${{ steps.params.outputs.branch }}"
+          CMD="$CMD -e force_clean=${{ steps.params.outputs.force_clean }}"
+          CMD="$CMD $PLAYBOOK"
+
+          echo "Running: $CMD"
+          echo ""
+
+          if eval $CMD; then
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            
+            echo ""
+            echo "✅ SUCCESS: terrac.com deployed (${DURATION}s)"
+            echo "deployment_status=success" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+          else
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            
+            echo ""
+            echo "❌ FAILED: terrac.com deployment failed (${DURATION}s)"
+            echo "deployment_status=failed" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: |
+          rm -f /tmp/.vault_pass
+
+      - name: Post-deployment health check
+        if: success()
+        run: |
+          echo "🔍 Verifying deployment..."
+          
+          # Wait for nginx to reload
+          sleep 5
+
+          # Check if the website responds
+          if timeout 10 bash -c "curl -f -s -o /dev/null http://192.168.1.143/" 2>/dev/null; then
+            echo "✅ Website responding on nginx"
+          else
+            echo "⚠️  Website not responding (this may be normal if nginx needs restart)"
+          fi
+
+          # Verify files exist
+          if ssh terrac@192.168.1.143 "test -f /data01/services/terrac_com/index.html"; then
+            echo "✅ index.html exists on server"
+          else
+            echo "❌ index.html NOT FOUND on server"
+            exit 1
+          fi
+
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          BRANCH="${{ steps.params.outputs.branch }}"
+          FORCE_CLEAN="${{ steps.params.outputs.force_clean }}"
+          COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
+          COMMIT_MESSAGE="${{ steps.params.outputs.commit_message }}"
+          STATUS="${{ env.deployment_status || 'unknown' }}"
+          DURATION="${{ env.deployment_duration || 'N/A' }}"
+
+          if [ "$STATUS" = "success" ]; then
+            STATUS_EMOJI="✅"
+            STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
+          else
+            STATUS_EMOJI="❌"
+            STATUS_TEXT="DEPLOYMENT FAILED"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 🌐 terrac.com Website Deployment
+
+          ## $STATUS_EMOJI $STATUS_TEXT
+
+          **Branch:** \`$BRANCH\`  
+          **Commit:** \`$COMMIT_SHA\`  
+          **Message:** $COMMIT_MESSAGE  
+          **Force Clean:** $FORCE_CLEAN  
+          **Duration:** ${DURATION}s
+
+          ## Deployment Details
+
+          | Parameter | Value |
+          |-----------|-------|
+          | Repository | bluefishforsale/terrac_com_2026 |
+          | Branch | $BRANCH |
+          | Destination | /data01/services/terrac_com |
+          | Web Server | nginx on ocean (192.168.1.143) |
+
+          ## Access URLs
+
+          - https://terrac.com
+          - https://www.terrac.com
+
+          ---
+
+          View full logs in the workflow run above.
+          EOF
+
+          echo "Deployment summary created"

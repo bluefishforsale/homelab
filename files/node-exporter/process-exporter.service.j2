@@ -17,7 +17,7 @@ ExecStartPre=-/usr/bin/docker pull {{ process_exporter_image }}:{{ process_expor
 ExecStart=docker run --rm \
     --name {{ process_exporter_service }} \
     --hostname {{ process_exporter_service }} \
-    --environment TZ=America/Los_Angeles \
+    -e TZ=America/Los_Angeles \
     -p {{ process_exporter_port }}:9256 \
     --privileged \
     -v /proc:/host/proc \

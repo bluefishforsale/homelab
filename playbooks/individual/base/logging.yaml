@@ -190,6 +190,10 @@
                 target_label: 'container'
               - source_labels: ['__journal_container_id']
                 target_label: 'container_id'
+              # Add nodename label matching node_exporter for dashboard compatibility
+              - action: replace
+                replacement: '{{ inventory_hostname }}'
+                target_label: 'nodename'
       mode: '0644'
     notify:
       - Restart promtail
@@ -232,6 +236,10 @@
                 target_label: 'container'
               - source_labels: ['__journal_container_id']
                 target_label: 'container_id'
+              # Add nodename label matching node_exporter for dashboard compatibility
+              - action: replace
+                replacement: '{{ inventory_hostname }}'
+                target_label: 'nodename'
 
           # Syslog listener for remote devices
           - job_name: syslog
@@ -255,10 +263,18 @@
       - Restart promtail
     when: inventory_hostname == 'ocean'
 
+  - name: Add promtail user to systemd-journal group for journal access
+    ansible.builtin.user:
+      name: promtail
+      groups: systemd-journal
+      append: yes
+    notify: Restart promtail
+
   - name: Create Promtail positions directory
     ansible.builtin.file:
       path: /var/lib/promtail
       state: directory
+      owner: promtail
       mode: '0755'
 
   - name: Enable and start Promtail service

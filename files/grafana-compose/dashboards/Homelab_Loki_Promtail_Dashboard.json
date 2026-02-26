@@ -92,7 +92,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{host=~\".+\"} | logfmt\n\n",
+          "expr": "{nodename=\"$nodename\"} | logfmt",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"

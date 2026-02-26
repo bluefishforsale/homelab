@@ -12,7 +12,6 @@ on:
           # Network Services
           - nginx
           - cloudflared
-          - cloudflare_ddns
           # Media Services (Plex excluded - use deploy-critical-service.yml)
           - sonarr
           - radarr
@@ -33,6 +32,7 @@ on:
           - payloadcms
           - strapi
           - tinacms
+          - terrac_com_static
           # Monitoring
           - prometheus
           - grafana
@@ -91,6 +91,7 @@ jobs:
             payloadcms) PLAYBOOK="playbooks/individual/ocean/services/payloadcms.yaml" ;;
             strapi) PLAYBOOK="playbooks/individual/ocean/services/strapi.yaml" ;;
             tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
+            terrac_com_static) PLAYBOOK="playbooks/individual/ocean/services/terrac_com_static.yaml" ;;
             
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;

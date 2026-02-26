@@ -1,0 +1,79 @@
+---
+# Proxmox VE Exporter - Prometheus exporter for Proxmox Virtual Environment
+#
+# Available tags:
+#   --tags setup    Create directories and deploy configuration
+#   --tags deploy   Deploy systemd service and start exporter
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/pve_exporter.yaml
+#
+- name: Configure Proxmox VE Exporter
+  hosts: proxmox
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  vars:
+    service: pve-exporter
+    home: "/data01/services/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service }}"
+    docker_image: "prompve/prometheus-pve-exporter"
+    docker_tag: "latest"
+    exporter_port: 9221
+    # Proxmox credentials from vault
+    # Append @pam realm if not already present
+    proxmox_user: "{{ proxmox.username }}{% if '@' not in proxmox.username %}@pam{% endif %}"
+    proxmox_password: "{{ proxmox.password }}"
+    # Use host IP address to reach Proxmox API from Docker container
+    proxmox_target: "https://{{ ansible_default_ipv4.address }}:8006"
+
+  tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: "Deploying {{ service }} on {{ inventory_hostname }} ({{ ansible_default_ipv4.address }})"
+      tags: [always]
+
+    - name: Ensure base directory exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+      tags: [setup]
+
+    - name: Deploy pve.yaml configuration
+      ansible.builtin.template:
+        src: "{{ files }}/pve.yaml.j2"
+        dest: "{{ home }}/pve.yaml"
+        mode: '0644'
+      notify: Restart pve-exporter
+      tags: [setup, config]
+
+    - name: Deploy systemd service
+      ansible.builtin.template:
+        src: "{{ files }}/pve-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart pve-exporter
+      tags: [deploy]
+
+    - name: Enable and start pve-exporter service
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: yes
+        state: started
+      tags: [deploy]
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart pve-exporter
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        state: restarted
