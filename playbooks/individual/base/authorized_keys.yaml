@@ -1,0 +1,42 @@
+---
+- name: Refresh authorized_keys for Ansible SSH user
+  hosts: all
+  become: true
+
+  vars:
+    github_user: "{{ github_user_id | default('bluefishforsale') }}"
+    github_keys_url: "https://github.com/{{ github_user }}.keys"
+    ssh_keys_exclusive: false
+
+  tasks:
+    - name: Determine SSH login user
+      ansible.builtin.set_fact:
+        ssh_login_user: "{{ ansible_user | default(ansible_ssh_user) | default('root') }}"
+
+    - name: Load passwd database
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: Ensure SSH login user exists
+      ansible.builtin.assert:
+        that:
+          - ssh_login_user in getent_passwd
+        fail_msg: "SSH login user '{{ ssh_login_user }}' does not exist on this host."
+
+    - name: Determine home directory for SSH login user
+      ansible.builtin.set_fact:
+        ssh_login_user_home: "{{ getent_passwd[ssh_login_user][4] }}"
+
+    - name: Ensure .ssh directory exists for SSH login user
+      ansible.builtin.file:
+        path: "{{ ssh_login_user_home }}/.ssh"
+        state: directory
+        owner: "{{ ssh_login_user }}"
+        mode: '0700'
+
+    - name: Refresh authorized_keys from GitHub
+      ansible.builtin.authorized_key:
+        user: "{{ ssh_login_user }}"
+        state: present
+        key: "{{ github_keys_url }}"
+        exclusive: "{{ ssh_keys_exclusive }}"
