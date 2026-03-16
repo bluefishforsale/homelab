@@ -1,0 +1,208 @@
+---
+# DNS Stack - PowerDNS + Kea DHCP + netboot.xyz
+# Managed by Ansible - do not edit manually
+
+services:
+  # ── PowerDNS Authoritative DNS ──────────────────────────────────────────
+  powerdns:
+    image: powerdns/pdns-auth-49:latest
+    container_name: powerdns
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "{{ service_ports.dns_stack.pdns_api }}:8081/tcp"
+    volumes:
+      - {{ home }}/config/pdns.conf:/etc/powerdns/pdns.conf:ro
+      - {{ home }}/data/pdns:/var/lib/powerdns
+    environment:
+      TZ: America/Los_Angeles
+    healthcheck:
+      test: ["CMD", "pdns_control", "rping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: powerdns
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Kea Exporter (Prometheus Metrics) ───────────────────────────────────
+  kea-exporter:
+    image: ghcr.io/mweinelt/kea-exporter:latest
+    container_name: kea-exporter
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "--address=127.0.0.1"
+      - "--port={{ service_ports.dns_stack.kea_exporter }}"
+      - "/kea/sockets/kea4-ctrl-socket"
+      - "/kea/sockets/kea-ddns-ctrl-socket"
+    volumes:
+      - kea-sockets:/kea/sockets:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: journald
+      options:
+        tag: kea-exporter
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - kea-dhcp4
+      - kea-dhcp-ddns
+
+  # ── Promtail (Loki Log Collector) ───────────────────────────────────────
+  promtail:
+    image: grafana/promtail:latest
+    container_name: dns-promtail
+    restart: unless-stopped
+    volumes:
+      - {{ home }}/config/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+    logging:
+      driver: journald
+      options:
+        tag: dns-promtail
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Kea DHCP4 Server ────────────────────────────────────────────────────
+  # Host network required for DHCP broadcast packets on ports 67/68
+  kea-dhcp4:
+    image: jonasal/kea-dhcp4:2
+    container_name: kea-dhcp4
+    restart: unless-stopped
+    network_mode: host
+    command: ["-c", "/etc/kea/kea-dhcp4.conf"]
+    volumes:
+      - {{ home }}/config/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      - {{ home }}/data/kea:/kea/leases
+      - kea-sockets:/kea/sockets
+    environment:
+      TZ: America/Los_Angeles
+    healthcheck:
+      test: ["CMD", "kea-dhcp4", "-t", "/etc/kea/kea-dhcp4.conf"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: journald
+      options:
+        tag: kea-dhcp4
+    depends_on:
+      powerdns:
+        condition: service_healthy
+
+  # ── Kea DHCP-DDNS Daemon ────────────────────────────────────────────────
+  # Receives DDNS requests from Kea DHCP4, sends RFC 2136 updates to PowerDNS
+  kea-dhcp-ddns:
+    image: jonasal/kea-dhcp-ddns:2
+    container_name: kea-dhcp-ddns
+    restart: unless-stopped
+    network_mode: host
+    command: ["-c", "/etc/kea/kea-dhcp-ddns.conf"]
+    volumes:
+      - {{ home }}/config/kea-dhcp-ddns.conf:/etc/kea/kea-dhcp-ddns.conf:ro
+      - kea-sockets:/kea/sockets
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: journald
+      options:
+        tag: kea-dhcp-ddns
+    depends_on:
+      powerdns:
+        condition: service_healthy
+
+  # ── Kea Control Agent (REST API) ────────────────────────────────────────
+  kea-ctrl-agent:
+    image: jonasal/kea-ctrl-agent:2
+    container_name: kea-ctrl-agent
+    restart: unless-stopped
+    network_mode: host
+    command: ["-c", "/etc/kea/kea-ctrl-agent.conf"]
+    volumes:
+      - {{ home }}/config/kea-ctrl-agent.conf:/etc/kea/kea-ctrl-agent.conf:ro
+      - kea-sockets:/kea/sockets
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: journald
+      options:
+        tag: kea-ctrl-agent
+    depends_on:
+      - kea-dhcp4
+      - kea-dhcp-ddns
+
+  # ── netboot.xyz (PXE/TFTP/HTTP Boot Menu) ──────────────────────────────
+  netbootxyz:
+    image: ghcr.io/netbootxyz/netbootxyz:latest
+    container_name: netbootxyz
+    restart: unless-stopped
+    ports:
+      - "69:69/udp"
+      - "{{ service_ports.dns_stack.netboot_http }}:80/tcp"
+      - "{{ service_ports.dns_stack.netboot_web }}:3000/tcp"
+    volumes:
+      - {{ home }}/data/netboot/config:/config
+      - {{ home }}/data/netboot/assets:/assets
+    environment:
+      TZ: America/Los_Angeles
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000", "||", "exit", "1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: journald
+      options:
+        tag: netbootxyz
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  kea-sockets:
+    driver: local

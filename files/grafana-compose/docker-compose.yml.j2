@@ -73,6 +73,7 @@ services:
       - {{ home }}/data:/var/lib/grafana
       - {{ home }}/logs:/var/log/grafana
       - {{ home }}/provisioning:/etc/grafana/provisioning:ro
+      - {{ home }}/dashboards:/var/lib/grafana/dashboards:ro
     
     # Health check - check if Grafana web interface is responding
     healthcheck:

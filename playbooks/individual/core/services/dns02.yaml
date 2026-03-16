@@ -1,0 +1,398 @@
+---
+# DNS Stack (PowerDNS + Kea DHCP + netboot.xyz) on dns02
+#
+# Replaces ISC DHCP + BIND9 with modern stack:
+#   - PowerDNS Authoritative (DNS, DDNS via RFC 2136)
+#   - Kea DHCP4 (DHCP with PXE boot support)
+#   - Kea DHCP-DDNS (forwards DDNS to PowerDNS)
+#   - Kea Control Agent (REST API)
+#   - netboot.xyz (PXE/TFTP/HTTP boot menus)
+#
+# Available tags:
+#   --tags setup     Create directories and deploy configs
+#   --tags zones     Import zone data into PowerDNS
+#   --tags deploy    Start/restart the stack
+#   --tags validate  Run DNS parity check
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns02.yaml
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns02.yaml --tags zones
+#
+- name: Deploy DNS Stack on dns02
+  hosts: dns02
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: dns-stack
+    home: "/opt/dns-stack"
+    files: "{{ playbook_dir }}/../../../../files/dns-stack"
+
+  tasks:
+    # ── Display info ────────────────────────────────────────────────────────
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: >-
+          Deploying {{ service }} to {{ inventory_hostname }}
+          ({{ ansible_host }})
+      tags: [always]
+
+    # ── Wait for cloud-init to fully finish ──────────────────────────────
+    - name: Wait for cloud-init to complete
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      tags: [setup]
+
+    - name: Wait for dpkg lock to be released
+      ansible.builtin.include_tasks: ../../../tasks/dpkg_lock.yaml
+      tags: [setup]
+
+    # ── Disable systemd-resolved (conflicts with port 53) ──────────────────
+    - name: Stop and disable systemd-resolved
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        state: stopped
+        enabled: false
+      failed_when: false
+      tags: [setup]
+
+    - name: Configure resolv.conf for static DNS
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        content: |
+          nameserver 192.168.1.2
+          nameserver 1.1.1.1
+          search home
+        mode: '0644'
+      tags: [setup]
+
+    # ── Install Docker CE (official repo, compose v2) ──────────────────────
+    - name: Install Docker prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: true
+      tags: [setup]
+
+    - name: Ensure /etc/apt/keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      tags: [setup]
+
+    - name: Add Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+      tags: [setup]
+
+    - name: Add Docker APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+      tags: [setup]
+
+    - name: Install Docker CE packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      tags: [setup]
+
+    - name: Ensure /etc/docker directory exists
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+      tags: [setup]
+
+    - name: Configure Docker daemon
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "log-driver": "journald"
+          }
+        mode: '0644'
+      tags: [setup]
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: [setup]
+
+    # ── Create directories ──────────────────────────────────────────────────
+    - name: Create service directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ home }}"
+        - "{{ home }}/config"
+        - "{{ home }}/data/pdns"
+        - "{{ home }}/data/kea"
+        - "{{ home }}/data/netboot/config"
+        - "{{ home }}/data/netboot/assets"
+      tags: [setup]
+
+    # ── Deploy configuration templates ──────────────────────────────────────
+    - name: Deploy docker-compose template
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Deploy PowerDNS configuration
+      ansible.builtin.template:
+        src: "{{ files }}/pdns.conf.j2"
+        dest: "{{ home }}/config/pdns.conf"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Deploy Kea DHCP4 configuration
+      ansible.builtin.template:
+        src: "{{ files }}/kea-dhcp4.conf.j2"
+        dest: "{{ home }}/config/kea-dhcp4.conf"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Deploy Kea DHCP-DDNS configuration
+      ansible.builtin.template:
+        src: "{{ files }}/kea-dhcp-ddns.conf.j2"
+        dest: "{{ home }}/config/kea-dhcp-ddns.conf"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Deploy Kea Control Agent configuration
+      ansible.builtin.template:
+        src: "{{ files }}/kea-ctrl-agent.conf.j2"
+        dest: "{{ home }}/config/kea-ctrl-agent.conf"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Deploy Promtail configuration
+      ansible.builtin.template:
+        src: "{{ files }}/promtail-config.yml.j2"
+        dest: "{{ home }}/config/promtail-config.yml"
+        mode: '0644'
+      notify: Restart dns-stack
+      tags: [setup, deploy]
+
+    # ── Deploy systemd service ──────────────────────────────────────────────
+    - name: Deploy systemd service
+      ansible.builtin.template:
+        src: "{{ files }}/dns-stack.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart dns-stack
+      tags: [setup, deploy]
+
+    - name: Enable dns-stack service
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        daemon_reload: true
+      tags: [setup, deploy]
+
+    # ── Initialize PowerDNS SQLite database ─────────────────────────────────
+    - name: Pull Docker images
+      ansible.builtin.command:
+        cmd: docker compose pull
+        chdir: "{{ home }}"
+      changed_when: false
+      tags: [setup, deploy]
+
+    - name: Check if PowerDNS database exists
+      ansible.builtin.stat:
+        path: "{{ home }}/data/pdns/pdns.sqlite3"
+      register: pdns_db
+      tags: [setup, zones]
+
+    - name: Remove any existing temporary container
+      ansible.builtin.command:
+        cmd: docker rm -f pdns-temp
+      failed_when: false
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Create temporary container to extract schema
+      ansible.builtin.command:
+        cmd: docker create --name pdns-temp powerdns/pdns-auth-49:latest
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Extract PowerDNS schema from container
+      ansible.builtin.command:
+        cmd: docker cp pdns-temp:/usr/local/share/doc/pdns/schema.sqlite3.sql {{ home }}/schema.sqlite3.sql
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Remove temporary container
+      ansible.builtin.command:
+        cmd: docker rm pdns-temp
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Install sqlite3
+      ansible.builtin.apt:
+        name: sqlite3
+        state: present
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Initialize PowerDNS SQLite database
+      ansible.builtin.shell: |
+        sqlite3 {{ home }}/data/pdns/pdns.sqlite3 < {{ home }}/schema.sqlite3.sql
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Set ownership on PowerDNS data directory
+      ansible.builtin.file:
+        path: "{{ home }}/data/pdns"
+        owner: root
+        group: root
+        mode: '0777'
+        recurse: true
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Set permissions on PowerDNS database file
+      ansible.builtin.file:
+        path: "{{ home }}/data/pdns/pdns.sqlite3"
+        mode: '0666'
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Remove schema file
+      ansible.builtin.file:
+        path: "{{ home }}/schema.sqlite3.sql"
+        state: absent
+      when: not pdns_db.stat.exists
+      tags: [setup, zones]
+
+    - name: Start PowerDNS to initialize database
+      ansible.builtin.command:
+        cmd: docker compose up -d powerdns
+        chdir: "{{ home }}"
+      changed_when: false
+      tags: [setup, zones]
+
+    - name: Wait for PowerDNS to be healthy
+      ansible.builtin.command:
+        cmd: docker exec powerdns pdns_control rping
+      register: pdns_ping
+      retries: 15
+      delay: 2
+      until: pdns_ping.rc == 0
+      changed_when: false
+      tags: [setup, zones]
+
+    # ── Import zone data ────────────────────────────────────────────────────
+    - name: Deploy zone import script
+      ansible.builtin.template:
+        src: "{{ files }}/import-zones.sh.j2"
+        dest: "{{ home }}/import-zones.sh"
+        mode: '0755'
+      tags: [zones]
+
+    - name: Copy zone import script into PowerDNS container
+      ansible.builtin.command:
+        cmd: docker cp {{ home }}/import-zones.sh powerdns:/import-zones.sh
+      changed_when: false
+      tags: [zones]
+
+    - name: Run zone import
+      ansible.builtin.command:
+        cmd: docker exec powerdns /bin/bash /import-zones.sh
+      register: zone_import
+      changed_when: "'Zone Import' in zone_import.stdout"
+      tags: [zones]
+
+    - name: Display zone import output
+      ansible.builtin.debug:
+        msg: "{{ zone_import.stdout_lines }}"
+      tags: [zones]
+
+    # ── Start full stack ────────────────────────────────────────────────────
+    - name: Start all services
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        state: started
+      tags: [deploy]
+
+    # ── Validate DNS ────────────────────────────────────────────────────────
+    - name: Test forward DNS resolution
+      ansible.builtin.command:
+        cmd: "dig +short @{{ ansible_host }} {{ item }}.home. A"
+      register: dns_test
+      changed_when: false
+      failed_when: dns_test.stdout == ""
+      loop:
+        - dns01
+        - ocean-bond0
+        - pihole
+        - gw
+      tags: [validate]
+
+    - name: Test reverse DNS resolution
+      ansible.builtin.command:
+        cmd: "dig +short @{{ ansible_host }} -x 192.168.1.143"
+      register: reverse_test
+      changed_when: false
+      failed_when: "'ocean' not in reverse_test.stdout"
+      tags: [validate]
+
+    - name: Test wildcard DNS resolution
+      ansible.builtin.command:
+        cmd: "dig +short @{{ ansible_host }} randomtest.home. A"
+      register: wildcard_test
+      changed_when: false
+      failed_when: "'192.168.1.143' not in wildcard_test.stdout"
+      tags: [validate]
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        msg: >-
+          DNS validation passed.
+          Forward: {{ dns_test.results | map(attribute='stdout') | list }},
+          Reverse: {{ reverse_test.stdout }},
+          Wildcard: {{ wildcard_test.stdout }}
+      tags: [validate]
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart dns-stack
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        state: restarted

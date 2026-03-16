@@ -1,0 +1,21 @@
+[Unit]
+Description=DNS Stack (PowerDNS + Kea DHCP + netboot.xyz)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=120
+TimeoutStopSec=60
+WorkingDirectory={{ home }}
+ExecStartPre=/usr/bin/docker compose pull --quiet
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+ExecReload=/usr/bin/docker compose up -d --remove-orphans
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

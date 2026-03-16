@@ -49,6 +49,8 @@
     - provisioning
     - provisioning/users
     - provisioning/datasources
+    - provisioning/dashboards
+    - dashboards
 
   - name: Check if MySQL database is already initialized
     ansible.builtin.find:
@@ -127,6 +129,37 @@
       mode: '0644'
     register: grafana_loki_datasource
 
+  - name: Create dashboard provisioning configuration
+    ansible.builtin.copy:
+      dest: "{{ home }}/provisioning/dashboards/dashboards.yml"
+      content: |
+        apiVersion: 1
+        
+        providers:
+          - name: 'default'
+            orgId: 1
+            folder: ''
+            type: file
+            disableDeletion: false
+            updateIntervalSeconds: 30
+            allowUiUpdates: true
+            options:
+              path: /var/lib/grafana/dashboards
+              foldersFromFilesStructure: false
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: grafana_dashboard_provisioning
+
+  - name: Copy dashboard JSON files to server
+    ansible.builtin.copy:
+      src: "{{ files }}/dashboards/"
+      dest: "{{ home }}/dashboards/"
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    register: grafana_dashboards
+
   - name: Create grafana configuration file with integrated MySQL
     ansible.builtin.template:
       src: "{{ files }}/grafana-mysql-container.ini.j2"
@@ -157,7 +190,7 @@
   - name: Show what configuration files changed
     ansible.builtin.debug:
       msg: "Configuration files have been updated - containers will be recreated"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed or grafana_dashboards.changed
 
   - name: Create grafana systemd service
     ansible.builtin.template:
@@ -181,7 +214,7 @@
       docker compose down --timeout 30
       docker compose up -d --force-recreate
       echo "Container recreation completed"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed or grafana_dashboards.changed
 
   handlers:
   - name: Reload systemd daemon

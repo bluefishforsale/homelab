@@ -1,0 +1,49 @@
+# PowerDNS Authoritative Server Configuration
+# Managed by Ansible - do not edit manually
+
+# Backend: SQLite3
+launch=gsqlite3
+gsqlite3-database=/var/lib/powerdns/pdns.sqlite3
+
+# Network
+local-address=0.0.0.0
+local-port=53
+
+# API and Prometheus metrics
+webserver=yes
+webserver-address=0.0.0.0
+webserver-port=8081
+webserver-allow-from=0.0.0.0/0
+api=yes
+api-key={{ infrastructure.dns_stack.pdns_api_key }}
+
+# DNS UPDATE (RFC 2136) for DDNS from Kea
+dnsupdate=yes
+
+# TSIG key for authenticating DDNS updates
+# Key is created via pdnsutil after first boot
+
+# Zone transfers (for future HA replication)
+allow-axfr-ips=192.168.1.0/24
+disable-axfr=no
+
+# Security
+allow-dnsupdate-from=127.0.0.0/8,192.168.1.0/24
+
+# Performance
+receiver-threads=2
+distributor-threads=2
+cache-ttl=60
+negquery-cache-ttl=60
+query-cache-ttl=20
+
+# Logging
+log-dns-details=no
+log-dns-queries=no
+loglevel=4
+
+# Disable DNSSEC (internal network only)
+default-soa-edit=INCEPTION-INCREMENT
+
+# SOA defaults
+default-soa-content=dns01.home. dnsadmin.home. 0 3600 3600 3600 3600

@@ -343,6 +343,22 @@ qm resize 2000 scsi0 +8G
 qm start 2000
 ```
 
+#### dns02 (VMID 2001)
+
+```bash
+qm clone 9999 2001
+qm set 2001 --name dns02 --ipconfig0 ip=192.168.1.3/24,gw=192.168.1.1 --nameserver=1.1.1.1 --onboot 1
+qm set 2001 --cores 2 --memory 2048
+qm resize 2001 scsi0 +8G
+qm start 2001
+```
+
+Or via Ansible:
+
+```bash
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns02_vm.yaml
+```
+
 #### pihole (VMID 3000)
 
 ```bash

@@ -1,0 +1,136 @@
+{
+    "Dhcp4": {
+        "valid-lifetime": 3600,
+        "max-valid-lifetime": 864000,
+        "renew-timer": 1800,
+        "rebind-timer": 3150,
+
+        "interfaces-config": {
+            "interfaces": ["eth0"],
+            "dhcp-socket-type": "raw"
+        },
+
+        "authoritative": true,
+
+        "control-socket": {
+            "socket-type": "unix",
+            "socket-name": "/kea/sockets/kea4-ctrl-socket"
+        },
+
+        "lease-database": {
+            "type": "memfile",
+            "persist": true,
+            "name": "/kea/leases/kea-leases4.csv",
+            "lfc-interval": 3600
+        },
+
+        "dhcp-ddns": {
+            "enable-updates": true,
+            "server-ip": "127.0.0.1",
+            "server-port": 53001,
+            "sender-ip": "",
+            "sender-port": 0,
+            "max-queue-size": 1024,
+            "ncr-protocol": "UDP",
+            "ncr-format": "JSON"
+        },
+
+        "ddns-qualifying-suffix": "home.",
+        "ddns-override-client-update": true,
+        "ddns-override-no-update": true,
+        "ddns-update-on-renew": true,
+        "ddns-replace-client-name": "when-not-present",
+        "hostname-char-set": "[^A-Za-z0-9.-]",
+        "hostname-char-replacement": "-",
+
+        "option-data": [
+            {
+                "name": "domain-name-servers",
+                "data": "192.168.1.9, {{ ansible_host }}"
+            },
+            {
+                "name": "domain-name",
+                "data": "home"
+            },
+            {
+                "name": "routers",
+                "data": "192.168.1.1"
+            },
+            {
+                "name": "broadcast-address",
+                "data": "192.168.1.255"
+            },
+            {
+                "name": "domain-search",
+                "data": "home."
+            }
+        ],
+
+        "client-classes": [
+            {
+                "name": "ipxe_detected",
+                "test": "option[77].hex == 'iPXE'",
+                "boot-file-name": "http://{{ ansible_host }}:{{ service_ports.dns_stack.netboot_http }}/menu.ipxe"
+            },
+            {
+                "name": "UEFI-64",
+                "test": "option[93].hex == 0x0007 and not member('ipxe_detected')",
+                "next-server": "{{ ansible_host }}",
+                "boot-file-name": "ipxe.efi"
+            },
+            {
+                "name": "Legacy-BIOS",
+                "test": "option[93].hex == 0x0000 and not member('ipxe_detected')",
+                "next-server": "{{ ansible_host }}",
+                "boot-file-name": "undionly.kpxe"
+            },
+            {
+                "name": "BIOS-fallback",
+                "test": "not member('ipxe_detected') and not member('UEFI-64') and not member('Legacy-BIOS')",
+                "next-server": "{{ ansible_host }}",
+                "boot-file-name": "undionly.kpxe"
+            }
+        ],
+
+        "subnet4": [
+            {
+                "id": 1,
+                "subnet": "192.168.1.0/24",
+                "pools": [
+                    {
+                        "pool": "192.168.1.150 - 192.168.1.239"
+                    }
+                ],
+                "reservations-global": false,
+                "reservations-in-subnet": true,
+                "reservations-out-of-pool": true,
+                "reservations": [
+                    {
+                        "hw-address": "a6:47:8f:4b:cc:41",
+                        "ip-address": "192.168.1.143",
+                        "hostname": "ocean-bond0"
+                    },
+                    {
+                        "hw-address": "ac:1f:6b:19:f2:06",
+                        "ip-address": "192.168.1.144",
+                        "hostname": "ocean-eth0"
+                    }
+                ]
+            }
+        ],
+
+        "loggers": [
+            {
+                "name": "kea-dhcp4",
+                "output-options": [
+                    {
+                        "output": "stdout",
+                        "pattern": "{% raw %}%D{%Y-%m-%d %H:%M:%S.%q} %-5p [%c/%i.%t] %m\n{% endraw %}"
+                    }
+                ],
+                "severity": "INFO",
+                "debuglevel": 0
+            }
+        ]
+    }
+}

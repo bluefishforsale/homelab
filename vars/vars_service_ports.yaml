@@ -16,6 +16,17 @@ service_ports:
     http: 80
     https: 443
 
+  dns_stack:
+    dns: 53
+    dhcp: 67
+    tftp: 69
+    netboot_http: 8070
+    netboot_web: 3001
+    pdns_api: 8081
+    kea_api: 8000
+    pdns_exporter: 9120
+    kea_exporter: 9547
+
   mysql:
     port: 3306
 

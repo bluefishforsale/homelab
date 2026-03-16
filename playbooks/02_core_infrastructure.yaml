@@ -23,14 +23,18 @@
 - name: Configure Dell PERC RAID
   ansible.builtin.import_playbook: individual/core/storage/dell_perc_raid.yaml
 
-- name: Install Docker
-  ansible.builtin.import_playbook: individual/core/services/docker.yaml
-
 - name: Configure DNS Service
   ansible.builtin.import_playbook: individual/core/services/dns.yaml
 
 - name: Configure DHCP with DDNS
   ansible.builtin.import_playbook: individual/core/services/dhcp_ddns.yaml
+
+# dns02 sequence: create VM → deploy dns-stack (includes Docker CE install)
+- name: Provision dns02 VM on node006
+  ansible.builtin.import_playbook: individual/core/services/dns02_vm.yaml
+
+- name: Deploy DNS Stack (PowerDNS + Kea DHCP + netboot.xyz) on dns02
+  ansible.builtin.import_playbook: individual/core/services/dns02.yaml
 
 - name: Configure Pi-hole
   ansible.builtin.import_playbook: individual/core/services/pi_hole.yaml
