@@ -6,6 +6,12 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 
 ## Quick Commands
 
+**Prerequisite:** Source the environment before running any commands:
+```bash
+source .envrc
+```
+This sets `ANSIBLE_VAULT_PASSWORD_FILE`, `ANSIBLE_CONFIG`, and `ANSIBLE_INVENTORY`.
+
 ### Validation & Testing
 ```bash
 # Run all validation checks
