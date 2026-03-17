@@ -1,0 +1,165 @@
+---
+# Provision dns01 VM on node005 via Proxmox qm CLI
+#
+# Clones template 9999 (Debian 12 cloud-init) and configures
+# the VM for the DNS stack (PowerDNS + Kea DHCP + netboot.xyz).
+# HA pair with dns02 on node006.
+#
+# Available tags:
+#   --tags create    Clone template and configure VM
+#   --tags start     Start the VM
+#   --tags destroy   Stop and destroy the VM (requires -e confirm_destroy=yes)
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns01_vm.yaml
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns01_vm.yaml --tags destroy -e confirm_destroy=yes
+#
+- name: Provision dns01 VM on node005
+  hosts: node005
+  become: true
+  gather_facts: false
+
+  vars:
+    vmid: 2000
+    template_vmid: 9999
+    vm_name: dns01
+    vm_ip: "192.168.1.2"
+    vm_gw: "192.168.1.1"
+    vm_nameserver: "192.168.1.3"
+    vm_cores: 2
+    vm_memory: 2048
+    vm_disk_extra: "8G"
+    vm_onboot: 1
+
+  tasks:
+    # ── Pre-flight checks ───────────────────────────────────────────────────
+    - name: Display provisioning info
+      ansible.builtin.debug:
+        msg: >-
+          Provisioning {{ vm_name }} (VMID {{ vmid }})
+          on {{ inventory_hostname }}:
+          IP={{ vm_ip }}, cores={{ vm_cores }}, mem={{ vm_memory }}MB
+      tags: [always]
+
+    - name: Check if VM already exists
+      ansible.builtin.command:
+        cmd: "qm status {{ vmid }}"
+      register: vm_exists
+      changed_when: false
+      failed_when: false
+      tags: [create, start, destroy]
+
+    - name: Check if template exists
+      ansible.builtin.command:
+        cmd: "qm status {{ template_vmid }}"
+      register: template_exists
+      changed_when: false
+      failed_when: template_exists.rc != 0
+      when: vm_exists.rc != 0
+      tags: [create]
+
+    # ── Create VM ───────────────────────────────────────────────────────────
+    - name: Clone template to new VM
+      ansible.builtin.command:
+        cmd: "qm clone {{ template_vmid }} {{ vmid }}"
+      when: vm_exists.rc != 0
+      tags: [create]
+
+    - name: Configure VM name, network, and boot
+      ansible.builtin.command:
+        cmd: >-
+          qm set {{ vmid }}
+          --name {{ vm_name }}
+          --ciuser debian
+          --ipconfig0 ip={{ vm_ip }}/24,gw={{ vm_gw }}
+          --nameserver={{ vm_nameserver }}
+          --onboot {{ vm_onboot }}
+      when: vm_exists.rc != 0
+      tags: [create]
+
+    - name: Configure VM resources
+      ansible.builtin.command:
+        cmd: "qm set {{ vmid }} --cores {{ vm_cores }} --memory {{ vm_memory }}"
+      when: vm_exists.rc != 0
+      tags: [create]
+
+    - name: Resize VM disk
+      ansible.builtin.command:
+        cmd: "qm resize {{ vmid }} scsi0 +{{ vm_disk_extra }}"
+      when: vm_exists.rc != 0
+      tags: [create]
+
+    # ── Start VM ────────────────────────────────────────────────────────────
+    - name: Get VM status
+      ansible.builtin.command:
+        cmd: "qm status {{ vmid }}"
+      register: vm_status
+      changed_when: false
+      tags: [start]
+
+    - name: Start VM
+      ansible.builtin.command:
+        cmd: "qm start {{ vmid }}"
+      when: "'stopped' in vm_status.stdout"
+      tags: [create, start]
+
+    - name: Wait for SSH port to open
+      ansible.builtin.wait_for:
+        host: "{{ vm_ip }}"
+        port: 22
+        delay: 10
+        timeout: 120
+        state: started
+      delegate_to: localhost
+      become: false
+      tags: [create, start]
+
+    - name: Verify SSH login from controller
+      ansible.builtin.command:
+        cmd: >-
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10
+          -o BatchMode=yes debian@{{ vm_ip }} echo ok
+      delegate_to: localhost
+      become: false
+      register: ssh_check
+      until: ssh_check.rc == 0
+      retries: 18
+      delay: 10
+      changed_when: false
+      tags: [create, start]
+
+    - name: VM provisioned and SSH confirmed
+      ansible.builtin.debug:
+        msg: >-
+          {{ vm_name }} (VMID {{ vmid }}) is running at {{ vm_ip }}.
+          SSH confirmed from controller.
+          Next: ansible-playbook -i inventories/production/hosts.ini
+          playbooks/individual/core/services/dns_ha_stack.yaml
+      tags: [create, start]
+
+    # ── Destroy VM (safety-gated) ───────────────────────────────────────────
+    - name: Fail if destroy not confirmed
+      ansible.builtin.fail:
+        msg: "Pass -e confirm_destroy=yes to destroy this VM"
+      when:
+        - confirm_destroy is not defined or confirm_destroy != "yes"
+      tags: [destroy, never]
+
+    - name: Stop VM
+      ansible.builtin.command:
+        cmd: "qm stop {{ vmid }}"
+      when:
+        - vm_exists.rc == 0
+        - confirm_destroy is defined
+        - confirm_destroy == "yes"
+      failed_when: false
+      tags: [destroy, never]
+
+    - name: Destroy VM
+      ansible.builtin.command:
+        cmd: "qm destroy {{ vmid }} --purge"
+      when:
+        - vm_exists.rc == 0
+        - confirm_destroy is defined
+        - confirm_destroy == "yes"
+      tags: [destroy, never]

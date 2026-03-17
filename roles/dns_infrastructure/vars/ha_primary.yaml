@@ -1,0 +1,11 @@
+---
+# HA Primary Server Variables (dns02)
+
+ha_role: primary
+ha_peer_ip: 192.168.1.2
+ha_this_server_name: dns02
+ha_peer_server_name: dns01
+
+# PowerDNS role
+pdns_role: master
+pdns_also_notify: 192.168.1.2

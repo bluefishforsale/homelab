@@ -1,0 +1,39 @@
+---
+# DNS Infrastructure HA Role - Main Entry Point
+
+- name: Display deployment information
+  ansible.builtin.debug:
+    msg: >-
+      Deploying DNS infrastructure to {{ inventory_hostname }}
+      ({{ ansible_host }}) - HA role: {{ ha_role }}
+  tags: [always]
+
+- name: Include common setup tasks
+  ansible.builtin.include_tasks: common.yaml
+  tags: [setup]
+
+- name: Include PowerDNS tasks
+  ansible.builtin.include_tasks: powerdns.yaml
+  tags: [setup, dns]
+
+- name: Include Kea DHCP tasks
+  ansible.builtin.include_tasks: kea-dhcp.yaml
+  when: enable_dhcp
+  tags: [setup, dhcp]
+
+- name: Include netboot.xyz tasks
+  ansible.builtin.include_tasks: netboot.yaml
+  when: enable_pxe
+  tags: [setup, pxe]
+
+- name: Include monitoring tasks
+  ansible.builtin.include_tasks: monitoring.yaml
+  when: enable_monitoring
+  tags: [setup, monitoring]
+
+- name: Start DNS stack service
+  ansible.builtin.systemd:
+    name: "{{ dns_service_name }}.service"
+    state: started
+    enabled: true
+  tags: [deploy]

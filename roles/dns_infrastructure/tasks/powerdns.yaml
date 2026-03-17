@@ -1,0 +1,126 @@
+---
+# PowerDNS deployment tasks
+
+- name: Deploy docker-compose template
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ dns_home }}/docker-compose.yml"
+    mode: '0644'
+  notify: Restart dns-stack
+
+- name: Deploy PowerDNS configuration
+  ansible.builtin.template:
+    src: powerdns/pdns.conf.j2
+    dest: "{{ dns_home }}/config/pdns.conf"
+    mode: '0644'
+  notify: Restart dns-stack
+
+- name: Deploy PowerDNS Recursor configuration
+  ansible.builtin.template:
+    src: powerdns/recursor.conf.j2
+    dest: "{{ dns_home }}/config/recursor.conf"
+    mode: '0644'
+  notify: Restart dns-stack
+
+- name: Deploy systemd service
+  ansible.builtin.template:
+    src: systemd/dns-stack.service.j2
+    dest: "/etc/systemd/system/{{ dns_service_name }}.service"
+    mode: '0644'
+  notify:
+    - Reload systemd daemon
+    - Restart dns-stack
+
+- name: Pull Docker images
+  ansible.builtin.command:
+    cmd: docker compose pull
+    chdir: "{{ dns_home }}"
+  changed_when: false
+
+- name: Check if PowerDNS database exists
+  ansible.builtin.stat:
+    path: "{{ dns_home }}/data/pdns/pdns.sqlite3"
+  register: pdns_db
+
+- name: Remove any existing temporary container
+  ansible.builtin.command:
+    cmd: docker rm -f pdns-temp
+  failed_when: false
+  when: not pdns_db.stat.exists
+
+- name: Create temporary container to extract schema
+  ansible.builtin.command:
+    cmd: docker create --name pdns-temp powerdns/pdns-auth-49:latest
+  when: not pdns_db.stat.exists
+
+- name: Extract PowerDNS schema from container
+  ansible.builtin.command:
+    cmd: docker cp pdns-temp:/usr/local/share/doc/pdns/schema.sqlite3.sql {{ dns_home }}/schema.sqlite3.sql
+  when: not pdns_db.stat.exists
+
+- name: Remove temporary container
+  ansible.builtin.command:
+    cmd: docker rm pdns-temp
+  when: not pdns_db.stat.exists
+
+- name: Initialize PowerDNS SQLite database
+  ansible.builtin.shell: |
+    sqlite3 {{ dns_home }}/data/pdns/pdns.sqlite3 < {{ dns_home }}/schema.sqlite3.sql
+  when: not pdns_db.stat.exists
+
+- name: Set ownership on PowerDNS data directory
+  ansible.builtin.file:
+    path: "{{ dns_home }}/data/pdns"
+    owner: root
+    group: root
+    mode: '0777'
+    recurse: true
+  when: not pdns_db.stat.exists
+
+- name: Set permissions on PowerDNS database file
+  ansible.builtin.file:
+    path: "{{ dns_home }}/data/pdns/pdns.sqlite3"
+    mode: '0666'
+  when: not pdns_db.stat.exists
+
+- name: Remove schema file
+  ansible.builtin.file:
+    path: "{{ dns_home }}/schema.sqlite3.sql"
+    state: absent
+  when: not pdns_db.stat.exists
+
+- name: Start PowerDNS to initialize database
+  ansible.builtin.command:
+    cmd: docker compose up -d powerdns
+    chdir: "{{ dns_home }}"
+  changed_when: false
+
+- name: Wait for PowerDNS to be healthy
+  ansible.builtin.command:
+    cmd: docker exec powerdns pdns_control rping
+  register: pdns_ping
+  retries: 15
+  delay: 2
+  until: pdns_ping.rc == 0
+  changed_when: false
+
+- name: Deploy zone import script
+  ansible.builtin.template:
+    src: powerdns/import-zones.sh.j2
+    dest: "{{ dns_home }}/import-zones.sh"
+    mode: '0755'
+
+- name: Copy zone import script into PowerDNS container
+  ansible.builtin.command:
+    cmd: docker cp {{ dns_home }}/import-zones.sh powerdns:/import-zones.sh
+  changed_when: false
+
+- name: Run zone import
+  ansible.builtin.command:
+    cmd: docker exec powerdns /bin/bash /import-zones.sh
+  register: zone_import
+  changed_when: "'Zone Import' in zone_import.stdout"
+
+- name: Display zone import output
+  ansible.builtin.debug:
+    msg: "{{ zone_import.stdout_lines }}"

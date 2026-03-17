@@ -74,9 +74,14 @@ jobs:
               echo "  → Master playbook"
             
             # Critical services
-            elif [[ "$file" =~ playbooks/individual/core/services/(bind9_ddns|dhcp_ddns)\.yaml$ ]]; then
-              CRITICAL_SERVICES+=("dns-dhcp")
-              echo "  → Critical service (DNS/DHCP)"
+            elif [[ "$file" =~ playbooks/individual/core/services/bind9_ddns\.yaml$ ]]; then
+              CRITICAL_SERVICES+=("dns")
+              echo "  → Critical service (DNS)"
+            
+            # dns02 stack (PowerDNS + Kea DHCP) - also critical
+            elif [[ "$file" =~ playbooks/individual/core/services/dns02\.yaml$ ]]; then
+              CRITICAL_SERVICES+=("dns02-stack")
+              echo "  → Critical service (DNS02 Stack)"
             
             elif [[ "$file" =~ playbooks/individual/ocean/media/plex\.yaml$ ]]; then
               CRITICAL_SERVICES+=("plex")

@@ -1,0 +1,59 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://192.168.1.143:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: dns-stack-journal
+    journal:
+      max_age: 12h
+      labels:
+        job: dns-stack
+        host: dns02
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+      - source_labels: ['__journal__hostname']
+        target_label: 'hostname'
+      - source_labels: ['__journal_syslog_identifier']
+        target_label: 'syslog_identifier'
+      - source_labels: ['__journal_container_name']
+        target_label: 'container'
+        regex: '(.+)'
+      - source_labels: ['__journal_container_tag']
+        target_label: 'service'
+        regex: '(.+)'
+    pipeline_stages:
+      - match:
+          selector: '{service="powerdns"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<level>\w+)\s+\[(?P<component>[^\]]+)\]\s+(?P<message>.*)$'
+            - labels:
+                level:
+                component:
+      - match:
+          selector: '{service=~"kea-.*"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+(?P<level>\w+)\s+\[(?P<component>[^\]]+)\]\s+(?P<message>.*)$'
+            - labels:
+                level:
+                component:
+      - match:
+          selector: '{service="powerdns-exporter"}'
+          stages:
+            - regex:
+                expression: '^(?P<level>level)=(?P<level_value>\w+)\s+(?P<message>.*)$'
+            - labels:
+                level:
+      - match:
+          selector: '{service="kea-exporter"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+(?P<message>.*)$'

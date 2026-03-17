@@ -1,0 +1,42 @@
+{
+    "Control-agent": {
+        "http-host": "0.0.0.0",
+        "http-port": 8000,
+
+        "authentication": {
+            "type": "basic",
+            "realm": "kea-control-agent",
+            "clients": [
+                {
+                    "user": "admin",
+                    "password": "{{ infrastructure.dns_stack.kea_api_password }}"
+                }
+            ]
+        },
+
+        "control-sockets": {
+            "dhcp4": {
+                "socket-type": "unix",
+                "socket-name": "/kea/sockets/kea4-ctrl-socket"
+            },
+            "d2": {
+                "socket-type": "unix",
+                "socket-name": "/kea/sockets/kea-ddns-ctrl-socket"
+            }
+        },
+
+        "loggers": [
+            {
+                "name": "kea-ctrl-agent",
+                "output-options": [
+                    {
+                        "output": "stdout",
+                        "pattern": "{% raw %}%D{%Y-%m-%d %H:%M:%S.%q} %-5p [%c/%i.%t] %m\n{% endraw %}"
+                    }
+                ],
+                "severity": "INFO",
+                "debuglevel": 0
+            }
+        ]
+    }
+}

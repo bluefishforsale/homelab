@@ -1,0 +1,33 @@
+# PowerDNS Recursor Configuration
+# Managed by Ansible - do not edit manually
+
+# Network binding
+local-address=0.0.0.0
+local-port=53
+
+# Allow queries from local network
+allow-from=127.0.0.0/8,192.168.1.0/24
+
+# Forward local zones to authoritative server (localhost port 5300)
+forward-zones=home=127.0.0.1:5300
+forward-zones+=cluster.local=127.0.0.1:5300
+forward-zones+=1.168.192.in-addr.arpa=127.0.0.1:5300
+
+# Upstream DNS servers for recursive queries
+forward-zones-recurse=.=8.8.8.8;8.8.4.4
+
+# Performance
+threads=2
+max-cache-entries=1000000
+max-negative-ttl=3600
+
+# Logging
+log-common-errors=yes
+loglevel=4
+
+# API for metrics
+webserver=yes
+webserver-address=0.0.0.0
+webserver-port=8082
+webserver-allow-from=0.0.0.0/0
+api-key={{ infrastructure.dns_stack.pdns_api_key }}

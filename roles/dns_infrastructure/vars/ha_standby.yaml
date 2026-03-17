@@ -1,0 +1,11 @@
+---
+# HA Standby Server Variables (dns01)
+
+ha_role: standby
+ha_peer_ip: 192.168.1.3
+ha_this_server_name: dns01
+ha_peer_server_name: dns02
+
+# PowerDNS role
+pdns_role: slave
+pdns_primary_ip: 192.168.1.3

@@ -173,7 +173,7 @@
         group: root
         mode: '0755'
 
-    - name: Configure dnsmasq to forward .home domain to BIND9
+    - name: Configure dnsmasq to forward .home domain to both DNS servers
       copy:
         src: ../../../../files/pihole/etc/dnsmasq.d/02-local-dns.conf
         dest: /etc/dnsmasq.d/02-local-dns.conf

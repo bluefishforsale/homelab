@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# Import BIND zone data into PowerDNS
+# Managed by Ansible - do not edit manually
+#
+# This script is idempotent: it deletes and recreates zones on each run.
+# Run inside the powerdns container: docker exec powerdns /import-zones.sh
+
+set -euo pipefail
+
+PDNSUTIL="pdnsutil"
+
+echo "=== PowerDNS Zone Import ==="
+
+{% if pdns_role == 'master' %}
+echo "Role: PRIMARY (master) - Importing zones"
+
+# ── Helper ─────────────────────────────────────────────────────────────────
+add_record() {
+  local zone="$1" name="$2" type="$3" content="$4" ttl="${5:-86400}"
+  $PDNSUTIL add-record "$zone" "$name" "$type" "$ttl" "$content" 2>/dev/null || \
+    echo "  WARN: failed to add ${name}.${zone} ${type} ${content}"
+}
+
+# ── Zone: home. ────────────────────────────────────────────────────────────
+echo ""
+echo "--- Creating zone: home. ---"
+$PDNSUTIL delete-zone home. 2>/dev/null || true
+$PDNSUTIL create-zone home. dns02.home.
+$PDNSUTIL set-meta home. SOA-EDIT-API INCEPTION-INCREMENT
+
+# NS record
+add_record "home." "@" NS "dns01.home."
+
+# A records — infrastructure
+add_record "home." "gw" A "192.168.1.1"
+add_record "home." "dns01" A "192.168.1.2"
+add_record "home." "dns02" A "192.168.1.3"
+add_record "home." "gitlab" A "192.168.1.5"
+add_record "home." "pihole" A "192.168.1.9"
+add_record "home." "unifi" A "192.168.1.10"
+
+# A records — iDRAC/IPMI
+add_record "home." "node005-idrac" A "192.168.1.15"
+add_record "home." "ocean-idrac" A "192.168.1.16"
+
+# A records — GitHub runners
+add_record "home." "gh-runner-01" A "192.168.1.20"
+add_record "home." "gh-test-vm" A "192.168.1.25"
+
+# A records — misc
+add_record "home." "openclaw" A "192.168.1.31"
+
+# A records — Kubernetes (node005)
+add_record "home." "kube501" A "192.168.1.51"
+add_record "home." "kube502" A "192.168.1.52"
+add_record "home." "kube503" A "192.168.1.53"
+add_record "home." "kube511" A "192.168.1.54"
+add_record "home." "kube512" A "192.168.1.55"
+add_record "home." "kube513" A "192.168.1.56"
+
+# A records — Kubernetes (node006)
+add_record "home." "kube611" A "192.168.1.61"
+add_record "home." "kube612" A "192.168.1.62"
+add_record "home." "kube613" A "192.168.1.63"
+
+# A records — K8s API / MetalLB
+add_record "home." "apiserver" A "192.168.1.99"
+
+# A records — bare metal servers
+add_record "home." "node005" A "192.168.1.105"
+add_record "home." "node006" A "192.168.1.106"
+
+# A records — ocean
+add_record "home." "ocean-bond0" A "192.168.1.143"
+add_record "home." "ocean-eth0" A "192.168.1.144"
+
+# CNAME — ocean alias
+add_record "home." "ocean" CNAME "ocean-bond0.home."
+
+# A records — networking gear
+add_record "home." "usg-3p" A "192.168.1.1"
+add_record "home." "us-48-ac-pro" A "192.168.1.240"
+add_record "home." "us-16-xg-10g" A "192.168.1.241"
+add_record "home." "us-8-150w-poe" A "192.168.1.242"
+add_record "home." "uap-ac-pro-home-1" A "192.168.1.243"
+add_record "home." "uap-ac-pro-home-2" A "192.168.1.244"
+add_record "home." "uap-ac-pro-garage-1" A "192.168.1.245"
+
+# Wildcard — resolves undefined *.home to ocean nginx
+add_record "home." "*" A "192.168.1.143"
+
+# TSIG key for DDNS updates and AXFR transfers
+$PDNSUTIL import-tsig-key ddns-key hmac-sha256 '{{ infrastructure.dns_stack.tsig_key }}' 2>/dev/null || true
+$PDNSUTIL set-meta home. TSIG-ALLOW-DNSUPDATE ddns-key
+$PDNSUTIL set-meta home. TSIG-ALLOW-AXFR ddns-key
+$PDNSUTIL set-meta home. ALLOW-DNSUPDATE-FROM "127.0.0.0/8,192.168.1.0/24"
+
+echo "  home. zone: OK"
+
+# ── Zone: cluster.local. ──────────────────────────────────────────────────
+echo ""
+echo "--- Creating zone: cluster.local. ---"
+$PDNSUTIL delete-zone cluster.local. 2>/dev/null || true
+$PDNSUTIL create-zone cluster.local. dns01.home.
+$PDNSUTIL set-meta cluster.local. SOA-EDIT-API INCEPTION-INCREMENT
+
+add_record "cluster.local." "@" NS "dns01.home."
+add_record "cluster.local." "*" A "192.168.1.64" 1200
+
+# TSIG key for AXFR transfers
+$PDNSUTIL set-meta cluster.local. TSIG-ALLOW-AXFR ddns-key
+
+echo "  cluster.local. zone: OK"
+
+# ── Zone: 1.168.192.in-addr.arpa. ─────────────────────────────────────────
+echo ""
+echo "--- Creating zone: 1.168.192.in-addr.arpa. ---"
+$PDNSUTIL delete-zone 1.168.192.in-addr.arpa. 2>/dev/null || true
+$PDNSUTIL create-zone 1.168.192.in-addr.arpa. dns01.home.
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. SOA-EDIT-API INCEPTION-INCREMENT
+
+add_record "1.168.192.in-addr.arpa." "@" NS "dns01.home."
+
+# PTR records
+add_record "1.168.192.in-addr.arpa." "1" PTR "usg-3p.home."
+add_record "1.168.192.in-addr.arpa." "2" PTR "dns01.home."
+add_record "1.168.192.in-addr.arpa." "5" PTR "gitlab.home."
+add_record "1.168.192.in-addr.arpa." "9" PTR "pihole.home."
+add_record "1.168.192.in-addr.arpa." "10" PTR "unifi.home."
+add_record "1.168.192.in-addr.arpa." "15" PTR "node005-idrac.home."
+add_record "1.168.192.in-addr.arpa." "16" PTR "node006-idrac.home."
+add_record "1.168.192.in-addr.arpa." "20" PTR "gh-runner-01.home."
+add_record "1.168.192.in-addr.arpa." "25" PTR "gh-test-vm.home."
+add_record "1.168.192.in-addr.arpa." "31" PTR "openclaw.home."
+add_record "1.168.192.in-addr.arpa." "51" PTR "kube501.home."
+add_record "1.168.192.in-addr.arpa." "52" PTR "kube502.home."
+add_record "1.168.192.in-addr.arpa." "53" PTR "kube503.home."
+add_record "1.168.192.in-addr.arpa." "54" PTR "kube511.home."
+add_record "1.168.192.in-addr.arpa." "55" PTR "kube512.home."
+add_record "1.168.192.in-addr.arpa." "56" PTR "kube513.home."
+add_record "1.168.192.in-addr.arpa." "61" PTR "kube611.home."
+add_record "1.168.192.in-addr.arpa." "62" PTR "kube612.home."
+add_record "1.168.192.in-addr.arpa." "63" PTR "kube613.home."
+add_record "1.168.192.in-addr.arpa." "99" PTR "apiserver.home."
+add_record "1.168.192.in-addr.arpa." "105" PTR "node005.home."
+add_record "1.168.192.in-addr.arpa." "106" PTR "node006.home."
+add_record "1.168.192.in-addr.arpa." "143" PTR "ocean.home."
+add_record "1.168.192.in-addr.arpa." "144" PTR "ocean-eth0.home."
+add_record "1.168.192.in-addr.arpa." "240" PTR "us-8-150w-poe.home."
+add_record "1.168.192.in-addr.arpa." "241" PTR "us-48-ac-pro.home."
+add_record "1.168.192.in-addr.arpa." "242" PTR "us-16-xg-10g.home."
+add_record "1.168.192.in-addr.arpa." "243" PTR "uap-ac-pro-home-1.home."
+add_record "1.168.192.in-addr.arpa." "244" PTR "uap-ac-pro-home-2.home."
+add_record "1.168.192.in-addr.arpa." "245" PTR "uap-ac-pro-garage-1.home."
+
+# TSIG key for DDNS and AXFR on reverse zone
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. TSIG-ALLOW-DNSUPDATE ddns-key
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. TSIG-ALLOW-AXFR ddns-key
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. ALLOW-DNSUPDATE-FROM "127.0.0.0/8,192.168.1.0/24"
+
+echo "  1.168.192.in-addr.arpa. zone: OK"
+
+{% else %}
+echo "Role: SECONDARY (slave) - Configuring slave zones"
+
+# TSIG key for DDNS and AXFR (must be imported first)
+$PDNSUTIL import-tsig-key ddns-key hmac-sha256 '{{ infrastructure.dns_stack.tsig_key }}' 2>/dev/null || true
+
+# Add autoprimary for automatic zone creation on NOTIFY
+$PDNSUTIL add-autoprimary {{ pdns_primary_ip }} ddns-key 2>/dev/null || echo "  autoprimary already exists"
+
+# ── Configure slave zones ──────────────────────────────────────────────────
+echo ""
+echo "--- Configuring slave zone: home. ---"
+$PDNSUTIL delete-zone home. 2>/dev/null || true
+$PDNSUTIL create-zone home.
+$PDNSUTIL set-kind home. SLAVE
+$PDNSUTIL set-meta home. AXFR-MASTER-TSIG ddns-key
+$PDNSUTIL change-secondary-zone-primary home. {{ pdns_primary_ip }}
+echo "  home. slave zone: OK"
+
+echo ""
+echo "--- Configuring slave zone: cluster.local. ---"
+$PDNSUTIL delete-zone cluster.local. 2>/dev/null || true
+$PDNSUTIL create-zone cluster.local.
+$PDNSUTIL set-kind cluster.local. SLAVE
+$PDNSUTIL set-meta cluster.local. AXFR-MASTER-TSIG ddns-key
+$PDNSUTIL change-secondary-zone-primary cluster.local. {{ pdns_primary_ip }}
+echo "  cluster.local. slave zone: OK"
+
+echo ""
+echo "--- Configuring slave zone: 1.168.192.in-addr.arpa. ---"
+$PDNSUTIL delete-zone 1.168.192.in-addr.arpa. 2>/dev/null || true
+$PDNSUTIL create-zone 1.168.192.in-addr.arpa.
+$PDNSUTIL set-kind 1.168.192.in-addr.arpa. SLAVE
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. AXFR-MASTER-TSIG ddns-key
+$PDNSUTIL change-secondary-zone-primary 1.168.192.in-addr.arpa. {{ pdns_primary_ip }}
+echo "  1.168.192.in-addr.arpa. slave zone: OK"
+
+echo ""
+echo "Zones configured. Zone transfers will occur automatically on NOTIFY from primary."
+
+{% endif %}
+
+# ── Verify ─────────────────────────────────────────────────────────────────
+echo ""
+echo "=== Zone Summary ==="
+$PDNSUTIL list-all-zones
+echo ""
+echo "=== Import Complete ==="

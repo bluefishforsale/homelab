@@ -1,3 +1,24 @@
+---
+# ⚠️  DEPRECATED - ISC DHCP Server (Emergency Rollback Only)
+#
+# This playbook has been DEPRECATED and replaced by Kea DHCP on dns02.
+# 
+# Replacement: playbooks/individual/core/services/dns02.yaml
+# New Stack: PowerDNS + Kea DHCP + Kea DHCP-DDNS on dns02 (192.168.1.3)
+#
+# ⚠️  DO NOT USE unless emergency rollback is required
+#
+# Emergency Usage (if Kea DHCP fails):
+#   1. Stop Kea DHCP on dns02:
+#      ssh dns02 'systemctl stop dns-stack.service'
+#   2. Deploy ISC DHCP on dns01:
+#      ansible-playbook -i inventories/production/hosts.ini playbooks/deprecated/dhcp_ddns_isc.yaml
+#   3. Verify DHCP service:
+#      ssh dns01 'systemctl status isc-dhcp-server.service'
+#
+# Deprecated: March 2026 (Phase 1 DNS/DHCP migration complete)
+#
+
 - name: DCHP server
   hosts: dns
   become: True

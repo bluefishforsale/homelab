@@ -131,13 +131,13 @@ jobs:
             RESULTS="${RESULTS}❌ External DNS forwarding\n"
           fi
 
-          # DHCP server check
-          if ssh -F $SSH_CONFIG dns01.home "systemctl is-active isc-dhcp-server" 2>/dev/null | grep -q "active"; then
+          # DHCP server check (dns02 - Kea DHCP)
+          if ssh -F $SSH_CONFIG dns02.home "systemctl is-active dns-stack.service" 2>/dev/null | grep -q "active"; then
             HEALTHY=$((HEALTHY + 1))
-            RESULTS="${RESULTS}✅ DHCP Server\n"
+            RESULTS="${RESULTS}✅ DHCP Server (dns02 - Kea)\n"
           else
             UNHEALTHY=$((UNHEALTHY + 1))
-            RESULTS="${RESULTS}❌ DHCP Server\n"
+            RESULTS="${RESULTS}❌ DHCP Server (dns02 - Kea)\n"
           fi
 
           echo "healthy=$HEALTHY" >> $GITHUB_OUTPUT

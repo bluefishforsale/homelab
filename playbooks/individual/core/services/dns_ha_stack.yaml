@@ -1,0 +1,53 @@
+---
+# HA DNS/DHCP Stack Deployment (PowerDNS + Kea DHCP + netboot.xyz)
+#
+# Deploys DNS infrastructure to both dns01 and dns02 with HA configuration:
+#   - dns02: Primary DHCP server, PowerDNS master
+#   - dns01: Standby DHCP server, PowerDNS secondary
+#   - Kea HA hot-standby with automatic failover
+#   - PowerDNS AXFR zone replication
+#
+# Available tags:
+#   --tags setup       Create directories and deploy configs
+#   --tags dns         PowerDNS deployment
+#   --tags dhcp        Kea DHCP deployment
+#   --tags pxe         netboot.xyz deployment
+#   --tags monitoring  Promtail/exporters deployment
+#   --tags deploy      Start/restart services
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns_ha_stack.yaml
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns_ha_stack.yaml --tags dns
+#
+- name: Deploy HA DNS/DHCP Stack
+  hosts: dns_servers
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../../vault/secrets.yaml
+    - ../../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: dns-stack
+    home: /opt/dns-stack
+    files: "{{ playbook_dir }}/../../../../files/dns-stack"
+
+  pre_tasks:
+    - name: Load HA role-specific variables
+      ansible.builtin.include_vars:
+        file: "../../../../roles/dns_infrastructure/vars/ha_{{ 'primary' if inventory_hostname == 'dns02' else 'standby' }}.yaml"
+
+  roles:
+    - role: dns_infrastructure
+      vars:
+        dns_home: "{{ home }}"
+        dns_service_name: "{{ service }}"
+
+  post_tasks:
+    - name: Display HA status
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} deployed as {{ ha_role }} server.
+          Peer: {{ ha_peer_ip }}
+      tags: [always]

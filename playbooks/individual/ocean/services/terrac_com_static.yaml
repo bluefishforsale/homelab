@@ -79,6 +79,52 @@
       update_cache: no
     tags: [setup]
 
+  - name: Check if SSH key exists for terrac user
+    ansible.builtin.stat:
+      path: /home/terrac/.ssh/id_ed25519
+    register: terrac_ssh_key
+    tags: [setup, git]
+
+  - name: Generate SSH key for terrac user if not exists
+    ansible.builtin.user:
+      name: terrac
+      generate_ssh_key: true
+      ssh_key_type: ed25519
+      ssh_key_file: /home/terrac/.ssh/id_ed25519
+      ssh_key_comment: "terrac@ocean-github"
+    when: not terrac_ssh_key.stat.exists
+    register: ssh_key_generated
+    tags: [setup, git]
+
+  - name: Read SSH public key
+    ansible.builtin.slurp:
+      src: /home/terrac/.ssh/id_ed25519.pub
+    register: terrac_ssh_pub_key
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
+  - name: Display SSH public key for GitHub
+    ansible.builtin.debug:
+      msg:
+        - "⚠️  SSH key generated for terrac user!"
+        - "Add this public key to GitHub deploy keys for the repository:"
+        - "{{ terrac_ssh_pub_key.content | b64decode }}"
+        - ""
+        - "Steps:"
+        - "1. Go to: https://github.com/bluefishforsale/terrac_com_2026/settings/keys"
+        - "2. Click 'Add deploy key'"
+        - "3. Paste the key above"
+        - "4. Check 'Allow write access' if needed"
+        - "5. Re-run this playbook"
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
+  - name: Fail if SSH key was just generated
+    ansible.builtin.fail:
+      msg: "SSH key was just generated. Please add it to GitHub and re-run the playbook."
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
   - name: Always remove existing git repository for clean deployment
     ansible.builtin.file:
       path: "{{ git_clone_path }}"

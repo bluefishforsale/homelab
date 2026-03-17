@@ -1,0 +1,9 @@
+---
+# Monitoring tasks (Promtail, exporters)
+
+- name: Deploy Promtail configuration
+  ansible.builtin.template:
+    src: promtail-config.yml.j2
+    dest: "{{ dns_home }}/config/promtail-config.yml"
+    mode: '0644'
+  notify: Restart dns-stack

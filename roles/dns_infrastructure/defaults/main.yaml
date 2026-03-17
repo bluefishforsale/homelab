@@ -1,0 +1,35 @@
+---
+# DNS Infrastructure HA Role - Default Variables
+
+# HA Configuration
+ha_enabled: true
+ha_role: primary
+ha_peer_ip: ""
+ha_heartbeat_delay: 10000
+ha_max_response_delay: 60000
+ha_max_ack_delay: 10000
+ha_max_unacked_clients: 5
+
+# Service configuration
+dns_home: /opt/dns-stack
+dns_service_name: dns-stack
+enable_dhcp: true
+enable_pxe: true
+enable_monitoring: true
+
+# PowerDNS configuration
+pdns_primary_ip: 192.168.1.3
+pdns_allow_axfr: "192.168.1.2,192.168.1.3"
+pdns_api_key: "{{ vault_powerdns.api_key }}"
+
+# Network configuration
+dns_interface: eth0
+dns_domain: home
+cluster_domain: cluster.local
+
+# User/Group
+dns_user: root
+dns_group: root
+
+# Docker configuration
+docker_compose_version: "2.40.3"

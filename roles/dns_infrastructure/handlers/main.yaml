@@ -1,0 +1,11 @@
+---
+# DNS Infrastructure HA Role - Handlers
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart dns-stack
+  ansible.builtin.systemd:
+    name: "{{ dns_service_name }}.service"
+    state: restarted

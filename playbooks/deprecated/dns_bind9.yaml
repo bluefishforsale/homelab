@@ -1,4 +1,19 @@
 ---
+# ⚠️  DEPRECATED - BIND9 DNS Server (Emergency Rollback Only)
+#
+# This playbook has been DEPRECATED and replaced by the HA DNS/DHCP stack.
+#
+# Replacement: playbooks/individual/core/services/dns_ha_stack.yaml
+# New Stack: PowerDNS + Kea DHCP on both dns01 and dns02 with HA failover
+#
+# ⚠️  DO NOT USE unless emergency rollback is required
+#
+# Emergency Usage (if HA stack fails):
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/deprecated/dns_bind9.yaml
+#
+# Deprecated: March 2026 (HA DNS/DHCP migration complete)
+#
+# DNS Server (ISC BIND9) on dns01amed
 - name: DNS bind9 named
   hosts: dns
   become: true
