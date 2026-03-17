@@ -4,14 +4,13 @@
 
 services:
   # ── PowerDNS Authoritative DNS ──────────────────────────────────────────
+  # Serves internal zones (home., cluster.local., reverse) on port 5300
+  # Recursor forwards .home queries here via 127.0.0.1:5300
   powerdns:
     image: powerdns/pdns-auth-49:latest
     container_name: powerdns
     restart: unless-stopped
-    ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "{{ service_ports.dns_stack.pdns_api }}:8081/tcp"
+    network_mode: host
     volumes:
       - {{ home }}/config/pdns.conf:/etc/powerdns/pdns.conf:ro
       - {{ home }}/data/pdns:/var/lib/powerdns
@@ -32,6 +31,79 @@ services:
       driver: journald
       options:
         tag: powerdns
+    security_opt:
+      - no-new-privileges:true
+
+  # ── PowerDNS Recursor (Recursive DNS) ───────────────────────────────────
+  # Listens on port 5353, forwards .home/cluster.local to authoritative on 5300
+  # Forwards all other queries to upstream DNS (8.8.8.8, 8.8.4.4)
+  # dnsdist routes non-AXFR, non-internal queries here
+  pdns-recursor:
+    image: powerdns/pdns-recursor-49:latest
+    container_name: pdns-recursor
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ home }}/config/recursor.conf:/etc/powerdns/recursor.conf:ro
+    environment:
+      TZ: America/Los_Angeles
+    depends_on:
+      powerdns:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "rec_control", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: journald
+      options:
+        tag: pdns-recursor
+    security_opt:
+      - no-new-privileges:true
+
+  # ── dnsdist (DNS Traffic Director) ─────────────────────────────────────
+  # Sits on port 53, routes queries to the correct backend:
+  #   AXFR/IXFR → authoritative on 5300
+  #   .home/cluster.local/reverse → authoritative on 5300
+  #   Everything else → recursor on 5353
+  dnsdist:
+    image: powerdns/dnsdist-19:latest
+    container_name: dnsdist
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_BIND_SERVICE
+    volumes:
+      - {{ home }}/config/dnsdist.conf:/etc/dnsdist/dnsdist.conf:ro
+    environment:
+      TZ: America/Los_Angeles
+    depends_on:
+      powerdns:
+        condition: service_healthy
+      pdns-recursor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "echo | nc -w2 127.0.0.1 53 || true"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    logging:
+      driver: journald
+      options:
+        tag: dnsdist
     security_opt:
       - no-new-privileges:true
 

@@ -5,7 +5,7 @@
 launch=gsqlite3
 gsqlite3-database=/var/lib/powerdns/pdns.sqlite3
 
-# Network
+# Network - port 5300, recursor forwards .home queries here
 local-address=0.0.0.0
 local-port=5300
 
@@ -24,7 +24,7 @@ dnsupdate=yes
 # Key is created via pdnsutil after first boot
 
 # Zone transfers (HA replication)
-allow-axfr-ips=192.168.1.0/24
+allow-axfr-ips=127.0.0.0/8,192.168.1.0/24
 disable-axfr=no
 
 {% if pdns_role == 'master' %}

@@ -8,4 +8,4 @@ ha_peer_server_name: dns01
 
 # PowerDNS role
 pdns_role: master
-pdns_also_notify: 192.168.1.2
+pdns_also_notify: 192.168.1.2:5300

@@ -1,0 +1,31 @@
+-- dnsdist configuration
+-- Managed by Ansible - do not edit manually
+--
+-- Sits on port 53, routes queries:
+--   AXFR/IXFR → PowerDNS Authoritative (127.0.0.1:5300)
+--   .home/.cluster.local/reverse → PowerDNS Authoritative (127.0.0.1:5300)
+--   Everything else → PowerDNS Recursor (127.0.0.1:5353)
+
+-- Listen on all interfaces, port 53
+setLocal('0.0.0.0:53')
+
+-- ACL: allow queries from local network
+setACL({'127.0.0.0/8', '192.168.1.0/24'})
+
+-- Backend servers
+newServer({address='127.0.0.1:5300', name='authoritative', pool='auth'})
+newServer({address='127.0.0.1:5353', name='recursor', pool='recursor'})
+
+-- Route AXFR and IXFR to authoritative
+addAction(QTypeRule(DNSQType.AXFR), PoolAction('auth'))
+addAction(QTypeRule(DNSQType.IXFR), PoolAction('auth'))
+
+-- Route internal zones to authoritative for direct queries
+addAction(SuffixMatchNodeRule({'home.', 'cluster.local.', '1.168.192.in-addr.arpa.'}), PoolAction('auth'))
+
+-- Everything else goes to the recursor
+addAction(AllRule(), PoolAction('recursor'))
+
+-- Web server for metrics (Prometheus)
+webserver('0.0.0.0:8083')
+setWebserverConfig({password='{{ infrastructure.dns_stack.pdns_api_key }}', apiRequiresAuthentication=false, statsRequireAuthentication=false})

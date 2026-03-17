@@ -22,6 +22,13 @@
     mode: '0644'
   notify: Restart dns-stack
 
+- name: Deploy dnsdist configuration
+  ansible.builtin.template:
+    src: powerdns/dnsdist.conf.j2
+    dest: "{{ dns_home }}/config/dnsdist.conf"
+    mode: '0644'
+  notify: Restart dns-stack
+
 - name: Deploy systemd service
   ansible.builtin.template:
     src: systemd/dns-stack.service.j2

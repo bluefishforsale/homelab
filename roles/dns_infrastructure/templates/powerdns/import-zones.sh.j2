@@ -176,7 +176,7 @@ $PDNSUTIL delete-zone home. 2>/dev/null || true
 $PDNSUTIL create-zone home.
 $PDNSUTIL set-kind home. SLAVE
 $PDNSUTIL set-meta home. AXFR-MASTER-TSIG ddns-key
-$PDNSUTIL change-secondary-zone-primary home. {{ pdns_primary_ip }}
+$PDNSUTIL change-secondary-zone-primary home. {{ pdns_primary_ip }}:5300
 echo "  home. slave zone: OK"
 
 echo ""
@@ -185,7 +185,7 @@ $PDNSUTIL delete-zone cluster.local. 2>/dev/null || true
 $PDNSUTIL create-zone cluster.local.
 $PDNSUTIL set-kind cluster.local. SLAVE
 $PDNSUTIL set-meta cluster.local. AXFR-MASTER-TSIG ddns-key
-$PDNSUTIL change-secondary-zone-primary cluster.local. {{ pdns_primary_ip }}
+$PDNSUTIL change-secondary-zone-primary cluster.local. {{ pdns_primary_ip }}:5300
 echo "  cluster.local. slave zone: OK"
 
 echo ""
@@ -194,7 +194,7 @@ $PDNSUTIL delete-zone 1.168.192.in-addr.arpa. 2>/dev/null || true
 $PDNSUTIL create-zone 1.168.192.in-addr.arpa.
 $PDNSUTIL set-kind 1.168.192.in-addr.arpa. SLAVE
 $PDNSUTIL set-meta 1.168.192.in-addr.arpa. AXFR-MASTER-TSIG ddns-key
-$PDNSUTIL change-secondary-zone-primary 1.168.192.in-addr.arpa. {{ pdns_primary_ip }}
+$PDNSUTIL change-secondary-zone-primary 1.168.192.in-addr.arpa. {{ pdns_primary_ip }}:5300
 echo "  1.168.192.in-addr.arpa. slave zone: OK"
 
 echo ""
