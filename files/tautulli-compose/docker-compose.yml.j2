@@ -34,8 +34,9 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Use bridge networking
-    network_mode: bridge
+    # Join plex network for direct container communication
+    networks:
+      - plex_network
 
     # Resource limits
     cpus: '4.0'
@@ -50,7 +51,7 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - TAUTULLI_API_KEY={{ tautulli_api_key }}
-      - TAUTULLI_URI=http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ tautulli_port }}
+      - TAUTULLI_URI=http://{{ service }}:8181
       - TAUTULLI_TIMEOUT=60s
       
     ports:
@@ -66,8 +67,9 @@ services:
     security_opt:
       - no-new-privileges:true
     
-    # Use bridge networking
-    network_mode: bridge
+    # Join plex network for direct container communication
+    networks:
+      - plex_network
 
     # Service dependencies - wait for Tautulli to be healthy
     depends_on:
@@ -78,4 +80,6 @@ services:
     cpus: '0.5'
     mem_limit: 256m
 
-# No custom networks needed - using default bridge
+networks:
+  plex_network:
+    external: true
