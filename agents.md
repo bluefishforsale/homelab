@@ -361,3 +361,219 @@ All changes are validated via GitHub Actions:
 - Automated deployment on merge to main
 
 Critical services (DNS, DHCP, Plex) require manual approval before deployment.
+
+---
+
+## Hardware & Infrastructure
+
+**Node006 (Dell R720):** 40 cores, 680GB RAM, 64TB ZFS RAID2, RTX 3090 24GB, Proxmox → ocean VM
+**Node005 (Dell R620):** 56 cores, 128GB RAM, 1TB SSD, Proxmox → dns01, pihole, k8s, GitHub runners
+
+**Ocean IP:** 192.168.1.143 (primary service host)
+
+---
+
+## Development Preferences
+
+- **Spec first**: Write detailed specs before coding, review for resilience/performance/recovery
+- **Go over Python**: Better performance, lower memory for services
+- **PostgreSQL over SQLite**: Dedicated DB containers, not embedded
+- **IP addresses over hostnames**: Use 192.168.1.143:PORT, not container names (DNS fragility)
+- **Isolation**: Separate containers and playbooks per service
+- **Graceful degradation**: Services must work when dependencies fail
+- **Dead letter queues**: Never lose data, buffer in Redis
+- **Circuit breakers**: Backoff to prevent cascade failures
+- **Health checks**: Return healthy/degraded/unhealthy with component status
+- **Auto-recovery**: Replay buffered data on startup
+- **Retry with backoff**: 3 attempts, exponential, then dead letter
+
+---
+
+## Docker Network Architecture
+
+**web_proxy network** (172.20.0.0/16): Created by nginx for reverse proxy container communication
+- Containerized services use container names (grafana:3000, comfyui:8188)
+- Host services use IP addresses (192.168.1.143:PORT)
+
+**Logging:** Docker → journald → Promtail → Loki (daemon.json: `"log-driver": "journald"`, `"tag": "{{.Name}}"`)
+
+---
+
+## Systemd Service Template (Critical Fixes)
+
+```ini
+[Unit]
+Description={{ service }}
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=COMPOSE_PROJECT_NAME={{ service }}
+Environment=COMPOSE_HTTP_TIMEOUT=60
+ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
+ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull --quiet'
+ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
+ExecStop=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
+ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
+NoNewPrivileges=true
+ReadWritePaths={{ home }}
+ReadOnlyPaths=/var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Key fixes:** Use `bash -c` with `cd` (not `-f` flag), full paths to `/usr/bin/docker compose`, remove `PrivateTmp`/`ProtectSystem`/`ProtectHome` (causes namespace mount failures).
+
+---
+
+## Go Service Structure
+
+```
+files/{service-name}/
+├── docker-compose.yml.j2
+├── {service-name}.service.j2
+└── go/
+    ├── Dockerfile
+    ├── go.mod
+    ├── main.go        # Entry point, HTTP handlers, config
+    ├── types.go       # Shared types/structs
+    ├── metrics.go     # Prometheus metrics (promauto)
+    └── {component}.go # Component logic
+```
+
+Required: health check (healthy/degraded/unhealthy), Prometheus promauto metrics, graceful shutdown with context cancellation, config via `getEnv()`/`getEnvInt()`/`getEnvFloat()` helpers.
+
+---
+
+## Container Data Directory Permissions
+
+| Container | UID:GID | Mode |
+|-----------|---------|------|
+| Redis | 999:999 | 0755 |
+| PostgreSQL | 999:999 | 0700 |
+| Media services | 1001:1001 | 0755 |
+| System (terrac) | 1002:1002 | 0755 |
+
+Centralized uid/gid in vault (`vault/secrets.yaml`):
+```yaml
+system_users:
+  media: { uid: 1001, gid: 1001 }
+  terrac: { uid: 1002, gid: 1002 }
+  debian: { uid: 1003, gid: 1003 }
+```
+
+Vault variable pattern: `{{ log_anomaly_ml.postgres_password }}` (nested, not flat `vault_` prefix). Use `| default('value')` for optional secrets.
+
+---
+
+## DNS Stack Architecture
+
+```
+Client → dnsdist (:53) → pdns-recursor (:5353) → upstream (8.8.8.8, 8.8.4.4)
+                       → powerdns-auth (:5300)  → .home, cluster.local, reverse zones
+```
+
+- dns01=192.168.1.2, dns02=192.168.1.3, all PowerDNS containers use network_mode: host
+- dnssec=off in recursor (internal zones unsigned)
+- DHCP HA: dns02=primary, dns01=standby, TSIG zone replication
+- kea-ctrl-agent on port 8001 (not 8000, conflicts with HA hook)
+- Deploy: `ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns_ha_stack.yaml`
+
+---
+
+## GPU Troubleshooting
+
+**Plex GPU Transcoding (LD_LIBRARY_PATH)**
+NVIDIA CUDA libs at `/usr/lib/x86_64-linux-gnu/nvidia/current/` not in default search path. Fix:
+```yaml
+environment:
+  LD_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/nvidia/current:/usr/lib/plexmediaserver/lib
+```
+
+**llamacpp GPU Layer Offloading**
+`runtime: nvidia` alone doesn't guarantee offloading. Use deploy.resources.reservations:
+```yaml
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [gpu, compute, utility]
+command: ["--n-gpu-layers", "41"]  # Explicit count, not "-1"
+environment:
+  - NVIDIA_VISIBLE_DEVICES=all
+  - NVIDIA_DRIVER_CAPABILITIES=all
+  - CUDA_VISIBLE_DEVICES=0
+```
+
+---
+
+## Cloudflare Access Policies
+
+- Use **PUT** (not PATCH) to replace all policies — prevents mixed legacy + reusable policies
+- Vault email groups:
+```yaml
+cloudflare:
+  access_allow_emails:
+    admin: ["terracnosaur@gmail.com"]
+    plex-users: ["terracnosaur@gmail.com", "family@gmail.com"]
+```
+
+---
+
+## Service Catalog
+
+**Infrastructure:** mysql, nginx, cloudflare_ddns, cloudflared
+**Media:** plex, sonarr, radarr, nzbget, prowlarr, bazarr, tautulli, overseerr, tdarr, audible-downloader
+**AI/ML:** llamacpp, open_webui, comfyui, n8n
+**Cloud:** nextcloud
+**Monitoring:** prometheus, grafana, loki, log-anomaly-detector
+
+**Deployment Phases:**
+1. Infrastructure Foundation (base, storage, database, web server)
+2. Network Services (DNS, tunnels)
+3. Media Stack (Arr suite)
+4. AI/ML & Cloud (GPU pipeline, NextCloud)
+5. Optional (transcoding, audiobooks, monitoring)
+
+**Access:** `.home` internal, `.terrac.com` external via Cloudflare Zero Trust
+
+---
+
+## CI/CD Automation Details
+
+**PR Flow:** PR Opened → Provision Test VM → Test Playbooks → Post Results → Destroy VM
+**Merge Flow:** Merge to Main → Detect Changes → Apply to Production → Generate Summary
+
+**GitHub Secrets** (must be **Repository** secrets, not Environment):
+- `ANSIBLE_VAULT_PASSWORD`: Plain text
+- `PROXMOX_SSH_KEY`: Base64-encoded SSH key for root@node005.home
+
+**Test VM:** Proxmox node005, template VMID 9999, VMID = 8000 + (PR_NUMBER % 1000), 4 cores, 2GB RAM
+
+---
+
+## Log Anomaly Detector
+
+- Alert dedup: 1-hour cooldown per unique key (host:service:type:description)
+- Severity filtering: MIN_SEVERITY=high (only high/critical sent)
+- Thresholds: frequency_sigma=4.0, entropy=6.5, levenshtein=0.90, min_repetition=20
+- Suppressed services: blackbox-exporter, promtail, node-exporter
+- Structured alerts: host, service, severity, impact, actions[], log_sample
+- Deploy: `ansible-playbook playbooks/individual/ocean/log_anomaly_detector_go.yaml`
+
+---
+
+## Grafana + MySQL Consolidated Stack
+
+MySQL consolidated into Grafana docker-compose (MySQL only serves Grafana):
+- **grafana_internal** network: Grafana ↔ MySQL (private, no host exposure)
+- **web_proxy** network: nginx ↔ Grafana
+- MySQL: percona/percona-server:5.7, 1 CPU, 1GB, buffer_pool=512M
+- Storage: `/data01/services/grafana/{mysql-data,mysql-logs,mysql-conf,data,logs}/`
+- Deploy: single playbook manages both containers
