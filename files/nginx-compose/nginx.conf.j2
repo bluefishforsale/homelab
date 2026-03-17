@@ -76,8 +76,9 @@ http {
         limit_req zone=general burst=20 nodelay;
         
         location / {
-            return 200 '<!DOCTYPE html><html><head><title>Homelab Proxy</title></head><body><h1>Homelab Services</h1><p>Use proper hostname to access services</p></body></html>';
-            add_header Content-Type text/html;
+            root /usr/share/nginx/html;
+            index index.html;
+            charset utf-8;
         }
         
         # Health check endpoint

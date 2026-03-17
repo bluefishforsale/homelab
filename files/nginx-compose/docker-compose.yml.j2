@@ -17,6 +17,7 @@ services:
     volumes:
       - {{ home }}/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ home }}/conf.d:/etc/nginx/conf.d:ro
+      - {{ home }}/html:/usr/share/nginx/html:ro
       - {{ home }}/logs:/var/log/nginx
       - {{ data }}/services/terrac_com:/data01/services/terrac_com:ro
     
