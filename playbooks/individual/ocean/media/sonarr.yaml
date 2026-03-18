@@ -3,6 +3,7 @@
   hosts: ocean
   become: true
   vars_files:
+    - ../../../../vault/secrets.yaml
     - ../../../../vars/vars_service_ports.yaml
 
   vars:
@@ -61,6 +62,43 @@
       notify:
         - Reload exporter systemd daemon
         - Restart exporter service
+
+    - name: Ensure Sonarr is responding before API call
+      ansible.builtin.uri:
+        url: "http://localhost:{{ sonarr_port }}/api/v3/system/status"
+        method: GET
+        headers:
+          X-Api-Key: "{{ media_services.sonarr.api_key }}"
+        status_code: 200
+      register: sonarr_status
+      retries: 10
+      delay: 5
+      until: sonarr_status.status == 200
+      changed_when: false
+      tags: [rss]
+
+    - name: Get current Sonarr indexer config
+      ansible.builtin.uri:
+        url: "http://localhost:{{ sonarr_port }}/api/v3/config/indexer"
+        method: GET
+        headers:
+          X-Api-Key: "{{ media_services.sonarr.api_key }}"
+        return_content: true
+      register: sonarr_indexer_config
+      changed_when: false
+      tags: [rss]
+
+    - name: Set Sonarr RSS sync interval to 10 minutes
+      ansible.builtin.uri:
+        url: "http://localhost:{{ sonarr_port }}/api/v3/config/indexer"
+        method: PUT
+        headers:
+          X-Api-Key: "{{ media_services.sonarr.api_key }}"
+        body_format: json
+        body: "{{ sonarr_indexer_config.json | combine({'rssSyncInterval': 10}) }}"
+        status_code: [200, 202]
+      when: sonarr_indexer_config.json.rssSyncInterval != 10
+      tags: [rss]
 
   handlers:
     - name: Reload sonarr systemd daemon

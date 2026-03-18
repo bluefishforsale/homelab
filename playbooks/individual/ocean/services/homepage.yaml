@@ -40,6 +40,7 @@
       - config
       - images
       - logs
+      - .next
 
   - name: Create docker-compose.yml from template
     ansible.builtin.template:

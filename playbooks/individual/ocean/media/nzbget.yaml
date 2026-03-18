@@ -5,6 +5,7 @@
   vars_files:
     - ../../../../vault/secrets.yaml
     - ../../../../vars/vars_service_ports.yaml
+  gather_facts: true
 
   vars:
     service: nzbget

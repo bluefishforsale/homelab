@@ -85,9 +85,6 @@
 # Application Services
 # ============================================================================
 
-- name: Deploy NextCloud File Sharing
-  ansible.builtin.import_playbook: individual/ocean/services/nextcloud.yaml
-
 - name: Deploy TinaCMS Blog Platform
   ansible.builtin.import_playbook: individual/ocean/services/tinacms.yaml
 

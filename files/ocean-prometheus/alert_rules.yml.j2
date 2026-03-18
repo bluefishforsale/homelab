@@ -34,12 +34,12 @@ groups:
   # Service down alert (excluding all blackbox probes)
   - alert: ServiceDown
     expr: up{job!~"blackbox-.*"} == 0
-    for: 1m
+    for: 5m
     labels:
       severity: critical
     annotations:
       summary: "Service {{ "{{ $labels.job }}" }} is down"
-      description: "Service {{ "{{ $labels.job }}" }} on {{ "{{ $labels.instance }}" }} has been down for more than 1 minute"
+      description: "Service {{ "{{ $labels.job }}" }} on {{ "{{ $labels.instance }}" }} has been down for more than 5 minutes"
 
   # GPU temperature alert (if NVIDIA GPU is present)
   - alert: HighGpuTemperature

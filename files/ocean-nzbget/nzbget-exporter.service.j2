@@ -19,7 +19,7 @@ ExecStart=docker run --rm \
     --hostname {{ exporter_service }} \
     -e TZ="America/Los_Angeles" \
     -e VERSION={{ exporter_version }} \
-    -e NZBGET_HOST="http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ nzbget_port }}" \
+    -e NZBGET_HOST="http://nzbget:{{ media_services.nzbget.control_password }}@{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ nzbget_port }}" \
     -p {{ exporter_port }}:9452 \
     {{ exporter_image }}:{{ exporter_version }}
 ExecStop=docker rm -f {{ exporter_service }}

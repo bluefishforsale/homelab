@@ -19,10 +19,11 @@ services:
     volumes:
       - {{ home }}/config:/app/config
       - {{ home }}/images:/app/public/images
+      - {{ home }}/.next:/app/.next
       - /data01:/data01:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:{{ port_int }}/ || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:{{ port_int }}/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
