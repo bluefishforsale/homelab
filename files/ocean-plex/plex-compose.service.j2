@@ -34,7 +34,8 @@ RestartSec=10s
 
 # Security
 NoNewPrivileges=true
-PrivateTmp=true
+# PrivateTmp must NOT be set - it creates a private namespace that breaks
+# EAE (EasyAudioEncoder) inter-process file handoff in /transcode (ramdisk mount)
 
 [Install]
 WantedBy=multi-user.target

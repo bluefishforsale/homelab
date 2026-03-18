@@ -38,6 +38,7 @@
     with_items:
     - logs
     - conf.d
+    - html
 
   - name: Ensure terrac_com static website directory exists
     ansible.builtin.file:
@@ -71,6 +72,16 @@
       group: media
       mode: '0644'
       force: no
+
+  - name: Deploy default index.html
+    ansible.builtin.copy:
+      src: "{{ files }}/index.html"
+      dest: "{{ home }}/html/index.html"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Restart nginx service
 
   - name: Create nginx main configuration
     ansible.builtin.template:

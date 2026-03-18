@@ -40,6 +40,7 @@ services:
       - {{ complete }}/movies:/movies
       - {{ ramdisk }}:/transcode
       - {{ data }}:/data01
+    shm_size: 2g
     tmpfs:
       - /tmp:size=2G
     deploy:

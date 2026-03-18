@@ -23,7 +23,7 @@ service_ports:
     netboot_http: 8070
     netboot_web: 3001
     pdns_api: 8081
-    kea_api: 8000
+    kea_api: 8001
     pdns_exporter: 9120
     kea_exporter: 9547
 

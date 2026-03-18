@@ -38,7 +38,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -116,7 +116,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "log_anomaly_uptime_seconds",
           "legendFormat": "Service Uptime",
@@ -129,7 +129,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -180,7 +180,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "log_anomaly_patterns_loaded_total",
           "legendFormat": "{{category}} - {{type}}",
@@ -206,7 +206,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -285,7 +285,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "rate(log_anomaly_logs_processed_total[5m])",
           "legendFormat": "{{host}} - {{service}}",
@@ -298,7 +298,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -353,7 +353,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "log_anomaly_logs_recent_count",
           "legendFormat": "Recent Logs in Memory",
@@ -379,7 +379,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -458,7 +458,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "rate(log_anomaly_anomalies_detected_total[5m])",
           "legendFormat": "{{anomaly_type}} - {{severity}} - {{host}}",
@@ -471,7 +471,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -520,7 +520,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "sum by (severity) (log_anomaly_anomalies_detected_total)",
           "legendFormat": "{{severity}}",
@@ -533,7 +533,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -611,7 +611,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.95, rate(log_anomaly_score_bucket[5m]))",
           "legendFormat": "95th percentile - {{anomaly_type}}",
@@ -620,7 +620,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.50, rate(log_anomaly_score_bucket[5m]))",
           "legendFormat": "Median - {{anomaly_type}}",
@@ -646,7 +646,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -725,7 +725,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.95, rate(log_anomaly_processing_duration_seconds_bucket[5m]))",
           "legendFormat": "95th percentile - {{operation}}",
@@ -734,7 +734,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.50, rate(log_anomaly_processing_duration_seconds_bucket[5m]))",
           "legendFormat": "Median - {{operation}}",
@@ -747,7 +747,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -826,7 +826,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.95, rate(log_anomaly_loki_query_duration_seconds_bucket[5m]))",
           "legendFormat": "95th percentile",
@@ -835,7 +835,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "histogram_quantile(0.50, rate(log_anomaly_loki_query_duration_seconds_bucket[5m]))",
           "legendFormat": "Median",
@@ -848,7 +848,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -927,7 +927,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "rate(log_anomaly_loki_queries_total[5m])",
           "legendFormat": "{{status}}",
@@ -940,7 +940,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -1019,7 +1019,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "rate(log_anomaly_webhooks_sent_total[5m])",
           "legendFormat": "{{status}} - {{severity}}",

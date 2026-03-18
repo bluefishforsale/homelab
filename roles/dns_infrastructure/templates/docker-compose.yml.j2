@@ -108,18 +108,16 @@ services:
       - no-new-privileges:true
 
   # ── Kea Exporter (Prometheus Metrics) ───────────────────────────────────
+  # Uses Kea Control Agent HTTP API instead of Unix sockets for reliability
   kea-exporter:
     image: ghcr.io/mweinelt/kea-exporter:latest
     container_name: kea-exporter
     restart: unless-stopped
     network_mode: host
     command:
-      - "--address=127.0.0.1"
+      - "--address=0.0.0.0"
       - "--port={{ service_ports.dns_stack.kea_exporter }}"
-      - "/kea/sockets/kea4-ctrl-socket"
-      - "/kea/sockets/kea-ddns-ctrl-socket"
-    volumes:
-      - kea-sockets:/kea/sockets:ro
+      - "http://admin:{{ infrastructure.dns_stack.kea_api_password }}@127.0.0.1:{{ service_ports.dns_stack.kea_api }}"
     deploy:
       resources:
         limits:
@@ -132,8 +130,7 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - kea-dhcp4
-      - kea-dhcp-ddns
+      - kea-ctrl-agent
 
   # ── Promtail (Loki Log Collector) ───────────────────────────────────────
   promtail:

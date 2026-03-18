@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -76,7 +76,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "up{job=\"powerdns\"}",
           "refId": "A"
@@ -88,7 +88,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -139,7 +139,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
           "expr": "up{job=\"kea-exporter\"}",
           "refId": "A"
@@ -151,7 +151,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -226,9 +226,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "pdns_uptime_seconds{instance=\"dns02.home:8081\"}",
+          "expr": "pdns_auth_uptime{instance=\"192.168.1.3\", job=\"powerdns\"}",
           "legendFormat": "Uptime",
           "refId": "A"
         }
@@ -239,7 +239,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -294,9 +294,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "rate(pdns_queries_total{instance=\"dns02.home:8081\"}[5m]) * 60",
+          "expr": "rate(pdns_auth_udp_queries{instance=\"192.168.1.3\", job=\"powerdns\"}[5m]) * 60",
           "legendFormat": "Queries/min",
           "refId": "A"
         }
@@ -307,7 +307,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -385,19 +385,19 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "rate(pdns_queries_total{instance=\"dns02.home:8081\"}[5m])",
+          "expr": "rate(pdns_auth_udp_queries{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
           "legendFormat": "Total Queries",
           "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "rate(pdns_answers_total{instance=\"dns02.home:8081\"}[5m])",
-          "legendFormat": "{{type}}",
+          "expr": "rate(pdns_auth_noerror_packets{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
+          "legendFormat": "NOERROR",
           "refId": "B"
         }
       ],
@@ -407,7 +407,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -485,11 +485,29 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "rate(pdns_answers_total{instance=\"dns02.home:8081\"}[5m])",
-          "legendFormat": "{{type}}",
+          "expr": "rate(pdns_auth_noerror_packets{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
+          "legendFormat": "NOERROR",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "expr": "rate(pdns_auth_nxdomain_packets{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
+          "legendFormat": "NXDOMAIN",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "expr": "rate(pdns_auth_servfail_packets{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
+          "legendFormat": "SERVFAIL",
+          "refId": "C"
         }
       ],
       "title": "DNS Answers by Type",
@@ -498,7 +516,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -576,9 +594,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "pdns_latency_average_seconds{instance=\"dns02.home:8081\"} * 1000000",
+          "expr": "pdns_auth_latency{instance=\"192.168.1.3\", job=\"powerdns\"}",
           "legendFormat": "Average Latency",
           "refId": "A"
         }
@@ -589,7 +607,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "fieldConfig": {
         "defaults": {
@@ -701,10 +719,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "rate(pdns_exceptions_total{instance=\"dns02.home:8081\"}[5m])",
-          "legendFormat": "{{error}}",
+          "expr": "rate(pdns_auth_servfail_packets{instance=\"192.168.1.3\", job=\"powerdns\"}[5m])",
+          "legendFormat": "SERVFAIL",
           "refId": "A"
         }
       ],
@@ -714,7 +732,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "description": "Kea DHCP metrics - Available when exporter is operational",
       "fieldConfig": {
@@ -792,9 +810,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "kea_dhcp4_addresses_assigned_total{instance=\"dns02.home:9547\"}",
+          "expr": "kea_dhcp4_addresses_assigned_total{instance=\"192.168.1.3\", job=\"kea-exporter\"}",
           "legendFormat": "Subnet {{subnet}}",
           "refId": "A"
         }
@@ -805,7 +823,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "bf02tpxiz6m0wf"
       },
       "description": "Kea DHCP pool utilization - Available when exporter is operational",
       "fieldConfig": {
@@ -861,9 +879,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "bf02tpxiz6m0wf"
           },
-          "expr": "(kea_dhcp4_addresses_assigned_total{instance=\"dns02.home:9547\"} / kea_dhcp4_addresses_total{instance=\"dns02.home:9547\"}) * 100",
+          "expr": "(kea_dhcp4_addresses_assigned_total{instance=\"192.168.1.3\", job=\"kea-exporter\"} / kea_dhcp4_addresses_total{instance=\"192.168.1.3\", job=\"kea-exporter\"}) * 100",
           "legendFormat": "Subnet {{subnet}}",
           "refId": "A"
         }
