@@ -526,8 +526,8 @@ environment:
 ```yaml
 cloudflare:
   access_allow_emails:
-    admin: ["terracnosaur@gmail.com"]
-    plex-users: ["terracnosaur@gmail.com", "family@gmail.com"]
+    admin: ["<admin-email>"]
+    plex-users: ["<admin-email>", "<family-email>"]
 ```
 
 ---

@@ -339,7 +339,7 @@ log_anomaly_ml:
   redis_addr: "192.168.1.143:6379"
   alertmanager_url: "http://192.168.1.143:9093"
   digest_hour: 6
-  digest_recipient: "terracnosaur@gmail.com"
+  digest_recipient: "<your-email>"
 ```
 
 ### Models
@@ -568,7 +568,7 @@ Full problem details including sample anomalies.
 #### POST /digest/trigger
 Manually trigger digest email.
 ```json
-{"status": "sent", "recipient": "terracnosaur@gmail.com", "problems_included": 5}
+{"status": "sent", "recipient": "<digest-recipient>", "problems_included": 5}
 ```
 
 #### POST /similar
@@ -761,8 +761,8 @@ curl -X POST http://192.168.1.143:9093/api/v2/alerts \
 
 ```bash
 # Test with swaks (install: apt install swaks)
-swaks --to terracnosaur@gmail.com \
-  --from homelab-alerts@gmail.com \
+swaks --to <your-email> \
+  --from <smtp-from-address> \
   --server smtp.gmail.com:587 \
   --auth LOGIN \
   --auth-user "$SMTP_USER" \

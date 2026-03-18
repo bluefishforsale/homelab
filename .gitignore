@@ -12,5 +12,16 @@ qemu-output/
 # ignore unencrypted secrets files (encrypted vault_secrets.yaml is safe to commit)
 vault/secrets_plain.yaml
 
+# plaintext config files with hardcoded secrets (use .j2 templates instead)
+files/ocean-nzbget/config/nzbget.conf
+files/ocean-plex/meta-manager/config.yml
+files/ocean-plex/config/Preferences.xml
+files/audible-downloader/.audible/audible.json
+files/audible-downloader/compress.sh
+files/gitlab-docker/gitlab.rb
+
+# node_modules should never be committed
+node_modules/
+
 # large files from upstreams
 *.iso

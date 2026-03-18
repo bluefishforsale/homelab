@@ -89,7 +89,7 @@ services:
       - SMTP_USER={{ smtp.gmail_user | default('') }}
       - SMTP_PASSWORD={{ smtp.gmail_app_password | default('') }}
       - SMTP_FROM={{ smtp_from | default('homelab-alerts@gmail.com') }}
-      - DIGEST_RECIPIENT={{ digest_recipient | default('terracnosaur@gmail.com') }}
+      - DIGEST_RECIPIENT={{ digest_recipient | default('') }}
       - DIGEST_HOUR={{ digest_hour | default('6') }}
       - LLM_URL={{ llm_url | default('http://192.168.1.143:8080') }}
     depends_on:

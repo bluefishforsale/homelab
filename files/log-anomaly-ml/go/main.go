@@ -53,7 +53,7 @@ func loadConfig() Config {
 		SMTPPort:          getEnvInt("SMTP_PORT", 587),
 		SMTPUser:          getEnv("SMTP_USER", ""),
 		SMTPPassword:      getEnv("SMTP_PASSWORD", ""),
-		SMTPFrom:          getEnv("SMTP_FROM", "homelab-alerts@gmail.com"),
+		SMTPFrom:          getEnv("SMTP_FROM", ""),
 		DigestRecipient:   getEnv("DIGEST_RECIPIENT", ""),
 		DigestHour:        getEnvInt("DIGEST_HOUR", 6),
 		LLMUrl:            getEnv("LLM_URL", "http://192.168.1.143:8080"),
