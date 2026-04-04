@@ -1,0 +1,231 @@
+{
+  "_id": "MinimalHEVC",
+  "name": "HEVC NVenc - Minimal Single-Plugin",
+  "description": "HEVC NVenc - Minimal Single-Plugin",
+  "tags": "",
+  "flowPlugins": [
+    {
+      "name": "Input File",
+      "sourceRepo": "Community",
+      "pluginName": "inputFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "inputFile",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "name": "Begin Command",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandStart",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "beginCmd",
+      "position": {
+        "x": 200,
+        "y": 0
+      }
+    },
+    {
+      "name": "Check Video Codec",
+      "sourceRepo": "Community",
+      "pluginName": "checkVideoCodec",
+      "version": "1.0.0",
+      "inputsDB": {
+        "codecs": "hevc"
+      },
+      "fpEnabled": true,
+      "id": "checkCodec",
+      "position": {
+        "x": 400,
+        "y": 0
+      }
+    },
+    {
+      "name": "Complete Encode Command",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandCustomArguments",
+      "version": "1.0.0",
+      "inputsDB": {
+        "outputArguments": "-map 0:v -c:v hevc_nvenc -preset:v:0 p7 -rc:v:0 vbr -cq:v:0 23 -b:v 30M -maxrate 40M -bufsize 50M -level:v 5.1 -profile:v main10 -map 0:a:0 -c:a aac -b:a 384k -ac 6 -sn -dn -colorspace bt2020nc -color_primaries bt2020 -color_trc smpte2084"
+      },
+      "fpEnabled": true,
+      "id": "encodeAll",
+      "position": {
+        "x": 600,
+        "y": 0
+      }
+    },
+    {
+      "name": "Set Container MKV",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandSetContainer",
+      "version": "1.0.0",
+      "inputsDB": {
+        "container": "mkv",
+        "forceConform": "false"
+      },
+      "fpEnabled": true,
+      "id": "setContainer",
+      "position": {
+        "x": 800,
+        "y": 0
+      }
+    },
+    {
+      "name": "Execute",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandExecute",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "execute",
+      "position": {
+        "x": 1000,
+        "y": 0
+      }
+    },
+    {
+      "name": "Compare File Size",
+      "sourceRepo": "Community",
+      "pluginName": "compareFileSize",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "compareSize",
+      "position": {
+        "x": 1200,
+        "y": 0
+      }
+    },
+    {
+      "name": "Compare Duration",
+      "sourceRepo": "Community",
+      "pluginName": "compareFileDurationRatio",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "compareDuration",
+      "position": {
+        "x": 1400,
+        "y": 0
+      }
+    },
+    {
+      "name": "Replace Original",
+      "sourceRepo": "Community",
+      "pluginName": "replaceOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "replace",
+      "position": {
+        "x": 1600,
+        "y": 0
+      }
+    },
+    {
+      "name": "Set Original",
+      "sourceRepo": "Community",
+      "pluginName": "setOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "setOriginal",
+      "position": {
+        "x": 1600,
+        "y": 100
+      }
+    }
+  ],
+  "flowEdges": [
+    {
+      "source": "inputFile",
+      "sourceHandle": "1",
+      "target": "beginCmd",
+      "targetHandle": null,
+      "id": "e1"
+    },
+    {
+      "source": "beginCmd",
+      "sourceHandle": "1",
+      "target": "checkCodec",
+      "targetHandle": null,
+      "id": "e2"
+    },
+    {
+      "source": "checkCodec",
+      "sourceHandle": "1",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e3"
+    },
+    {
+      "source": "checkCodec",
+      "sourceHandle": "2",
+      "target": "encodeAll",
+      "targetHandle": null,
+      "id": "e4"
+    },
+    {
+      "source": "encodeAll",
+      "sourceHandle": "1",
+      "target": "setContainer",
+      "targetHandle": null,
+      "id": "e5"
+    },
+    {
+      "source": "setContainer",
+      "sourceHandle": "1",
+      "target": "execute",
+      "targetHandle": null,
+      "id": "e6"
+    },
+    {
+      "source": "execute",
+      "sourceHandle": "1",
+      "target": "compareSize",
+      "targetHandle": null,
+      "id": "e7"
+    },
+    {
+      "source": "compareSize",
+      "sourceHandle": "1",
+      "target": "compareDuration",
+      "targetHandle": null,
+      "id": "e8"
+    },
+    {
+      "source": "compareSize",
+      "sourceHandle": "2",
+      "target": "compareDuration",
+      "targetHandle": null,
+      "id": "e9"
+    },
+    {
+      "source": "compareSize",
+      "sourceHandle": "3",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e10"
+    },
+    {
+      "source": "compareDuration",
+      "sourceHandle": "1",
+      "target": "replace",
+      "targetHandle": null,
+      "id": "e11"
+    },
+    {
+      "source": "compareDuration",
+      "sourceHandle": "2",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e12"
+    },
+    {
+      "source": "compareDuration",
+      "sourceHandle": "3",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e13"
+    }
+  ]
+}
