@@ -11,6 +11,11 @@
     	<VideoProfile container="mp4" codec="Hevc,mpeg1video,mpeg2video,h264,mpeg4" audioCodec="eac3,ac3,aac,mp3,mp2"/>
     	<VideoProfile container="mkv" codec="vp9,hevc,h265,mpeg1video,mpeg2video,h264,mpeg4" audioCodec="eac3,ac3,aac,mp3,mp2,pcm,flac,alac" subtitleFormat="srt,ass"/>
       </DirectPlayProfiles>
+      <TranscodeProfiles>
+        <VideoProfile container="matroska" codec="h264,h265,hevc" audioCodec="aac,ac3,eac3">
+          <Setting name="AudioBoost" value="100" />
+        </VideoProfile>
+      </TranscodeProfiles>
       <CodecProfiles>
         <VideoCodec name="h265,hevc,vp9">
           <Limitations>
@@ -19,6 +24,11 @@
     		<UpperBound name="video.bitrate" value="75000"/>
           </Limitations>
         </VideoCodec>
+        <VideoAudioCodec name="truehd,dts,dca">
+          <Limitations>
+            <Match name="audio.codec" value="truehd|dts|dca" isRequired="false" />
+          </Limitations>
+        </VideoAudioCodec>
         <VideoAudioCodec name="*">
           <Limitations>
             <UpperBound name="audio.channels" value="6" />

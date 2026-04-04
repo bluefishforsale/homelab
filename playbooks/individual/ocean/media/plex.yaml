@@ -24,8 +24,8 @@
   become: true
   
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: plex
@@ -48,7 +48,7 @@
     meta_manager_image: meisnate12/plex-meta-manager
     meta_manager_version: latest
     data: /data01
-    files: ../../../../files/ocean-plex
+    files: "{{ playbook_dir }}/../../../../files/ocean-plex"
     complete: "{{ data }}/complete"
     plex_home: "{{ data }}/services/{{ service }}"
     meta_manager_home: "{{ data }}/services/{{ meta_manager_service }}"
@@ -92,9 +92,7 @@
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
-    notify:
-    - Reload systemd daemon
-    - Restart plex service
+    register: plex_preferences_result
     tags: [config, plex]
 
   - name: Copy all files from Profiles directory
@@ -107,9 +105,7 @@
       directory_mode: '0755'
     with_fileglob:
     - "{{ files }}/Profiles/*"
-    notify:
-    - Reload systemd daemon
-    - Restart plex service
+    register: plex_profiles_result
     tags: [config, plex]
 
   - name: Create plex docker-compose files
@@ -122,9 +118,7 @@
     with_items:
     - { src: "plex-compose.yml.j2", dest: "docker-compose.yml" }
     - { src: "plex-compose.env.j2", dest: ".env" }
-    notify:
-    - Reload systemd daemon
-    - Restart plex service
+    register: plex_compose_result
     tags: [config, plex]
 
   - name: Create plex docker-compose systemd service
@@ -132,9 +126,7 @@
       src: "{{ files }}/plex-compose.service.j2"
       dest: "/etc/systemd/system/plex.service"
       mode: '0644'
-    notify:
-    - Reload systemd daemon
-    - Restart plex service
+    register: plex_service_result
     tags: [service, plex]
 
   - name: Ensure meta-manager basedir exists
@@ -153,9 +145,7 @@
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
-    notify:
-    - Reload systemd daemon
-    - Restart meta-manager service
+    register: meta_manager_config_result
     tags: [config, meta-manager]
 
   - name: Create meta-manager docker-compose files
@@ -168,9 +158,7 @@
     with_items:
     - { src: "plex-meta-manager-compose.yml.j2", dest: "docker-compose.yml" }
     - { src: "plex-meta-manager.env.j2", dest: ".env" }
-    notify:
-    - Reload systemd daemon
-    - Restart meta-manager service
+    register: meta_manager_compose_result
     tags: [config, meta-manager]
 
   - name: Create meta-manager docker-compose systemd service
@@ -180,9 +168,7 @@
       mode: '0644'
     with_items:
     - plex-meta-manager.service
-    notify:
-    - Reload systemd daemon
-    - Restart meta-manager service
+    register: meta_manager_service_result
     tags: [service, meta-manager]
 
   - name: Enable meta-manager service
@@ -192,20 +178,35 @@
       state: started
     tags: [service, meta-manager]
 
-  handlers:
-  - name: Reload systemd daemon
+  - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
       daemon_reload: yes
-    tags: [restart, service]
+    when: plex_service_result is changed
+    tags: [restart, service, plex]
 
-  - name: Restart plex service
+  - name: Reload systemd daemon if meta-manager service changed
+    ansible.builtin.systemd:
+      daemon_reload: yes
+    when: meta_manager_service_result is changed
+    tags: [restart, service, meta-manager]
+
+  - name: Restart plex service if config or service changed
     ansible.builtin.systemd:
       name: plex.service
       state: restarted
+    when: >
+      plex_preferences_result is changed or
+      plex_profiles_result is changed or
+      plex_compose_result is changed or
+      plex_service_result is changed
     tags: [restart, plex]
 
-  - name: Restart meta-manager service
+  - name: Restart meta-manager service if config or service changed
     ansible.builtin.systemd:
       name: plex-meta-manager.service
       state: restarted
+    when: >
+      meta_manager_config_result is changed or
+      meta_manager_compose_result is changed or
+      meta_manager_service_result is changed
     tags: [restart, meta-manager]
