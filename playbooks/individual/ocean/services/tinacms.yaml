@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: tinacms
@@ -15,7 +15,7 @@
     port_int: 3000
     port_ext: "{{ service_ports.tinacms.port }}"
     data: /data01
-    files: ../../../../files/tinacms
+    files: "{{ playbook_dir }}/../../../../files/ocean-tinacms"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

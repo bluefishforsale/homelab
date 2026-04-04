@@ -5,13 +5,13 @@
   gather_facts: true
   
   vars_files:
-    - ../../../../vault/secrets.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
     data01: /data01/services
     service: cloudflare_ddns
     path_home: "{{ data01 }}/{{ service }}"
-    files: ../../../../files/cloudflare_ddns
+    files: "{{ playbook_dir }}/../../../../files/cloudflare_ddns"
     systemd_services:
     - "{{ service }}.timer"
     - "{{ service }}.service"

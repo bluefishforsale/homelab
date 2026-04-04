@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: grafana
@@ -16,7 +16,7 @@
     port_ext: "{{ service_ports.grafana.port }}"
     plugins: "marcusolsson-treemap-panel 2.0.0"
     data: /data01
-    files: ../../../../files/grafana-compose
+    files: "{{ playbook_dir }}/../../../../files/ocean-grafana-compose"
     home: "{{ data }}/services/{{ service }}"
     user: grafana
     uid: "{{ system_users.media.uid }}"

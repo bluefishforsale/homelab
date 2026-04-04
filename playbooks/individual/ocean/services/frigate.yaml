@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: frigate
@@ -17,7 +17,7 @@
     rtsp_port: "{{ service_ports.frigate.rtsp }}"
     webrtc_port: "{{ service_ports.frigate.webrtc }}"
     data: /data01
-    files: ../../../../files/frigate
+    files: "{{ playbook_dir }}/../../../../files/ocean-frigate"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

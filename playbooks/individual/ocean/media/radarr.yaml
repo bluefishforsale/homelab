@@ -3,7 +3,7 @@
   hosts: ocean
   become: true
   vars_files:
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: radarr
@@ -15,7 +15,7 @@
     exporter_version: latest
     exporter_port: "{{ service_ports.radarr_exporter.port }}"
     data: /data01
-    files: ../../../../files/ocean-radarr
+    files: "{{ playbook_dir }}/../../../../files/ocean-radarr"
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"

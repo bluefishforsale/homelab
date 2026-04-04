@@ -5,13 +5,13 @@
   hosts: all  # Can run on any host
 
   vars_files:
-    - ../../../../vars/vars_cloudflared.yaml
-    - ../../../../vault/secrets.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_cloudflared.yaml"
 
   vars:
     package: cloudflared
     service: cloudflared
-    files: "../../../../files/{{ service }}"
+    files: "{{ playbook_dir }}/../../../../files/{{ service }}"
     path_home: "/etc/{{ service }}"
     local_cert_path: "/tmp/cloudflared-ansible-cert.pem"
     config: "{{ path_home }}/config.yaml"

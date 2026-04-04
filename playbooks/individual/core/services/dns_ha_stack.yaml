@@ -25,18 +25,18 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: dns-stack
     home: /opt/dns-stack
-    files: "{{ playbook_dir }}/../../../../files/dns-stack"
+    files: "{{ playbook_dir }}/files/dns-stack"
 
   pre_tasks:
     - name: Load HA role-specific variables
       ansible.builtin.include_vars:
-        file: "../../../../roles/dns_infrastructure/vars/ha_{{ 'primary' if inventory_hostname == 'dns02' else 'standby' }}.yaml"
+        file: "{{ playbook_dir }}/roles/dns_infrastructure/vars/ha_{{ 'primary' if inventory_hostname == 'dns02' else 'standby' }}.yaml"
 
   roles:
     - role: dns_infrastructure

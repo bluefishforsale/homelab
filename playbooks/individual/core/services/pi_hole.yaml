@@ -116,14 +116,14 @@
   become: true
   tags: ['force', 'install']
   vars_files:
-    - ../../../vault/secrets.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
   vars:
     pihole_admin_password: "admin"
 
   tasks:
     ############  fix dpkg if things went sideways #####################
     - name: Handle dpkg locks and repair
-      include_tasks: ../../../tasks/dpkg_lock.yaml
+      include_tasks: "{{ playbook_dir }}/../../../tasks/dpkg_lock.yaml"
 
     ############  apt install #####################
     - name: update cache once
@@ -158,7 +158,7 @@
 
     - name: Create /etc/pihole/setupVars.conf with specified variables
       template:
-        src: ../../../../files/pihole/etc/setupVars.conf.j2
+        src: "{{ playbook_dir }}/../../../../files/pihole/etc/setupVars.conf.j2"
         dest: /etc/pihole/setupVars.conf
         owner: root
         group: root
@@ -175,7 +175,7 @@
 
     - name: Configure dnsmasq to forward .home domain to both DNS servers
       copy:
-        src: ../../../../files/pihole/etc/dnsmasq.d/02-local-dns.conf
+        src: "{{ playbook_dir }}/../../../../files/pihole/etc/dnsmasq.d/02-local-dns.conf"
         dest: /etc/dnsmasq.d/02-local-dns.conf
         owner: root
         group: root

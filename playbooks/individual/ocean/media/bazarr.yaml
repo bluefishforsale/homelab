@@ -5,14 +5,14 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     image: linuxserver/bazarr
     version: latest
     service: bazarr
     data: /data01
-    files: ../../../../files/ocean-bazarr
+    files: "{{ playbook_dir }}/../../../../files/ocean-bazarr"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
     port: "{{ service_ports.bazarr.port }}"

@@ -3,8 +3,8 @@
   hosts: ocean
   become: true
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
   gather_facts: true
 
   vars:
@@ -17,7 +17,7 @@
     exporter_version: latest
     exporter_port: "{{ service_ports.nzbget_exporter.port }}"
     data: /data01
-    files: ../../../../files/ocean-nzbget
+    files: "{{ playbook_dir }}/../../../../files/ocean-nzbget"
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"

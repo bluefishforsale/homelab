@@ -5,13 +5,13 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     image: sctx/overseerr
     version: latest
     service: overseerr
-    files: ../../../../files/ocean-overseerr
+    files: "{{ playbook_dir }}/../../../../files/ocean-overseerr"
     data: /data01
     home: "{{ data }}/services/{{ service }}"
     port: "{{ service_ports.overseerr.port }}"

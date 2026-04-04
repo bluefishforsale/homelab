@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     image: prom/prometheus
@@ -17,7 +17,7 @@
     prom_config: prometheus.yml
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
-    prometheus_files: "../../../../files/ocean-prometheus"
+    prometheus_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
     uid: 1026  # Ocean user ID
     gid: 100   # Users group ID
     blackbox_exporter_service: blackbox-exporter
@@ -34,14 +34,14 @@
     alertmanager_version: latest
     alertmanager_port: "{{ service_ports.alertmanager.port }}"
     alertmanager_home: "{{ path_data01 }}/{{ alertmanager_service }}"
-    alertmanager_files: "../../../../files/ocean-prometheus"
+    alertmanager_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
     # Karma (Alertmanager Dashboard)
     karma_service: karma
     karma_image: ghcr.io/prymitive/karma
     karma_version: latest
     karma_port: "{{ service_ports.karma.port }}"
     karma_home: "{{ path_data01 }}/{{ karma_service }}"
-    karma_files: "../../../../files/ocean-prometheus"
+    karma_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
 
   tasks:
 
@@ -66,7 +66,7 @@
 
   - name: Create prometheus config file
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "{{ path_home }}/config/{{ item }}"
       owner: nobody
       group: nogroup
@@ -112,7 +112,7 @@
 
   - name: Create prometheus systemd service
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
@@ -135,7 +135,7 @@
 
   - name: Create alertmanager configuration
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/alertmanager.yml.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/alertmanager.yml.j2"
       dest: "{{ alertmanager_home }}/config/alertmanager.yml"
       owner: "{{ uid }}"
       group: "{{ gid }}"
@@ -197,7 +197,7 @@
 
   - name: Create karma configuration
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/karma.yml.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/karma.yml.j2"
       dest: "{{ karma_home }}/config/karma.yml"
       owner: "{{ uid }}"
       group: "{{ gid }}"
@@ -248,7 +248,7 @@
 
   - name: Create blackbox-exporter.service
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
@@ -259,7 +259,7 @@
 
   - name: Create systemd ndt-exporter.service
     ansible.builtin.template:
-      src: "../../../../files/ocean-prometheus/{{ item }}.j2"
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:

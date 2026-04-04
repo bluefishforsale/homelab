@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
     service: blog_saetnere_com_wp
@@ -14,8 +14,8 @@
     port_ext: 8085
     port_int: 80
     data: /data01
-    files: ../../../../files/wordpress
-    home: "/data01/services/wordpress"
+    files: "{{ playbook_dir }}/../../../../files/blog-saetnere-com-wp"
+    home: "{{ playbook_dir }}/../../../../data01/services/wordpress"
     user: media
     uid: 1001
     gid: 1001

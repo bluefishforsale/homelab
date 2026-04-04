@@ -5,10 +5,10 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vars/vars_afp.yaml
+    - "{{ playbook_dir }}/vars/vars_afp.yaml"
 
   vars:
-    files: ../../../../files/netatalk
+    files: "{{ playbook_dir }}/files/netatalk"
     netatalk_version: "4.3.2"
     netatalk_tag: "netatalk-{{ netatalk_version | replace('.', '-') }}"
     netatalk_src: "/tmp/netatalk-{{ netatalk_version }}"

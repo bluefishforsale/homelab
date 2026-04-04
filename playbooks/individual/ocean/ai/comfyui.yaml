@@ -5,8 +5,8 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vars/vars_comfyui_models.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_comfyui_models.yaml"
 
   vars:
     service: comfyui
@@ -14,7 +14,7 @@
     version: cu126-slim
     port: "{{ service_ports.comfyui.port }}"
     data: /data01
-    files: ../../../../files/comfyui
+    files: "{{ playbook_dir }}/../../../../files/ocean-comfyui"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001

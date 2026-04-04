@@ -16,15 +16,15 @@
   become: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: jellyfin
     image: jellyfin/jellyfin
     version: latest
     data: /data01
-    files: ../../../../files/ocean-jellyfin
+    files: "{{ playbook_dir }}/../../../../files/ocean-jellyfin"
     complete: "{{ data }}/complete"
     jellyfin_home: "{{ data }}/services/{{ service }}"
     ramdisk: /mnt/ramdisk

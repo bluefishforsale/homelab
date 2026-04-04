@@ -5,15 +5,15 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: homepage
     port_ext: "{{ service_ports.homepage.port }}"
     port_int: 3000
     data: /data01
-    files: ../../../../files/homepage
+    files: "{{ playbook_dir }}/../../../../files/ocean-homepage"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: "{{ system_users.media.uid }}"

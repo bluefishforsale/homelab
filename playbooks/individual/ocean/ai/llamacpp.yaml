@@ -5,9 +5,9 @@
   gather_facts: true
 
   vars_files:
-    - ../../../../vault/secrets.yaml
-    - ../../../../vars/vars_llamacpp_models.yaml
-    - ../../../../vars/vars_service_ports.yaml
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_llamacpp_models.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
     service: llamacpp
@@ -15,7 +15,7 @@
     version: server-cuda
     port: "{{ service_ports.llamacpp.port }}"
     data: /data01
-    files: ../../../../files/llamacpp
+    files: "{{ playbook_dir }}/../../../../files/ocean-llamacpp"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001
