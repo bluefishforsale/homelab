@@ -7,12 +7,18 @@ services:
     hostname: {{ inventory_hostname }}
     restart: unless-stopped
     
+    # Environment variables
+    environment:
+      - DOCKER_API_VERSION=1.44
+    
     # Command-line flags for better container name handling
     command:
-      - --docker_only=true
-      - --store_container_labels=false
-      - --housekeeping_interval=30s
-      - --disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl
+      - --store_container_labels=true
+      - --housekeeping_interval=60s
+      - --max_housekeeping_interval=120s
+      - --storage_duration=2m0s
+      - --disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl,process,advtcp,memory_numa,cpuset
+      - --enable_metrics=cpu,memory,network
     
     # Networking
     ports:
@@ -33,9 +39,9 @@ services:
     devices:
       - /dev/kmsg:/dev/kmsg
     
-    # Health Check (using wget to check cAdvisor web interface)
+    # Health Check (using wget with built-in timeout)
     healthcheck:
-      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/containers/"]
+      test: ["CMD", "wget", "--timeout=5", "--tries=1", "--spider", "-q", "http://localhost:8080/containers/"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -100,15 +100,15 @@
       loop: "{{ services }}"
       notify:
         - Reload systemd daemon
-        - Restart audible-download services
+
+    - name: Enable and start audible-download timer
+      ansible.builtin.systemd:
+        name: audible-download.timer
+        enabled: yes
+        state: started
+        daemon_reload: yes
 
   handlers:
     - name: Reload systemd daemon
       ansible.builtin.systemd:
         daemon_reload: yes
-
-    - name: Restart audible-download services
-      ansible.builtin.systemd:
-        name: "{{ item }}"
-        state: restarted
-      loop: "{{ services }}"

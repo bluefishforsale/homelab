@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily cAdvisor Container Restart
+After=cadvisor.service
+Requires=cadvisor.service
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ cadvisor_home }}
+ExecStart=/usr/bin/docker compose restart cadvisor
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

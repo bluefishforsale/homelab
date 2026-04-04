@@ -8,7 +8,6 @@ Type=oneshot
 {% for record in cf_records %}
 ExecStart=/bin/bash -c '{{ path_home }}/cloudflare_ddns.sh "{{ record.api_key }}" "{{ record.zone_id }}" "{{ record.record_id }}" "{{ record.dns }}"'
 {% endfor %}
-RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target

@@ -47,9 +47,9 @@ services:
       - '--collector.perf.cpus=1-{{ ansible_processor_vcpus }}'
       - '--collector.textfile.directory=/var/lib/node_exporter/textfile_collector'
     
-    # Health Check (using wget to check metrics endpoint)
+    # Health Check (using wget with built-in timeout)
     healthcheck:
-      test: ["CMD", "timeout", "5", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9100/metrics"]
+      test: ["CMD", "wget", "--timeout=5", "--tries=1", "--spider", "-q", "http://localhost:9100/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3

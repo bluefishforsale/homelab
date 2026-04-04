@@ -9,7 +9,8 @@ templates: []
 # The root route on which each incoming alert enters.
 route:
   # The labels by which incoming alerts are grouped together.
-  group_by: ['alertname']
+  # Group by service (job) so each service gets one notification listing all affected instances.
+  group_by: ['alertname', 'job']
   
   # How long to wait before sending a notification about new group of alerts
   group_wait: 10s
