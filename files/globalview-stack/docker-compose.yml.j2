@@ -1,0 +1,74 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg17
+    container_name: globalview-timescaledb
+    hostname: globalview-timescaledb
+    restart: unless-stopped
+
+    environment:
+      - TZ=America/Los_Angeles
+      - POSTGRES_DB={{ globalview.postgres_db }}
+      - POSTGRES_USER={{ globalview.postgres_user }}
+      - POSTGRES_PASSWORD={{ globalview.postgres_password }}
+
+    ports:
+      - "{{ service_ports.globalview_stack.postgres }}:5432"
+
+    volumes:
+      - {{ home }}/timescaledb-data:/home/postgres/pgdata
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ globalview.postgres_user }} -d {{ globalview.postgres_db }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
+
+    cpus: '2.0'
+    mem_limit: 2048m
+
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
+
+  redis:
+    image: redis:7-alpine
+    container_name: globalview-redis
+    hostname: globalview-redis
+    restart: unless-stopped
+
+    ports:
+      - "{{ service_ports.globalview_stack.redis }}:6379"
+
+    volumes:
+      - {{ home }}/redis-data:/data
+
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
+
+    cpus: '1.0'
+    mem_limit: 768m

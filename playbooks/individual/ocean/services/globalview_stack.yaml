@@ -1,0 +1,101 @@
+---
+# Globalview Stack - TimescaleDB + Redis
+#
+# Persistent storage for OSINT time-series data (ADS-B, satellites, seismic)
+# with Redis hot cache and pub/sub for live feeds.
+#
+# Available tags:
+#   --tags setup    Create directories
+#   --tags deploy   Deploy compose + systemd
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/globalview_stack.yaml
+#
+- name: Deploy Globalview Stack
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: globalview-stack
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/globalview-stack"
+    home: "{{ data }}/services/{{ service }}"
+
+  tasks:
+
+  - name: Display deployment information
+    ansible.builtin.debug:
+      msg: "Deploying {{ service }} — TimescaleDB on :{{ service_ports.globalview_stack.postgres }}, Redis on :{{ service_ports.globalview_stack.redis }}"
+    tags: [always]
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      mode: '0755'
+    tags: [setup]
+
+  - name: Ensure TimescaleDB data directory exists with correct ownership
+    ansible.builtin.file:
+      path: "{{ home }}/timescaledb-data"
+      state: directory
+      owner: '1000'
+      group: '1000'
+      mode: '0755'
+    tags: [setup]
+
+  - name: Ensure Redis data directory exists
+    ansible.builtin.file:
+      path: "{{ home }}/redis-data"
+      state: directory
+      mode: '0755'
+    tags: [setup]
+
+  - name: Deploy docker-compose template
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0644'
+    register: docker_compose_config
+    notify: Restart globalview-stack service
+    tags: [deploy]
+
+  - name: Deploy systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/globalview-stack.service.j2"
+      dest: "/etc/systemd/system/globalview-stack.service"
+      mode: '0644'
+    notify:
+      - Reload systemd daemon
+      - Restart globalview-stack service
+    tags: [deploy]
+
+  - name: Enable globalview-stack service
+    ansible.builtin.systemd:
+      name: globalview-stack.service
+      enabled: yes
+      daemon_reload: yes
+    tags: [deploy]
+
+  - name: Recreate containers if config changed
+    ansible.builtin.shell: |
+      cd {{ home }}
+      docker compose down --timeout 30
+      docker compose up -d --force-recreate
+    when: docker_compose_config.changed
+    tags: [deploy]
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart globalview-stack service
+    ansible.builtin.systemd:
+      name: globalview-stack.service
+      state: restarted

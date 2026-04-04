@@ -135,13 +135,10 @@ service_ports:
   plex:
     port: 32400
     tcp:
-      - 3005
-      - 8324
-      - 32400
-      - 32469
-    udp:
-      - 32410
-      - "32412-34414"
+      - 32400  # Main web UI and API
+      - 3005   # Plex Companion (mobile remote control)
+      - 8324   # Plex for Roku via Companion
+    udp: []    # No UDP needed for API-only access
 
   jellyfin:
     port: 8096
@@ -199,6 +196,13 @@ service_ports:
     port: 8085
 
   # =============================================================================
+  # Globalview (OSINT Dashboard)
+  # =============================================================================
+  globalview_stack:
+    postgres: 5433
+    redis: 6380
+
+  # =============================================================================
   # NVR / Security
   # =============================================================================
   frigate:
@@ -206,3 +210,11 @@ service_ports:
     rtmp: 1935
     rtsp: 8554
     webrtc: 8555
+
+
+# =============================================================================
+# Globalview (OSINT Dashboard)
+# =============================================================================
+globalview_db:
+  postgres: 5433
+  redis: 6380
