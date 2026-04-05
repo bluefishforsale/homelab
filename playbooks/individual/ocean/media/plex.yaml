@@ -181,13 +181,13 @@
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
       daemon_reload: yes
-    when: plex_service_result is changed
+    when: plex_service_result is defined and plex_service_result is changed
     tags: [restart, service, plex]
 
   - name: Reload systemd daemon if meta-manager service changed
     ansible.builtin.systemd:
       daemon_reload: yes
-    when: meta_manager_service_result is changed
+    when: meta_manager_service_result is defined and meta_manager_service_result is changed
     tags: [restart, service, meta-manager]
 
   - name: Restart plex service if config or service changed
@@ -195,10 +195,10 @@
       name: plex.service
       state: restarted
     when: >
-      plex_preferences_result is changed or
-      plex_profiles_result is changed or
-      plex_compose_result is changed or
-      plex_service_result is changed
+      (plex_preferences_result is defined and plex_preferences_result is changed) or
+      (plex_profiles_result is defined and plex_profiles_result is changed) or
+      (plex_compose_result is defined and plex_compose_result is changed) or
+      (plex_service_result is defined and plex_service_result is changed)
     tags: [restart, plex]
 
   - name: Restart meta-manager service if config or service changed
@@ -206,7 +206,7 @@
       name: plex-meta-manager.service
       state: restarted
     when: >
-      meta_manager_config_result is changed or
-      meta_manager_compose_result is changed or
-      meta_manager_service_result is changed
+      (meta_manager_config_result is defined and meta_manager_config_result is changed) or
+      (meta_manager_compose_result is defined and meta_manager_compose_result is changed) or
+      (meta_manager_service_result is defined and meta_manager_service_result is changed)
     tags: [restart, meta-manager]

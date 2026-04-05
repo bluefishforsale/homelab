@@ -34,7 +34,7 @@ services:
       - "{{ port }}:{{ port }}/udp"
 {% endfor %}
     volumes:
-      - /etc/letsencrypt/archive/home.terrac.com:/certs:ro
+      - /etc/letsencrypt/live/home.terrac.com:/certs:ro
       - {{ plex_home }}/config:/config
       - {{ plex_home }}/Profiles:/config/Library/Application Support/Plex Media Server/Profiles:ro
       - {{ complete }}/tv:/tv

@@ -1,0 +1,4 @@
+# Cloudflare API credentials for certbot DNS-01 challenge
+# This file is templated by Ansible from vault secrets
+# Permissions must be 0600 (certbot enforces this)
+dns_cloudflare_api_token = {{ external_apis.ddns.cloudflare_token }}

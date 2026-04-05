@@ -1,0 +1,31 @@
+#!/bin/bash
+# Post-renewal deploy hook: convert Let's Encrypt cert to PFX for Plex
+# Called automatically by certbot after successful renewal
+# Location: /etc/letsencrypt/renewal-hooks/deploy/deploy-plex-cert.sh
+
+set -euo pipefail
+
+DOMAIN="home.terrac.com"
+LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+PFX_PATH="${LIVE_DIR}/${DOMAIN}.pfx"
+PFX_PASS="{{ plex_cert_pfx_password }}"
+PLEX_UID="{{ uid }}"
+PLEX_GID="{{ uid }}"
+
+echo "[certbot-deploy] Converting certificate to PFX for Plex..."
+
+openssl pkcs12 -export \
+  -out "${PFX_PATH}" \
+  -inkey "${LIVE_DIR}/privkey.pem" \
+  -in "${LIVE_DIR}/fullchain.pem" \
+  -passout "pass:${PFX_PASS}"
+
+chown "${PLEX_UID}:${PLEX_GID}" "${PFX_PATH}"
+chmod 0640 "${PFX_PATH}"
+
+echo "[certbot-deploy] PFX written to ${PFX_PATH}"
+
+echo "[certbot-deploy] Restarting Plex to load new certificate..."
+systemctl restart plex.service
+
+echo "[certbot-deploy] Done."

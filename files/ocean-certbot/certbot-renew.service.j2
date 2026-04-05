@@ -1,0 +1,9 @@
+[Unit]
+Description=Certbot renewal for home.terrac.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot renew --quiet --deploy-hook /etc/letsencrypt/renewal-hooks/deploy/deploy-plex-cert.sh
+PrivateTmp=true

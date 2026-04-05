@@ -1,0 +1,128 @@
+---
+# Certbot - Automated Let's Encrypt SSL certificate for home.terrac.com
+#
+# Uses Cloudflare DNS-01 challenge (no HTTP access required)
+# Post-renewal hook converts cert to PFX for Plex and restarts the service
+#
+# Available tags:
+#   --tags setup      Install packages and directories only
+#   --tags config     Deploy credentials and hook script only
+#   --tags service    Deploy and enable systemd timer only
+#   --tags issue      Issue/renew certificate and run hook
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/network/certbot.yaml
+
+- name: Configure certbot with Cloudflare DNS-01 for home.terrac.com
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: certbot-renew
+    domain: home.terrac.com
+    files: "{{ playbook_dir }}/../../../../files/ocean-certbot"
+    cf_credentials_path: /etc/letsencrypt/cloudflare.ini
+    hook_dest: /etc/letsencrypt/renewal-hooks/deploy/deploy-plex-cert.sh
+    live_dir: "/etc/letsencrypt/live/{{ domain }}"
+    pfx_path: "{{ live_dir }}/{{ domain }}.pfx"
+    plex_cert_pfx_password: string_cheese
+    uid: 1001
+
+  tasks:
+
+  - name: Install certbot and Cloudflare DNS plugin
+    ansible.builtin.apt:
+      name:
+        - certbot
+        - python3-certbot-dns-cloudflare
+      state: present
+      update_cache: true
+    tags: [setup]
+
+  - name: Ensure renewal-hooks deploy directory exists
+    ansible.builtin.file:
+      path: /etc/letsencrypt/renewal-hooks/deploy
+      state: directory
+      mode: '0755'
+    tags: [setup]
+
+  - name: Deploy Cloudflare credentials file
+    ansible.builtin.template:
+      src: "{{ files }}/cloudflare.ini.j2"
+      dest: "{{ cf_credentials_path }}"
+      mode: '0600'
+      owner: root
+      group: root
+    tags: [config]
+
+  - name: Deploy post-renewal hook script
+    ansible.builtin.template:
+      src: "{{ files }}/deploy-plex-cert.sh.j2"
+      dest: "{{ hook_dest }}"
+      mode: '0755'
+      owner: root
+      group: root
+    tags: [config]
+
+  - name: Deploy certbot-renew systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/certbot-renew.service.j2"
+      dest: "/etc/systemd/system/{{ service }}.service"
+      mode: '0644'
+    notify: Reload systemd daemon
+    tags: [service]
+
+  - name: Deploy certbot-renew systemd timer
+    ansible.builtin.template:
+      src: "{{ files }}/certbot-renew.timer.j2"
+      dest: "/etc/systemd/system/{{ service }}.timer"
+      mode: '0644'
+    notify: Reload systemd daemon
+    tags: [service]
+
+  - name: Enable and start certbot-renew timer
+    ansible.builtin.systemd:
+      name: "{{ service }}.timer"
+      enabled: true
+      state: started
+      daemon_reload: true
+    tags: [service]
+
+  - name: Check if certificate already exists and is valid
+    ansible.builtin.command:
+      cmd: "certbot certificates --cert-name {{ domain }}"
+    register: cert_check
+    failed_when: false
+    changed_when: false
+    tags: [issue]
+
+  - name: Issue certificate via DNS-01 challenge (first time or if missing)
+    ansible.builtin.command:
+      cmd: >
+        certbot certonly
+        --non-interactive
+        --agree-tos
+        --email terracnosaur@gmail.com
+        --dns-cloudflare
+        --dns-cloudflare-credentials {{ cf_credentials_path }}
+        --dns-cloudflare-propagation-seconds 30
+        --domain {{ domain }}
+        --keep-until-expiring
+    register: certbot_issue
+    changed_when: "'Certificate not yet due for renewal' not in certbot_issue.stdout"
+    tags: [issue]
+
+  - name: Run deploy hook immediately to generate PFX
+    ansible.builtin.command:
+      cmd: "{{ hook_dest }}"
+    when: certbot_issue is changed
+    tags: [issue]
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: true
