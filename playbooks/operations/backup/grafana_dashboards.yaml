@@ -1,0 +1,122 @@
+---
+# Backup all live Grafana dashboards from ocean to repo
+# Usage: ansible-playbook -i inventories/production/hosts.ini playbooks/operations/backup/grafana_dashboards.yaml
+# Tags: --tags verify (dry-run), --tags execute (perform backup)
+
+- name: Backup Grafana Dashboards to Repository
+  hosts: ocean
+  become: false
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    grafana_url: "http://192.168.1.143:3000"
+    grafana_api_user: "terrac"
+    grafana_api_password: "{{ monitoring.grafana.terrac_password }}"
+    backup_dir: "{{ playbook_dir }}/../../../files/grafana-compose/dashboards"
+    temp_dir: "/tmp/grafana-dashboard-backup-{{ ansible_date_time.epoch }}"
+
+  tasks:
+
+  - name: Verify Grafana is accessible
+    ansible.builtin.uri:
+      url: "{{ grafana_url }}/api/health"
+      method: GET
+      status_code: 200
+    delegate_to: localhost
+    tags: [verify, execute]
+
+  - name: Get list of all dashboards from Grafana API
+    ansible.builtin.uri:
+      url: "{{ grafana_url }}/api/search?type=dash-db"
+      method: GET
+      user: "{{ grafana_api_user }}"
+      password: "{{ grafana_api_password }}"
+      force_basic_auth: yes
+      return_content: yes
+      body_format: json
+    register: dashboard_list
+    delegate_to: localhost
+    tags: [verify, execute]
+
+  - name: Parse dashboard list JSON
+    ansible.builtin.set_fact:
+      dashboards: "{{ dashboard_list.content | from_json }}"
+    tags: [verify, execute]
+
+  - name: Show number of dashboards found
+    ansible.builtin.debug:
+      msg: "Found {{ dashboards | length }} dashboards to backup"
+    tags: [verify, execute]
+
+  - name: Create temporary backup directory
+    ansible.builtin.file:
+      path: "{{ temp_dir }}"
+      state: directory
+      mode: '0755'
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Export each dashboard via API
+    ansible.builtin.uri:
+      url: "{{ grafana_url }}/api/dashboards/uid/{{ item.uid }}"
+      method: GET
+      user: "{{ grafana_api_user }}"
+      password: "{{ grafana_api_password }}"
+      force_basic_auth: yes
+      return_content: yes
+      body_format: json
+    register: dashboard_export
+    loop: "{{ dashboards }}"
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Save dashboards to temporary directory
+    ansible.builtin.copy:
+      content: "{{ (item.content | from_json).dashboard | to_nice_json }}"
+      dest: "{{ temp_dir }}/{{ (item.content | from_json).meta.slug }}.json"
+      mode: '0644'
+    loop: "{{ dashboard_export.results }}"
+    loop_control:
+      label: "{{ (item.content | from_json).meta.slug }}"
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Show backup location
+    ansible.builtin.debug:
+      msg: "Dashboards backed up to {{ temp_dir }}"
+    tags: [execute]
+
+  - name: List backed up files
+    ansible.builtin.find:
+      paths: "{{ temp_dir }}"
+      patterns: "*.json"
+    register: backed_up_files
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Copy dashboards to repository
+    ansible.builtin.copy:
+      src: "{{ temp_dir }}/"
+      dest: "{{ backup_dir }}/"
+      mode: '0644'
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Clean up temporary directory
+    ansible.builtin.file:
+      path: "{{ temp_dir }}"
+      state: absent
+    delegate_to: localhost
+    tags: [execute]
+
+  - name: Show completion summary
+    ansible.builtin.debug:
+      msg: 
+        - "Backup completed successfully"
+        - "{{ backed_up_files.matched }} dashboards saved to {{ backup_dir }}"
+        - "Review changes with: git status"
+        - "Commit changes with: git add {{ backup_dir }} && git commit -m 'backup: Update Grafana dashboards'"
+    tags: [execute]
