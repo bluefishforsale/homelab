@@ -129,6 +129,8 @@ playbooks/individual/infrastructure/registry_cache.yaml
 files/registry-cache/
   docker-compose.yml.j2
   registry-cache.service.j2
+  promtail-config.yml.j2
+  grafana-registry-cache-dashboard.json
   config/
     docker-hub.yml.j2
     ghcr.yml.j2
@@ -172,9 +174,92 @@ A playbook that iterates over all image references from compose templates and pu
 | Disk full | GC reclaims unreferenced layers; increase disk or run GC more aggressively |
 | Cache staleness | Pull-through checks upstream manifest on every pull; cached layers served only if tag unchanged or upstream unreachable |
 
-## Monitoring
+## Observability
 
-Each registry instance exposes `/v2/` as a health endpoint. A Prometheus HTTP probe or simple cron curl confirms each cache is alive. No dedicated exporter needed initially.
+### Metrics (Prometheus)
+
+The Distribution registry natively exposes Prometheus metrics at `/metrics` when enabled in the config. Add to each registry config:
+
+```yaml
+http:
+  debug:
+    addr: :5001  # debug/metrics port (internal to container)
+    prometheus:
+      enabled: true
+      path: /metrics
+```
+
+Since all four containers share a compose stack, expose a metrics port per container (5011-5014) and add a single Prometheus scrape job:
+
+```yaml
+- job_name: 'registry-cache'
+  static_configs:
+    - targets:
+        - registry-cache.internal:5011
+        - registry-cache.internal:5012
+        - registry-cache.internal:5013
+        - registry-cache.internal:5014
+      labels:
+        __metrics_path__: /metrics
+  relabel_configs:
+    - source_labels: [__address__]
+      regex: '.*:5011'
+      target_label: upstream
+      replacement: docker-hub
+    - source_labels: [__address__]
+      regex: '.*:5012'
+      target_label: upstream
+      replacement: ghcr
+    - source_labels: [__address__]
+      regex: '.*:5013'
+      target_label: upstream
+      replacement: gitlab
+    - source_labels: [__address__]
+      regex: '.*:5014'
+      target_label: upstream
+      replacement: nvcr
+```
+
+Key metrics exposed by Distribution registry:
+- `registry_proxy_hits_total` / `registry_proxy_misses_total` — cache hit/miss rates
+- `registry_storage_blob_upload_total` — blobs cached from upstream
+- `registry_http_requests_total` — request counts by method/status
+- `registry_http_request_duration_seconds` — request latency
+- `registry_storage_cache_total` — storage cache operations
+
+This job gets added to `files/ocean-prometheus/prometheus.yml.j2` following the existing pattern.
+
+### Logging (Loki)
+
+The registry-cache systemd service uses journald logging (standard for all homelab services). Promtail on the registry-cache VM scrapes journald and ships logs to Loki. The Promtail config follows the same pattern as other hosts — scrape `systemd-journal` with labels for host and unit.
+
+Registry containers log to journald via the Docker journald log driver (already the default in `daemon.json`). Logs include pull requests, cache hits/misses, upstream connectivity errors, and GC activity.
+
+Add a Promtail sidecar container to the registry-cache compose stack (same pattern as `files/dns-stack/docker-compose.yml.j2` which already includes Promtail) or install Promtail as a systemd service on the VM.
+
+### Grafana Dashboard
+
+A dedicated Grafana dashboard (`files/registry-cache/grafana-registry-cache-dashboard.json`) with:
+
+**Cache Performance:**
+- Cache hit rate (%) per upstream — `rate(registry_proxy_hits_total) / (rate(registry_proxy_hits_total) + rate(registry_proxy_misses_total))`
+- Cache hits vs misses over time (stacked area chart per upstream)
+- Total pulls served from cache vs upstream
+
+**Health & Availability:**
+- Upstream reachability status per registry (up/down indicator)
+- HTTP request rate and error rate (4xx/5xx) per upstream
+- Request latency p50/p95/p99
+
+**Storage:**
+- Disk usage per upstream cache (blobs uploaded over time)
+- GC runs and space reclaimed (from logs)
+
+**Logs Panel:**
+- Recent pull activity from Loki (filterable by upstream, image name)
+- Error log stream (upstream connectivity failures, GC errors)
+
+The dashboard JSON is provisioned via the existing Grafana dashboard deployment pattern.
 
 ## Out of Scope
 
@@ -182,3 +267,4 @@ Each registry instance exposes `/v2/` as a health endpoint. A Prometheus HTTP pr
 - Image signing or vulnerability scanning
 - Multi-site replication
 - Automatic failover for non-Hub registries (manual `registry_cache_enabled` toggle is sufficient)
+- Alerting rules (can be added later once baseline metrics are established)
