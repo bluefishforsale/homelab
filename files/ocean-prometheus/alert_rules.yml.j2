@@ -41,6 +41,18 @@ groups:
       summary: "Service {{ "{{ $labels.job }}" }} is down"
       description: "Service {{ "{{ $labels.job }}" }} on {{ "{{ $labels.instance }}" }} has been down for more than 5 minutes"
 
+  # Plex unreachable from plex-exporter (exporter is scraping but Plex isn't
+  # responding). Catches OOM/crash loops the generic ServiceDown alert misses
+  # because the exporter itself stays up.
+  - alert: PlexDown
+    expr: plex_up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Plex is unreachable from plex-exporter on {{ "{{ $labels.instance }}" }}"
+      description: "plex_up has been 0 for more than 5 minutes on {{ "{{ $labels.instance }}" }} — Plex is down or in a restart loop"
+
   # GPU temperature alert (if NVIDIA GPU is present)
   - alert: HighGpuTemperature
     expr: nvidia_gpu_temperature_celsius > 85
