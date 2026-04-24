@@ -71,9 +71,12 @@ services:
     environment:
       PLEX_ADDR: http://plex:32400
       PLEX_TOKEN: "{{ media_services.plex.api_key }}"
-      PLEX_TIMEOUT: "300"
+      # Keep below Prometheus scrape_timeout (default 10s) so scrapes don't
+      # time out while the exporter waits on a hung Plex.
+      PLEX_TIMEOUT: "5"
       PLEX_RETRIES_COUNT: "3"
       PLEX_SSL_VERIFY: "false"
+      RACK_ENV: "production"
     ports:
       - "{{ exporter_port }}:{{ exporter_port }}"
     depends_on:
@@ -85,7 +88,7 @@ services:
           cpus: '0.5'
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:{{ exporter_port }}/metrics"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:{{ exporter_port }}/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3
