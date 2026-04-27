@@ -1,0 +1,66 @@
+---
+# Fix ocean VM CPU type from kvm64 → host so NumPy 2.x (and any future
+# package requiring x86-v2 CPU features) works inside Docker containers.
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini \
+#     playbooks/individual/infrastructure/ocean_cpu_host.yaml
+#
+- name: Set ocean VM CPU type to host and restart
+  hosts: node006
+  become: true
+  gather_facts: false
+
+  vars:
+    vmid: 5000
+    ocean_ip: "192.168.1.143"
+
+  tasks:
+    - name: Show current CPU type
+      ansible.builtin.command: "qm config {{ vmid }}"
+      register: vm_config
+      changed_when: false
+
+    - name: Print current cpu line
+      ansible.builtin.debug:
+        msg: "{{ vm_config.stdout_lines | select('match', '^cpu') | list }}"
+
+    - name: Gracefully shut down ocean VM
+      ansible.builtin.command: "qm shutdown {{ vmid }}"
+      register: shutdown_result
+      changed_when: true
+
+    - name: Wait for VM to reach stopped state
+      ansible.builtin.command: "qm status {{ vmid }}"
+      register: vm_status
+      until: "'stopped' in vm_status.stdout"
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Set CPU type to host
+      ansible.builtin.command: "qm set {{ vmid }} --cpu host"
+      changed_when: true
+
+    - name: Confirm new CPU config
+      ansible.builtin.command: "qm config {{ vmid }}"
+      register: new_config
+      changed_when: false
+
+    - name: Print new cpu line
+      ansible.builtin.debug:
+        msg: "{{ new_config.stdout_lines | select('match', '^cpu') | list }}"
+
+    - name: Start ocean VM
+      ansible.builtin.command: "qm start {{ vmid }}"
+      changed_when: true
+
+    - name: Wait for SSH to become available on ocean
+      ansible.builtin.wait_for:
+        host: "{{ ocean_ip }}"
+        port: 22
+        delay: 15
+        timeout: 180
+        state: started
+      delegate_to: localhost
+      become: false
