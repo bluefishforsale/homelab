@@ -446,6 +446,7 @@ qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --namese
 qm set 5000 --net0 virtio,bridge=vmbr0,queues=128  # Ensure multiqueue is configured
 qm resize 5000 scsi0 +126G
 qm set 5000 --cores 30 --memory 262144  # 30 cores, 256GB RAM
+qm set 5000 --cpu host                  # expose x86-v2 features for NumPy 2.x+
 qm set 5000 --hostpci0=42:00,pcie=1,x-vga=1  # RTX 3090 GPU (includes audio)
 qm set 5000 --hostpci1=02:00,pcie=1  # SAS Controller + all 8 ZFS disks
 # NOTE: NVMe passthrough skipped due to MSI-X issues
