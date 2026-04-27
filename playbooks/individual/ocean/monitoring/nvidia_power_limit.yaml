@@ -1,0 +1,30 @@
+---
+- name: Deploy NVIDIA GPU power limit service
+  hosts: ocean
+  become: true
+  vars:
+    gpu_power_limit_watts: 150
+
+  tasks:
+    - name: Install nvidia-power-limit systemd service
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../../../files/ocean-nvidia/nvidia-power-limit.service.j2"
+        dest: /etc/systemd/system/nvidia-power-limit.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart nvidia-power-limit
+
+    - name: Enable and start nvidia-power-limit service
+      ansible.builtin.systemd:
+        name: nvidia-power-limit
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart nvidia-power-limit
+      ansible.builtin.systemd:
+        name: nvidia-power-limit
+        state: restarted
+        daemon_reload: true
