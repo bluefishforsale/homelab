@@ -385,6 +385,7 @@ qm start 4000
 qm clone 9999 5000
 qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
 qm set 5000 --cores 30 --memory 262144
+qm set 5000 --cpu host          # expose x86-v2 features for NumPy 2.x+
 qm resize 5000 scsi0 +126G
 qm set 5000 --hostpci0=42:00,pcie=1,x-vga=1  # RTX 3090 GPU
 qm set 5000 --hostpci1=02:00,pcie=1          # SAS Controller

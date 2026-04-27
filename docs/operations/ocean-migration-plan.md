@@ -184,6 +184,9 @@ qm resize 5000 scsi0 +126G
 # Set CPU and Memory (ocean specs: 30 cores, 256GB RAM)
 qm set 5000 --cores 30
 qm set 5000 --memory 262144  # 256GB in MB
+# Set CPU type to host so x86-v2 features (SSE4.2, POPCNT) are visible
+# inside the VM. Required for NumPy 2.x and other modern packages.
+qm set 5000 --cpu host
 
 # GPU Passthrough - NVIDIA RTX 3090 (includes both GPU and audio)
 # Pass through entire function (42:00.0 and 42:00.1)
