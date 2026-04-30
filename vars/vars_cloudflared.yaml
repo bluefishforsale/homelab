@@ -99,12 +99,3 @@ cloudflared:
         # Catch-all rule (required)
         - hostname: "*"
           service_type: "http_status:404"
-
-# Cloudflare API configuration
-# Priority: 1. Command line (-e), 2. Environment variables, 3. Local secrets file
-# Supports both API Token (Bearer) and API Key (Email + Key) methods
-cloudflare:
-  api_email: "{{ lookup('env', 'CLOUDFLARE_API_EMAIL') or cloudflare_api_email | default('') }}"
-  api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') or cloudflare_api_key | default('') }}"
-  api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') or cloudflare_api_token | default('') }}"
-  zone_id: "{{ lookup('env', 'CLOUDFLARE_ZONE_ID') or cloudflare_zone_id | default('') }}"
