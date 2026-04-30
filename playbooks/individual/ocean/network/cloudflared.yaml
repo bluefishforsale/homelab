@@ -978,6 +978,17 @@
     - Reload systemd daemon
     - Restart service
 
+  - name: Enable cloudflared service
+    ansible.builtin.systemd:
+      name: cloudflared.service
+      enabled: yes
+      daemon_reload: yes
+
+  - name: Start cloudflared service if not running
+    ansible.builtin.systemd:
+      name: cloudflared.service
+      state: started
+
   # Cleanup temp cert file
   - name: Remove temporary cert file
     ansible.builtin.file:
