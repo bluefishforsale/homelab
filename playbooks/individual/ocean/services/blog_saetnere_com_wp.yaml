@@ -14,8 +14,8 @@
     port_ext: 8085
     port_int: 80
     data: /data01
-    files: "{{ playbook_dir }}/../../../../files/blog-saetnere-com-wp"
-    home: "{{ playbook_dir }}/../../../../data01/services/wordpress"
+    files: "{{ playbook_dir }}/../../../../files/wordpress"
+    home: "{{ data }}/services/wordpress"
     user: media
     uid: 1001
     gid: 1001

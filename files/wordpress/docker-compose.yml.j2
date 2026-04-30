@@ -5,7 +5,7 @@ services:
     image: {{ image }}:{{ version }}
     container_name: {{ service }}
     hostname: {{ service }}
-    restart: unless-stopped
+    restart: always
     
     environment:
       # Database Configuration
@@ -83,7 +83,7 @@ services:
     image: mariadb:10.11
     container_name: {{ service }}_db
     hostname: wordpress-db
-    restart: unless-stopped
+    restart: always
     
     environment:
       - MYSQL_ROOT_PASSWORD={{ cloud_services.wordpress.database_root_password }}
