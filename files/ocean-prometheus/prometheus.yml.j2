@@ -304,6 +304,27 @@ scrape_configs:
       - target_label: __address__
         replacement: ocean.home:9115
 
+  # TLS Probes - Plex WAN path (IPv4-forced; redirect-tolerant)
+  - job_name: 'blackbox-tls-plex'
+    metrics_path: /probe
+    params:
+      module: [http_tls_ip4]
+    scrape_interval: 1h
+    static_configs:
+      - targets:
+        # Plex path
+        - https://plex.tv:443
+        labels:
+          probe_type: "tls"
+          category: "plex_path"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
   # ICMP Ping Probes - Network connectivity
   - job_name: 'blackbox-icmp'
     metrics_path: /probe
