@@ -1,3 +1,6 @@
+# git worktrees
+.worktrees/
+
 # macOS files
 .DS_Store
 .vscode/settings.json
