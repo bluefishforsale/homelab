@@ -36,25 +36,31 @@ Targets the `ocean` host. Runs as `become: true` to manage systemd and Docker.
 
 ```
 for each model where benchmark_eligible == true:
-  1. Write .env override  →  swap model + benchmark_ctx_size
+  1. Write benchmark docker-compose.yml  →  swap model + benchmark_ctx_size
   2. systemctl restart llamacpp
   3. Poll http://localhost:8080/health  (timeout: 3 min, retry every 10s)
-  4. docker run terminalbench container  →  write results file
-  5. Capture stdout to Ansible log
+  4. harbor run --agent terminus-2 --model openai/<model>  →  write results files
+  5. Capture stdout + JSON results to benchmarks dir
 
 after loop:
   6. import_playbook: llamacpp.yaml  →  restore production profile
 ```
 
-### Terminalbench Container
+### Harbor CLI (terminal-bench)
 
-- Run mode: `docker run --rm` (exits after each model, no persistent service)
-- Arguments (verify exact flag names against the terminalbench image at implementation time):
-  - `--base-url http://localhost:8080/v1`
-  - `--api-key llamacpp-homelab-key`
-  - `--model <model_name>`
-- Volume mount: host benchmark dir → `/results/` inside container
-- Output file written by container: `/results/output.json` (renamed by Ansible to include date + model name)
+Terminal-bench is the [Harbor framework's](https://github.com/harbor-framework/terminal-bench) agent evaluation benchmark — not a simple HTTP client. It runs LLM agents against real terminal tasks in Docker sandbox containers, scoring whether the agent solves each task.
+
+- **Installation**: `uv tool install harbor` on the ocean VM (one-time, idempotent)
+- **Agent**: `terminus-2` — Harbor's reference agent for terminal tasks
+- **Model routing**: LiteLLM `openai/<model-name>` prefix with `OPENAI_API_BASE` env var pointing at localhost:8080
+- **Run command**:
+  ```bash
+  OPENAI_API_BASE=http://localhost:8080/v1 \
+  OPENAI_API_KEY=llamacpp-homelab-key \
+  harbor run --dataset terminal-bench@2.0 --agent terminus-2 \
+             --model openai/<model-name> -n 1
+  ```
+- **Output**: JSON result files written to a temp working directory; Ansible copies them to the benchmarks dir with dated model-named filenames
 
 ---
 
@@ -63,14 +69,16 @@ after loop:
 ### `vars/vars_terminalbench.yaml` (new)
 
 ```yaml
-terminalbench_image: "ghcr.io/TODO/terminalbench:latest"   # image TBD at implementation
-terminalbench_benchmark_ctx_size: 8192                      # standardized context for all models
+terminalbench_dataset: "terminal-bench@2.0"
+terminalbench_agent: "terminus-2"
+terminalbench_benchmark_ctx_size: 8192        # standardized context for all models
 terminalbench_output_dir: /data01/services/llamacpp/benchmarks
 terminalbench_api_base: http://localhost:8080/v1
 terminalbench_api_key: llamacpp-homelab-key
 terminalbench_health_url: http://localhost:8080/health
-terminalbench_health_timeout: 180    # seconds
-terminalbench_health_interval: 10    # seconds between polls
+terminalbench_health_timeout: 180             # seconds
+terminalbench_health_interval: 10             # seconds between polls
+terminalbench_n_concurrent: 1
 ```
 
 ### `vars/vars_llamacpp_models.yaml` additions
@@ -106,16 +114,17 @@ Naming pattern: `{{ ansible_date_time.date }}_{{ model.name | replace('.gguf', '
 
 | Path | Purpose |
 |---|---|
-| `playbooks/individual/ocean/ai/terminalbench.yaml` | Main benchmark playbook |
-| `vars/vars_terminalbench.yaml` | Benchmark-specific config (image, ctx size, output dir) |
+| `playbooks/individual/ocean/ai/terminalbench_run.yaml` | Entry point: benchmark then restore |
+| `playbooks/individual/ocean/ai/terminalbench.yaml` | Benchmark play: setup + per-model loop |
+| `playbooks/individual/ocean/ai/terminalbench_model.yaml` | Per-model included tasks: swap, restart, health, run, collect |
+| `vars/vars_terminalbench.yaml` | Benchmark-specific config (agent, ctx size, output dir) |
+| `files/ocean-terminalbench/docker-compose.yml.j2` | Benchmark docker-compose template (parameterized model + ctx) |
 
 ## Modified Files
 
 | Path | Change |
 |---|---|
 | `vars/vars_llamacpp_models.yaml` | Add `benchmark_eligible: true` to each qualifying model |
-
-No templates needed initially — the terminalbench container handles its own output formatting.
 
 ---
 
@@ -134,7 +143,7 @@ This runs the full production llamacpp playbook, restoring the production model 
 ## Invocation
 
 ```bash
-ansible-playbook playbooks/individual/ocean/ai/terminalbench.yaml
+ansible-playbook playbooks/individual/ocean/ai/terminalbench_run.yaml
 ```
 
 No extra vars required. The eligible model list is fully driven by `benchmark_eligible: true` in `vars_llamacpp_models.yaml`.
