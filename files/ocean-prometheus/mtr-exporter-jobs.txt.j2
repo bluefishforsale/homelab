@@ -1,0 +1,17 @@
+# MTR exporter jobs file (mgumz/mtr-exporter format)
+# Format: <label> -- <schedule> -- <mtr-flags>
+# Comments start with #. Each scrape pulls all jobs' last reports.
+#
+# --no-dns: skip rDNS to keep MTR fast and predictable
+# --report-cycles 5: number of probe rounds per run (5 packets per hop)
+# --tcp --port 443: TCP-SYN probes for hosts that block ICMP (AWS, etc.)
+
+# General internet anchors (ICMP)
+cloudflare -- @every 60s -- --no-dns --report-cycles 5 1.1.1.1
+google -- @every 60s -- --no-dns --report-cycles 5 8.8.8.8
+
+# Plex API path (TCP/443; plex.tv hosted on AWS, blocks ICMP)
+plex_api -- @every 60s -- --no-dns --report-cycles 5 --tcp --port 443 plex.tv
+
+# Plex pubsub (TCP/443; the host EventSourceClient retried on 2026-04-26)
+plex_pubsub -- @every 60s -- --no-dns --report-cycles 5 --tcp --port 443 pubsub04.pop.fmt.plex.bz

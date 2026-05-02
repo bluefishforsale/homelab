@@ -57,6 +57,9 @@ service_ports:
   ndt_exporter:
     port: 9140
 
+  mtr_exporter:
+    port: 9141
+
   cadvisor:
     port: 8912
 
