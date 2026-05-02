@@ -3,8 +3,6 @@
 
 llamacpp_models:
   reasoning:
-    # Primary: Qwen3-14B - Optimal for 16GB VRAM with thinking/reasoning
-    # Supports /think mode for step-by-step reasoning
     - name: "Qwen3-14B-Q4_K_M.gguf"
       url: "https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf"
       size: "8.5GB"
@@ -15,8 +13,8 @@ llamacpp_models:
       timeout: 3600
       priority: 1
       requires_auth: false
-      
-    # Fallback: Qwen3-8B for even larger context
+      benchmark_eligible: true
+
     - name: "Qwen3-8B-Q4_K_M.gguf"
       url: "https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf"
       size: "5.0GB"
@@ -27,46 +25,44 @@ llamacpp_models:
       timeout: 2400
       priority: 2
       requires_auth: false
-      
+      benchmark_eligible: true
+
   backup:
-    # Current model as fallback (much smaller)
     - name: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
       url: "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
       size: "4GB"
-      parameters: "7B"  
+      parameters: "7B"
       vram_usage: "~5GB"
       capabilities: ["reasoning", "basic", "fast"]
       context_size: "16K"
       timeout: 1800
       priority: 4
       requires_auth: false
+      benchmark_eligible: true
 
 # RTX 3090 Performance Profiles (16GB VRAM budget for headroom)
 rtx_3090_profiles:
-  # Primary: Qwen3-14B with max context for single user
   single_user_reasoning:
     model: "Qwen3-14B-Q4_K_M.gguf"
     gpu_layers: -1
-    context_size: 40960  # 40K context fits in 16GB with 14B model
-    batch_size: 2048
-    parallel_requests: 1  # Single user
-    flash_attention: true
-    thinking_mode: true
-    
-  # Alternative: Qwen3-8B with massive context
-  max_context:
-    model: "Qwen3-8B-Q4_K_M.gguf"  
-    gpu_layers: -1
-    context_size: 65536  # 64K context with 8B model
+    context_size: 40960
     batch_size: 2048
     parallel_requests: 1
     flash_attention: true
     thinking_mode: true
-    
-  # Fallback: smaller model for testing
+
+  max_context:
+    model: "Qwen3-8B-Q4_K_M.gguf"
+    gpu_layers: -1
+    context_size: 65536
+    batch_size: 2048
+    parallel_requests: 1
+    flash_attention: true
+    thinking_mode: true
+
   lightweight:
     model: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
-    gpu_layers: -1  
+    gpu_layers: -1
     context_size: 32768
     batch_size: 1024
     parallel_requests: 1
@@ -74,6 +70,6 @@ rtx_3090_profiles:
 
 # Model download priorities (1 = download first)
 download_priority:
-  1: "Qwen3-14B-Q4_K_M.gguf"                     # Primary reasoning model (fits 16GB)
-  2: "Qwen3-8B-Q4_K_M.gguf"                      # Fallback with larger context
-  3: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"   # Lightweight reasoning
+  1: "Qwen3-14B-Q4_K_M.gguf"
+  2: "Qwen3-8B-Q4_K_M.gguf"
+  3: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
