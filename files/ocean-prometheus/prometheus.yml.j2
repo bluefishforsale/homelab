@@ -152,6 +152,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9140']
 
+  - job_name: 'mtr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    static_configs:
+    - targets: ['ocean.home:9141']
+
   - job_name: 'promtail'
     relabel_configs: *dropPortNumber
     scrape_interval: 15s
