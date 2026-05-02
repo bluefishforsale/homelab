@@ -1,0 +1,62 @@
+services:
+  llamacpp:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    container_name: llamacpp
+    hostname: llamacpp
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility]
+
+    environment:
+      - TZ=America/Los_Angeles
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=0
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - /data01/services/llamacpp/models:/models
+      - /data01/services/llamacpp/config:/config
+      - /data01/services/llamacpp/logs:/logs
+
+    command:
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--model"
+      - "/models/{{ bench_model }}"
+      - "--n-gpu-layers"
+      - "-1"
+      - "--ctx-size"
+      - "{{ bench_ctx_size }}"
+      - "--parallel"
+      - "1"
+      - "--batch-size"
+      - "2048"
+      - "--ubatch-size"
+      - "512"
+      - "--flash-attn"
+      - "--api-key"
+      - "llamacpp-homelab-key"
+      - "--metrics"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/v1/models || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
