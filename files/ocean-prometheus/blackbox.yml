@@ -37,7 +37,7 @@ modules:
       fail_if_ssl: false
       fail_if_not_ssl: false
       valid_status_codes: [200]
-      fail_if_not_matches_regexp:
+      fail_if_body_not_matches_regexp:
         - "application/json"
       tls_config:
         insecure_skip_verify: false
@@ -113,6 +113,14 @@ modules:
   tcp_connect:
     prober: tcp
     timeout: 5s
+
+  # Basic TCP connection forced to IPv4 (for dual-stack hosts on IPv4-only uplinks)
+  tcp_connect_ip4:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
 
   # TCP with TLS and certificate validation
   tcp_tls:

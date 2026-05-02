@@ -78,6 +78,16 @@
     - Reload systemd daemon
     - Restart prometheus service
 
+  - name: Copy blackbox-exporter modules config
+    ansible.builtin.copy:
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/blackbox.yml"
+      dest: "{{ path_home }}/config/blackbox.yml"
+      owner: nobody
+      group: nogroup
+      mode: '0644'
+    notify:
+    - Restart blackbox-exporter service
+
   - name: Create prometheus docker-compose.yml
     ansible.builtin.template:
       src: "{{ prometheus_files }}/prometheus-compose.yml.j2"

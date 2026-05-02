@@ -401,11 +401,34 @@ scrape_configs:
           probe_type: "tcp"
           category: "ssh"
       - targets:
-        # SMTP services  
+        # SMTP services
         - smtp.gmail.com:587
         labels:
           probe_type: "tcp"
           category: "smtp"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # TCP Probes - Plex WAN path (IPv4-forced; pubsub04 is dual-stack but ocean has no IPv6 uplink)
+  - job_name: 'blackbox-tcp-plex'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect_ip4]
+    scrape_interval: 1m
+    static_configs:
+      - targets:
+        # Plex path
+        - plex.tv:443
+        - pubsub04.pop.fmt.plex.bz:443
+        - 1.1.1.1:443
+        labels:
+          probe_type: "tcp"
+          category: "plex_path"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
