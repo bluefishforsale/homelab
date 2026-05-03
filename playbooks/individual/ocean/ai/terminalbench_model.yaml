@@ -24,6 +24,7 @@
     method: GET
     status_code: 200
   register: health_check
-  until: health_check.status == 200
+  failed_when: false
+  until: health_check.status is defined and health_check.status == 200
   retries: "{{ (terminalbench_health_timeout / terminalbench_health_interval) | int }}"
   delay: "{{ terminalbench_health_interval }}"
