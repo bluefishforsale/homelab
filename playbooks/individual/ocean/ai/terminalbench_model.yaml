@@ -35,50 +35,53 @@
     suffix: "_terminalbench"
   register: bench_tmpdir
 
-- name: "Run harbor terminal-bench for {{ bench_model_item.name }}"
-  ansible.builtin.command: >
-    /root/.local/bin/harbor run
-    --dataset {{ terminalbench_dataset }}
-    --agent {{ terminalbench_agent }}
-    --model openai/{{ bench_model_item.name }}
-    -n {{ terminalbench_n_concurrent }}
-  args:
-    chdir: "{{ bench_tmpdir.path }}"
-  environment:
-    HOME: /root
-    PATH: "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    OPENAI_API_BASE: "{{ terminalbench_api_base }}"
-    OPENAI_API_KEY: "{{ terminalbench_api_key }}"
-  register: harbor_result
+- name: "Run and collect terminal-bench results for {{ bench_model_item.name }}"
+  block:
+    - name: "Run harbor terminal-bench for {{ bench_model_item.name }}"
+      ansible.builtin.command: >
+        /root/.local/bin/harbor run
+        --dataset {{ terminalbench_dataset }}
+        --agent {{ terminalbench_agent }}
+        --model openai/{{ bench_model_item.name }}
+        -n {{ terminalbench_n_concurrent }}
+      args:
+        chdir: "{{ bench_tmpdir.path }}"
+      environment:
+        HOME: /root
+        PATH: "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        OPENAI_API_BASE: "{{ terminalbench_api_base }}"
+        OPENAI_API_KEY: "{{ terminalbench_api_key }}"
+      register: harbor_result
 
-- name: "Save harbor stdout for {{ bench_model_item.name }}"
-  ansible.builtin.copy:
-    content: "{{ harbor_result.stdout }}"
-    dest: >-
-      {{ terminalbench_output_dir }}/{{ ansible_date_time.date }}_{{ bench_model_item.name | replace('.gguf', '') }}_stdout.txt
-    owner: media
-    group: media
-    mode: '0644'
+    - name: "Save harbor stdout for {{ bench_model_item.name }}"
+      ansible.builtin.copy:
+        content: "{{ harbor_result.stdout }}"
+        dest: >-
+          {{ terminalbench_output_dir }}/{{ ansible_date_time.date }}_{{ bench_model_item.name | replace('.gguf', '') }}_stdout.txt
+        owner: media
+        group: media
+        mode: '0644'
 
-- name: "Find harbor result JSON files for {{ bench_model_item.name }}"
-  ansible.builtin.find:
-    paths: "{{ bench_tmpdir.path }}"
-    patterns: "*.json"
-    recurse: true
-  register: harbor_result_files
+    - name: "Find harbor result JSON files for {{ bench_model_item.name }}"
+      ansible.builtin.find:
+        paths: "{{ bench_tmpdir.path }}"
+        patterns: "*.json"
+        recurse: true
+      register: harbor_result_files
 
-- name: "Copy harbor result JSON for {{ bench_model_item.name }}"
-  ansible.builtin.copy:
-    src: "{{ harbor_result_files.files[0].path }}"
-    dest: >-
-      {{ terminalbench_output_dir }}/{{ ansible_date_time.date }}_{{ bench_model_item.name | replace('.gguf', '') }}.json
-    owner: media
-    group: media
-    mode: '0644'
-    remote_src: true
-  when: harbor_result_files.files | length > 0
+    - name: "Copy harbor result JSON for {{ bench_model_item.name }}"
+      ansible.builtin.copy:
+        src: "{{ harbor_result_files.files[0].path }}"
+        dest: >-
+          {{ terminalbench_output_dir }}/{{ ansible_date_time.date }}_{{ bench_model_item.name | replace('.gguf', '') }}.json
+        owner: media
+        group: media
+        mode: '0644'
+        remote_src: true
+      when: harbor_result_files.files | length > 0
 
-- name: "Clean up temp dir for {{ bench_model_item.name }}"
-  ansible.builtin.file:
-    path: "{{ bench_tmpdir.path }}"
-    state: absent
+  always:
+    - name: "Clean up temp dir for {{ bench_model_item.name }}"
+      ansible.builtin.file:
+        path: "{{ bench_tmpdir.path }}"
+        state: absent
