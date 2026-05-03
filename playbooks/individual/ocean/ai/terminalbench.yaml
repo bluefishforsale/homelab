@@ -35,11 +35,13 @@
 
     - name: Install uv
       ansible.builtin.shell: |
+        set -o pipefail
         curl -LsSf https://astral.sh/uv/install.sh | sh
       args:
         executable: /bin/bash
       environment:
         HOME: /root
+      changed_when: true
       when: uv_check.rc != 0
 
     - name: Install harbor via uv

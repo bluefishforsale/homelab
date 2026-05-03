@@ -51,6 +51,7 @@
         PATH: "/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         OPENAI_API_BASE: "{{ terminalbench_api_base }}"
         OPENAI_API_KEY: "{{ terminalbench_api_key }}"
+      changed_when: true
       register: harbor_result
 
     - name: "Save harbor stdout for {{ bench_model_item.name }}"
