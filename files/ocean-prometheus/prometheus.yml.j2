@@ -202,6 +202,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:8080']
 
+  - job_name: 'paia'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+    - targets: ['ocean.home:9092']
+
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
     metrics_path: /probe
