@@ -36,6 +36,9 @@
 - name: Deploy ComfyUI for AI Image Generation
   ansible.builtin.import_playbook: individual/ocean/ai/comfyui.yaml
 
+- name: Deploy paia Personal AI Assistant
+  ansible.builtin.import_playbook: individual/ocean/ai/paia.yaml
+
 
 # ============================================================================
 # Media Services

@@ -1,0 +1,33 @@
+services:
+  paia:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/Los_Angeles
+      - PAIA_DATA_DIR=/app/data
+      - PAIA_METRICS_ADDR=0.0.0.0:{{ metrics_port }}
+      - PAIA_LOG_FORMAT=json
+
+    ports:
+      - "0.0.0.0:{{ metrics_port }}:{{ metrics_port }}"
+
+    volumes:
+      - {{ home }}/data:/app/data
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ metrics_port }}/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
