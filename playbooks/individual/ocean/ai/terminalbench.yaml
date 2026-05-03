@@ -48,3 +48,10 @@
       changed_when: "'already installed' not in (harbor_install.stderr | default(''))"
       environment:
         HOME: /root
+
+    - name: Evaluate each benchmark-eligible model
+      ansible.builtin.include_tasks: terminalbench_model.yaml
+      loop: "{{ benchmark_models }}"
+      loop_control:
+        loop_var: bench_model_item
+        label: "{{ bench_model_item.name }}"
