@@ -45,6 +45,6 @@
     - name: Install harbor via uv
       ansible.builtin.command: /root/.local/bin/uv tool install harbor
       register: harbor_install
-      changed_when: "'already installed' not in (harbor_install.stdout | default(''))"
+      changed_when: "'already installed' not in (harbor_install.stderr | default(''))"
       environment:
         HOME: /root
