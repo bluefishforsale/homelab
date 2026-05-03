@@ -1,0 +1,29 @@
+---
+# Per-model benchmark tasks — included from terminalbench.yaml
+# loop_var: bench_model_item
+
+- name: "Write benchmark docker-compose.yml for {{ bench_model_item.name }}"
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../../../../files/ocean-terminalbench/docker-compose.yml.j2"
+    dest: "{{ llamacpp_home }}/docker-compose.yml"
+    owner: media
+    group: media
+    mode: '0644'
+  vars:
+    bench_model: "{{ bench_model_item.name }}"
+    bench_ctx_size: "{{ terminalbench_benchmark_ctx_size }}"
+
+- name: "Restart llamacpp for {{ bench_model_item.name }}"
+  ansible.builtin.systemd:
+    name: llamacpp.service
+    state: restarted
+
+- name: "Wait for llamacpp to be healthy ({{ bench_model_item.name }})"
+  ansible.builtin.uri:
+    url: "{{ terminalbench_health_url }}"
+    method: GET
+    status_code: 200
+  register: health_check
+  until: health_check.status == 200
+  retries: "{{ (terminalbench_health_timeout / terminalbench_health_interval) | int }}"
+  delay: "{{ terminalbench_health_interval }}"
