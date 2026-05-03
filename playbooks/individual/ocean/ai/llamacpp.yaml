@@ -13,7 +13,7 @@
     service: llamacpp
     image: ghcr.io/ggerganov/llama.cpp
     version: server-cuda
-    port: "{{ service_ports.llamacpp.port }}"
+    llamacpp_port: "{{ service_ports.llamacpp.port }}"
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-llamacpp"
     home: "{{ data }}/services/{{ service }}"
@@ -21,7 +21,7 @@
     uid: 1001
     gid: 1001
     api_key: llamacpp-homelab-key
-    # RTX 3090 optimized profile  
+    # RTX 3090 optimized profile
     selected_profile: max_performance
 
   tasks:
@@ -53,7 +53,7 @@
       - models
       - debug
 
-  - name: Download authenticated HuggingFace models (QwQ-32B) 
+  - name: Download authenticated HuggingFace models (QwQ-32B)
     ansible.builtin.get_url:
       url: "https://huggingface.co/{{ item.1.repo_id }}/resolve/main/{{ item.1.filename }}"
       dest: "{{ home }}/models/{{ item.1.name }}"
@@ -67,12 +67,12 @@
     with_subelements:
       - "{{ llamacpp_models | dict2items }}"
       - value
-    when: 
+    when:
       - item.1.requires_auth | default(false)
       - item.1.priority <= 2
       - ai_services.huggingface.token is defined
       - ai_services.huggingface.token != ''
-    tags: 
+    tags:
       - models
       - download
       - auth
@@ -92,10 +92,10 @@
     with_subelements:
       - "{{ llamacpp_models | dict2items }}"
       - value
-    when: 
+    when:
       - not (item.1.requires_auth | default(false))
       - item.1.priority <= 2
-    tags: 
+    tags:
       - models
       - download
     retries: 3
@@ -137,13 +137,13 @@
   - name: Enable llamacpp service
     ansible.builtin.systemd:
       name: llamacpp.service
-      enabled: yes
-      daemon_reload: yes
+      enabled: true
+      daemon_reload: true
 
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
-      daemon_reload: yes
+      daemon_reload: true
 
   - name: Restart llamacpp service
     ansible.builtin.systemd:

@@ -1,6 +1,8 @@
 ---
 # On-demand terminal-bench evaluation entry point.
 # Runs benchmarks for all benchmark_eligible models, then restores production llamacpp.
-- import_playbook: terminalbench.yaml
+- name: Run terminal-bench evaluation
+  import_playbook: terminalbench.yaml
 
-- import_playbook: llamacpp.yaml
+- name: Restore production llamacpp configuration
+  import_playbook: llamacpp.yaml
