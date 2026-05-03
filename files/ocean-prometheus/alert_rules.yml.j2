@@ -53,6 +53,38 @@ groups:
       summary: "Plex is unreachable from plex-exporter on {{ "{{ $labels.instance }}" }}"
       description: "plex_up has been 0 for more than 5 minutes on {{ "{{ $labels.instance }}" }} — Plex is down or in a restart loop"
 
+  # WAN path to Plex is degraded — TCP/443 to Plex API or pubsub failing
+  # or losing >5%. Excludes 1.1.1.1:443 (control), so this fires only when
+  # Plex's network specifically is bad, not when the entire internet is bad.
+  - alert: PlexPathDegraded
+    expr: |
+      probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"} == 0
+      or
+      (1 - avg_over_time(probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"}[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Plex WAN path degraded ({{ "{{ $labels.instance }}" }})"
+      description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} failing or losing >5% for 5m. Open the WAN Path Diagnosis dashboard to see which hop."
+
+  # General internet WAN path degraded — both Cloudflare and Google anchors
+  # losing >5%. Distinguishes 'internet bad' from 'specifically Plex bad'.
+  - alert: WANInternetDegraded
+    expr: |
+      (1 - avg_over_time(probe_success{job="blackbox-icmp", instance=~"1\\.1\\.1\\.1|8\\.8\\.8\\.8"}[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "WAN internet path degraded ({{ "{{ $labels.instance }}" }})"
+      description: "ICMP loss to {{ "{{ $labels.instance }}" }} >5% for 5m — general internet anchor unhealthy."
+
+  # ConntrackTablePressure deferred — unpoller is not exposing metrics on
+  # this gateway (service not running on ocean / endpoint returns empty).
+  # When unpoller is restored or replaced, add a rule using the actual
+  # conntrack_used / conntrack_max metric names.
+
   # GPU temperature alert (if NVIDIA GPU is present)
   - alert: HighGpuTemperature
     expr: nvidia_gpu_temperature_celsius > 85
