@@ -19,7 +19,7 @@
     unpoller_version: latest
     unpoller_port: "{{ service_ports.unpoller.port }}"
     unpoller_home: "{{ path_data01 }}/{{ unpoller_service }}"
-    unpoller_files: "files/unpoller"
+    unpoller_files: "{{ playbook_dir }}/../../../../files/unpoller"
     
     # UniFi Controller Configuration (from vault)
     unifi_controller_url: "{{ network.unifi.controller_url }}"
