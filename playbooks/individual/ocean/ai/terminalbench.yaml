@@ -1,0 +1,50 @@
+---
+- name: Run terminal-bench evaluation on benchmark-eligible llamacpp models
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_llamacpp_models.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_terminalbench.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    llamacpp_home: /data01/services/llamacpp
+    benchmark_models: >-
+      {{ llamacpp_models | dict2items
+         | map(attribute='value') | flatten
+         | selectattr('benchmark_eligible', 'equalto', true) | list }}
+
+  tasks:
+
+    - name: Ensure benchmark output directory exists
+      ansible.builtin.file:
+        path: "{{ terminalbench_output_dir }}"
+        state: directory
+        owner: media
+        group: media
+        mode: '0755'
+
+    - name: Check if uv is installed
+      ansible.builtin.command: which uv
+      register: uv_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install uv
+      ansible.builtin.shell: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /root
+      when: uv_check.rc != 0
+
+    - name: Install harbor via uv
+      ansible.builtin.command: /root/.local/bin/uv tool install harbor
+      register: harbor_install
+      changed_when: "'already installed' not in (harbor_install.stdout | default(''))"
+      environment:
+        HOME: /root
