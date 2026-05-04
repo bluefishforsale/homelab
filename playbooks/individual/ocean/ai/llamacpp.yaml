@@ -13,7 +13,7 @@
     service: llamacpp
     image: ghcr.io/ggerganov/llama.cpp
     version: server-cuda
-    llamacpp_port: "{{ service_ports.llamacpp.port }}"
+    port: "{{ service_ports.llamacpp.port }}"  # noqa: var-naming[no-reserved]
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-llamacpp"
     home: "{{ data }}/services/{{ service }}"
