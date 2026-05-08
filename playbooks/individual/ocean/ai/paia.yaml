@@ -1,4 +1,5 @@
 ---
+# paia: Discord bot + metrics server for ocean
 - name: Deploy paia personal AI assistant using Docker Compose
   hosts: ocean
   become: true
