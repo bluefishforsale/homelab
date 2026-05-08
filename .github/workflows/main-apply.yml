@@ -72,13 +72,13 @@ jobs:
           # Determine which targets to health-check
           TARGETS="[]"
           if echo "$PLAYBOOKS" | grep -qE 'ocean|03_ocean'; then
-            TARGETS=$(echo "$TARGETS" | jq '. + ["ocean"]')
+            TARGETS=$(echo "$TARGETS" | jq -c '. + ["ocean"]')
           fi
           if echo "$PLAYBOOKS" | grep -qE 'dns|bind9|dhcp|02_core'; then
-            TARGETS=$(echo "$TARGETS" | jq '. + ["dns"]')
+            TARGETS=$(echo "$TARGETS" | jq -c '. + ["dns"]')
           fi
           if echo "$PLAYBOOKS" | grep -qE 'github.*runner'; then
-            TARGETS=$(echo "$TARGETS" | jq '. + ["runners"]')
+            TARGETS=$(echo "$TARGETS" | jq -c '. + ["runners"]')
           fi
 
           echo "Playbooks to apply:"
