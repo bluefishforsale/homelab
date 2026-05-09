@@ -24,7 +24,7 @@
 
   - name: Log ocean into GHCR to pull private paia image
     ansible.builtin.shell: |
-      echo "{{ development.github.token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
     no_log: true
 
   - name: Ensure base directory exists
