@@ -1,4 +1,5 @@
 ---
+# tracer 2d: validate after gh-runner-01 ssh key sync
 # tracer 2c: validate after exit-code fix + ssh key sync
 # tracer: see docs/operations/deploy-tracer.md
 # GitHub Actions ephemeral Docker-based runners playbook
