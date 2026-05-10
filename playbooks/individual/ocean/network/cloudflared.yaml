@@ -44,7 +44,6 @@
     changed_when: false
     when: inventory_hostname != 'ocean'
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Debug tunnel_check variable
