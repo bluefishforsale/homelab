@@ -1,4 +1,5 @@
 ---
+# tracer: see docs/operations/deploy-tracer.md
 - name: Configure Homepage dashboard using Docker Compose
   hosts: ocean
   become: true
