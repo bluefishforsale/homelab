@@ -1,0 +1,199 @@
+---
+# Deploy blog.terrac.com Hugo static blog from GitHub
+#
+# Deploys pre-built static files (public/) committed by GitHub Actions CI.
+# Always does a clean deployment to avoid git ownership/permissions issues.
+#
+# Usage:
+#   ansible-playbook playbooks/individual/ocean/services/blog_terrac_com_static.yaml
+#
+- name: Deploy blog.terrac.com Hugo Static Blog from GitHub
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: blog_terrac_com
+    git_repo: "{{ lookup('env', 'GIT_REPO') | default('git@github.com:bluefishforsale/blog_terrac_com.git', true) }}"
+    git_branch: "{{ lookup('env', 'GIT_BRANCH') | default('main', true) }}"
+    data: /data01
+    home: "{{ data }}/services/{{ service }}"
+    git_clone_path: "{{ home }}/repo"
+    web_root: "{{ home }}"
+    user: media
+    uid: 1001
+    gid: 1001
+    accept_hostkey: yes
+
+  tasks:
+
+  - name: Display deployment information
+    ansible.builtin.debug:
+      msg:
+        - "Deploying blog.terrac.com Hugo static blog (clean deployment)"
+        - "Repository: {{ git_repo }}"
+        - "Branch: {{ git_branch }}"
+        - "Destination: {{ web_root }}"
+    tags: [always]
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags: [always, setup]
+
+  - name: Ensure repo directory exists
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: directory
+      owner: terrac
+      group: terrac
+      mode: '0755'
+    tags: [always, setup]
+
+  - name: Install required packages
+    ansible.builtin.apt:
+      name:
+        - git
+        - rsync
+      state: present
+      update_cache: no
+    tags: [setup]
+
+  - name: Check if SSH key exists for terrac user
+    ansible.builtin.stat:
+      path: /home/terrac/.ssh/id_ed25519
+    register: terrac_ssh_key
+    tags: [setup, git]
+
+  - name: Generate SSH key for terrac user if not exists
+    ansible.builtin.user:
+      name: terrac
+      generate_ssh_key: true
+      ssh_key_type: ed25519
+      ssh_key_file: /home/terrac/.ssh/id_ed25519
+      ssh_key_comment: "terrac@ocean-github"
+    when: not terrac_ssh_key.stat.exists
+    register: ssh_key_generated
+    tags: [setup, git]
+
+  - name: Read SSH public key
+    ansible.builtin.slurp:
+      src: /home/terrac/.ssh/id_ed25519.pub
+    register: terrac_ssh_pub_key
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
+  - name: Display SSH public key for GitHub
+    ansible.builtin.debug:
+      msg:
+        - "SSH key generated for terrac user!"
+        - "Add this public key to GitHub deploy keys for the repository:"
+        - "{{ terrac_ssh_pub_key.content | b64decode }}"
+        - ""
+        - "Steps:"
+        - "1. Go to: https://github.com/bluefishforsale/blog_terrac_com/settings/keys"
+        - "2. Click 'Add deploy key'"
+        - "3. Paste the key above"
+        - "4. Re-run this playbook"
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
+  - name: Fail if SSH key was just generated
+    ansible.builtin.fail:
+      msg: "SSH key was just generated. Please add it to GitHub and re-run the playbook."
+    when: ssh_key_generated.changed
+    tags: [setup, git]
+
+  - name: Always remove existing git repository for clean deployment
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: absent
+    tags: [deploy, git]
+
+  - name: Recreate repo directory with correct ownership
+    ansible.builtin.file:
+      path: "{{ git_clone_path }}"
+      state: directory
+      owner: terrac
+      group: terrac
+      mode: '0755'
+    tags: [deploy, git]
+
+  - name: Clone git repository (fresh every time)
+    ansible.builtin.git:
+      repo: "{{ git_repo }}"
+      dest: "{{ git_clone_path }}"
+      version: "{{ git_branch }}"
+      force: yes
+      update: yes
+      accept_hostkey: "{{ accept_hostkey }}"
+    become_user: terrac
+    environment:
+      GIT_SSH_COMMAND: "ssh -i /home/terrac/.ssh/id_ed25519 -o StrictHostKeyChecking=no"
+    register: git_clone
+    tags: [deploy, git]
+
+  - name: Display git clone result
+    ansible.builtin.debug:
+      msg:
+        - "Git operation completed"
+        - "Before: {{ git_clone.before | default('N/A') }}"
+        - "After: {{ git_clone.after | default('N/A') }}"
+        - "Changed: {{ git_clone.changed }}"
+    when: git_clone is defined
+    tags: [deploy, git]
+
+  - name: Sync built files to web root
+    ansible.builtin.synchronize:
+      src: "{{ git_clone_path }}/public/"
+      dest: "{{ web_root }}/"
+      delete: yes
+      recursive: yes
+      rsync_opts:
+        - "--exclude=.git"
+        - "--exclude=.gitignore"
+        - "--exclude=.github"
+        - "--exclude=README.md"
+        - "--exclude=repo"
+        - "--chown={{ uid }}:{{ gid }}"
+    delegate_to: "{{ inventory_hostname }}"
+    tags: [deploy]
+
+  - name: Ensure all files have correct ownership
+    ansible.builtin.file:
+      path: "{{ web_root }}"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+    tags: [deploy]
+
+  - name: Verify index.html exists
+    ansible.builtin.stat:
+      path: "{{ web_root }}/index.html"
+    register: index_file
+    tags: [deploy]
+
+  - name: Display warning if index.html not found
+    ansible.builtin.debug:
+      msg: "WARNING: index.html not found in {{ web_root }}. The website may not load correctly."
+    when: not index_file.stat.exists
+    tags: [deploy]
+
+  - name: Display deployment success
+    ansible.builtin.debug:
+      msg:
+        - "Deployment completed successfully!"
+        - "Blog root: {{ web_root }}"
+        - "Files deployed from branch: {{ git_branch }}"
+        - "Git commit: {{ git_clone.after | default('N/A') }}"
+        - ""
+        - "Access URL: https://blog.terrac.com"
+    when: git_clone is defined
+    tags: [always]
