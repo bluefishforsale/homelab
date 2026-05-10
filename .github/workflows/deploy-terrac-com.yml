@@ -71,10 +71,14 @@ jobs:
             COMMIT_MESSAGE="Manual deployment"
           fi
 
+          # GITHUB_OUTPUT lines are name=value; collapse multi-line commit
+          # messages to the subject so the step doesn't crash on newlines.
+          COMMIT_MESSAGE_SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -1)
+
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "force_clean=$FORCE_CLEAN" >> $GITHUB_OUTPUT
           echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE_SUBJECT" >> $GITHUB_OUTPUT
 
           echo "Deployment Parameters:"
           echo "  Branch: $BRANCH"
