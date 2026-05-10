@@ -907,3 +907,17 @@ git push origin phase-1-tracer
 ```
 
 Phase 1 is complete. Phase 2 (service registry) can begin from this commit.
+
+---
+
+## Follow-ups (surfaced in the final review, deferred from Phase 1)
+
+These are real but non-blocking. Address before they bite.
+
+1. **Fallback suppression in `detect-impacted-playbooks.sh`.** When a push contains both a specific match (e.g., a playbook edit) and an unmatched path that should trigger fallback (e.g., `vars/vars_users.yaml`), the fallback is silently dropped because of the `[[ ! -s "$SEEN_FILE" ]]` guard at the end of the script. The unmatched file's effect is lost. Phase 2 sidesteps this for `vars/vars_web_services.yaml` by promoting it to a specific rule, but other unmatched `vars/`, `roles/`, `files/` paths remain affected. Fix: emit fallback whenever `need_fallback=1`, even if specific matches exist; add a test fixture for the mixed case.
+
+2. **`deploy-critical-service.yml` concurrency asymmetry.** It uses `group: deploy-${{ inputs.service }}` (resolves to `deploy-plex` for plex deploys), while `main-apply.yml`'s resolver maps `plex.yaml` to `deploy-ocean` (since plex's `hosts: ocean`). The two paths don't serialize against each other. Fix: change critical-service to derive the group from the playbook's `hosts:` directive, the same way `main-apply.yml` does.
+
+3. **Other deploy workflows missing concurrency.** `deploy-changed-services.yml`, `deploy-services.yml`, `rollback.yml` have no concurrency block. The spec said "all deploy workflows"; these were deferred. `rollback.yml` is the highest priority — it can run while a deploy is in flight.
+
+4. **Pre-existing: `deploy-critical-service.yml` references `playbooks/individual/core/services/bind9_ddns.yaml`** which doesn't exist. The DNS critical path is broken at syntax-check. Out of scope for Phase 1; track separately.
