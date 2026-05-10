@@ -16,7 +16,7 @@
     port_ext: "{{ service_ports.homepage.port }}"
     port_int: 3000
     data: /data01
-    files: "{{ playbook_dir }}/../../../../files/ocean-homepage"
+    files: "{{ playbook_dir }}/../../../../files/homepage"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: "{{ system_users.media.uid }}"
