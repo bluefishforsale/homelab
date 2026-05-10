@@ -25,9 +25,9 @@ out=$(printf '' | bash "$SCRIPT")
 assert_eq "empty input" "[]" "$out"
 
 # 2. Single individual playbook → just that playbook
-out=$(printf 'playbooks/individual/ocean/services/homepage.yaml\n' | bash "$SCRIPT")
+out=$(printf 'playbooks/individual/ocean/services/terrac_com.yaml\n' | bash "$SCRIPT")
 assert_eq "homepage playbook only" \
-  '["playbooks/individual/ocean/services/homepage.yaml"]' "$out"
+  '["playbooks/individual/ocean/services/terrac_com.yaml"]' "$out"
 
 # 3. Cloudflared config file → cloudflared playbook
 out=$(printf 'files/cloudflared/config.yaml.j2\n' | bash "$SCRIPT")
@@ -55,9 +55,9 @@ assert_eq "group_vars all fallback" \
   '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
 
 # 8. Mixed inputs are unioned and deduped
-out=$(printf 'playbooks/individual/ocean/services/homepage.yaml\nfiles/nginx-compose/proxy_hostname_web_proxy.conf\nfiles/nginx-compose/proxy_hostname_web_proxy.conf\n' | bash "$SCRIPT")
+out=$(printf 'playbooks/individual/ocean/services/terrac_com.yaml\nfiles/nginx-compose/proxy_hostname_web_proxy.conf\nfiles/nginx-compose/proxy_hostname_web_proxy.conf\n' | bash "$SCRIPT")
 assert_eq "mixed homepage+nginx (deduped, sorted)" \
-  '["playbooks/individual/ocean/network/nginx_compose.yaml","playbooks/individual/ocean/services/homepage.yaml"]' "$out"
+  '["playbooks/individual/ocean/network/nginx_compose.yaml","playbooks/individual/ocean/services/terrac_com.yaml"]' "$out"
 
 # 9. Orchestrator playbook explicit edit → that orchestrator only
 out=$(printf 'playbooks/01_base_system.yaml\n' | bash "$SCRIPT")

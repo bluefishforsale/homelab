@@ -39,6 +39,8 @@ need_fallback=0
 
 emit() {
   local pb="$1"
+  # Skip playbooks that no longer exist (e.g., deleted/renamed in this commit).
+  [[ -f "$REPO_ROOT/$pb" ]] || return 0
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"
   fi
