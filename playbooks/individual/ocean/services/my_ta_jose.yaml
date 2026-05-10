@@ -1,0 +1,101 @@
+---
+# my-ta-jose: paper grading web app (FastAPI; Phase 2 of the spec at
+# https://github.com/bluefishforsale/my-ta-jose/blob/main/docs/specs/2026-05-09-paper-grading-design.md)
+#
+# This playbook is scaffolded ahead of the Phase 2 web layer. Until the
+# my-ta-jose CI starts pushing images to ghcr.io/bluefishforsale/my-ta-jose,
+# `docker compose pull` will fail. That's expected — the chain is wired so
+# the moment Phase 2 builds an image, deploys just work.
+- name: Deploy my-ta-jose paper grading web app using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: my_ta_jose
+    image: ghcr.io/bluefishforsale/my-ta-jose
+    version: latest
+    port_ext: "{{ service_ports.my_ta_jose.port }}"
+    port_int: 8000
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/my_ta_jose"
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull private my-ta-jose image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Ensure data subdirectory exists
+    ansible.builtin.file:
+      path: "{{ home }}/data"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0750'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart my_ta_jose service
+
+  - name: Create my_ta_jose environment file
+    ansible.builtin.template:
+      src: "{{ files }}/my_ta_jose.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart my_ta_jose service
+
+  - name: Create my_ta_jose systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - my_ta_jose.service
+    notify:
+    - Reload systemd daemon
+    - Restart my_ta_jose service
+
+  - name: Enable my_ta_jose service
+    ansible.builtin.systemd:
+      name: my_ta_jose.service
+      enabled: yes
+      daemon_reload: yes
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart my_ta_jose service
+    ansible.builtin.systemd:
+      name: my_ta_jose.service
+      state: restarted

@@ -195,6 +195,9 @@ service_ports:
   homepage:
     port: 8089
 
+  my_ta_jose:
+    port: 8092
+
   wordpress:
     port: 8085
 

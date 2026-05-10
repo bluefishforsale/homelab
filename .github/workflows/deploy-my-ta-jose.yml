@@ -1,0 +1,168 @@
+---
+name: Deploy my-ta-jose
+
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_branch:
+        description: "Git branch in the my-ta-jose repo to deploy (image tag, informational)"
+        required: false
+        default: "main"
+        type: string
+      force_clean:
+        description: "Force clean deployment"
+        required: false
+        type: boolean
+        default: false
+
+  # Webhook trigger from the my-ta-jose repository
+  repository_dispatch:
+    types: [deploy-my-ta-jose]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  deploy:
+    name: Deploy my-ta-jose
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify Ansible installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible --version
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Determine deployment parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            BRANCH="${{ github.event.client_payload.branch || 'main' }}"
+            COMMIT_SHA="${{ github.event.client_payload.sha || 'unknown' }}"
+            COMMIT_MESSAGE="${{ github.event.client_payload.commit_message || 'Webhook deployment' }}"
+            FORCE_CLEAN="${{ github.event.client_payload.force_clean || 'false' }}"
+          else
+            BRANCH="${{ inputs.git_branch || 'main' }}"
+            COMMIT_SHA="unknown"
+            COMMIT_MESSAGE="Manual deployment"
+            FORCE_CLEAN="${{ inputs.force_clean || 'false' }}"
+          fi
+
+          COMMIT_MESSAGE_SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -1)
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE_SUBJECT" >> $GITHUB_OUTPUT
+          echo "force_clean=$FORCE_CLEAN" >> $GITHUB_OUTPUT
+
+          echo "Deployment parameters:"
+          echo "  Branch: $BRANCH"
+          echo "  Commit: $COMMIT_SHA"
+          echo "  Message: $COMMIT_MESSAGE"
+
+      - name: Run deployment playbook
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          INVENTORY="inventories/production/hosts.ini"
+          PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml"
+
+          echo "================================================"
+          echo "Deploying my-ta-jose"
+          echo "================================================"
+          echo "Commit: ${{ steps.params.outputs.commit_sha }}"
+          echo "Message: ${{ steps.params.outputs.commit_message }}"
+          echo ""
+
+          START_TIME=$(date +%s)
+          if ansible-playbook -i "$INVENTORY" --vault-password-file=/tmp/.vault_pass "$PLAYBOOK" 2>&1 | tee /tmp/playbook.log; then
+            ANSIBLE_EXIT=${PIPESTATUS[0]}
+          else
+            ANSIBLE_EXIT=${PIPESTATUS[0]}
+          fi
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          if [ "$ANSIBLE_EXIT" -eq 0 ]; then
+            echo ""
+            echo "✅ SUCCESS: my-ta-jose deployed (${DURATION}s)"
+            echo "deployment_status=success" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+          else
+            echo ""
+            echo "❌ FAILED: my-ta-jose deployment failed (${DURATION}s)"
+            echo "deployment_status=failed" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      - name: Post-deployment health check
+        if: success()
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 5
+          if timeout 10 bash -c "curl -f -s -o /dev/null http://192.168.1.143:8092/healthz" 2>/dev/null; then
+            echo "✅ my-ta-jose /healthz responding on port 8092"
+          else
+            echo "⚠️  /healthz not responding (expected until Phase 2 ships a real container image)"
+          fi
+
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          STATUS="${{ env.deployment_status || 'unknown' }}"
+          DURATION="${{ env.deployment_duration || 'N/A' }}"
+          BRANCH="${{ steps.params.outputs.branch }}"
+          COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
+          COMMIT_MESSAGE="${{ steps.params.outputs.commit_message }}"
+
+          if [ "$STATUS" = "success" ]; then
+            STATUS_EMOJI="✅"; STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
+          else
+            STATUS_EMOJI="❌"; STATUS_TEXT="DEPLOYMENT FAILED"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📝 my-ta-jose Deployment
+
+          ## $STATUS_EMOJI $STATUS_TEXT
+
+          **Branch:** \`$BRANCH\`
+          **Commit:** \`$COMMIT_SHA\`
+          **Message:** $COMMIT_MESSAGE
+          **Duration:** ${DURATION}s
+
+          | Parameter | Value |
+          |-----------|-------|
+          | Repository | bluefishforsale/my-ta-jose |
+          | Image | ghcr.io/bluefishforsale/my-ta-jose:latest |
+          | Host port | 8092 |
+          | URL | https://ta.terrac.com |
+
+          EOF

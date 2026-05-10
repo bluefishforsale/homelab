@@ -38,6 +38,7 @@ on:
           - tinacms
           - terrac_com
           - gethomepage
+          - my_ta_jose
           # Monitoring
           - prometheus
           - grafana
@@ -98,6 +99,7 @@ jobs:
             tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
             terrac_com) PLAYBOOK="playbooks/individual/ocean/services/terrac_com.yaml" ;;
             gethomepage) PLAYBOOK="playbooks/individual/ocean/services/gethomepage.yaml" ;;
+            my_ta_jose) PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml" ;;
 
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;

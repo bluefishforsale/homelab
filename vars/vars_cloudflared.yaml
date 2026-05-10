@@ -74,6 +74,13 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:80"
 
+        # my-ta-jose paper grading web app
+        # Routed through nginx; app handles its own shared-password auth.
+        # Public (bypass Cloudflare Access) via fully_public_services in cloudflared.yaml.
+        - hostname: "ta.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
         # Management services (running on ocean - 192.168.1.143)
         - hostname: "portainer.terrac.com"
           service_type: "http"
