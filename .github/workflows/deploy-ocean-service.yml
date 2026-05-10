@@ -1,6 +1,10 @@
 ---
 name: Deploy Ocean Service
 
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:

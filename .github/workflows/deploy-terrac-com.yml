@@ -1,6 +1,10 @@
 ---
 name: Deploy terrac.com Website
 
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
 on:
   # Manual trigger
   workflow_dispatch:

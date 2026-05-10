@@ -1,6 +1,10 @@
 ---
 name: Deploy Critical Service (Protected)
 
+concurrency:
+  group: deploy-${{ inputs.service }}
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
