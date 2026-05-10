@@ -20,6 +20,7 @@ services:
       - {{ home }}/html:/usr/share/nginx/html:ro
       - {{ home }}/logs:/var/log/nginx
       - {{ data }}/services/terrac_com:/data01/services/terrac_com:ro
+      - {{ data }}/services/blog_terrac_com:/data01/services/blog_terrac_com:ro
     
     # Health check - check if nginx is responding
     healthcheck:
