@@ -68,6 +68,16 @@ github_runner_gid: 1100
 # Leave empty to disable SSH key mounting
 github_runner_ssh_key_dir: "/home/{{ github_runner_user }}/.ssh"
 
+# Cloudflared binary mount
+# When true, installs cloudflared on the runner host and bind-mounts the
+# binary into each runner container at /usr/local/bin/cloudflared.
+# Needed for playbooks that delegate_to: localhost and invoke the cloudflared
+# CLI (e.g. playbooks/individual/ocean/network/cloudflared.yaml's tunnel
+# management tasks).
+github_runner_mount_cloudflared: true
+github_runner_cloudflared_path: /usr/local/bin/cloudflared
+github_runner_cloudflared_url: "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+
 # Docker Compose configuration
 github_runners_compose_file: "{{ github_runners_base_dir }}/docker-compose.yml"
 github_runners_service_name: "github-docker-runners"

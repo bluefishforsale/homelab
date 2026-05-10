@@ -89,7 +89,13 @@ services:
       # Mount the runner user's SSH directory to allow SSH to other hosts
       # Useful for running Ansible playbooks against your homelab inventory
       - {{ github_runner_ssh_key_dir }}:/root/.ssh:ro
-      
+
+{% endif %}
+{% if github_runner_mount_cloudflared %}
+      # cloudflared binary for Ansible playbooks that delegate_to: localhost
+      # and invoke the cloudflared CLI (e.g. tunnel management).
+      - {{ github_runner_cloudflared_path }}:{{ github_runner_cloudflared_path }}:ro
+
 {% endif %}
     
     # Resource limits (optional)

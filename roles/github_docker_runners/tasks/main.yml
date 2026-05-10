@@ -180,6 +180,16 @@
     - not runner_ssh_key.stat.exists
   register: ssh_key_generated
 
+# cloudflared binary on host (bind-mounted into each runner container)
+- name: Install cloudflared binary on runner host
+  ansible.builtin.get_url:
+    url: "{{ github_runner_cloudflared_url }}"
+    dest: "{{ github_runner_cloudflared_path }}"
+    mode: '0755'
+    owner: root
+    group: root
+  when: github_runner_mount_cloudflared
+
 # Deploy Docker Compose configuration
 - name: Template docker-compose.yml for ephemeral runners
   ansible.builtin.template:
