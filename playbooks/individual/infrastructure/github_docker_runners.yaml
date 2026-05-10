@@ -1,4 +1,5 @@
 ---
+# tracer 2c: validate after exit-code fix + ssh key sync
 # tracer: see docs/operations/deploy-tracer.md
 # GitHub Actions ephemeral Docker-based runners playbook
 # Configures the runner host VM with Docker and deploys ephemeral runner containers
