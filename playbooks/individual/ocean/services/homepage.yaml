@@ -1,4 +1,5 @@
 ---
+# tracer 1b: verify ocean ssh after deploy-terrac-com failure
 # tracer: see docs/operations/deploy-tracer.md
 - name: Configure Homepage dashboard using Docker Compose
   hosts: ocean
