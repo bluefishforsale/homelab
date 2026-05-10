@@ -29,7 +29,7 @@ Now you can deploy from the homelab:
 ```bash
 # In homelab repository
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/terrac_com_static.yaml
+  playbooks/individual/ocean/services/terrac_com.yaml
 ```
 
 ### Option 2: Automated Build with GitHub Actions (Recommended)
@@ -100,7 +100,7 @@ After committing dist/ to the repo:
 ```bash
 # Deploy from homelab
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/terrac_com_static.yaml
+  playbooks/individual/ocean/services/terrac_com.yaml
 
 # Verify deployment
 curl -I http://192.168.1.143/
@@ -127,7 +127,7 @@ git push
 
 # Force clean deployment
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/terrac_com_static.yaml \
+  playbooks/individual/ocean/services/terrac_com.yaml \
   -e "force_clean=true"
 ```
 
@@ -143,7 +143,7 @@ ssh terrac@192.168.1.143 "cd /data01/services/terrac_com/repo && git pull"
 
 # Redeploy
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/terrac_com_static.yaml
+  playbooks/individual/ocean/services/terrac_com.yaml
 ```
 
 ## Manual Deployment

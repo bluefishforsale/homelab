@@ -25,7 +25,7 @@ out=$(printf '[]\n' | bash "$SCRIPT")
 assert_eq "empty array" "deploy-none" "$out"
 
 # 2. Single ocean playbook → deploy-ocean
-out=$(printf '["playbooks/individual/ocean/services/terrac_com.yaml"]\n' | bash "$SCRIPT")
+out=$(printf '["playbooks/individual/ocean/services/gethomepage.yaml"]\n' | bash "$SCRIPT")
 assert_eq "homepage → ocean" "deploy-ocean" "$out"
 
 # 3. Single runner playbook → deploy-github_runners (matches playbook hosts: directive)
@@ -33,11 +33,11 @@ out=$(printf '["playbooks/individual/infrastructure/github_docker_runners.yaml"]
 assert_eq "github_docker_runners → github_runners" "deploy-github_runners" "$out"
 
 # 4. Two ocean playbooks → deploy-ocean (deduped)
-out=$(printf '["playbooks/individual/ocean/services/terrac_com.yaml","playbooks/individual/ocean/network/nginx_compose.yaml"]\n' | bash "$SCRIPT")
+out=$(printf '["playbooks/individual/ocean/services/gethomepage.yaml","playbooks/individual/ocean/network/nginx_compose.yaml"]\n' | bash "$SCRIPT")
 assert_eq "two ocean playbooks deduped" "deploy-ocean" "$out"
 
 # 5. Mixed ocean + runners → deploy-github_runners-ocean (sorted)
-out=$(printf '["playbooks/individual/ocean/services/terrac_com.yaml","playbooks/individual/infrastructure/github_docker_runners.yaml"]\n' | bash "$SCRIPT")
+out=$(printf '["playbooks/individual/ocean/services/gethomepage.yaml","playbooks/individual/infrastructure/github_docker_runners.yaml"]\n' | bash "$SCRIPT")
 assert_eq "ocean + runners sorted" "deploy-github_runners-ocean" "$out"
 
 # 6. Orchestrator (01_base_system has no top-level hosts:, so it should default to 'all')

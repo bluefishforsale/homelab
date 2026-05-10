@@ -93,7 +93,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           INVENTORY="inventories/production/hosts.ini"
-          PLAYBOOK="playbooks/individual/ocean/services/terrac_com_static.yaml"
+          PLAYBOOK="playbooks/individual/ocean/services/terrac_com.yaml"
 
           echo "================================================"
           echo "Deploying terrac.com static website"

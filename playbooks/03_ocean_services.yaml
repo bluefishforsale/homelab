@@ -95,7 +95,7 @@
   ansible.builtin.import_playbook: individual/ocean/services/tinacms.yaml
 
 - name: Deploy terrac.com Static Website
-  ansible.builtin.import_playbook: individual/ocean/services/terrac_com_static.yaml
+  ansible.builtin.import_playbook: individual/ocean/services/terrac_com.yaml
 
 - name: Deploy Audible Downloader
   ansible.builtin.import_playbook: individual/ocean/services/audible_downloader.yaml

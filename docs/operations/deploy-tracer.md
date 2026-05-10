@@ -18,10 +18,10 @@ Goal: confirm a change to one service playbook triggers only that playbook.
 # 1. Make a no-op edit to the homepage playbook (bump a comment)
 sed -i '' '1a\
 # tracer: see docs/operations/deploy-tracer.md
-' playbooks/individual/ocean/services/terrac_com.yaml
+' playbooks/individual/ocean/services/gethomepage.yaml
 
 # 2. Single commit, push
-git add playbooks/individual/ocean/services/terrac_com.yaml
+git add playbooks/individual/ocean/services/gethomepage.yaml
 git commit -m "ci(tracer): homepage no-op edit"
 git push origin master
 
@@ -35,8 +35,8 @@ gh run view "$RUN" --log | grep -E '^Applying:|^✅ SUCCESS|^❌ FAILED'
 ```
 
 **Expected:**
-- One line: `Applying: playbooks/individual/ocean/services/terrac_com.yaml`
-- One line: `✅ SUCCESS: playbooks/individual/ocean/services/terrac_com.yaml (...)`
+- One line: `Applying: playbooks/individual/ocean/services/gethomepage.yaml`
+- One line: `✅ SUCCESS: playbooks/individual/ocean/services/gethomepage.yaml (...)`
 - No other playbooks applied.
 
 **Smoke-test the live site:**

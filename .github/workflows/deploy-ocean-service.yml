@@ -36,7 +36,8 @@ on:
           - payloadcms
           - strapi
           - tinacms
-          - terrac_com_static
+          - terrac_com
+          - gethomepage
           # Monitoring
           - prometheus
           - grafana
@@ -95,8 +96,9 @@ jobs:
             payloadcms) PLAYBOOK="playbooks/individual/ocean/services/payloadcms.yaml" ;;
             strapi) PLAYBOOK="playbooks/individual/ocean/services/strapi.yaml" ;;
             tinacms) PLAYBOOK="playbooks/individual/ocean/services/tinacms.yaml" ;;
-            terrac_com_static) PLAYBOOK="playbooks/individual/ocean/services/terrac_com_static.yaml" ;;
-            
+            terrac_com) PLAYBOOK="playbooks/individual/ocean/services/terrac_com.yaml" ;;
+            gethomepage) PLAYBOOK="playbooks/individual/ocean/services/gethomepage.yaml" ;;
+
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;
             grafana) PLAYBOOK="playbooks/individual/ocean/monitoring/grafana_compose.yaml" ;;
