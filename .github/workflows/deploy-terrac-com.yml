@@ -152,7 +152,7 @@ jobs:
           fi
 
           # Verify files exist
-          if ssh terrac@192.168.1.143 "test -f /data01/services/terrac_com/index.html"; then
+          if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null terrac@192.168.1.143 "test -f /data01/services/terrac_com/index.html"; then
             echo "✅ index.html exists on server"
           else
             echo "❌ index.html NOT FOUND on server"
