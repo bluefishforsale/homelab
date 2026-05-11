@@ -90,6 +90,16 @@
       enabled: yes
       daemon_reload: yes
 
+  # Always (re)start the systemd unit at the end of the playbook so a new
+  # :latest image gets pulled and the container is recreated even when
+  # docker-compose.yml / .env / .service templates were byte-identical.
+  # The unit's ExecStartPre runs `docker compose pull --quiet` before
+  # `docker compose up -d`, so a fresh image is picked up on restart.
+  - name: Restart my_ta_jose service to pick up latest image
+    ansible.builtin.systemd:
+      name: my_ta_jose.service
+      state: restarted
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
