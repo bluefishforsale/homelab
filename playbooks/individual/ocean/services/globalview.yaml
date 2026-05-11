@@ -1,0 +1,75 @@
+---
+# globalview: React + Cesium OSINT dashboard SPA, served by nginx in-container.
+# Public URL: https://globalview.terrac.com (single-host vhost path-routes
+# /api/ to the globalview_backend service; everything else hits this SPA).
+- name: Deploy globalview frontend using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: globalview
+    image: ghcr.io/bluefishforsale/globalview
+    version: latest
+    port_ext: "{{ service_ports.globalview.port }}"
+    port_int: 80
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/globalview"
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull private globalview image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+
+  - name: Create globalview environment file
+    ansible.builtin.template:
+      src: "{{ files }}/globalview.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+
+  - name: Create globalview systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/globalview.service.j2"
+      dest: "/etc/systemd/system/globalview.service"
+      mode: '0644'
+
+  - name: Enable globalview service
+    ansible.builtin.systemd:
+      name: globalview.service
+      enabled: yes
+      daemon_reload: yes
+
+  # Always restart so a new :latest image is pulled — same rationale as
+  # paia / my_ta_jose / etc. See docs/operations/deploy-pattern.md gotcha #5.
+  - name: Restart globalview service to pick up latest image
+    ansible.builtin.systemd:
+      name: globalview.service
+      state: restarted

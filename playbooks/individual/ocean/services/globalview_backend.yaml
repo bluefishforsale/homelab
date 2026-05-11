@@ -1,0 +1,74 @@
+---
+# globalview_backend: FastAPI + WebSocket OSINT API.
+# Reads TimescaleDB + Redis on the host bridge (deployed by globalview_stack.yaml).
+# Reached by the SPA at https://globalview.terrac.com/api/v1/* (nginx vhost
+# path-routes /api/ here; everything else hits the globalview frontend).
+- name: Deploy globalview backend using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: globalview_backend
+    image: ghcr.io/bluefishforsale/globalview-backend-py
+    version: latest
+    port_ext: "{{ service_ports.globalview_backend.port }}"
+    port_int: 8090
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/globalview_backend"
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull globalview-backend-py image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+
+  - name: Create globalview_backend environment file
+    ansible.builtin.template:
+      src: "{{ files }}/globalview_backend.env.j2"
+      dest: "{{ home }}/.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+
+  - name: Create globalview_backend systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/globalview_backend.service.j2"
+      dest: "/etc/systemd/system/globalview_backend.service"
+      mode: '0644'
+
+  - name: Enable globalview_backend service
+    ansible.builtin.systemd:
+      name: globalview_backend.service
+      enabled: yes
+      daemon_reload: yes
+
+  - name: Restart globalview_backend service to pick up latest image
+    ansible.builtin.systemd:
+      name: globalview_backend.service
+      state: restarted

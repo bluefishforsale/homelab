@@ -1,0 +1,179 @@
+---
+name: Deploy globalview backend
+
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_branch:
+        description: "Git branch in the globalview-backend-py repo to deploy (image tag, informational)"
+        required: false
+        default: "main"
+        type: string
+      force_clean:
+        description: "Force clean deployment"
+        required: false
+        type: boolean
+        default: false
+
+  # Webhook trigger from the globalview-backend-py repository
+  repository_dispatch:
+    types: [deploy-globalview-backend]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  deploy:
+    name: Deploy globalview backend
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify Ansible installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible --version
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Determine deployment parameters
+        id: params
+        # Pass payload via env vars (not `${{ ... }}` inline expansion) so
+        # special chars (quotes, braces, $, newlines) in the commit message
+        # can't break out of the shell context.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_BRANCH: ${{ github.event.client_payload.branch }}
+          CLIENT_COMMIT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_COMMIT_MESSAGE: ${{ github.event.client_payload.commit_message }}
+          CLIENT_FORCE_CLEAN: ${{ github.event.client_payload.force_clean }}
+          INPUT_BRANCH: ${{ inputs.git_branch }}
+          INPUT_FORCE_CLEAN: ${{ inputs.force_clean }}
+        run: |
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            BRANCH="${CLIENT_BRANCH:-main}"
+            COMMIT_SHA="${CLIENT_COMMIT_SHA:-unknown}"
+            COMMIT_MESSAGE="${CLIENT_COMMIT_MESSAGE:-Webhook deployment}"
+            FORCE_CLEAN="${CLIENT_FORCE_CLEAN:-false}"
+          else
+            BRANCH="${INPUT_BRANCH:-main}"
+            COMMIT_SHA="unknown"
+            COMMIT_MESSAGE="Manual deployment"
+            FORCE_CLEAN="${INPUT_FORCE_CLEAN:-false}"
+          fi
+
+          COMMIT_MESSAGE_SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -1)
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MESSAGE_SUBJECT" >> $GITHUB_OUTPUT
+          echo "force_clean=$FORCE_CLEAN" >> $GITHUB_OUTPUT
+
+          echo "Deployment parameters:"
+          echo "  Branch: $BRANCH"
+          echo "  Commit: $COMMIT_SHA"
+          echo "  Message: $COMMIT_MESSAGE"
+
+      - name: Run deployment playbook
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          INVENTORY="inventories/production/hosts.ini"
+          PLAYBOOK="playbooks/individual/ocean/services/globalview_backend.yaml"
+
+          echo "================================================"
+          echo "Deploying globalview_backend"
+          echo "================================================"
+          echo "Commit: ${{ steps.params.outputs.commit_sha }}"
+          echo "Message: ${{ steps.params.outputs.commit_message }}"
+          echo ""
+
+          START_TIME=$(date +%s)
+          if ansible-playbook -i "$INVENTORY" --vault-password-file=/tmp/.vault_pass "$PLAYBOOK" 2>&1 | tee /tmp/playbook.log; then
+            ANSIBLE_EXIT=${PIPESTATUS[0]}
+          else
+            ANSIBLE_EXIT=${PIPESTATUS[0]}
+          fi
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          if [ "$ANSIBLE_EXIT" -eq 0 ]; then
+            echo ""
+            echo "✅ SUCCESS: globalview_backend deployed (${DURATION}s)"
+            echo "deployment_status=success" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+          else
+            echo ""
+            echo "❌ FAILED: globalview_backend deployment failed (${DURATION}s)"
+            echo "deployment_status=failed" >> $GITHUB_ENV
+            echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      - name: Post-deployment health check
+        if: success()
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 5
+          if timeout 10 bash -c "curl -f -s -o /dev/null http://192.168.1.143:8094/api/v1/health" 2>/dev/null; then
+            echo "✅ globalview_backend /api/v1/health responding on port 8094"
+          else
+            echo "⚠️  /api/v1/health not responding"
+          fi
+
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          STATUS="${{ env.deployment_status || 'unknown' }}"
+          DURATION="${{ env.deployment_duration || 'N/A' }}"
+          BRANCH="${{ steps.params.outputs.branch }}"
+          COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
+          COMMIT_MESSAGE="${{ steps.params.outputs.commit_message }}"
+
+          if [ "$STATUS" = "success" ]; then
+            STATUS_EMOJI="✅"; STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
+          else
+            STATUS_EMOJI="❌"; STATUS_TEXT="DEPLOYMENT FAILED"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 📝 globalview_backend Deployment
+
+          ## $STATUS_EMOJI $STATUS_TEXT
+
+          **Branch:** \`$BRANCH\`
+          **Commit:** \`$COMMIT_SHA\`
+          **Message:** $COMMIT_MESSAGE
+          **Duration:** ${DURATION}s
+
+          | Parameter | Value |
+          |-----------|-------|
+          | Repository | bluefishforsale/globalview-backend-py |
+          | Image | ghcr.io/bluefishforsale/globalview-backend-py:latest |
+          | Host port | 8094 |
+          | URL | https://globalview.terrac.com/api/v1/ |
+
+          EOF

@@ -198,6 +198,12 @@ service_ports:
   my_ta_jose:
     port: 8092
 
+  globalview:
+    port: 8093
+
+  globalview_backend:
+    port: 8094
+
   wordpress:
     port: 8085
 

@@ -1,0 +1,29 @@
+services:
+  globalview_backend:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/Los_Angeles
+
+    ports:
+      - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:{{ port_int }}/api/v1/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
+
+    network_mode: bridge

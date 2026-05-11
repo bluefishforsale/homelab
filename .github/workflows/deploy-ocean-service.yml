@@ -39,6 +39,8 @@ on:
           - terrac_com
           - gethomepage
           - my_ta_jose
+          - globalview
+          - globalview_backend
           # Monitoring
           - prometheus
           - grafana
@@ -100,6 +102,8 @@ jobs:
             terrac_com) PLAYBOOK="playbooks/individual/ocean/services/terrac_com.yaml" ;;
             gethomepage) PLAYBOOK="playbooks/individual/ocean/services/gethomepage.yaml" ;;
             my_ta_jose) PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml" ;;
+            globalview) PLAYBOOK="playbooks/individual/ocean/services/globalview.yaml" ;;
+            globalview_backend) PLAYBOOK="playbooks/individual/ocean/services/globalview_backend.yaml" ;;
 
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;

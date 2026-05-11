@@ -1,0 +1,29 @@
+services:
+  globalview:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/Los_Angeles
+
+    ports:
+      - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:{{ port_int }}/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
+
+    network_mode: bridge
