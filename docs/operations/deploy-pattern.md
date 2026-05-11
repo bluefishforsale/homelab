@@ -148,6 +148,15 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
    hosts.** The cloudflared SSH-tunnel-check task had it; one host's positive
    result made all non-ocean hosts try `cloudflared tunnel info ssh-<host>` for
    tunnels that didn't exist. Drop `run_once` for register-into-fact tasks.
+9. **Vault values that get embedded in URLs need URL-safe chars.** A
+   `vault.globalview.postgres_password` with `/!%@?` mangled the
+   `postgresql://user:pw@host:port/db` URL — libpq/asyncpg parsed the
+   leading `/` in the password as a path separator and lost the host:port.
+   `| urlencode` in the env template helps but isn't sufficient for every
+   parser. Prefer URL-safe passwords (`[A-Za-z0-9_-]{32,}`) when the value
+   will ever appear in a URL. Rotate via `ALTER USER` (or equivalent) on
+   the running service AND update the vault, in that order, so the service
+   still authenticates with the old credential during the gap.
 
 ## Bootstrap checklist for a new service
 
