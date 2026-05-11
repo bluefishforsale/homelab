@@ -32,6 +32,8 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 
 ### CI/CD & Automation
 
+- **Adding a new external-repo service (READ FIRST when onboarding a new project)** → [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
+- **Validating the deploy chain end-to-end** → [`docs/operations/deploy-tracer.md`](docs/operations/deploy-tracer.md)
 - **GitHub Actions Workflows** → [`.github/workflows/`](.github/workflows/)
 - **Playbook Documentation** → [`playbooks/README.md`](playbooks/README.md)
 
@@ -39,10 +41,11 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 
 ## Quick Reference
 
-**Primary Host:** ocean (192.168.1.143)  
-**Environment Setup:** `source .envrc`  
-**Deploy All:** `ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml`  
+**Primary Host:** ocean (192.168.1.143)
+**Environment Setup:** `source .envrc`
+**Deploy All:** `ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml`
 **Validate:** `make validate`
+**Adding a new project that deploys here:** follow [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md) — bootstrap checklist + every gotcha that's bitten this repo before.
 
 ---
 
