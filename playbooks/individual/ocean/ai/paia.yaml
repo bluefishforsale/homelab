@@ -82,6 +82,13 @@
       enabled: yes
       daemon_reload: yes
 
+  # Always restart so a new :latest image gets pulled — see gotcha #5 in
+  # docs/operations/deploy-pattern.md.
+  - name: Restart paia service to pick up latest image
+    ansible.builtin.systemd:
+      name: paia.service
+      state: restarted
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
