@@ -56,17 +56,26 @@ jobs:
 
       - name: Determine deployment parameters
         id: params
+        # Pass payload via env vars (not `${{ ... }}` inline expansion) so
+        # special chars (quotes, braces, $, newlines) in the commit message
+        # can't break out of the shell context.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_BRANCH: ${{ github.event.client_payload.branch }}
+          CLIENT_FORCE_CLEAN: ${{ github.event.client_payload.force_clean }}
+          CLIENT_COMMIT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_COMMIT_MESSAGE: ${{ github.event.client_payload.commit_message }}
+          INPUT_BRANCH: ${{ inputs.git_branch }}
+          INPUT_FORCE_CLEAN: ${{ inputs.force_clean }}
         run: |
-          # For repository_dispatch events, use payload data if available
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            BRANCH="${{ github.event.client_payload.branch || 'main' }}"
-            FORCE_CLEAN="${{ github.event.client_payload.force_clean || 'false' }}"
-            COMMIT_SHA="${{ github.event.client_payload.sha || 'unknown' }}"
-            COMMIT_MESSAGE="${{ github.event.client_payload.commit_message || 'Webhook deployment' }}"
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            BRANCH="${CLIENT_BRANCH:-main}"
+            FORCE_CLEAN="${CLIENT_FORCE_CLEAN:-false}"
+            COMMIT_SHA="${CLIENT_COMMIT_SHA:-unknown}"
+            COMMIT_MESSAGE="${CLIENT_COMMIT_MESSAGE:-Webhook deployment}"
           else
-            # For workflow_dispatch, use inputs
-            BRANCH="${{ inputs.git_branch || 'main' }}"
-            FORCE_CLEAN="${{ inputs.force_clean || 'false' }}"
+            BRANCH="${INPUT_BRANCH:-main}"
+            FORCE_CLEAN="${INPUT_FORCE_CLEAN:-false}"
             COMMIT_SHA="unknown"
             COMMIT_MESSAGE="Manual deployment"
           fi
