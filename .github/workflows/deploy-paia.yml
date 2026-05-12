@@ -98,7 +98,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           INVENTORY="inventories/production/hosts.ini"
-          PLAYBOOK="playbooks/individual/ocean/services/paia.yaml"
+          PLAYBOOK="playbooks/individual/ocean/ai/paia.yaml"
 
           echo "================================================"
           echo "Deploying paia"
@@ -128,6 +128,20 @@ jobs:
             echo "deployment_duration=$DURATION" >> $GITHUB_ENV
             exit 1
           fi
+
+      - name: Force restart paia.service to pull new image
+        # The playbook only restarts when its templates change. A deploy
+        # triggered by a paia image push (no template diff) wouldn't pick up
+        # the new :latest without this. systemd's ExecStartPre pulls.
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible -i inventories/production/hosts.ini \
+            --vault-password-file=/tmp/.vault_pass \
+            ocean -m ansible.builtin.systemd \
+            -a "name=paia.service state=restarted" \
+            --become
 
       - name: Cleanup vault password
         if: always()
