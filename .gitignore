@@ -1,6 +1,9 @@
 # git worktrees
 .worktrees/
 
+# Claude Code local state (per-project settings, worktrees, etc.)
+.claude/
+
 # macOS files
 .DS_Store
 .vscode/settings.json
