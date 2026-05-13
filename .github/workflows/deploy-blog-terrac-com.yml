@@ -11,7 +11,7 @@ on:
         type: string
 
   repository_dispatch:
-    types: [deploy-blog]
+    types: [deploy-blog-website]
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
