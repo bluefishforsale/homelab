@@ -126,9 +126,6 @@ service_ports:
   ai_corp:
     port: 8088
 
-  openclaw:
-    port: 80
-
   paia:
     metrics: 9092
 
