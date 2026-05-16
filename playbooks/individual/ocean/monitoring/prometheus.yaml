@@ -28,6 +28,10 @@
     ndt_exporter_image: bluefishforsale/ndt-speedtest-exporter
     ndt_exporter_version: latest
     ndt_exporter_port: "{{ service_ports.ndt_exporter.port }}"
+    mtr_exporter_service: mtr-exporter
+    mtr_exporter_image: dragoonaethis/mtr-exporter
+    mtr_exporter_version: "0.3.0"
+    mtr_exporter_port: "{{ service_ports.mtr_exporter.port }}"
     # Alertmanager (Docker Compose deployment)
     alertmanager_service: alertmanager
     alertmanager_image: prom/alertmanager
@@ -77,6 +81,26 @@
     notify:
     - Reload systemd daemon
     - Restart prometheus service
+
+  - name: Copy blackbox-exporter modules config
+    ansible.builtin.copy:
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/blackbox.yml"
+      dest: "{{ path_home }}/config/blackbox.yml"
+      owner: nobody
+      group: nogroup
+      mode: '0644'
+    notify:
+    - Restart blackbox-exporter service
+
+  - name: Create mtr-exporter jobs config
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/mtr-exporter-jobs.txt.j2"
+      dest: "{{ path_home }}/config/mtr-exporter-jobs.txt"
+      owner: nobody
+      group: nogroup
+      mode: '0644'
+    notify:
+    - Restart mtr-exporter service
 
   - name: Create prometheus docker-compose.yml
     ansible.builtin.template:
@@ -268,6 +292,17 @@
     - Reload systemd daemon
     - Restart ndt-exporter service
 
+  - name: Create systemd mtr-exporter.service
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - mtr-exporter.service
+    notify:
+    - Reload systemd daemon
+    - Restart mtr-exporter service
+
   - name: Start and enable prometheus Docker Compose service
     ansible.builtin.systemd:
       name: prometheus.service
@@ -284,6 +319,12 @@
   - name: Start and enable ndt-exporter service
     ansible.builtin.systemd:
       name: ndt-exporter.service
+      state: started
+      enabled: true
+
+  - name: Start and enable mtr-exporter service
+    ansible.builtin.systemd:
+      name: mtr-exporter.service
       state: started
       enabled: true
 
@@ -329,4 +370,9 @@
   - name: Restart ndt-exporter service
     ansible.builtin.systemd:
       name: ndt-exporter.service
+      state: restarted
+
+  - name: Restart mtr-exporter service
+    ansible.builtin.systemd:
+      name: mtr-exporter.service
       state: restarted

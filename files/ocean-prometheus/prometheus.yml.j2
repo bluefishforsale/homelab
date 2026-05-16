@@ -152,6 +152,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9140']
 
+  - job_name: 'mtr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    static_configs:
+    - targets: ['ocean.home:9141']
+
   - job_name: 'promtail'
     relabel_configs: *dropPortNumber
     scrape_interval: 15s
@@ -304,6 +311,27 @@ scrape_configs:
       - target_label: __address__
         replacement: ocean.home:9115
 
+  # TLS Probes - Plex WAN path (IPv4-forced; redirect-tolerant)
+  - job_name: 'blackbox-tls-plex'
+    metrics_path: /probe
+    params:
+      module: [http_tls_ip4]
+    scrape_interval: 1h
+    static_configs:
+      - targets:
+        # Plex path
+        - https://plex.tv:443
+        labels:
+          probe_type: "tls"
+          category: "plex_path"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
   # ICMP Ping Probes - Network connectivity
   - job_name: 'blackbox-icmp'
     metrics_path: /probe
@@ -401,11 +429,34 @@ scrape_configs:
           probe_type: "tcp"
           category: "ssh"
       - targets:
-        # SMTP services  
+        # SMTP services
         - smtp.gmail.com:587
         labels:
           probe_type: "tcp"
           category: "smtp"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # TCP Probes - Plex WAN path (IPv4-forced; pubsub04 is dual-stack but ocean has no IPv6 uplink)
+  - job_name: 'blackbox-tcp-plex'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect_ip4]
+    scrape_interval: 1m
+    static_configs:
+      - targets:
+        # Plex path
+        - plex.tv:443
+        - pubsub04.pop.fmt.plex.bz:443
+        - 1.1.1.1:443
+        labels:
+          probe_type: "tcp"
+          category: "plex_path"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

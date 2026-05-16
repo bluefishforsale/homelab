@@ -27,6 +27,26 @@ modules:
       headers:
         User-Agent: "Prometheus BlackBox Exporter"
 
+  # TLS handshake forced to IPv4 + redirect-tolerant
+  # (mirrors tcp_connect_ip4: ocean has no IPv6 uplink, so dual-stack
+  # hosts must be probed via IPv4. valid_status_codes allows 3xx so
+  # plex.tv (302 to /web/index.html) reports probe_success=1.)
+  http_tls_ip4:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      method: GET
+      no_follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+      valid_status_codes: [200, 301, 302, 303, 307, 308]
+      tls_config:
+        insecure_skip_verify: false
+      headers:
+        User-Agent: "Prometheus BlackBox Exporter"
+
   # API endpoints with JSON response validation
   http_api_json:
     prober: http
@@ -37,7 +57,7 @@ modules:
       fail_if_ssl: false
       fail_if_not_ssl: false
       valid_status_codes: [200]
-      fail_if_not_matches_regexp:
+      fail_if_body_not_matches_regexp:
         - "application/json"
       tls_config:
         insecure_skip_verify: false
@@ -113,6 +133,14 @@ modules:
   tcp_connect:
     prober: tcp
     timeout: 5s
+
+  # Basic TCP connection forced to IPv4 (for dual-stack hosts on IPv4-only uplinks)
+  tcp_connect_ip4:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
 
   # TCP with TLS and certificate validation
   tcp_tls:

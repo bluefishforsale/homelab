@@ -19,6 +19,9 @@ services:
       - UP_UNIFI_DEFAULT_URL={{ unifi_controller_url }}
       - UP_UNIFI_DEFAULT_USER={{ unifi_username }}
       - UP_UNIFI_DEFAULT_PASS={{ unifi_password }}
+      # UniFi OS console (UDM/UDR/Cloud Key Gen2+) uses /api/auth/login instead
+      # of /api/login. unpoller auto-detects when this flag is true.
+      - UP_UNIFI_DEFAULT_UNIFI_OS=true
       - UP_UNIFI_DEFAULT_VERIFY_SSL=false
       - UP_UNIFI_DEFAULT_TIMEOUT=30s
       - UP_PROMETHEUS_HTTP_LISTEN=0.0.0.0:9130

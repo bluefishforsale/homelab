@@ -1,0 +1,259 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "datasource", "uid": "grafana"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Plex path probe success",
+      "description": "TCP/443 probes to plex.tv and pubsub04 (excluding the 1.1.1.1 control). Red = bad, green = good.",
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "probe_success{job=\"blackbox-tcp-plex\", instance!=\"1.1.1.1:443\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"color": "red", "text": "DOWN"}, "1": {"color": "green", "text": "UP"}}}
+          ],
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "value_and_name"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Internet anchor probe success",
+      "description": "ICMP to 1.1.1.1 / 8.8.8.8. If both red, it's the internet not Plex.",
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "probe_success{job=\"blackbox-icmp\", instance=~\"1\\\\.1\\\\.1\\\\.1|8\\\\.8\\\\.8\\\\.8\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"color": "red", "text": "DOWN"}, "1": {"color": "green", "text": "UP"}}}
+          ],
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "value_and_name"}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "ICMP loss rate (5m avg) — internet anchors and gateway",
+      "description": "1 - avg_over_time(probe_success). Spikes here mean the WAN is dropping packets.",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "1 - avg_over_time(probe_success{job=\"blackbox-icmp\", instance=~\"1\\\\.1\\\\.1\\\\.1|8\\\\.8\\\\.8\\\\.8|192\\\\.168\\\\.1\\\\.1\"}[5m])",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 0.5,
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "spanNulls": true}
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "ICMP RTT — internet anchors",
+      "description": "Round-trip time to 1.1.1.1 and 8.8.8.8. Sudden jumps = path congestion or rerouting.",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "probe_icmp_duration_seconds{job=\"blackbox-icmp\", instance=~\"1\\\\.1\\\\.1\\\\.1|8\\\\.8\\\\.8\\\\.8\", phase=\"rtt\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s", "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 10}}
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "TCP/443 probe success — Plex path",
+      "description": "Per-target TCP handshake success over time.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "probe_success{job=\"blackbox-tcp-plex\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"min": 0, "max": 1, "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 20, "spanNulls": false}}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Per-hop avg RTT — cloudflare path (1.1.1.1)",
+      "description": "Each line is one hop on the trace to 1.1.1.1. The diagnostic killshot: a hop that suddenly spikes is the failing one.",
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "mtr_report_avg{mtr_exporter_job=\"cloudflare\"}",
+          "legendFormat": "hop {{count}} ({{host}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms", "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "spanNulls": true}}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Per-hop avg RTT — Plex API path (plex.tv TCP/443)",
+      "description": "Same per-hop view but for the path to plex.tv. Compare against cloudflare to see where Plex's path diverges.",
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "mtr_report_avg{mtr_exporter_job=\"plex_api\"}",
+          "legendFormat": "hop {{count}} ({{host}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms", "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "spanNulls": true}}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Per-hop loss — cloudflare path",
+      "description": "Per-hop packet loss to 1.1.1.1. A hop showing sustained loss is your weak spot.",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "mtr_report_loss{mtr_exporter_job=\"cloudflare\"}",
+          "legendFormat": "hop {{count}} ({{host}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0}}
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Per-hop loss — Plex API path",
+      "description": "Per-hop packet loss to plex.tv via TCP/443.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "mtr_report_loss{mtr_exporter_job=\"plex_api\"}",
+          "legendFormat": "hop {{count}} ({{host}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0}}
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "plex.tv cert expiry (days)",
+      "description": "Days until plex.tv's TLS certificate expires.",
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 38},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-tls-plex\"} - time()) / 86400",
+          "legendFormat": "days",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 14}, {"color": "green", "value": 30}]}
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "textMode": "value"}
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "plex.tv TCP handshake duration",
+      "description": "Time-to-first-byte for plex.tv:443. Slow handshakes precede full failures.",
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 38},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"blackbox-tcp-plex\", instance=\"plex.tv:443\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.5}, {"color": "red", "value": 1}]}
+        }
+      },
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "textMode": "value"}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["wan", "network", "plex", "diagnosis"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "WAN Path Diagnosis",
+  "uid": "wan-path-diagnosis",
+  "version": 1,
+  "weekStart": ""
+}

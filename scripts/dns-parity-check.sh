@@ -142,7 +142,6 @@ check_record "node005-idrac.home." A
 check_record "ocean-idrac.home." A
 check_record "gh-runner-01.home." A
 check_record "gh-test-vm.home." A
-check_record "openclaw.home." A
 check_record "kube501.home." A
 check_record "kube502.home." A
 check_record "kube503.home." A
