@@ -40,19 +40,29 @@ jobs:
 
       - name: Determine deployment parameters
         id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PAYLOAD_BRANCH: ${{ github.event.client_payload.branch }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.sha }}
+          PAYLOAD_MSG: ${{ github.event.client_payload.commit_message }}
+          INPUT_BRANCH: ${{ inputs.git_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            BRANCH="${{ github.event.client_payload.branch || 'main' }}"
-            COMMIT_SHA="${{ github.event.client_payload.sha || 'unknown' }}"
-            COMMIT_MESSAGE="${{ github.event.client_payload.commit_message || 'Webhook deployment' }}"
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            BRANCH="${PAYLOAD_BRANCH:-main}"
+            COMMIT_SHA="${PAYLOAD_SHA:-unknown}"
+            COMMIT_MESSAGE="${PAYLOAD_MSG:-Webhook deployment}"
           else
-            BRANCH="${{ inputs.git_branch || 'main' }}"
+            BRANCH="${INPUT_BRANCH:-main}"
             COMMIT_SHA="unknown"
             COMMIT_MESSAGE="Manual deployment"
           fi
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "commit_message<<COMMIT_MSG_EOF"
+            printf '%s\n' "$COMMIT_MESSAGE"
+            echo "COMMIT_MSG_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run deployment playbook
         env:
