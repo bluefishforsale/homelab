@@ -20,3 +20,4 @@ echo "  🔐 Vault password: $ANSIBLE_VAULT_PASSWORD_FILE"
 echo "  ⚙️  Config: $ANSIBLE_CONFIG"
 echo "  📋 Inventory: $ANSIBLE_INVENTORY"
 echo "  🔒 Vault file: $HOMELAB_VAULT_FILE"
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.ansible_vault_pass

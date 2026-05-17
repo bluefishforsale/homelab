@@ -11,7 +11,7 @@ on:
         type: string
 
   repository_dispatch:
-    types: [deploy-blog-website]
+    types: [deploy-blog-terrac-com]
 
 env:
   ANSIBLE_FORCE_COLOR: "true"

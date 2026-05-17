@@ -22,7 +22,7 @@ on:
 
   # Webhook trigger from terrac_com_2026 repository
   repository_dispatch:
-    types: [deploy-website]
+    types: [deploy-terrac-com]
 
 env:
   ANSIBLE_FORCE_COLOR: "true"

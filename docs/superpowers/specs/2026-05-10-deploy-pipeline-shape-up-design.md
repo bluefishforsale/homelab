@@ -27,7 +27,7 @@ Make changes to homelab-managed code — and code in external service repos — 
   - external ingress: `vars/vars_cloudflared.yaml` (flat list under `cloudflared.tunnels.main.ingress`)
 - Two existing external-repo deploy patterns:
   - **Image-based** (paia) — external repo builds image → GHCR; homelab playbook (`playbooks/individual/ocean/ai/paia.yaml`) pulls `image: ghcr.io/.../paia:latest`. No auto-redeploy on upstream image push.
-  - **Source-pull** (terrac.com) — external repo dispatches `repository_dispatch: deploy-website` → `deploy-terrac-com.yml` → `terrac_com_static.yaml` plays git-clones and rsyncs the built `dist/`.
+  - **Source-pull** (terrac.com) — external repo dispatches `repository_dispatch: deploy-terrac-com` → `deploy-terrac-com.yml` → `terrac_com_static.yaml` plays git-clones and rsyncs the built `dist/`.
 - Homepage end-to-end works today (user-confirmed).
 
 ## Phases
