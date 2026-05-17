@@ -13,6 +13,12 @@ on:
       - "roles/**"
       - "vars/**/*.yaml"
       - "group_vars/**"
+  workflow_dispatch:
+    inputs:
+      playbooks:
+        description: "Comma-separated playbook paths to apply (e.g. playbooks/individual/ocean/monitoring/unpoller.yaml). Use for vault-only fixes or any redeploy not picked up by the push path filter."
+        required: true
+        type: string
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
@@ -37,10 +43,17 @@ jobs:
 
       - name: Find changed playbooks
         id: find-playbooks
+        env:
+          DISPATCH_PLAYBOOKS: ${{ github.event.inputs.playbooks }}
         run: |
           set -euo pipefail
-          echo "Detecting changed files in last commit..."
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          if [[ -n "${DISPATCH_PLAYBOOKS:-}" ]]; then
+            echo "Manual dispatch — using provided playbooks list..."
+            CHANGED_FILES=$(echo "$DISPATCH_PLAYBOOKS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+          else
+            echo "Detecting changed files in last commit..."
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
           echo "Changed files:"
           echo "$CHANGED_FILES"
           echo ""
