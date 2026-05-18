@@ -16,7 +16,7 @@
     port_ext: "{{ service_ports.grafana.port }}"
     plugins: "marcusolsson-treemap-panel 2.0.0"
     data: /data01
-    files: "{{ playbook_dir }}/../../../../files/ocean-grafana-compose"
+    files: "{{ playbook_dir }}/../../../../files/grafana-compose"
     home: "{{ data }}/services/{{ service }}"
     user: grafana
     uid: "{{ system_users.media.uid }}"
