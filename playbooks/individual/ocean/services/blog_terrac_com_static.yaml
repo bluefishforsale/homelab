@@ -1,8 +1,9 @@
 ---
 # Deploy blog.terrac.com Hugo static blog from GitHub
 #
-# Deploys pre-built static files (public/) committed by GitHub Actions CI.
-# Always does a clean deployment to avoid git ownership/permissions issues.
+# Clones the blog repo; nginx serves repo/public/ directly (no rsync to
+# a separate web_root). public/ is built and committed by the project's
+# GitHub Actions CI before this playbook runs.
 #
 # Usage:
 #   ansible-playbook playbooks/individual/ocean/services/blog_terrac_com_static.yaml
@@ -22,7 +23,7 @@
     data: /data01
     home: "{{ data }}/services/{{ service }}"
     git_clone_path: "{{ home }}/repo"
-    web_root: "{{ home }}"
+    web_root: "{{ git_clone_path }}/public"
     user: media
     uid: 1001
     gid: 1001
@@ -149,30 +150,6 @@
         - "Changed: {{ git_clone.changed }}"
     when: git_clone is defined
     tags: [deploy, git]
-
-  - name: Sync built files to web root
-    ansible.builtin.synchronize:
-      src: "{{ git_clone_path }}/public/"
-      dest: "{{ web_root }}/"
-      delete: yes
-      recursive: yes
-      rsync_opts:
-        - "--exclude=.git"
-        - "--exclude=.gitignore"
-        - "--exclude=.github"
-        - "--exclude=README.md"
-        - "--exclude=repo"
-        - "--chown={{ uid }}:{{ gid }}"
-    delegate_to: "{{ inventory_hostname }}"
-    tags: [deploy]
-
-  - name: Ensure all files have correct ownership
-    ansible.builtin.file:
-      path: "{{ web_root }}"
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      recurse: yes
-    tags: [deploy]
 
   - name: Verify index.html exists
     ansible.builtin.stat:
