@@ -659,6 +659,84 @@
       - ocean_ssh_app_create.status == 400
       - "'already exists' not in ocean_ssh_app_create.json.errors[0].message | default('')"
 
+  # Rate-limit llama.terrac.com /v1/* at the CF edge. Access is bypassed
+  # for this hostname, so this is the only gate before traffic hits
+  # llama.cpp's --api-key check. Caps a leaked Bearer token at 30 req/min
+  # per source IP per CF datacenter; legit single-user workloads stay
+  # well under (parallel=1, ~5 req/min sustained).
+  - name: Define llamacpp rate-limit rule body
+    ansible.builtin.set_fact:
+      llamacpp_rl_rule:
+        description: "llamacpp tunnel rate limit"
+        expression: '(http.host eq "llama.terrac.com" and starts_with(http.request.uri.path, "/v1/"))'
+        action: "block"
+        ratelimit:
+          characteristics: ["cf.colo.id", "ip.src"]
+          period: 60
+          requests_per_period: 30
+          mitigation_timeout: 60
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+
+  - name: Get terrac.com http_ratelimit phase ruleset
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets/phases/http_ratelimit/entrypoint"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+      status_code: [200, 404]
+    register: rl_entrypoint
+    when:
+      - inventory_hostname == 'ocean'
+      - llamacpp_rl_rule is defined
+    delegate_to: localhost
+    become: false
+
+  - name: Create http_ratelimit ruleset with llamacpp rule (zone has no ruleset yet)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "default"
+        kind: "zone"
+        phase: "http_ratelimit"
+        rules:
+          - "{{ llamacpp_rl_rule }}"
+      status_code: [200]
+    when:
+      - inventory_hostname == 'ocean'
+      - llamacpp_rl_rule is defined
+      - rl_entrypoint.status == 404
+    delegate_to: localhost
+    become: false
+
+  - name: Replace llamacpp rule in existing http_ratelimit ruleset
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets/{{ rl_entrypoint.json.result.id }}"
+      method: PUT
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        rules: "{{ (rl_entrypoint.json.result.rules | default([]) | rejectattr('description','equalto', llamacpp_rl_rule.description) | list) + [llamacpp_rl_rule] }}"
+      status_code: [200]
+    when:
+      - inventory_hostname == 'ocean'
+      - llamacpp_rl_rule is defined
+      - rl_entrypoint.status == 200
+    delegate_to: localhost
+    become: false
+
   # Cloudflare Access Application (Zero Trust) for SSH
   - name: Set Access application variables
     ansible.builtin.set_fact:
