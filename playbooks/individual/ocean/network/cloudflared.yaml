@@ -661,9 +661,9 @@
 
   # Rate-limit llama.terrac.com /v1/* at the CF edge. Access is bypassed
   # for this hostname, so this is the only gate before traffic hits
-  # llama.cpp's --api-key check. Caps a leaked Bearer token at 30 req/min
-  # per source IP per CF datacenter; legit single-user workloads stay
-  # well under (parallel=1, ~5 req/min sustained).
+  # llama.cpp's --api-key check. Caps a source IP to 5 req per 10s
+  # (=30/min sustained) per CF datacenter. Free plan only permits
+  # period=10, so the bucket is tight but the effective limit matches.
   - name: Define llamacpp rate-limit rule body
     ansible.builtin.set_fact:
       llamacpp_rl_rule:
@@ -672,9 +672,9 @@
         action: "block"
         ratelimit:
           characteristics: ["cf.colo.id", "ip.src"]
-          period: 60
-          requests_per_period: 30
-          mitigation_timeout: 60
+          period: 10
+          requests_per_period: 5
+          mitigation_timeout: 10
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
