@@ -28,10 +28,9 @@
         mode: '0755'
 
     - name: Check if uv is installed
-      ansible.builtin.command: which uv
-      register: uv_check
-      changed_when: false
-      failed_when: false
+      ansible.builtin.stat:
+        path: /root/.local/bin/uv
+      register: uv_stat
 
     - name: Install uv
       ansible.builtin.shell: |
@@ -42,7 +41,7 @@
       environment:
         HOME: /root
       changed_when: true
-      when: uv_check.rc != 0
+      when: not uv_stat.stat.exists
 
     - name: Install harbor via uv
       ansible.builtin.command: /root/.local/bin/uv tool install harbor

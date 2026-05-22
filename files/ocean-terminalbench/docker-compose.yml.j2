@@ -46,7 +46,7 @@ services:
       - "512"
       - "--flash-attn"
       - "--api-key"
-      - "llamacpp-homelab-key"
+      - "{{ terminalbench_api_key }}"
       - "--metrics"
 
     healthcheck:
