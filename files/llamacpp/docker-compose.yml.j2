@@ -51,6 +51,9 @@ services:
       - "--flash-attn"
       - "--api-key-file"
       - "/config/keys.txt"
+      # API only — the built-in chat UI at / is unauthenticated, so disable
+      # it now that the server is reachable through llama.terrac.com.
+      - "--no-webui"
       - "--metrics"
       - "--verbose"
     
