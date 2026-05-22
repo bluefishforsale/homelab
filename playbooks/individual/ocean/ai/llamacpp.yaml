@@ -15,12 +15,15 @@
     version: server-cuda
     port: "{{ service_ports.llamacpp.port }}"  # noqa: var-naming[no-reserved]
     data: /data01
-    files: "{{ playbook_dir }}/../../../../files/ocean-llamacpp"
+    files: "{{ playbook_dir }}/../../../../files/{{ service }}"
     home: "{{ data }}/services/{{ service }}"
     user: media
     uid: 1001
     gid: 1001
-    api_key: llamacpp-homelab-key
+    # All accepted bearer tokens for llama.cpp --api-key-file.
+    # Legacy api_key kept so internal callers (open-webui) keep working;
+    # named api_keys are the user-facing tokens.
+    llamacpp_api_keys: "{{ [ai_services.llamacpp.api_key] + (ai_services.llamacpp.api_keys | default({}) | dict2items | map(attribute='value') | list) }}"
     # RTX 3090 optimized profile
     selected_profile: max_performance
 
@@ -100,6 +103,18 @@
       - download
     retries: 3
     delay: 10
+
+  - name: Write llama.cpp API keys file
+    ansible.builtin.copy:
+      content: "{{ llamacpp_api_keys | join('\n') + '\n' }}"
+      dest: "{{ home }}/config/keys.txt"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    no_log: true
+    notify:
+    - Reload systemd daemon
+    - Restart llamacpp service
 
   - name: Create docker-compose.yml
     ansible.builtin.template:

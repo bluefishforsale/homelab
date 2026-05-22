@@ -49,8 +49,8 @@ services:
       - "--ubatch-size" 
       - "512"
       - "--flash-attn"
-      - "--api-key"
-      - "{{ api_key | default('llamacpp-homelab-key') }}"
+      - "--api-key-file"
+      - "/config/keys.txt"
       - "--metrics"
       - "--verbose"
     
