@@ -40,3 +40,75 @@
         state: present
         key: "{{ github_keys_url }}"
         exclusive: "{{ ssh_keys_exclusive }}"
+
+    # Auto-refresh authorized_keys every 5 minutes so revoking a key on
+    # GitHub propagates without re-running ansible. Writes to a tmp file
+    # then renames so a partial download can't lock you out.
+    - name: Install authorized_keys refresh script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/refresh-authorized-keys
+        mode: '0755'
+        owner: root
+        group: root
+        content: |
+          #!/bin/sh
+          set -eu
+          USER_NAME="$1"
+          URL="$2"
+          HOME_DIR=$(getent passwd "$USER_NAME" | cut -d: -f6)
+          SSH_DIR="$HOME_DIR/.ssh"
+          AUTH_KEYS="$SSH_DIR/authorized_keys"
+          install -d -o "$USER_NAME" -g "$USER_NAME" -m 0700 "$SSH_DIR"
+          TMP=$(mktemp "$SSH_DIR/.authorized_keys.XXXXXX")
+          trap 'rm -f "$TMP"' EXIT
+          if curl -fsS --max-time 15 "$URL" -o "$TMP"; then
+              chown "$USER_NAME":"$USER_NAME" "$TMP"
+              chmod 0600 "$TMP"
+              mv "$TMP" "$AUTH_KEYS"
+              trap - EXIT
+          else
+              echo "refresh-authorized-keys: fetch failed, keeping existing $AUTH_KEYS" >&2
+              exit 1
+          fi
+
+    - name: Install authorized_keys refresh systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/refresh-authorized-keys.service
+        mode: '0644'
+        owner: root
+        group: root
+        content: |
+          [Unit]
+          Description=Refresh {{ ssh_login_user }}'s authorized_keys from GitHub
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/refresh-authorized-keys {{ ssh_login_user }} {{ github_keys_url }}
+
+    - name: Install authorized_keys refresh systemd timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/refresh-authorized-keys.timer
+        mode: '0644'
+        owner: root
+        group: root
+        content: |
+          [Unit]
+          Description=Refresh authorized_keys from GitHub every 5 minutes
+
+          [Timer]
+          OnBootSec=2min
+          OnUnitActiveSec=5min
+          RandomizedDelaySec=30s
+          Unit=refresh-authorized-keys.service
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable authorized_keys refresh timer
+      ansible.builtin.systemd:
+        name: refresh-authorized-keys.timer
+        enabled: true
+        state: started
+        daemon_reload: true
