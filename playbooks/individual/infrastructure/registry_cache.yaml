@@ -1,0 +1,120 @@
+---
+# Docker Registry Pull-Through Cache
+# Four registry:2 containers (docker-hub, ghcr, gitlab, nvcr) + promtail sidecar.
+#
+# Prerequisites:
+#   - VM created via playbooks/individual/infrastructure/create_registry_cache_vm.yaml
+#   - Docker installed via playbooks/individual/infrastructure/docker_ce.yaml
+#   - vault/secrets.yaml contains infrastructure.registry_cache.docker_hub_username
+#     and docker_hub_password
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini \
+#     playbooks/individual/infrastructure/registry_cache.yaml
+
+- name: Deploy registry pull-through cache stack
+  hosts: registry_cache
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    service: registry-cache
+    files: "{{ playbook_dir }}/../../../files/registry-cache"
+    data: /data01
+    home: "{{ data }}/services/{{ service }}"
+
+  tasks:
+    - name: Ensure base directory exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure config directory exists
+      ansible.builtin.file:
+        path: "{{ home }}/config"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure per-upstream data directories exist
+      ansible.builtin.file:
+        path: "{{ home }}/data/{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - docker-hub
+        - ghcr
+        - gitlab
+        - nvcr
+
+    - name: Render registry configs for each upstream
+      ansible.builtin.template:
+        src: "{{ files }}/config/{{ item }}.yml.j2"
+        dest: "{{ home }}/config/{{ item }}.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - docker-hub
+        - ghcr
+        - gitlab
+        - nvcr
+      notify:
+        - Restart registry-cache service
+
+    - name: Render docker-compose.yml
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Restart registry-cache service
+
+    - name: Render promtail config
+      ansible.builtin.template:
+        src: "{{ files }}/promtail-config.yml.j2"
+        dest: "{{ home }}/config/promtail-config.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Restart registry-cache service
+
+    - name: Install registry-cache systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/registry-cache.service.j2"
+        dest: /etc/systemd/system/registry-cache.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart registry-cache service
+
+    - name: Enable registry-cache service
+      ansible.builtin.systemd:
+        name: registry-cache.service
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart registry-cache service
+      ansible.builtin.systemd:
+        name: registry-cache.service
+        state: restarted

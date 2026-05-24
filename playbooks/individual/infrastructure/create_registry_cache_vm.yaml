@@ -1,0 +1,117 @@
+---
+# Proxmox VM creation for the registry pull-through cache host
+# Creates a single dedicated VM on node005 for the four registry:2 cache
+# instances (docker-hub, ghcr, gitlab, nvcr). Mirrors the patterns in
+# create_runner_vm.yaml.
+
+- name: Create registry-cache VM on Proxmox
+  hosts: node005
+  become: true
+  gather_facts: true
+  vars:
+    cache_vm_id: 7000
+    cache_vm_name: registry-cache-01
+    cache_vm_hostname: registry-cache-01
+    cache_vm_cores: 2
+    cache_vm_memory_mb: 2048
+    cache_vm_disk_size_increase: "+192G"
+    cache_vm_template_id: 9999
+    cache_vm_onboot: 1
+
+    cache_vm_ip: "{{ lookup('dig', cache_vm_hostname + '.home', errors='ignore') | default('192.168.1.30', true) }}"
+    cache_vm_netmask: 24
+    cache_vm_gateway: 192.168.1.1
+    cache_vm_nameserver: 192.168.1.2
+
+  tasks:
+    - name: Download SSH keys for registry-cache VM
+      ansible.builtin.get_url:
+        url: "https://github.com/bluefishforsale.keys"
+        dest: "/root/ssh.keys"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Check registry-cache VM status
+      ansible.builtin.command: "qm status {{ cache_vm_id }}"
+      register: cache_vm_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Clone template for registry-cache VM
+      ansible.builtin.command: "qm clone {{ cache_vm_template_id }} {{ cache_vm_id }}"
+      when: cache_vm_status.rc != 0
+      register: clone_result
+
+    - name: Set registry-cache VM name and network configuration
+      ansible.builtin.shell: |
+        qm set {{ cache_vm_id }} --name {{ cache_vm_name }}
+        qm set {{ cache_vm_id }} --ipconfig0 ip={{ cache_vm_ip }}/{{ cache_vm_netmask }},gw={{ cache_vm_gateway }}
+        qm set {{ cache_vm_id }} --nameserver {{ cache_vm_nameserver }}
+        qm set {{ cache_vm_id }} --onboot {{ cache_vm_onboot }}
+      when: cache_vm_status.rc != 0 or cache_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set SSH keys for registry-cache VM
+      ansible.builtin.shell: "qm set {{ cache_vm_id }} --sshkeys /root/ssh.keys"
+      when: cache_vm_status.rc != 0 or cache_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Resize registry-cache VM disk
+      ansible.builtin.shell: "qm resize {{ cache_vm_id }} scsi0 {{ cache_vm_disk_size_increase }}"
+      when: cache_vm_status.rc != 0
+      changed_when: true
+
+    - name: Set registry-cache VM CPU cores
+      ansible.builtin.shell: "qm set {{ cache_vm_id }} --cores {{ cache_vm_cores }}"
+      when: cache_vm_status.rc != 0 or cache_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set registry-cache VM memory
+      ansible.builtin.shell: "qm set {{ cache_vm_id }} --memory {{ cache_vm_memory_mb }}"
+      when: cache_vm_status.rc != 0 or cache_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set registry-cache VM description
+      ansible.builtin.shell: |
+        qm set {{ cache_vm_id }} --description "Docker Registry Pull-Through Cache - docker-hub, ghcr, gitlab, nvcr"
+      when: cache_vm_status.rc != 0
+      changed_when: true
+
+    - name: Start registry-cache VM
+      ansible.builtin.command: "qm start {{ cache_vm_id }}"
+      when: cache_vm_status.rc != 0 or cache_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Display boot wait message
+      ansible.builtin.debug:
+        msg:
+          - "Starting registry-cache VM and waiting for boot..."
+          - "This typically takes 1-3 minutes for cloud-init and SSH to initialize"
+          - "Maximum wait time: 5 minutes"
+          - "VM IP: {{ cache_vm_ip }}"
+      when: cache_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+
+    - name: Wait for registry-cache VM to boot and accept SSH connections (max 5 minutes)
+      ansible.builtin.wait_for:
+        host: "{{ cache_vm_ip }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+        msg: "Waiting for {{ cache_vm_ip }}:22 to become available..."
+      when: cache_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+
+    - name: Display registry-cache VM information
+      ansible.builtin.debug:
+        msg:
+          - "Registry-cache VM created successfully"
+          - "VM ID: {{ cache_vm_id }}"
+          - "VM Name: {{ cache_vm_name }}"
+          - "IP Address: {{ cache_vm_ip }}"
+          - "vCPUs: {{ cache_vm_cores }}"
+          - "Memory: {{ cache_vm_memory_mb }} MB"
+          - ""
+          - "Next steps:"
+          - "1. Confirm {{ cache_vm_hostname }} is under [registry_cache] in inventories/production/hosts.ini"
+          - "2. Run: ansible-playbook playbooks/individual/infrastructure/registry_cache.yaml"

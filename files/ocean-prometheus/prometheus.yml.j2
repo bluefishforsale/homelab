@@ -511,6 +511,33 @@ scrape_configs:
       - target_label: __address__
         replacement: ocean.home:9115
 
+  # Docker registry pull-through cache (per-upstream container metrics)
+  - job_name: 'registry-cache'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        - registry-cache.home:5011
+        - registry-cache.home:5012
+        - registry-cache.home:5013
+        - registry-cache.home:5014
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '.*:5011'
+        target_label: upstream
+        replacement: docker-hub
+      - source_labels: [__address__]
+        regex: '.*:5012'
+        target_label: upstream
+        replacement: ghcr
+      - source_labels: [__address__]
+        regex: '.*:5013'
+        target_label: upstream
+        replacement: gitlab
+      - source_labels: [__address__]
+        regex: '.*:5014'
+        target_label: upstream
+        replacement: nvcr
+
   # Internal Service Health Checks
   - job_name: 'blackbox-internal'
     metrics_path: /probe

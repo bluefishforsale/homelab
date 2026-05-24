@@ -1,0 +1,32 @@
+version: 0.1
+log:
+  level: info
+  fields:
+    service: registry
+    upstream: gitlab
+proxy:
+  remoteurl: https://registry.gitlab.com
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  maintenance:
+    uploadpurging:
+      enabled: true
+      age: 168h
+      interval: 24h
+  delete:
+    enabled: true
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  debug:
+    addr: :5001
+    prometheus:
+      enabled: true
+      path: /metrics
+health:
+  storagedriver:
+    enabled: true
+    interval: 30s
+    threshold: 3

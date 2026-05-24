@@ -5,6 +5,10 @@
     },
     "live-restore": true,
     "storage-driver": "overlay2"
+{% if registry_cache_mirror | default(true) %}
+    ,
+    "registry-mirrors": ["http://registry-cache.home:5001"]
+{% endif %}
 {% if docker is defined and docker | length > 0 %}
     ,
     "data-root": "{{ docker }}"

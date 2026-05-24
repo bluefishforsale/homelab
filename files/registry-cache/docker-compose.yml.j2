@@ -1,0 +1,128 @@
+---
+# Docker Registry Pull-Through Cache
+# Managed by Ansible - do not edit manually
+
+services:
+  # ── Docker Hub pull-through cache ──────────────────────────────────────
+  docker-hub-cache:
+    image: registry:2
+    container_name: docker-hub-cache
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+      - "5011:5001"
+    volumes:
+      - {{ home }}/config/docker-hub.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/docker-hub:/var/lib/registry
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: docker-hub-cache
+    security_opt:
+      - no-new-privileges:true
+
+  # ── ghcr.io pull-through cache ─────────────────────────────────────────
+  ghcr-cache:
+    image: registry:2
+    container_name: ghcr-cache
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+      - "5012:5001"
+    volumes:
+      - {{ home }}/config/ghcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/ghcr:/var/lib/registry
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: ghcr-cache
+    security_opt:
+      - no-new-privileges:true
+
+  # ── registry.gitlab.com pull-through cache ─────────────────────────────
+  gitlab-cache:
+    image: registry:2
+    container_name: gitlab-cache
+    restart: unless-stopped
+    ports:
+      - "5003:5000"
+      - "5013:5001"
+    volumes:
+      - {{ home }}/config/gitlab.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/gitlab:/var/lib/registry
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: gitlab-cache
+    security_opt:
+      - no-new-privileges:true
+
+  # ── nvcr.io pull-through cache ─────────────────────────────────────────
+  nvcr-cache:
+    image: registry:2
+    container_name: nvcr-cache
+    restart: unless-stopped
+    ports:
+      - "5004:5000"
+      - "5014:5001"
+    volumes:
+      - {{ home }}/config/nvcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/nvcr:/var/lib/registry
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: nvcr-cache
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Promtail (Loki Log Collector) ──────────────────────────────────────
+  promtail:
+    image: grafana/promtail:latest
+    container_name: registry-cache-promtail
+    restart: unless-stopped
+    volumes:
+      - {{ home }}/config/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+    logging:
+      driver: journald
+      options:
+        tag: registry-cache-promtail
+    security_opt:
+      - no-new-privileges:true
