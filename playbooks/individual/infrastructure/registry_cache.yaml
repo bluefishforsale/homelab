@@ -5,8 +5,8 @@
 # Prerequisites:
 #   - VM created via playbooks/individual/infrastructure/create_registry_cache_vm.yaml
 #   - Docker installed via playbooks/individual/infrastructure/docker_ce.yaml
-#   - vault/secrets.yaml contains infrastructure.registry_cache.docker_hub_username
-#     and docker_hub_password
+#   - vault/secrets.yaml provides development.docker_registry.username/password
+#     (Docker Hub credentials, used by the docker-hub-cache upstream auth)
 #
 # Usage:
 #   ansible-playbook -i inventories/production/hosts.ini \

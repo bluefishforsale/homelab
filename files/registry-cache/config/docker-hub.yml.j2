@@ -6,8 +6,8 @@ log:
     upstream: docker-hub
 proxy:
   remoteurl: https://registry-1.docker.io
-  username: "{{ infrastructure.registry_cache.docker_hub_username }}"
-  password: "{{ infrastructure.registry_cache.docker_hub_password }}"
+  username: "{{ development.docker_registry.username }}"
+  password: "{{ development.docker_registry.password }}"
 storage:
   filesystem:
     rootdirectory: /var/lib/registry
