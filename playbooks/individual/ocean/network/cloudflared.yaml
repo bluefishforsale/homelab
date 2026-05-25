@@ -94,23 +94,12 @@
       - existing_tunnel_info.stdout != ""
       - not ansible_check_mode
 
-  - name: Verify tunnel credentials file exists
-    ansible.builtin.stat:
-      path: "{{ files }}/{{ ssh_tunnel_id }}.json"
-    register: cred_file_check
-    when: 
-      - inventory_hostname != 'ocean'
-      - ssh_tunnel_id is defined
-    delegate_to: localhost
-    become: false
-
   - name: Display tunnel creation success
     ansible.builtin.debug:
-      msg: "✅ SSH tunnel created: ssh-{{ inventory_hostname }} ({{ ssh_tunnel_id }})"
-    when: 
+      msg: "SSH tunnel ready: ssh-{{ inventory_hostname }} ({{ ssh_tunnel_id }})"
+    when:
       - inventory_hostname != 'ocean'
       - ssh_tunnel_id is defined
-      - cred_file_check.stat.exists
 
   - name: Test SSH tunnel connectivity
     ansible.builtin.command: >
@@ -1021,14 +1010,37 @@
       - Reload systemd daemon
       - Restart service
 
-  - name: Copy SSH tunnel credentials for non-ocean hosts
-    ansible.builtin.copy:
-      src: "{{ files }}/{{ ssh_tunnel_id }}.json"
-      dest: "{{ path_home }}/{{ ssh_tunnel_id }}.json"
-      mode: '0600'
-    when: 
+  # Non-ocean SSH tunnels authenticate via TUNNEL_TOKEN env var instead of
+  # a per-host credentials JSON. The token is a base64 JWT containing the
+  # same {account_tag, tunnel_id, tunnel_secret}; we fetch it from CF at
+  # playbook runtime via the origincert so no per-host secret needs to
+  # live in vault or the repo. Tunnels remain locally-managed
+  # (config_src=local), so config.yaml still drives ingress.
+  - name: Fetch tunnel token for non-ocean hosts
+    ansible.builtin.command: >
+      cloudflared tunnel --origincert {{ local_cert_path }} token ssh-{{ inventory_hostname }}
+    register: tunnel_token_result
+    changed_when: false
+    no_log: true
+    when:
       - inventory_hostname != 'ocean'
       - ssh_tunnel_id is defined
+    delegate_to: localhost
+    become: false
+
+  - name: Write tunnel token EnvironmentFile on non-ocean hosts
+    ansible.builtin.copy:
+      content: "TUNNEL_TOKEN={{ tunnel_token_result.stdout }}\n"
+      dest: "{{ path_home }}/token.env"
+      mode: '0600'
+      owner: root
+      group: root
+    no_log: true
+    when:
+      - inventory_hostname != 'ocean'
+      - tunnel_token_result is defined
+      - tunnel_token_result.stdout is defined
+      - tunnel_token_result.stdout != ''
     notify:
       - Reload systemd daemon
       - Restart service

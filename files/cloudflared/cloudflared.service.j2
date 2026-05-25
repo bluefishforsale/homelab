@@ -11,7 +11,12 @@ TimeoutStartSec=5
 PrivateTmp=true
 Type=simple
 PIDFile=/run/cloudflared.pid
+{% if inventory_hostname == 'ocean' %}
 ExecStart=cloudflared tunnel --config {{ config }} run {{ tunnel }}
+{% else %}
+EnvironmentFile=/etc/cloudflared/token.env
+ExecStart=cloudflared tunnel --config {{ config }} run
+{% endif %}
 
 # Logging
 StandardOutput=journal

@@ -1,5 +1,7 @@
 tunnel: {{ tunnel }}
+{% if inventory_hostname == 'ocean' %}
 credentials-file: "{{ cred_file }}"
+{% endif %}
 
 # Force IPv4-only connections to Cloudflare Edge
 edge-ip-version: "4"
