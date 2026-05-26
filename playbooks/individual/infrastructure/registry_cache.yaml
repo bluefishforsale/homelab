@@ -4,9 +4,10 @@
 #
 # Prerequisites:
 #   - VM created via playbooks/individual/infrastructure/create_registry_cache_vm.yaml
-#   - Docker installed via playbooks/individual/infrastructure/docker_ce.yaml
 #   - vault/secrets.yaml provides development.docker_registry.username/password
 #     (Docker Hub credentials, used by the docker-hub-cache upstream auth)
+#
+# Docker is bootstrapped inline; no separate docker_ce run required for this host.
 #
 # Usage:
 #   ansible-playbook -i inventories/production/hosts.ini \
@@ -27,6 +28,67 @@
     home: "{{ data }}/services/{{ service }}"
 
   tasks:
+    - name: Install Docker apt prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: Ensure /etc/apt/keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install Docker apt key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure /etc/docker exists
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Render Docker daemon.json (no registry-mirror on the cache host itself)
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../../files/docker/daemon.json.j2"
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart docker
+
+    - name: Ensure Docker service is started and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
     - name: Ensure base directory exists
       ansible.builtin.file:
         path: "{{ home }}"
@@ -118,3 +180,9 @@
       ansible.builtin.systemd:
         name: registry-cache.service
         state: restarted
+
+    - name: Restart docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: yes
