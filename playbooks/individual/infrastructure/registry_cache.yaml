@@ -28,6 +28,11 @@
     home: "{{ data }}/services/{{ service }}"
 
   tasks:
+    - name: Wait for cloud-init to finish on first boot
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      failed_when: false
+
     - name: Install Docker apt prerequisites
       ansible.builtin.apt:
         name:
@@ -38,6 +43,7 @@
           - lsb-release
         state: present
         update_cache: yes
+        lock_timeout: 600
 
     - name: Ensure /etc/apt/keyrings directory exists
       ansible.builtin.file:
@@ -66,6 +72,7 @@
           - docker-compose-plugin
         state: present
         update_cache: yes
+        lock_timeout: 600
 
     - name: Ensure /etc/docker exists
       ansible.builtin.file:
