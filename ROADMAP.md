@@ -56,6 +56,8 @@ Status and future plans for the homelab infrastructure.
 - **llama.cpp**: GPU-accelerated LLM API (Qwen3-14B, 40K context, full GPU offload)
 - **Open WebUI**: Chat interface auto-configured for llama.cpp
 - **ComfyUI**: AI image generation with YanWenKun image (cu126-slim)
+- **paia**: Personal AI assistant
+- **terminalbench**: LLM benchmarking and testing
 
 ### Monitoring Stack
 
@@ -64,6 +66,8 @@ Status and future plans for the homelab infrastructure.
 - **Loki**: Log aggregation with custom homelab dashboards
 - **Promtail**: Log shipping from systemd journal
 - **Log Anomaly Detector**: Go-based intelligent alerting with pattern matching
+- **AlertManager**: Alert routing and management
+- **Karma**: AlertManager dashboard for alert visualization
 - **UnPoller**: UniFi network metrics
 - **NVIDIA DCGM**: GPU metrics exporter
 
@@ -71,9 +75,12 @@ Status and future plans for the homelab infrastructure.
 
 - **NextCloud**: File sharing with MariaDB + Redis backend
 - **TinaCMS**: Git-backed CMS (Docker Hub private image)
-- **WordPress**: Blog platform with dedicated database
+- **WordPress**: Blog platform (saetnere.com) with dedicated database
+- **terrac.com**: Static blog site
 - **Frigate**: NVR with object detection
 - **Home Assistant**: Smart home automation
+- **Homepage**: Service status dashboard
+- **GlobalView**: Custom service monitoring stack
 
 ### Automation & Security
 
@@ -86,30 +93,18 @@ Status and future plans for the homelab infrastructure.
 
 ---
 
-## In Progress
-
-| Task | Status |
-|------|--------|
-| AlertManager | Rules defined, needs deployment |
-| Strapi CMS | Playbook ready, needs vault secrets |
-| PayloadCMS | Playbook ready, needs vault secrets |
-
----
-
 ## Todo
 
 ### Phase 1: Alerting & Notifications
 
-- **AlertManager deployment**: Route alerts to Discord/Slack/email
-- **Karma dashboard**: Alert visualization and silencing
 - **Uptime Kuma**: External uptime monitoring
 - **Healthchecks.io integration**: Cron job monitoring
+- **AlertManager routing**: Configure Discord/Slack/email integrations
 
 ### Phase 2: Control Plane
 
 - **Ansible Semaphore**: Web UI for playbook execution
 - **Portainer**: Docker management UI
-- **Homepage dashboard**: Service status overview
 
 ### Phase 3: Backup & DR
 
@@ -142,6 +137,8 @@ Status and future plans for the homelab infrastructure.
 - **Vaultwarden**: Password manager
 - **Authentik**: SSO and identity provider
 - **Arr Discord bot**: Media request notifications
+- **Strapi CMS**: Headless CMS (playbook ready, needs vault secrets)
+- **PayloadCMS**: Headless CMS (playbook ready, needs vault secrets)
 
 ---
 
@@ -152,6 +149,9 @@ Status and future plans for the homelab infrastructure.
 | Plex | http://192.168.1.143:32400 | https://plex.terrac.com |
 | Grafana | http://grafana.home | https://grafana.terrac.com |
 | Prometheus | http://192.168.1.143:9090 | - |
+| AlertManager | http://192.168.1.143:9093 | - |
+| Karma | http://192.168.1.143:8080 | - |
+| Homepage | http://192.168.1.143:3001 | - |
 | llama.cpp API | http://192.168.1.143:8080 | - |
 | Open WebUI | http://192.168.1.143:3000 | https://chat.terrac.com |
 | ComfyUI | http://comfyui.home | https://comfyui.terrac.com |
