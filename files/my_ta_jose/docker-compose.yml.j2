@@ -58,9 +58,14 @@ services:
       - TZ=America/Los_Angeles
       - Java_Xms=256m
       - Java_Xmx=1500m
+      # Google ngram data for confusion-pair detection (their/there,
+      # affect/effect). Points at the parent dir holding en/{1,2,3}grams;
+      # the playbook downloads and extracts it before this container starts.
+      - langtool_languageModel=/ngrams
 
     volumes:
-      - languagetool_ngrams:/ngrams
+      # ~9GB of Lucene ngram indexes, populated on the host by the playbook.
+      - {{ home }}/ngrams:/ngrams:ro
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8010/v2/languages"]
@@ -72,13 +77,13 @@ services:
     security_opt:
       - no-new-privileges:true
 
+    # ngram indexes are memory-mapped (off-heap), so heap stays at 1500m but the
+    # limit is raised for index page-cache headroom — at 2048m almost nothing
+    # stays cached and every confusion-pair lookup hits disk.
     cpus: '1.0'
-    mem_limit: 2048m
+    mem_limit: 4096m
 
     logging:
       driver: journald
       options:
         tag: "languagetool"
-
-volumes:
-  languagetool_ngrams:
