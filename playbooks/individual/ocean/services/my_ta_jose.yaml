@@ -51,6 +51,65 @@
       group: "{{ user }}"
       mode: '0750'
 
+  # LanguageTool confusion-pair detection (their/there, affect/effect) needs
+  # Google ngram data: a ~9GB one-time download. The sentinel makes it
+  # idempotent so later deploys skip it. LanguageTool crash-loops if
+  # langtool_languageModel points at an incomplete en/{1,2,3}grams tree, so the
+  # download + extract must fully succeed before the compose template (which
+  # sets langtool_languageModel) is rendered and the service restarted — hence
+  # these run first, and the sentinel is only written after a clean extract.
+  - name: Ensure unzip is installed (extracts the ngram dataset)
+    ansible.builtin.apt:
+      name: unzip
+      state: present
+      update_cache: true
+      cache_valid_time: 3600
+
+  - name: Ensure ngram data directory exists
+    ansible.builtin.file:
+      path: "{{ home }}/ngrams/en"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Check whether English ngram data is already present
+    ansible.builtin.stat:
+      path: "{{ home }}/ngrams/.ngrams-en-complete"
+    register: ngram_marker
+
+  - name: Download English ngram dataset
+    ansible.builtin.get_url:
+      url: https://languagetool.org/download/ngram-data/ngrams-en-20150817.zip
+      dest: "{{ home }}/ngrams/ngrams-en-20150817.zip"
+      mode: '0644'
+      timeout: 3600
+    when: not ngram_marker.stat.exists
+
+  - name: Extract English ngram dataset into en/
+    ansible.builtin.unarchive:
+      src: "{{ home }}/ngrams/ngrams-en-20150817.zip"
+      dest: "{{ home }}/ngrams/en"
+      remote_src: true
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    when: not ngram_marker.stat.exists
+
+  - name: Mark ngram extraction complete
+    ansible.builtin.file:
+      path: "{{ home }}/ngrams/.ngrams-en-complete"
+      state: touch
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    when: not ngram_marker.stat.exists
+
+  - name: Remove ngram zip to reclaim space
+    ansible.builtin.file:
+      path: "{{ home }}/ngrams/ngrams-en-20150817.zip"
+      state: absent
+    when: not ngram_marker.stat.exists
+
   - name: Create docker-compose.yml
     ansible.builtin.template:
       src: "{{ files }}/docker-compose.yml.j2"

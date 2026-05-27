@@ -10,12 +10,24 @@ services:
 
     environment:
       - TZ=America/Los_Angeles
+      # Mechanics pre-pass: deterministic spelling/grammar/punctuation via the
+      # bundled languagetool sibling, reached by compose service-name DNS.
+      # Unset this and my-ta-jose skips the pre-pass, letting the LLM mark
+      # mechanics on its own.
+      - LANGUAGETOOL_URL=http://languagetool:8010
 
     ports:
       - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
 
     volumes:
       - {{ home }}/data:/app/data
+
+    # llama.cpp is published on the host (0.0.0.0:{{ service_ports.llamacpp.port }}).
+    # This service used to sit on docker0 and reach it via 172.17.0.1, but it now
+    # lives on the compose network so it can resolve `languagetool` by name, so
+    # reach the host through that network's gateway instead.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:{{ port_int }}/healthz"]
@@ -24,9 +36,54 @@ services:
       retries: 3
       start_period: 30s
 
+    depends_on:
+      languagetool:
+        condition: service_healthy
+
     logging:
       driver: journald
       options:
         tag: "{{ service }}"
 
-    network_mode: bridge
+  # Deterministic mechanics engine (LanguageTool HTTP API) for my-ta-jose's
+  # pre-pass. Internal only: no published ports, reachable solely over the
+  # compose network by the my_ta_jose service via service-name DNS.
+  languagetool:
+    image: erikvl87/languagetool
+    container_name: languagetool
+    hostname: languagetool
+    restart: unless-stopped
+
+    environment:
+      - TZ=America/Los_Angeles
+      - Java_Xms=256m
+      - Java_Xmx=1500m
+      # Google ngram data for confusion-pair detection (their/there,
+      # affect/effect). Points at the parent dir holding en/{1,2,3}grams;
+      # the playbook downloads and extracts it before this container starts.
+      - langtool_languageModel=/ngrams
+
+    volumes:
+      # ~9GB of Lucene ngram indexes, populated on the host by the playbook.
+      - {{ home }}/ngrams:/ngrams:ro
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8010/v2/languages"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    security_opt:
+      - no-new-privileges:true
+
+    # ngram indexes are memory-mapped (off-heap), so heap stays at 1500m but the
+    # limit is raised for index page-cache headroom — at 2048m almost nothing
+    # stays cached and every confusion-pair lookup hits disk.
+    cpus: '1.0'
+    mem_limit: 4096m
+
+    logging:
+      driver: journald
+      options:
+        tag: "languagetool"
