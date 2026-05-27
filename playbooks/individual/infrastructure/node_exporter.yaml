@@ -10,7 +10,7 @@
   vars:
     cadvisor_service: cadvisor
     cadvisor_image: gcr.io/cadvisor/cadvisor
-    cadvisor_version: latest
+    cadvisor_version: v0.55.1
     cadvisor_port: "{{ service_ports.cadvisor.port }}"
     cadvisor_home: "/data01/services/{{ cadvisor_service }}"
     cadvisor_files: "{{ playbook_dir }}/../../../files/node-exporter"
@@ -252,6 +252,7 @@
       cd {{ cadvisor_home }}
       echo "Recreating cAdvisor containers due to configuration changes..."
       docker compose down --timeout 30
+      docker compose pull
       docker compose up -d --force-recreate
       echo "cAdvisor container recreation completed"
     when: docker_check.rc == 0 and (cadvisor_docker_compose_config.changed or cadvisor_env_config.changed)
