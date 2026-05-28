@@ -102,25 +102,33 @@ jobs:
     name: Lint Ansible Playbooks
     runs-on: [self-hosted, homelab, ansible]
     environment: Github Actions CI
-    needs: validate-ansible
-    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The self-hosted runner's system python is 3.8, too old for a current
+      # ansible-lint (needs 3.9+). Provision a modern interpreter so lint runs
+      # for real instead of crashing on import.
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install Ansible and ansible-lint
-        run: |
-          python3 -m pip install --user --quiet ansible ansible-lint
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: python3 -m pip install --quiet ansible ansible-lint
 
       - name: Lint playbooks
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "Linting Ansible playbooks..."
-          ansible-lint playbooks/*.yaml || true
-          echo "✓ Ansible lint complete"
+          # ansible-lint loads vars_files (incl. the encrypted vault), so give
+          # it the password; otherwise it reports load-failure (a min-profile
+          # rule). Profile is pinned to `min` in .ansible-lint.
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+          trap 'rm -f /tmp/.vault_pass' EXIT
+          export ANSIBLE_VAULT_PASSWORD_FILE=/tmp/.vault_pass
+          ansible-lint playbooks/
 
   validate-templates:
     name: Validate Jinja2 Templates
