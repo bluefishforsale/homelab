@@ -204,6 +204,9 @@ service_ports:
   globalview_backend:
     port: 8094
 
+  photonic_inventory:
+    port: 8095
+
   wordpress:
     port: 8085
 

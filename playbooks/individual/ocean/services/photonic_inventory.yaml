@@ -1,0 +1,106 @@
+---
+# photonic_inventory: lighting rental inventory web app (FastAPI + SQLite).
+# Image is built and pushed by the photonic_inventory repo CI, which then
+# dispatches `deploy-photonic-inventory` to this repo. nginx fronts the
+# container on port {{ port_ext }}; cloudflared exposes inventory.terrac.com.
+#
+# The app applies its own migrations on boot (FastAPI lifespan) and seeds a
+# bootstrap admin if the person table is empty, so there is no separate
+# migrate step here.
+- name: Deploy photonic_inventory using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: photonic_inventory
+    image: ghcr.io/bluefishforsale/photonic_inventory
+    version: latest
+    port_ext: "{{ service_ports.photonic_inventory.port }}"
+    port_int: 8000
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/photonic_inventory"
+    home: "{{ data }}/services/{{ service }}"
+    # The container runs as uid/gid 10001 (baked into the Dockerfile as the
+    # `app` user). The host-mounted data dir must be writable by that uid or
+    # SQLite can't open the DB.
+    app_uid: 10001
+    app_gid: 10001
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull private photonic_inventory image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      mode: '0755'
+
+  - name: Ensure data subdirectory exists (owned by container uid)
+    ansible.builtin.file:
+      path: "{{ home }}/data"
+      state: directory
+      owner: "{{ app_uid }}"
+      group: "{{ app_gid }}"
+      mode: '0750'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart photonic_inventory service
+
+  - name: Create photonic_inventory environment file
+    ansible.builtin.template:
+      src: "{{ files }}/photonic_inventory.env.j2"
+      dest: "{{ home }}/.env"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart photonic_inventory service
+
+  - name: Create photonic_inventory systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - photonic_inventory.service
+    notify:
+    - Reload systemd daemon
+    - Restart photonic_inventory service
+
+  - name: Enable photonic_inventory service
+    ansible.builtin.systemd:
+      name: photonic_inventory.service
+      enabled: yes
+      daemon_reload: yes
+
+  # Always (re)start so a new :latest image is pulled and the container is
+  # recreated even when the templates were byte-identical. The unit's
+  # ExecStartPre runs `docker compose pull --quiet` before `up -d`.
+  - name: Restart photonic_inventory service to pick up latest image
+    ansible.builtin.systemd:
+      name: photonic_inventory.service
+      state: restarted
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart photonic_inventory service
+    ansible.builtin.systemd:
+      name: photonic_inventory.service
+      state: restarted
