@@ -1,31 +1,19 @@
 services:
-  llamacpp:
+  terminalbench-llamacpp:
     image: ghcr.io/ggerganov/llama.cpp:server-cuda
-    container_name: llamacpp
-    hostname: llamacpp
+    container_name: terminalbench-llamacpp
+    hostname: terminalbench-llamacpp
     restart: unless-stopped
-
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, compute, utility]
 
     environment:
       - TZ=America/Los_Angeles
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - CUDA_VISIBLE_DEVICES=0
 
     ports:
-      - "8080:8080"
+      - "{{ terminalbench_llamacpp_port }}:8080"
 
     volumes:
-      - /data01/services/llamacpp/models:/models
-      - /data01/services/llamacpp/config:/config
-      - /data01/services/llamacpp/logs:/logs
+      # Shared model files, read-only — never writes into the production llamacpp dir.
+      - /data01/services/llamacpp/models:/models:ro
 
     command:
       - "--host"
@@ -34,8 +22,14 @@ services:
       - "8080"
       - "--model"
       - "/models/{{ bench_model }}"
+      # CPU-only by design: keep the GPU entirely for the production llamacpp.
+      # (0 = no layers offloaded.) Thread count matches the cpus cap below.
       - "--n-gpu-layers"
-      - "-1"
+      - "0"
+      - "--threads"
+      - "8"
+      - "--threads-batch"
+      - "8"
       - "--ctx-size"
       - "{{ bench_ctx_size }}"
       - "--parallel"
@@ -44,9 +38,8 @@ services:
       - "2048"
       - "--ubatch-size"
       - "512"
-      - "--flash-attn"
       - "--api-key"
-      - "llamacpp-homelab-key"
+      - "{{ terminalbench_api_key }}"
       - "--metrics"
 
     healthcheck:
@@ -58,5 +51,9 @@ services:
 
     security_opt:
       - no-new-privileges:true
+
+    # Hard caps so benchmarking can't starve the host (CPU inference is heavy).
+    cpus: '8.0'
+    mem_limit: 24g
 
     network_mode: bridge

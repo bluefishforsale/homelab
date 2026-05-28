@@ -5,7 +5,7 @@
 - name: "Write benchmark docker-compose.yml for {{ bench_model_item.name }}"
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../../../../files/ocean-terminalbench/docker-compose.yml.j2"
-    dest: "{{ llamacpp_home }}/docker-compose.yml"
+    dest: "{{ terminalbench_llamacpp_home }}/docker-compose.yml"
     owner: media
     group: media
     mode: '0644'
@@ -13,10 +13,14 @@
     bench_model: "{{ bench_model_item.name }}"
     bench_ctx_size: "{{ terminalbench_benchmark_ctx_size }}"
 
-- name: "Restart llamacpp for {{ bench_model_item.name }}"
-  ansible.builtin.systemd:
-    name: llamacpp.service
-    state: restarted
+# Recreate the dedicated bench instance with this model. This manages only the
+# terminalbench-llamacpp container in its own dir — it never touches the
+# production llamacpp.service.
+- name: "(Re)create the terminalbench llamacpp instance for {{ bench_model_item.name }}"
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ terminalbench_llamacpp_home }}"
+  changed_when: true
 
 - name: "Wait for llamacpp to be healthy ({{ bench_model_item.name }})"
   ansible.builtin.uri:

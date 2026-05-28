@@ -11,7 +11,6 @@
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
-    llamacpp_home: /data01/services/llamacpp
     benchmark_models: >-
       {{ llamacpp_models | dict2items
          | map(attribute='value') | flatten
@@ -19,13 +18,16 @@
 
   tasks:
 
-    - name: Ensure benchmark output directory exists
+    - name: Ensure terminalbench llamacpp + output directories exist
       ansible.builtin.file:
-        path: "{{ terminalbench_output_dir }}"
+        path: "{{ item }}"
         state: directory
         owner: media
         group: media
         mode: '0755'
+      loop:
+        - "{{ terminalbench_llamacpp_home }}"
+        - "{{ terminalbench_output_dir }}"
 
     - name: Check if uv is installed
       ansible.builtin.command: which uv
@@ -57,3 +59,10 @@
       loop_control:
         loop_var: bench_model_item
         label: "{{ bench_model_item.name }}"
+
+    - name: Tear down the terminalbench llamacpp instance
+      ansible.builtin.command:
+        cmd: docker compose down
+        chdir: "{{ terminalbench_llamacpp_home }}"
+      changed_when: true
+      failed_when: false
