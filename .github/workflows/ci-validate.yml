@@ -79,6 +79,14 @@ jobs:
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
 
+          # Some *.yaml under playbooks/ are task includes (e.g.
+          # terminalbench_model.yaml, pulled in via include_tasks), not plays.
+          # --syntax-check treats every file as a playbook and errors on those,
+          # so skip anything that isn't a list of plays (hosts/import_playbook).
+          is_playbook() {
+            python3 -c "import yaml,sys; d=yaml.safe_load(open(sys.argv[1])); sys.exit(0 if isinstance(d,list) and all(isinstance(i,dict) and ('hosts' in i or 'import_playbook' in i) for i in d) else 1)" "$1"
+          }
+
           echo "Validating Ansible playbook syntax..."
           for playbook in playbooks/*.yaml; do
             if [ -f "$playbook" ]; then
@@ -87,10 +95,14 @@ jobs:
             fi
           done
 
-          # Also check individual playbooks
+          # Also check individual playbooks (skipping task-include files)
           find playbooks/individual -name "*.yaml" | while read playbook; do
-            echo "Checking $playbook"
-            ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
+            if is_playbook "$playbook"; then
+              echo "Checking $playbook"
+              ansible-playbook --syntax-check --vault-password-file=/tmp/.vault_pass -i .github/ci_inventory.ini "$playbook"
+            else
+              echo "Skipping $playbook (task include, not a playbook)"
+            fi
           done
 
           # Clean up
