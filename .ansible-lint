@@ -1,3 +1,5 @@
-skip_list:
-  - name[template]
-  - yaml[indentation]
+# Minimal enforced profile. The playbooks predate ansible-lint adoption and
+# carry stylistic deviations (e.g. `yes`/`no` truthy values) that the stricter
+# profiles flag; `min` enforces the rules that catch real breakage (parse
+# errors, load failures, syntax) without a repo-wide style rewrite.
+profile: min

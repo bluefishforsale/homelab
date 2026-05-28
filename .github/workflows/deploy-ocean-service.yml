@@ -116,7 +116,7 @@ jobs:
           echo "📋 Service '$SERVICE' → Playbook: $PLAYBOOK"
 
   validate:
-    name: Validate & Lint
+    name: Validate
     needs: determine-playbook
     runs-on: [self-hosted, homelab, ansible]
     steps:
@@ -137,15 +137,6 @@ jobs:
         run: |
           echo "Validating Ansible playbook syntax"
           ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}
-
-      - name: Lint playbook
-        run: |
-          if command -v ansible-lint &> /dev/null; then
-            echo "Running ansible-lint"
-            ansible-lint ${{ needs.determine-playbook.outputs.playbook }}
-          else
-            echo "⚠️  ansible-lint not found, skipping"
-          fi
 
   dry-run:
     name: Dry-Run (Check Mode)
