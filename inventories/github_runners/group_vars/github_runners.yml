@@ -90,7 +90,10 @@ github_runner_count: 4
 #   - May require additional configuration for Docker support
 #   - Less documented for ephemeral mode
 github_runner_image: "myoung34/github-runner"
-github_runner_version: "latest"
+# debian-bookworm = Debian 12 / Python 3.11 (matches the homelab host OS and is
+# new enough for current ansible-lint). The old "latest" tag is ubuntu-focal
+# (20.04 / Python 3.8), which crashes modern Python tooling.
+github_runner_version: "debian-bookworm"
 
 # ============================================================================
 # EPHEMERAL CONFIGURATION
