@@ -144,7 +144,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible pyyaml
+          python3 -m pip install --user --break-system-packages --quiet ansible pyyaml
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Validate changed playbooks
@@ -191,7 +191,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible pyyaml
+          python3 -m pip install --user --break-system-packages --quiet ansible pyyaml
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Setup SSH key

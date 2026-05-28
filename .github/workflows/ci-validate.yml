@@ -61,7 +61,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible
+          python3 -m pip install --user --break-system-packages --quiet ansible
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Verify Ansible installation
@@ -108,7 +108,7 @@ jobs:
 
       - name: Install Ansible and ansible-lint
         run: |
-          python3 -m pip install --user --quiet ansible ansible-lint
+          python3 -m pip install --user --break-system-packages --quiet ansible ansible-lint
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Lint playbooks

@@ -125,7 +125,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible
+          python3 -m pip install --user --break-system-packages --quiet ansible
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Validate YAML syntax
@@ -161,7 +161,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible
+          python3 -m pip install --user --break-system-packages --quiet ansible
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up SSH keys
@@ -211,7 +211,7 @@ jobs:
 
       - name: Install Ansible
         run: |
-          python3 -m pip install --user --quiet ansible
+          python3 -m pip install --user --break-system-packages --quiet ansible
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up SSH keys
