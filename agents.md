@@ -39,6 +39,59 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 
 ---
 
+## Multi-agent coordination
+
+Rules for when more than one agent (or a human plus agents) changes this repo.
+The repo drives a production homelab, so coordination is about preventing drift,
+deploy races, and resource hijacking.
+
+1. **One source of truth.** `master` is desired state; deployed state must equal
+   it. Never hand-edit files on a host or run ad-hoc `docker`/`compose` — changes
+   flow repo → branch → PR → merge → playbook. Drift is a defect, not a shortcut.
+
+2. **Branch per change; isolated trees.** Never commit to `master`. One logical
+   change per PR. Stage explicit paths (`git add <path>`), never `-A` / `.`. Use a
+   separate git worktree or clone per concurrent agent; if a clone is shared, run
+   `git status` first and leave any foreign uncommitted changes untouched.
+
+3. **PRs are the coordination ledger.** Open a draft PR (or claim an issue) early
+   to signal intent; scan open PRs and branches before starting overlapping work.
+
+4. **Serialize deploys; check before triggering.** Host deploys run under the
+   `deploy-ocean` concurrency group (`cancel-in-progress: false`) — keep it.
+   Before triggering a deploy, confirm nothing else is actively managing or using
+   that service. Don't deploy an unmerged branch except for deliberate testing.
+
+5. **Explicit ownership; no hijacking.** Each service has one owner = its playbook
+   plus compose path. A task must never rewrite or restart another service to
+   borrow it; if you need another instance, run a separate one (own
+   dir/container/port) with CPU/RAM caps. The single GPU is allocated
+   deliberately — production keeps it; experiments run on CPU or a declared VRAM
+   budget.
+
+6. **CI-mediated vs manual.** Ordinary ocean services deploy via CI/dispatch.
+   Self-referential infra (the GitHub Actions runners themselves) and anything
+   that would kill the job mid-run are applied **manually on the homelab network,
+   never via CI** — a runner cannot redeploy itself.
+
+7. **Propose → review → merge → deploy → verify.** Agents propose via PR; merge
+   per the authority rule below; the owning agent then deploys and reports
+   evidence. Deploys stay manually triggered (not push-to-deploy) by design.
+
+8. **Detect drift; fix shared CI first.** Run the apply playbooks in `--check` on
+   a schedule so deployed-≠-repo surfaces on its own. When shared CI breaks,
+   fixing it unblocks every agent — prioritize it and fix at the root.
+
+**Merge authority:** humans merge by default; agents open PRs and do not merge
+their own changes. Low-risk classes (CI fixes, dashboards, docs) may be delegated
+to a designated reviewer once checks are green.
+
+**Isolation:** a git worktree or clone per concurrent agent is preferred;
+shared-clone work is allowed only with strict branch discipline and
+explicit-path staging.
+
+---
+
 ## Quick Reference
 
 **Primary Host:** ocean (192.168.1.143)
