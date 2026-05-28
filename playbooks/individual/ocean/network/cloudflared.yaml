@@ -57,11 +57,10 @@
     ansible.builtin.command: >
       cloudflared tunnel --origincert {{ local_cert_path }} create ssh-{{ inventory_hostname }}
     register: tunnel_creation
-    when: 
+    when:
       - inventory_hostname != 'ocean'
       - (tunnel_check is not defined) or (tunnel_check.rc is not defined) or (tunnel_check.rc != 0)
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Extract tunnel ID from creation output
@@ -135,14 +134,13 @@
     ansible.builtin.command: >
       cloudflared tunnel --origincert {{ local_cert_path }} route dns ssh-{{ inventory_hostname }} ssh-{{ inventory_hostname }}.terrac.com
     register: dns_route_result
-    failed_when: 
+    failed_when:
       - dns_route_result.rc != 0
       - "'already exists' not in dns_route_result.stderr"
-    when: 
+    when:
       - inventory_hostname != 'ocean'
       - ssh_tunnel_id is defined
     delegate_to: localhost
-    run_once: true
     become: false
 
 
@@ -245,7 +243,7 @@
   # Define which services need NO authentication (bypass policy)
   - name: Define fully public services list (no authentication required)
     ansible.builtin.set_fact:
-      fully_public_services: ["blog", "terrac", "www", "ta", "llama"]
+      fully_public_services: ["blog", "terrac", "www", "ta", "llama", "inventory"]
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -755,7 +753,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Debug Access apps response
@@ -804,7 +801,6 @@
       - cloudflare.api_key != ''
       - cf_access_app_existing is not defined or cf_access_app_existing == None
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Determine Access app ID
@@ -851,7 +847,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Replace all policies with reusable admin policy (SSH apps)
@@ -883,7 +878,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
     failed_when:
       - ssh_replace_policy_result.status == 400
@@ -915,7 +909,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
     failed_when:
       - ssh_dns_create.status == 400
