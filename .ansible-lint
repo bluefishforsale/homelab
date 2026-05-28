@@ -3,3 +3,8 @@
 # profiles flag; `min` enforces the rules that catch real breakage (parse
 # errors, load failures, syntax) without a repo-wide style rewrite.
 profile: min
+
+# Retained from the prior config (pre-existing tuning).
+skip_list:
+  - name[template]
+  - yaml[indentation]
