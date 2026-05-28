@@ -106,16 +106,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # The self-hosted runner's system python is 3.8, too old for a current
-      # ansible-lint (needs 3.9+). Provision a modern interpreter so lint runs
-      # for real instead of crashing on import.
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install Ansible and ansible-lint
-        run: python3 -m pip install --quiet ansible ansible-lint
+        run: |
+          python3 -m pip install --user --quiet ansible ansible-lint
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Lint playbooks
         env:
