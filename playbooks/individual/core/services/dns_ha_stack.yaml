@@ -36,7 +36,7 @@
   pre_tasks:
     - name: Load HA role-specific variables
       ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/roles/dns_infrastructure/vars/ha_{{ 'primary' if inventory_hostname == 'dns02' else 'standby' }}.yaml"
+        file: "{{ playbook_dir }}/../../../../roles/dns_infrastructure/vars/ha_{{ 'primary' if inventory_hostname == 'dns02' else 'standby' }}.yaml"
 
   roles:
     - role: dns_infrastructure
