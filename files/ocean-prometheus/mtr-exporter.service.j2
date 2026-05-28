@@ -13,7 +13,7 @@ RestartSec=120s
 TimeoutStartSec=180s
 ExecStartPre=-docker rm -f {{ mtr_exporter_service }}
 ExecStartPre=-/usr/bin/docker pull {{ mtr_exporter_image }}:{{ mtr_exporter_version }}
-ExecStart=docker run --rm \
+ExecStart=docker run --rm --init \
     --name {{ mtr_exporter_service }} \
     --hostname {{ mtr_exporter_service }} \
     --cap-add NET_RAW \
