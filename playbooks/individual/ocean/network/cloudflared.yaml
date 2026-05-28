@@ -115,9 +115,10 @@
   - name: Display SSH test result
     ansible.builtin.debug:
       msg: "SSH tunnel test: {{ 'PASS' if ssh_test.rc == 0 else 'FAIL - ' + ssh_test.stderr }}"
-    when: 
+    when:
       - inventory_hostname != 'ocean'
       - ssh_test is defined
+      - ssh_test.rc is defined
 
   - name: Debug Cloudflare credentials
     ansible.builtin.debug:
@@ -147,18 +148,21 @@
 
   - name: Display DNS route creation result
     ansible.builtin.debug:
-      msg: "DNS route: {{ 'Created successfully' if dns_route_result is defined and dns_route_result.rc == 0 else 'Already exists' if dns_route_result is defined and 'already exists' in dns_route_result.stderr else 'Skipped' }}"
-    when: 
+      msg: "DNS route: {{ 'Created successfully' if dns_route_result.rc == 0 else 'Already exists' if 'already exists' in dns_route_result.stderr else 'Skipped' }}"
+    when:
       - inventory_hostname != 'ocean'
+      - dns_route_result is defined
+      - dns_route_result.rc is defined
 
   - name: Test SSH tunnel connectivity after DNS route creation
     ansible.builtin.command: >
       timeout 10 cloudflared access ssh --hostname ssh-{{ inventory_hostname }}.terrac.com --dry-run
     register: ssh_final_test
     failed_when: false
-    when: 
+    when:
       - inventory_hostname != 'ocean'
       - dns_route_result is defined
+      - dns_route_result.rc is defined
       - dns_route_result.rc == 0
     delegate_to: localhost
     become: false
