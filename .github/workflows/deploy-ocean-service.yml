@@ -123,6 +123,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - name: Validate YAML syntax
         run: |
           echo "Validating YAML syntax for ${{ needs.determine-playbook.outputs.playbook }}"
@@ -150,6 +155,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up SSH keys
         run: ssh-add -l || echo "No SSH keys loaded"
@@ -195,6 +205,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up SSH keys
         run: ssh-add -l || echo "No SSH keys loaded"
