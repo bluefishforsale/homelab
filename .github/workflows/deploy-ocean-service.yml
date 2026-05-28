@@ -134,9 +134,21 @@ jobs:
           python3 -c "import yaml; yaml.safe_load(open('${{ needs.determine-playbook.outputs.playbook }}'))"
 
       - name: Validate Ansible syntax
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           echo "Validating Ansible playbook syntax"
-          ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}
+          # Playbooks that load the encrypted vault via vars_files need the
+          # password even for --syntax-check, else: "Attempting to decrypt but
+          # no vault secrets found". Mirrors the dry-run/deploy jobs.
+          CMD="ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}"
+          if [ -n "$VAULT_PASSWORD" ]; then
+            echo "$VAULT_PASSWORD" > /tmp/vault_pass
+            chmod 600 /tmp/vault_pass
+            trap 'rm -f /tmp/vault_pass' EXIT
+            CMD="$CMD --vault-password-file=/tmp/vault_pass"
+          fi
+          $CMD
 
   dry-run:
     name: Dry-Run (Check Mode)
