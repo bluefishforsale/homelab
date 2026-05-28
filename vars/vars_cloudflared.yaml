@@ -95,13 +95,14 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:80"
 
-        # photonic_inventory lighting rental inventory web app. Routed through
-        # nginx; the app has its own login (sessions + CSRF + argon2), so it
-        # bypasses Cloudflare Access (listed in fully_public_services in
-        # cloudflared.yaml) — guests need to reach the login page.
+        # photonic_inventory lighting rental inventory web app. Single FastAPI
+        # backend, so the tunnel hits the container's published port directly
+        # (no nginx hop). The app has its own login (sessions + CSRF + argon2);
+        # it bypasses Cloudflare Access (listed in fully_public_services in
+        # cloudflared.yaml) so guests can reach the login page.
         - hostname: "inventory.terrac.com"
           service_type: "http"
-          service_url: "http://192.168.1.143:80"
+          service_url: "http://192.168.1.143:8095"
 
         # Management services (running on ocean - 192.168.1.143)
         - hostname: "portainer.terrac.com"
