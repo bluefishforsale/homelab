@@ -139,6 +139,9 @@ jobs:
           ansible-playbook --syntax-check ${{ needs.determine-playbook.outputs.playbook }}
 
       - name: Lint playbook
+        # Advisory only: never block a deploy on lint. The runner's pre-installed
+        # ansible-lint also crashes under Python 3.8 (needs functools.cache, 3.9+).
+        continue-on-error: true
         run: |
           if command -v ansible-lint &> /dev/null; then
             echo "Running ansible-lint"
