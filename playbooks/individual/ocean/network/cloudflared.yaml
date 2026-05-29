@@ -345,9 +345,58 @@
       - ocean_cf_access_apps.json.result | selectattr('domain','equalto', item.domain) | list | length == 0
     delegate_to: localhost
     become: false
-    failed_when: 
+    failed_when:
       - ocean_access_app_create.status == 400
       - "'already exists' not in ocean_access_app_create.json.errors[0].message"
+
+  # Re-fetch apps AFTER creation so apps created in this run land in the id map
+  # (the earlier snapshot predates creation, so new hostnames were missing).
+  - name: Re-fetch Access applications (terrac.com) after create
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: ocean_cf_access_apps_terrac_post
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Re-fetch Access applications (saetnere.com) after create
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.saetnere_com }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: ocean_cf_access_apps_saetnere_post
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    run_once: true
+    become: false
+
+  - name: Re-combine Access apps from both zones (post-create)
+    ansible.builtin.set_fact:
+      ocean_cf_access_apps:
+        json:
+          result: "{{ (ocean_cf_access_apps_terrac_post.json.result | default([])) + (ocean_cf_access_apps_saetnere_post.json.result | default([])) }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - ocean_cf_access_apps_terrac_post is defined
 
   - name: Get Access app IDs for policy creation
     ansible.builtin.set_fact:
@@ -544,7 +593,7 @@
         domain: "{{ item.domain }}"
         type: "self_hosted"
         session_duration: "24h"
-        policies: "{{ [reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else [])) }}"
+        policies: "{{ ([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list }}"
       status_code: [200, 400]
     register: replace_policy_result
     loop: "{{ ocean_access_apps }}"
@@ -553,7 +602,10 @@
       - ocean_access_app_ids[item.domain] is defined
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
-      - reusable_admin_policy_id | default('') != ''
+      # Gate per-app on the policy THIS app needs, not always the admin policy:
+      # a fully_public app uses the bypass policy and must not be blocked by a
+      # missing admin policy id.
+      - (([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list | length > 0)
     delegate_to: localhost
     become: false
     failed_when:
