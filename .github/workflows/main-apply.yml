@@ -19,6 +19,11 @@ on:
         description: "Comma-separated playbook paths to apply (e.g. playbooks/individual/ocean/monitoring/unpoller.yaml). Use for vault-only fixes or any redeploy not picked up by the push path filter."
         required: true
         type: string
+      extra_vars:
+        description: "Optional ansible --extra-vars (e.g. 'terminalbench_n_tasks=1' or 'key1=v1 key2=v2'). Applied to every playbook in this dispatch."
+        required: false
+        type: string
+        default: ""
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
@@ -130,11 +135,18 @@ jobs:
         id: apply
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          EXTRA_VARS: ${{ inputs.extra_vars || '' }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
 
           PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
           INVENTORY="inventories/production/hosts.ini"
+
+          # Optional --extra-vars from workflow_dispatch input (empty on push).
+          EXTRA_VARS_FLAG=()
+          if [ -n "$EXTRA_VARS" ]; then
+            EXTRA_VARS_FLAG=(--extra-vars "$EXTRA_VARS")
+          fi
 
           echo "================================================"
           echo "Applying playbooks to production infrastructure"
@@ -164,6 +176,7 @@ jobs:
             ansible-playbook \
               -i "$INVENTORY" \
               --vault-password-file=/tmp/.vault_pass \
+              "${EXTRA_VARS_FLAG[@]}" \
               "$PLAYBOOK" 2>&1 | tee /tmp/playbook-${TOTAL}.log
             ANSIBLE_EXIT=${PIPESTATUS[0]}
             if [ "$ANSIBLE_EXIT" -eq 0 ]; then

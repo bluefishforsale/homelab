@@ -74,6 +74,16 @@ while IFS= read -r path; do
     continue
   fi
 
+  # Terminalbench is on-demand only — its playbook runs a multi-hour CPU
+  # benchmark and must never auto-apply on push. Changes to its playbook,
+  # tasks file, vars, or files dir are dispatched manually via
+  # workflow_dispatch (with -e terminalbench_n_tasks=N for fast captures).
+  if [[ "$path" == playbooks/individual/ocean/ai/terminalbench*.yaml ]] \
+     || [[ "$path" == vars/vars_terminalbench.yaml ]] \
+     || [[ "$path" == files/ocean-terminalbench/* ]]; then
+    continue
+  fi
+
   # Direct playbook edits
   if [[ "$path" =~ ^playbooks/individual/.*\.ya?ml$ ]] \
      && [[ "$path" != playbooks/individual/*/tasks/* ]]; then
