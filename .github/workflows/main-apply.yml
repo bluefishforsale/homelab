@@ -53,18 +53,25 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${DISPATCH_PLAYBOOKS:-}" ]]; then
-            echo "Manual dispatch — using provided playbooks list..."
+            # workflow_dispatch is an explicit user intent — trust the input
+            # verbatim instead of routing it through the auto-detect script,
+            # which is meant for push-time file→playbook mapping and applies
+            # exclusions (e.g. terminalbench) that legitimately need to be
+            # dispatchable.
+            echo "Manual dispatch — using provided playbooks list verbatim..."
             CHANGED_FILES=$(echo "$DISPATCH_PLAYBOOKS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+            echo "$CHANGED_FILES"
+            echo ""
+            PLAYBOOK_JSON=$(echo "$CHANGED_FILES" | jq -R . | jq -s -c .)
           else
             echo "Detecting changed files in last commit..."
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+            echo ""
+            PLAYBOOK_JSON=$(echo "$CHANGED_FILES" \
+              | bash .github/workflows/lib/detect-impacted-playbooks.sh)
           fi
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-          echo ""
-
-          PLAYBOOK_JSON=$(echo "$CHANGED_FILES" \
-            | bash .github/workflows/lib/detect-impacted-playbooks.sh)
 
           COUNT=$(echo "$PLAYBOOK_JSON" | jq 'length')
 
