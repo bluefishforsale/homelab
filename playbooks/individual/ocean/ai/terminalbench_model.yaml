@@ -48,6 +48,7 @@
         --agent {{ terminalbench_agent }}
         --model openai/{{ bench_model_item.name }}
         -n {{ terminalbench_n_concurrent }}
+        {% if terminalbench_n_tasks | int > 0 %}-l {{ terminalbench_n_tasks }}{% endif %}
       args:
         chdir: "{{ bench_tmpdir.path }}"
       environment:

@@ -16,3 +16,9 @@ terminalbench_health_url: "http://localhost:8082/health"
 terminalbench_health_timeout: 180
 terminalbench_health_interval: 10
 terminalbench_n_concurrent: 1
+
+# Maximum number of tasks to run from the dataset (harbor's -l/--n-tasks).
+# 0 = no limit (run the whole dataset, the production default). Set >0 for a
+# fast capture / smoke run (e.g. -e terminalbench_n_tasks=1 captures schema in
+# one task on CPU).
+terminalbench_n_tasks: 0
