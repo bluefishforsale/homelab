@@ -60,6 +60,86 @@
         loop_var: bench_model_item
         label: "{{ bench_model_item.name }}"
 
+    # ---- Results signal to the homelab repo ----
+    # Per-model .prom files were already written to {{ node_exporter_textfiles }}
+    # on ocean (in terminalbench_model.yaml) — those feed the Grafana dashboard
+    # via the existing node_exporter scrape. Now commit the per-run JSONs and an
+    # appended markdown summary row back to the homelab repo using the PAT in
+    # the vault. All repo I/O delegates to localhost (the runner) so it never
+    # tries to git-push from ocean.
+    - name: "Sync benchmark results back to the repo"
+      delegate_to: localhost
+      become: false
+      when: terminalbench_summary_rows is defined and (terminalbench_summary_rows | length) > 0
+      vars:
+        _repo_root: "{{ playbook_dir }}/../../../.."
+        _runs_dir: "{{ _repo_root }}/{{ terminalbench_repo_runs_dir }}"
+        _summary_md: "{{ _repo_root }}/{{ terminalbench_repo_summary }}"
+      block:
+        - name: "Ensure docs/benchmarks/runs/ exists in the runner checkout"
+          ansible.builtin.file:
+            path: "{{ _runs_dir }}"
+            state: directory
+            mode: '0755'
+
+        - name: "Fetch per-run result JSONs to the runner"
+          ansible.builtin.fetch:
+            src: "{{ row.json_src }}"
+            dest: "{{ _runs_dir }}/{{ row.date }}_{{ row.model }}.json"
+            flat: true
+          delegate_to: ocean
+          loop: "{{ terminalbench_summary_rows }}"
+          loop_control:
+            loop_var: row
+            label: "{{ row.model }}"
+
+        - name: "Ensure summary markdown exists with a header"
+          ansible.builtin.copy:
+            dest: "{{ _summary_md }}"
+            force: false
+            mode: '0644'
+            content: |
+              # Terminal-Bench Results
+
+              Appended automatically by `playbooks/individual/ocean/ai/terminalbench.yaml`
+              after each run. One row per `(date, model)` evaluation; the matching
+              full result JSON lives under `{{ terminalbench_repo_runs_dir }}/`.
+
+              | date | model | dataset | agent | pass_rate | resolved | total | errored | duration_s |
+              |------|-------|---------|-------|-----------|----------|-------|---------|------------|
+
+        - name: "Append a summary row per model"
+          ansible.builtin.lineinfile:
+            path: "{{ _summary_md }}"
+            line: >-
+              | {{ row.date }} | {{ row.model }} | {{ row.dataset }} | {{ row.agent }}
+              | {{ '%.4f' | format(row.pass_rate | float) }} | {{ row.resolved }}
+              | {{ row.total }} | {{ row.errored }} | {{ row.duration_s }} |
+            insertafter: EOF
+          loop: "{{ terminalbench_summary_rows }}"
+          loop_control:
+            loop_var: row
+            label: "{{ row.model }}"
+
+        - name: "Commit + push results to homelab master (PAT)"
+          ansible.builtin.shell: |
+            set -euo pipefail
+            cd "{{ _repo_root }}"
+            git config user.email "terminalbench@homelab.local"
+            git config user.name  "terminalbench-bot"
+            git add "{{ terminalbench_repo_summary }}" "{{ terminalbench_repo_runs_dir }}"
+            if git diff --cached --quiet; then
+              echo "No results changes to commit"
+              exit 0
+            fi
+            ROWS=$(echo '{{ terminalbench_summary_rows | length }}' | tr -d '[:space:]')
+            git commit -m "chore(benchmarks): terminalbench results — ${ROWS} model(s), $(date -u +%FT%H:%MZ)"
+            git pull --rebase origin master
+            git push "https://x-access-token:${PAT}@github.com/bluefishforsale/homelab.git" HEAD:master
+          environment:
+            PAT: "{{ terminalbench.pat }}"
+          no_log: true
+
     - name: Tear down the terminalbench llamacpp instance
       ansible.builtin.command:
         cmd: docker compose down

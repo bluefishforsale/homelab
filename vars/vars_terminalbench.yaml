@@ -22,3 +22,13 @@ terminalbench_n_concurrent: 1
 # fast capture / smoke run (e.g. -e terminalbench_n_tasks=1 captures schema in
 # one task on CPU).
 terminalbench_n_tasks: 0
+
+# Where the .prom textfile lands on ocean; node_exporter exposes whatever lives
+# there (its compose mounts this dir to /var/lib/node_exporter/textfile_collector
+# read-only). Kept in sync with playbooks/individual/infrastructure/node_exporter.yaml.
+node_exporter_textfiles: /data01/services/node-exporter/text_files
+
+# Sub-paths in this repo where benchmark history is committed back from the
+# runner. Created by the playbook if missing.
+terminalbench_repo_summary: docs/benchmarks/results.md
+terminalbench_repo_runs_dir: docs/benchmarks/runs

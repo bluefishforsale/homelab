@@ -91,3 +91,77 @@
       ansible.builtin.file:
         path: "{{ bench_tmpdir.path }}"
         state: absent
+
+# Parse the result JSON and emit a Prometheus textfile for this model. The
+# .prom file lives in node_exporter's textfile_collector dir so it rides the
+# existing node_exporter scrape (no new Prometheus job).
+- name: "Load result JSON for {{ bench_model_item.name }}"
+  ansible.builtin.slurp:
+    src: >-
+      {{ terminalbench_output_dir }}/{{ ansible_date_time.date }}_{{ bench_model_item.name | replace('.gguf', '') }}.json
+  register: bench_result_slurp
+
+- name: "Derive metrics for {{ bench_model_item.name }}"
+  vars:
+    _r: "{{ bench_result_slurp.content | b64decode | from_json }}"
+    _model_label: "{{ bench_model_item.name | replace('.gguf', '') }}"
+    _eval_key: "{{ terminalbench_agent }}__{{ bench_model_item.name }}__terminal-bench"
+  ansible.builtin.set_fact:
+    bench_model_label: "{{ _model_label }}"
+    bench_pass_rate: "{{ _r.stats.evals[_eval_key].metrics[0].mean | float }}"
+    bench_n_trials: "{{ _r.stats.evals[_eval_key].n_trials | int }}"
+    bench_n_errors: "{{ _r.stats.evals[_eval_key].n_errors | int }}"
+    bench_n_resolved: >-
+      {{ (_r.stats.evals[_eval_key].metrics[0].mean | float * _r.stats.evals[_eval_key].n_trials | int) | round | int }}
+    bench_duration_s: >-
+      {{ ((_r.finished_at | to_datetime('%Y-%m-%dT%H:%M:%S.%f'))
+          - (_r.started_at  | to_datetime('%Y-%m-%dT%H:%M:%S.%f'))).total_seconds() | int }}
+    bench_finished_ts: >-
+      {{ (_r.finished_at | to_datetime('%Y-%m-%dT%H:%M:%S.%f')).strftime('%s') }}
+
+- name: "Write Prometheus textfile for {{ bench_model_item.name }}"
+  ansible.builtin.copy:
+    # Atomic via ansible's tempfile+rename. node_exporter mounts the parent dir
+    # read-only and re-reads on each scrape, so the new sample appears within
+    # one scrape interval.
+    dest: "{{ node_exporter_textfiles }}/terminalbench_{{ bench_model_label }}.prom"
+    owner: nobody
+    group: nogroup
+    mode: '0644'
+    content: |
+      # HELP terminalbench_pass_rate Pass rate (0..1) for this model on terminal-bench (latest run).
+      # TYPE terminalbench_pass_rate gauge
+      terminalbench_pass_rate{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_pass_rate }}
+      # HELP terminalbench_trials_total Total trials run in the latest bench run for this model.
+      # TYPE terminalbench_trials_total gauge
+      terminalbench_trials_total{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_n_trials }}
+      # HELP terminalbench_trials_resolved Trials that passed (reward>0) in the latest bench run.
+      # TYPE terminalbench_trials_resolved gauge
+      terminalbench_trials_resolved{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_n_resolved }}
+      # HELP terminalbench_trials_errored Trials that errored (e.g. agent timeouts) in the latest bench run.
+      # TYPE terminalbench_trials_errored gauge
+      terminalbench_trials_errored{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_n_errors }}
+      # HELP terminalbench_run_duration_seconds Wall-clock duration of the latest bench run for this model.
+      # TYPE terminalbench_run_duration_seconds gauge
+      terminalbench_run_duration_seconds{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_duration_s }}
+      # HELP terminalbench_run_timestamp_seconds Unix timestamp the latest run finished.
+      # TYPE terminalbench_run_timestamp_seconds gauge
+      terminalbench_run_timestamp_seconds{model="{{ bench_model_label }}",dataset="{{ terminalbench_dataset }}",agent="{{ terminalbench_agent }}"} {{ bench_finished_ts }}
+
+# Record this model's row for the repo summary (built up across the loop and
+# committed in the parent playbook).
+- name: "Record summary row for {{ bench_model_item.name }}"
+  ansible.builtin.set_fact:
+    terminalbench_summary_rows: >-
+      {{ (terminalbench_summary_rows | default([])) + [{
+        'date': ansible_date_time.date,
+        'model': bench_model_label,
+        'dataset': terminalbench_dataset,
+        'agent': terminalbench_agent,
+        'pass_rate': bench_pass_rate,
+        'resolved': bench_n_resolved,
+        'total': bench_n_trials,
+        'errored': bench_n_errors,
+        'duration_s': bench_duration_s,
+        'json_src': terminalbench_output_dir + '/' + ansible_date_time.date + '_' + bench_model_label + '.json',
+      }] }}
