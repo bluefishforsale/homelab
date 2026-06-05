@@ -29,6 +29,10 @@
     tags: [verify, execute]
 
   - name: Get list of all dashboards from Grafana API
+    # /api/health returning 200 (above) does not guarantee /api/search is ready
+    # if Grafana was just recreated — the search endpoint can briefly return an
+    # empty body, which then crashes from_json in the next task. Retry until we
+    # get a 200 with a non-empty JSON body (array or object).
     ansible.builtin.uri:
       url: "{{ grafana_url }}/api/search?type=dash-db"
       method: GET
@@ -39,6 +43,12 @@
       body_format: json
     register: dashboard_list
     delegate_to: localhost
+    retries: 12
+    delay: 5
+    until:
+      - dashboard_list.status == 200
+      - (dashboard_list.content | default('') | trim | length) > 0
+      - (dashboard_list.content | trim)[0] in ['[', '{']
     tags: [verify, execute]
 
   - name: Parse dashboard list JSON
