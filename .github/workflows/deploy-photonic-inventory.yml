@@ -142,12 +142,14 @@ jobs:
 
       - name: Generate deployment summary
         if: always()
+        env:
+          DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
         run: |
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
           BRANCH="${{ steps.params.outputs.branch }}"
           COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
-          COMMIT_MESSAGE="${{ steps.params.outputs.commit_message }}"
+          COMMIT_MESSAGE="$DEPLOY_COMMIT_MESSAGE"
 
           if [ "$STATUS" = "success" ]; then
             STATUS_EMOJI="✅"; STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
