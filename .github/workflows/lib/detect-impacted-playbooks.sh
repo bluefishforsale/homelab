@@ -94,6 +94,13 @@ while IFS= read -r path; do
     emit "$path"
     continue
   fi
+  # Operations playbooks (backup, etc.) are real playbooks too; mapping them
+  # to themselves stops a change there from falling through to the 01/02/03
+  # site-wide fallback replay.
+  if [[ "$path" =~ ^playbooks/operations/.*\.ya?ml$ ]]; then
+    emit "$path"
+    continue
+  fi
 
   # Cloudflared
   if [[ "$path" == files/cloudflared/* ]] \
