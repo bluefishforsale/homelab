@@ -6,7 +6,8 @@
 - name: Backup Grafana Dashboards to Repository
   hosts: ocean
   become: false
-  gather_facts: false
+  # temp_dir uses ansible_date_time.epoch, which needs facts.
+  gather_facts: true
 
   vars_files:
     - "{{ playbook_dir }}/../../../vault/secrets.yaml"
