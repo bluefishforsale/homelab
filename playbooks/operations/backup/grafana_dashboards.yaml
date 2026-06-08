@@ -15,8 +15,11 @@
   vars:
     # 3000 used to land here by accident — that's open-webui, not Grafana.
     grafana_url: "http://192.168.1.143:{{ service_ports.grafana.port }}"
-    grafana_api_user: "terrac"
-    grafana_api_password: "{{ monitoring.grafana.terrac_password }}"
+    # Use admin (verified working against the live instance); the `terrac`
+    # account no longer authenticates against this Grafana, so the previous
+    # basic-auth attempts returned 401.
+    grafana_api_user: "admin"
+    grafana_api_password: "{{ monitoring.grafana.admin_password }}"
     backup_dir: "{{ playbook_dir }}/../../../files/grafana-compose/dashboards"
     temp_dir: "/tmp/grafana-dashboard-backup-{{ ansible_date_time.epoch }}"
 
