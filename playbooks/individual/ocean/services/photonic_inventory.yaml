@@ -38,6 +38,16 @@
       echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
     no_log: true
 
+  # Pull explicitly here (not only in the unit's tolerant ExecStartPre) so a bad
+  # or expired GHCR credential FAILS THE DEPLOY instead of silently leaving the
+  # old image running. docker pull returns non-zero on auth/denied, failing the
+  # task. The unit keeps a tolerant pull for boot-time resilience.
+  - name: Pull latest photonic_inventory image (loud on bad credentials)
+    ansible.builtin.command:
+      cmd: "docker pull {{ image }}:{{ version }}"
+    register: ghcr_pull
+    changed_when: "'Downloaded newer image' in ghcr_pull.stdout"
+
   - name: Ensure base directory exists
     ansible.builtin.file:
       path: "{{ home }}"

@@ -16,7 +16,10 @@ Environment=COMPOSE_HTTP_TIMEOUT=60
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
 ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
-ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull --quiet'
+# Tolerant (leading '-') so a host reboot during a registry blip still starts
+# on the cached image; the deploy-time pull above is the loud guard. Not
+# --quiet, so a failed pull is visible in the journal.
+ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull'
 
 ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
 ExecStop=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
