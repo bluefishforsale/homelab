@@ -35,7 +35,7 @@
 
   - name: Log ocean into GHCR to pull private photonic_inventory image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ photonic_inventory.github_homelab_deploy_pat }}" | docker login ghcr.io -u bluefishforsale --password-stdin
     no_log: true
 
   - name: Ensure base directory exists
