@@ -4,21 +4,21 @@
 comfyui_models:
   checkpoints:
     - name: v1-5-pruned-emaonly-fp16.safetensors
-      url: https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetenss
+      url: https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
     - name: flux1-dev-fp8.safetensors
       url: https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors
     - name: sd3_medium_incl_clips.safetensors
-      url: htps://huggingface.co/stabilityai/stable-diffusion-3-medium/blob/main/sd3_medium_incl_clips.safetensors
+      url: https://huggingface.co/stabilityai/stable-diffusion-3-medium/resolve/main/sd3_medium_incl_clips.safetensors
     - name: sd_xl_base_1.0.safetensors
-      url: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/sd_xl_base_1.0.safetensors
+      url: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors
     - name: sd3.5_large.safetensors
-      url: https://huggingface.co/stabilityai/stable-diffusion-3.5-large/blob/main/sd3.5_large.safetensors
+      url: https://huggingface.co/stabilityai/stable-diffusion-3.5-large/resolve/main/sd3.5_large.safetensors
 
   vae:
     - name: ae.safetensors
       url: https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors
     - name: wan2.2_vae.safetensors
-      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/vae/wan2.2_vae.safetensors
+      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors
 
   clip:
     - name: t5xxl_fp8.safetensors
@@ -45,7 +45,7 @@ comfyui_models:
       
   text_encoders:
     - name: umt5_xxl_fp8_e4m3fn_scaled.safetensors
-      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/tree/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+      url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
 
 # Model symlinks to avoid duplicate downloads
 comfyui_model_symlinks:

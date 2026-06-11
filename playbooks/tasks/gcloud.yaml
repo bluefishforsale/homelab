@@ -27,13 +27,13 @@
     ansible.builtin.command: which brew
     register: homebrew_check
     changed_when: false
-    failed_when: homebrew_check.rc != 0
+    failed_when: false
     when: ansible_facts['os_family'] == "Darwin"
 
   - name: Install Homebrew
     ansible.builtin.shell: |
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    when: ansible_facts['os_family'] == "Darwin" and not homebrew_check
+    when: ansible_facts['os_family'] == "Darwin" and homebrew_check.rc != 0
 
   - name: Install Google Cloud SDK on macOS
     community.general.homebrew:
