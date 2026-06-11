@@ -95,7 +95,7 @@ jobs:
                     echo "  → Affected: grafana_compose.yaml (via $file)"
                   fi
                   ;;
-                files/comfyui/*)
+                files/ocean-comfyui/*)
                   if [[ ! " ${PLAYBOOKS[@]} " =~ "playbooks/individual/ocean/ai/comfyui.yaml" ]]; then
                     PLAYBOOKS+=("playbooks/individual/ocean/ai/comfyui.yaml")
                     echo "  → Affected: comfyui.yaml (via $file)"
