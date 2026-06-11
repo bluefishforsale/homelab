@@ -76,7 +76,7 @@
     - name: Set fact to trigger apt cache update if repo changed
       ansible.builtin.set_fact:
         nvidia_container_repo_changed: true
-      when: nvidia_repo_file_download.changed or nvidia_repo_modified.changed
+      when: nvidia_repo_file_download.changed
 
     - name: Update apt cache if NVIDIA Container Toolkit repository changed
       ansible.builtin.apt:
