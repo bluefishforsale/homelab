@@ -196,7 +196,7 @@ jobs:
 
       - name: Setup SSH key
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.OCEAN_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.PROXMOX_SSH_KEY }}
         run: |
           mkdir -p ${{ runner.temp }}/.ssh
           chmod 700 ${{ runner.temp }}/.ssh
