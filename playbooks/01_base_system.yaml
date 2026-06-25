@@ -6,11 +6,11 @@
 #   ansible-playbook playbooks/01_base_system.yaml
 #   ansible-playbook playbooks/01_base_system.yaml --check  # Dry run
 
-- name: Configure I/O, CPU, and UPS Settings
-  ansible.builtin.import_playbook: individual/base/io_cpu_ups.yaml
-
 - name: Install Base System Packages
   ansible.builtin.import_playbook: individual/base/packages.yaml
+
+- name: Configure I/O, CPU, and UPS Settings
+  ansible.builtin.import_playbook: individual/base/io_cpu_ups.yaml
 
 - name: Configure System Users and Groups
   ansible.builtin.import_playbook: individual/base/users.yaml
