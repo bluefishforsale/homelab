@@ -4,6 +4,7 @@
   tasks:
   - name: Tools and Utilities
     become: yes
+    when: dell_perc | default(false) | bool
     block:
 
     - name: mkdir /tmp/perc_cli
@@ -20,15 +21,7 @@
         dest: "/tmp/perc_cli"
         copy: no
 
-    - name: Enable universe repository
-      apt_repository:
-        repo: "{{ item }}"
-      loop:
-        - "deb http://archive.ubuntu.com/ubuntu/ bionic universe"
-        - "deb http://archive.ubuntu.com/ubuntu/ bionic-updates universe"
-        - "deb http://security.ubuntu.com/ubuntu/ bionic-security universe"
-
-    - name: Update repositories cache
+    - name: Install alien for RPM conversion
       apt:
         name: alien
         update_cache: yes

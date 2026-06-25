@@ -41,8 +41,9 @@
       group: root
       mode: '0755'
     with_items:
-    - config
-    - data
+    - conf
+    - server
+    - logs
 
   - name: Create tdarr config files
     ansible.builtin.template:

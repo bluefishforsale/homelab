@@ -87,11 +87,11 @@ jobs:
             overseerr) PLAYBOOK="playbooks/individual/ocean/media/overseerr.yaml" ;;
             plex-meta-manager) PLAYBOOK="playbooks/individual/ocean/media/plex-meta-manager.yaml" ;;
             tdarr) PLAYBOOK="playbooks/individual/ocean/media/tdarr.yaml" ;;
-            audible-downloader) PLAYBOOK="playbooks/individual/ocean/media/audible-downloader.yaml" ;;
+            audible-downloader) PLAYBOOK="playbooks/individual/ocean/services/audible_downloader.yaml" ;;
             
             # AI/ML
             llamacpp) PLAYBOOK="playbooks/individual/ocean/ai/llamacpp.yaml" ;;
-            open-webui) PLAYBOOK="playbooks/individual/ocean/ai/open-webui.yaml" ;;
+            open-webui) PLAYBOOK="playbooks/individual/ocean/ai/open_webui.yaml" ;;
             comfyui) PLAYBOOK="playbooks/individual/ocean/ai/comfyui.yaml" ;;
             
             # Cloud
