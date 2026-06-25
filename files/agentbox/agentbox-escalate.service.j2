@@ -1,0 +1,15 @@
+[Unit]
+Description=agentbox escalation drain (Claude Code premium lane)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME=/home/{{ user }}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WorkingDirectory={{ home }}
+ExecStart=/usr/local/bin/agentbox-escalate-to-claude.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-escalate

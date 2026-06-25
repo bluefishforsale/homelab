@@ -1,0 +1,197 @@
+---
+# agentbox host configuration.
+# Installs the multi-model agent toolchain (Claude Code premium lane + opencode
+# free lanes), renders config/scripts/units, and enables the issue-watcher and
+# escalation timers.
+#
+# ONE-TIME MANUAL BOOTSTRAP (cannot be automated; interactive OAuth):
+#   ssh debian@agentbox
+#   claude /login          # Pro/Max subscription. Do NOT export ANTHROPIC_API_KEY.
+#   gh auth login          # only if no vaulted PAT (agentbox.github_pat)
+#   gcloud auth login      # only if not using a vaulted service-account key
+#   sudo systemctl enable --now agentbox-remote-control.service   # after claude /login
+#
+# Structure mirrors playbooks/individual/ocean/ai/paia.yaml.
+
+- name: Configure agentbox multi-model agent host
+  hosts: agent_hosts
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    service: agentbox
+    user: debian
+    home: "/home/debian"
+    files: "{{ playbook_dir }}/../../../files/agentbox"
+    # Deployable repos (Shape A/B) whose open issues the fleet resolves.
+    agentbox_repos:
+      - paia
+      - blog_terrac_com
+      - globalview
+      - globalview-backend-py
+      - my-ta-jose
+      - photonic_inventory
+      - terrac_com_2026
+
+  tasks:
+
+  - name: Install base packages
+    ansible.builtin.apt:
+      name:
+        - curl
+        - ca-certificates
+        - gnupg
+        - git
+        - jq
+        - tmux
+        - nodejs
+        - npm
+      state: present
+      update_cache: yes
+
+  # --- Claude Code (apt repo) ---
+  - name: Ensure apt keyrings dir exists
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Claude Code apt key
+    ansible.builtin.get_url:
+      url: https://downloads.claude.ai/keys/claude-code.asc
+      dest: /etc/apt/keyrings/claude-code.asc
+      mode: '0644'
+
+  - name: Add Claude Code apt repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main"
+      filename: claude-code
+      state: present
+
+  - name: Add GitHub CLI apt key
+    ansible.builtin.get_url:
+      url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+      dest: /usr/share/keyrings/githubcli-archive-keyring.gpg
+      mode: '0644'
+
+  - name: Add GitHub CLI apt repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+      filename: github-cli
+      state: present
+
+  - name: Add Google Cloud CLI apt key
+    ansible.builtin.get_url:
+      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      dest: /usr/share/keyrings/cloud.google.gpg
+      mode: '0644'
+
+  - name: Add Google Cloud CLI apt repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main"
+      filename: google-cloud-sdk
+      state: present
+
+  - name: Install Claude Code, GitHub CLI, and Google Cloud CLI
+    ansible.builtin.apt:
+      name:
+        - claude-code
+        - gh
+        - google-cloud-cli
+      state: present
+      update_cache: yes
+
+  - name: Install opencode (npm global)
+    ansible.builtin.command: npm install -g opencode-ai
+    args:
+      creates: /usr/local/bin/opencode
+
+  # --- Directories ---
+  - name: Ensure agentbox directories exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    loop:
+      - "{{ home }}/repos"
+      - "{{ home }}/.config/opencode"
+      - "{{ home }}/.config/agentbox"
+
+  # --- Config + secrets ---
+  - name: Render opencode config
+    ansible.builtin.template:
+      src: "{{ files }}/opencode.json.j2"
+      dest: "{{ home }}/.config/opencode/opencode.json"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+
+  - name: Render agentbox environment file
+    ansible.builtin.template:
+      src: "{{ files }}/agentbox.env.j2"
+      dest: "{{ home }}/.config/agentbox/agentbox.env"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+
+  - name: Write Google service-account credentials (when present in vault)
+    ansible.builtin.copy:
+      content: "{{ (agentbox | default({})).gcloud_sa_json | default('') }}"
+      dest: "{{ home }}/.config/agentbox/gcloud-sa.json"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    when: (agentbox | default({})).gcloud_sa_json | default('') | length > 0
+
+  # --- Scripts ---
+  - name: Install agent scripts
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item.src }}"
+      dest: "/usr/local/bin/{{ item.dest }}"
+      mode: '0755'
+    loop:
+      - { src: issue-watcher.sh, dest: agentbox-issue-watcher.sh }
+      - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
+
+  # --- systemd units ---
+  - name: Install systemd units
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    loop:
+      - agentbox-issue-watcher.service
+      - agentbox-issue-watcher.timer
+      - agentbox-escalate.service
+      - agentbox-escalate.timer
+      - agentbox-remote-control.service
+    notify: Reload systemd daemon
+
+  - name: Flush handlers so units are registered before enabling
+    ansible.builtin.meta: flush_handlers
+
+  - name: Enable agent timers
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      enabled: yes
+      state: started
+      daemon_reload: yes
+    loop:
+      - agentbox-issue-watcher.timer
+      - agentbox-escalate.timer
+
+  # The remote-control service is installed but left disabled: it needs the
+  # one-time interactive `claude /login` first (see header). Enable it manually.
+  - name: Note remote-control requires manual login
+    ansible.builtin.debug:
+      msg: "Run 'claude /login' on agentbox, then 'systemctl enable --now agentbox-remote-control.service'."
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes

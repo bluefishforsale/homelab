@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the agentbox escalation drain periodically (rationed premium lane)
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
