@@ -1,5 +1,5 @@
 [Unit]
-Description=Claude Code remote-control (premium lane, Pro/Max subscription)
+Description=Claude Code remote-control for %i (premium lane, Pro/Max subscription)
 After=network-online.target
 Wants=network-online.target
 
@@ -10,13 +10,13 @@ Environment=HOME=/home/{{ user }}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # ANTHROPIC_API_KEY intentionally NOT set: Claude Code must use the subscription.
 # An API key here would silently switch to metered billing.
-WorkingDirectory={{ home }}/repos
-ExecStart=/usr/bin/env claude remote-control --name agentbox
+WorkingDirectory={{ home }}/repos/%i
+ExecStart=/usr/bin/env claude remote-control --name %i
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=agentbox-claude-rc
+SyslogIdentifier=agentbox-rc-%i
 
 [Install]
 WantedBy=multi-user.target

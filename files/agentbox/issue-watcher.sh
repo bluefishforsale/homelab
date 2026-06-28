@@ -13,11 +13,26 @@ OWNER="bluefishforsale"
 WORKROOT="{{ home }}/repos"
 LABEL_WORKING="agent-working"
 LABEL_CLAUDE="needs-claude"
+LABEL_REVIEW="needs-human-merge"
 
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
 
 mkdir -p "$WORKROOT"
+
+# Paths that, if a diff touches anything outside them, mean the change can
+# affect prod (Shape-A images, homelab plays, app code). Only when EVERY changed
+# file is inside this set is a change "no-prod-effect" and eligible for auto-merge.
+NOPROD_RE='^(docs/|README|CONTEXT|.*\.md$|.*_test\.|test/|tests/|spec/)'
+
+no_prod_effect() {  # $1 = newline-separated changed files
+  [ -n "$1" ] || return 1
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    printf '%s\n' "$f" | grep -Eq "$NOPROD_RE" || return 1
+  done <<<"$1"
+  return 0
+}
 
 for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
@@ -51,11 +66,38 @@ Make the minimal, correct change. Do not touch unrelated code. Keep the build an
       gh pr create --repo "$slug" --head "agent/issue-$num" \
         --title "fix: $title (#$num)" \
         --body "Resolves #$num. Drafted by agentbox on the free lane." || true
-      gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+
+      # Tiered autonomy (ADR 0001): default is open PR + label + stop, a human
+      # merges from the phone. Auto-merge only when the repo opted in AND the
+      # diff touches no prod-affecting paths.
+      changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
+      if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
+         && no_prod_effect "$changed"; then
+        gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+      else
+        gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
+      fi
     else
-      # No usable change on the free lane -> hand to the Claude Code premium lane.
+      # No usable diff on the free lane -> hand to the Claude Code premium lane.
       gh issue edit "$num" --repo "$slug" \
         --remove-label "$LABEL_WORKING" --add-label "$LABEL_CLAUDE" >/dev/null
     fi
   done
+
+  # Failure-driven escalation: any open agent PR whose CI has gone red is closed
+  # and its issue handed to the Claude Code premium lane. Close + delete branch
+  # so the escalate lane recreates agent/issue-N from a clean base.
+  red=$(gh pr list --repo "$slug" --state open \
+    --json number,headRefName,statusCheckRollup \
+    --jq '.[] | select(.headRefName|startswith("agent/issue-"))
+            | select(any(.statusCheckRollup[]?; .conclusion=="FAILURE" or .state=="FAILURE"))
+            | "\(.number) \(.headRefName)"') || red=""
+  while read -r prnum ref; do
+    [ -z "${ref:-}" ] && continue
+    inum=${ref#agent/issue-}
+    gh pr close "$prnum" --repo "$slug" --delete-branch >/dev/null 2>&1 || true
+    gh issue edit "$inum" --repo "$slug" \
+      --remove-label "$LABEL_WORKING" --remove-label "$LABEL_REVIEW" \
+      --add-label "$LABEL_CLAUDE" >/dev/null 2>&1 || true
+  done <<<"$red"
 done

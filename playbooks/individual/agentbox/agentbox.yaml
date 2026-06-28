@@ -9,7 +9,9 @@
 #   claude /login          # Pro/Max subscription. Do NOT export ANTHROPIC_API_KEY.
 #   gh auth login          # only if no vaulted PAT (agentbox.github_pat)
 #   gcloud auth login      # only if not using a vaulted service-account key
-#   sudo systemctl enable --now agentbox-remote-control.service   # after claude /login
+#   for r in homelab photonic_inventory my-ta-jose; do \
+#     gh repo clone bluefishforsale/$r repos/$r; done   # rc-repo clones
+#   sudo systemctl start agentbox-rc@homelab.service     # ...per rc repo, after /login
 #
 # Structure mirrors playbooks/individual/ocean/ai/paia.yaml.
 
@@ -35,6 +37,15 @@
       - my-ta-jose
       - photonic_inventory
       - terrac_com_2026
+    # Repos driven live via a per-repo Claude Code remote-control session
+    # (systemd template agentbox-rc@<repo>.service, cwd repos/<repo>).
+    agentbox_rc_repos:
+      - homelab
+      - photonic_inventory
+      - my-ta-jose
+    # Opt-in auto-merge allowlist (ADR 0001). Empty = every PR waits for a human
+    # merge; listed repos auto-merge only no-prod-effect diffs.
+    agentbox_automerge_repos: []
 
   tasks:
 
@@ -117,10 +128,7 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
-    loop:
-      - "{{ home }}/repos"
-      - "{{ home }}/.config/opencode"
-      - "{{ home }}/.config/agentbox"
+    loop: "{{ [home + '/repos', home + '/.config/opencode', home + '/.config/agentbox'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
 
   # --- Config + secrets ---
   - name: Render opencode config
@@ -169,7 +177,7 @@
       - agentbox-issue-watcher.timer
       - agentbox-escalate.service
       - agentbox-escalate.timer
-      - agentbox-remote-control.service
+      - "agentbox-rc@.service"
     notify: Reload systemd daemon
 
   - name: Flush handlers so units are registered before enabling
@@ -185,11 +193,20 @@
       - agentbox-issue-watcher.timer
       - agentbox-escalate.timer
 
-  # The remote-control service is installed but left disabled: it needs the
-  # one-time interactive `claude /login` first (see header). Enable it manually.
-  - name: Note remote-control requires manual login
+  # Per-repo remote-control instances are enabled (start on boot) but not
+  # started now: they need the one-time interactive `claude /login` and a clone
+  # of each repo into repos/<repo> first (see header). After bootstrap they
+  # come up on the next boot or via `systemctl start`.
+  - name: Enable per-repo remote-control instances
+    ansible.builtin.systemd:
+      name: "agentbox-rc@{{ item }}.service"
+      enabled: yes
+      daemon_reload: yes
+    loop: "{{ agentbox_rc_repos }}"
+
+  - name: Note remote-control requires manual login + repo clones
     ansible.builtin.debug:
-      msg: "Run 'claude /login' on agentbox, then 'systemctl enable --now agentbox-remote-control.service'."
+      msg: "On agentbox: 'claude /login', clone each agentbox_rc_repos into repos/<repo>, then 'systemctl start agentbox-rc@<repo>.service'."
 
   handlers:
   - name: Reload systemd daemon

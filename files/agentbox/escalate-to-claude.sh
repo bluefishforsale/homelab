@@ -13,10 +13,24 @@ OWNER="bluefishforsale"
 WORKROOT="{{ home }}/repos"
 LABEL_WORKING="agent-working"
 LABEL_CLAUDE="needs-claude"
+LABEL_REVIEW="needs-human-merge"
 
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
 unset ANTHROPIC_API_KEY  # the env file must not set it; enforce here too
+
+# Tiered autonomy (ADR 0001) applies regardless of lane: auto-merge only an
+# opted-in repo whose diff touches no prod-affecting paths; else open + label.
+NOPROD_RE='^(docs/|README|CONTEXT|.*\.md$|.*_test\.|test/|tests/|spec/)'
+
+no_prod_effect() {  # $1 = newline-separated changed files
+  [ -n "$1" ] || return 1
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    printf '%s\n' "$f" | grep -Eq "$NOPROD_RE" || return 1
+  done <<<"$1"
+  return 0
+}
 
 for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
@@ -49,7 +63,14 @@ Make the minimal, correct change; keep the build and tests green."
       gh pr create --repo "$slug" --head "agent/issue-$num" \
         --title "fix: $title (#$num)" \
         --body "Resolves #$num. Shipped by the Claude Code premium lane." || true
-      gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+
+      changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
+      if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
+         && no_prod_effect "$changed"; then
+        gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+      else
+        gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
+      fi
     fi
   done
 done
