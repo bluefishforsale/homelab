@@ -52,6 +52,15 @@
     opencode_otel_plugin_version: "0.1.0"
     # Loki native OTLP ingest endpoint (ocean). Collector forwards logs here.
     LOKI_OTLP_URL: "http://192.168.1.143:3100/otlp"
+    # Shared MCP servers distributed to BOTH lanes (opencode + Claude Code).
+    # Neutral shape; rendered into each tool's config. Add a server here, deploy.
+    #   - name: context7
+    #     command: npx
+    #     args: ["-y", "@upstash/context7-mcp"]
+    #     env: {}
+    #   - name: somehttp
+    #     url: https://example.com/mcp
+    agentbox_mcp_servers: []
 
   tasks:
 
@@ -166,7 +175,7 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
-    loop: "{{ [home + '/repos', home + '/.config/opencode', home + '/.config/agentbox'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
+    loop: "{{ [home + '/repos', home + '/.config/opencode', home + '/.config/opencode/skills', home + '/.config/opencode/commands', home + '/.config/agentbox', home + '/.claude', home + '/.claude/skills', home + '/.claude/commands'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
 
   # --- Config + secrets ---
   - name: Render opencode config
@@ -259,6 +268,87 @@
     ansible.builtin.debug:
       msg: "On agentbox: 'claude /login', clone each agentbox_rc_repos into repos/<repo>, then 'systemctl start agentbox-rc@<repo>.service'."
 
+  # --- Shared agent config (skills, commands, scripts, MCP) ---
+  # One source tree (files/agentbox/shared) fanned out to both lanes. Autonomous
+  # lanes (opencode run, claude -p) spawn fresh per issue and pick changes up on
+  # the next tick; long-lived RC sessions are restarted by the handler.
+  - name: Sync shared skills to both lanes
+    ansible.builtin.copy:
+      src: "{{ files }}/shared/skills/"
+      dest: "{{ item }}/skills/"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    loop:
+      - "{{ home }}/.claude"
+      - "{{ home }}/.config/opencode"
+    notify: Restart RC sessions
+
+  - name: Sync shared commands to both lanes
+    ansible.builtin.copy:
+      src: "{{ files }}/shared/commands/"
+      dest: "{{ item }}/commands/"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    loop:
+      - "{{ home }}/.claude"
+      - "{{ home }}/.config/opencode"
+    notify: Restart RC sessions
+
+  - name: Install shared agent scripts on PATH
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "/usr/local/bin/{{ item | basename }}"
+      mode: '0755'
+    with_fileglob: "{{ files }}/shared/bin/*"
+    notify: Restart RC sessions
+
+  - name: Sync shared instructions (opencode AGENTS.md + Claude import target)
+    ansible.builtin.copy:
+      src: "{{ files }}/shared/AGENTS.md"
+      dest: "{{ item }}"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    loop:
+      - "{{ home }}/.config/opencode/AGENTS.md"
+      - "{{ home }}/.claude/AGENTS.md"
+    notify: Restart RC sessions
+
+  - name: Point Claude user memory at the shared instructions
+    ansible.builtin.copy:
+      content: "@AGENTS.md\n"
+      dest: "{{ home }}/.claude/CLAUDE.md"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify: Restart RC sessions
+
+  # MCP into Claude is added (not templated): ~/.claude.json also holds Claude's
+  # own runtime state, so we merge via the CLI instead of overwriting the file.
+  - name: List Claude MCP servers (user scope)
+    ansible.builtin.command: claude mcp list
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    register: claude_mcp_list
+    changed_when: false
+    failed_when: false
+
+  - name: Register shared MCP servers in Claude Code (user scope)
+    ansible.builtin.command: >
+      claude mcp add-json {{ item.name | quote }}
+      {{ ({'type': 'http', 'url': item.url} if item.url is defined
+          else {'type': 'stdio', 'command': item.command, 'args': item.args | default([]), 'env': item.env | default({})}) | to_json | quote }}
+      --scope user
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    loop: "{{ agentbox_mcp_servers }}"
+    when: item.name not in (claude_mcp_list.stdout | default(''))
+    notify: Restart RC sessions
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
@@ -273,3 +363,9 @@
     ansible.builtin.systemd:
       name: otelcol-contrib
       state: restarted
+
+  # try-restart only touches active instances (no-op before first login), so a
+  # shared-config change reloads any live RC session without starting new ones.
+  - name: Restart RC sessions
+    ansible.builtin.command: systemctl try-restart 'agentbox-rc@*.service'
+    changed_when: true

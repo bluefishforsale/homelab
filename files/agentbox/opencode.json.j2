@@ -1,6 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["@devtheops/opencode-plugin-otel@{{ opencode_otel_plugin_version }}"],
+  "instructions": ["{{ home }}/.config/opencode/AGENTS.md"],
+  "mcp": {
+{% for s in agentbox_mcp_servers %}
+    "{{ s.name }}": {% if s.url is defined %}{ "type": "remote", "url": "{{ s.url }}", "enabled": true }{% else %}{ "type": "stdio", "command": {{ ([s.command] + (s.args | default([]))) | to_json }}, "enabled": true }{% endif %}{{ "," if not loop.last else "" }}
+{% endfor %}
+  },
   "provider": {
     "local-llama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -10,7 +16,7 @@
         "apiKey": "{env:LLAMA_API_KEY}"
       },
       "models": {
-        "qwen3-14b": { "name": "Qwen3 14B (local GPU, free)" }
+        "local": { "name": "ocean local GPU (free)" }
       }
     },
     "google": {
@@ -23,7 +29,7 @@
     }
   },
   "model": "google/gemini-2.5-flash",
-  "small_model": "local-llama/qwen3-14b",
+  "small_model": "local-llama/local",
   "agent": {
     "plan": { "model": "google/gemini-2.5-flash" },
     "build": { "model": "google/gemini-2.5-flash" }
