@@ -109,24 +109,15 @@
       filename: github-cli
       state: present
 
-  - name: Add Google Cloud CLI apt key
-    ansible.builtin.get_url:
-      url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-      dest: /usr/share/keyrings/cloud.google.gpg
-      mode: '0644'
-
-  - name: Add Google Cloud CLI apt repository
-    ansible.builtin.apt_repository:
-      repo: "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main"
-      filename: google-cloud-sdk
-      state: present
-
-  - name: Install Claude Code, GitHub CLI, and Google Cloud CLI
+  # gcloud is out-of-scope for v1 (headless Google is optional; the issue->PR
+  # loop needs only gh + claude + opencode). Its apt repo also breaks on Google's
+  # rotated signing key. Re-add later by dearmoring the key:
+  #   curl -fsSL .../apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+  - name: Install Claude Code and GitHub CLI
     ansible.builtin.apt:
       name:
         - claude-code
         - gh
-        - google-cloud-cli
       state: present
       update_cache: yes
 
