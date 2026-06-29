@@ -121,10 +121,22 @@
       state: present
       update_cache: yes
 
-  - name: Install opencode (npm global)
-    ansible.builtin.command: npm install -g opencode-ai
+  # The npm package's postinstall is flaky at fetching the platform binary; the
+  # official installer drops a self-contained binary. Install as the user (it
+  # hardcodes $HOME/.opencode/bin) and symlink onto PATH for the systemd units.
+  - name: Install opencode (official installer)
+    ansible.builtin.shell: curl -fsSL https://opencode.ai/install | bash
     args:
-      creates: /usr/local/bin/opencode
+      creates: "{{ home }}/.opencode/bin/opencode"
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+
+  - name: Symlink opencode onto PATH
+    ansible.builtin.file:
+      src: "{{ home }}/.opencode/bin/opencode"
+      dest: /usr/local/bin/opencode
+      state: link
 
   # --- Telemetry: OpenTelemetry Collector (contrib) ---
   - name: Download otelcol-contrib deb
