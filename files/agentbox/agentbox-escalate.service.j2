@@ -1,0 +1,18 @@
+[Unit]
+Description=agentbox escalation drain (Claude Code premium lane)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME=/home/{{ user }}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# Exports keys + OTel env so gh/claude children inherit them. The env file has
+# no ANTHROPIC_API_KEY (subscription auth), and the script unsets it anyway.
+EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
+WorkingDirectory={{ home }}
+ExecStart=/usr/local/bin/agentbox-escalate-to-claude.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-escalate

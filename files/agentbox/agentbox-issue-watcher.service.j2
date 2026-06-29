@@ -1,0 +1,18 @@
+[Unit]
+Description=agentbox issue watcher (free-lane triage + auto-merge PRs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME=/home/{{ user }}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# Exports keys + OTel env into the process so gh/opencode children inherit them
+# (the env file's bare KEY=value lines would not export via `source` alone).
+EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
+WorkingDirectory={{ home }}
+ExecStart=/usr/local/bin/agentbox-issue-watcher.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-watcher
