@@ -10,7 +10,7 @@
   become: true
   gather_facts: true
   vars:
-    agentbox_vm_id: 3000
+    agentbox_vm_id: 8000
     agentbox_vm_name: agentbox
     agentbox_vm_hostname: agentbox
     agentbox_vm_cores: 6
