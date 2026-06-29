@@ -46,6 +46,12 @@
     # Opt-in auto-merge allowlist (ADR 0001). Empty = every PR waits for a human
     # merge; listed repos auto-merge only no-prod-effect diffs.
     agentbox_automerge_repos: []
+    # OpenTelemetry collector. Verify the latest contrib release at deploy time.
+    otelcol_version: "0.105.0"
+    # Third-party opencode OTel plugin. Pin; verify the published version at deploy.
+    opencode_otel_plugin_version: "0.1.0"
+    # Loki native OTLP ingest endpoint (ocean). Collector forwards logs here.
+    LOKI_OTLP_URL: "http://192.168.1.143:3100/otlp"
 
   tasks:
 
@@ -120,6 +126,38 @@
     args:
       creates: /usr/local/bin/opencode
 
+  # --- Telemetry: OpenTelemetry Collector (contrib) ---
+  - name: Download otelcol-contrib deb
+    ansible.builtin.get_url:
+      url: "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otelcol_version }}/otelcol-contrib_{{ otelcol_version }}_linux_amd64.deb"
+      dest: "/tmp/otelcol-contrib_{{ otelcol_version }}.deb"
+      mode: '0644'
+
+  - name: Install otelcol-contrib
+    ansible.builtin.apt:
+      deb: "/tmp/otelcol-contrib_{{ otelcol_version }}.deb"
+
+  # --- Host metrics: native node_exporter (agentbox runs no docker) ---
+  - name: Install Prometheus node exporter
+    ansible.builtin.apt:
+      name: prometheus-node-exporter
+      state: present
+
+  - name: Enable systemd + processes collectors (lane liveness via node_systemd_unit_state)
+    ansible.builtin.copy:
+      dest: /etc/default/prometheus-node-exporter
+      content: |
+        # Managed by ansible (agentbox.yaml)
+        ARGS="--collector.systemd --collector.processes"
+      mode: '0644'
+    notify: Restart node exporter
+
+  - name: Enable and start node exporter
+    ansible.builtin.systemd:
+      name: prometheus-node-exporter
+      enabled: yes
+      state: started
+
   # --- Directories ---
   - name: Ensure agentbox directories exist
     ansible.builtin.file:
@@ -155,6 +193,19 @@
       group: "{{ user }}"
       mode: '0600'
     when: (agentbox | default({})).gcloud_sa_json | default('') | length > 0
+
+  - name: Render OpenTelemetry Collector config
+    ansible.builtin.template:
+      src: "{{ files }}/otelcol-config.yaml.j2"
+      dest: /etc/otelcol-contrib/config.yaml
+      mode: '0644'
+    notify: Restart otelcol
+
+  - name: Enable and start otelcol-contrib
+    ansible.builtin.systemd:
+      name: otelcol-contrib
+      enabled: yes
+      state: started
 
   # --- Scripts ---
   - name: Install agent scripts
@@ -212,3 +263,13 @@
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
+
+  - name: Restart node exporter
+    ansible.builtin.systemd:
+      name: prometheus-node-exporter
+      state: restarted
+
+  - name: Restart otelcol
+    ansible.builtin.systemd:
+      name: otelcol-contrib
+      state: restarted

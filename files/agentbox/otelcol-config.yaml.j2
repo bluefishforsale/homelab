@@ -1,0 +1,40 @@
+# agentbox OpenTelemetry Collector - rendered from
+# files/agentbox/otelcol-config.yaml.j2.
+#
+# Claude Code (native OTel) and opencode (via @devtheops/opencode-plugin-otel)
+# push metrics + logs here. The OTLP receiver is localhost-only (agents run on
+# this box); the prometheus exporter on :9464 is LAN-scrapable by ocean.
+# resource_to_telemetry_conversion turns OTEL_RESOURCE_ATTRIBUTES (repo, lane,
+# service) into Prometheus labels so cost/tokens/requests break down per repo.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+processors:
+  batch: {}
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlphttp/loki:
+    endpoint: {{ LOKI_OTLP_URL }}
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]

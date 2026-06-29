@@ -10,6 +10,9 @@ Environment=HOME=/home/{{ user }}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # ANTHROPIC_API_KEY intentionally NOT set: Claude Code must use the subscription.
 # An API key here would silently switch to metered billing.
+# OTel env (telemetry endpoint + flags) without ANTHROPIC_API_KEY; per-repo label.
+EnvironmentFile={{ home }}/.config/agentbox/agentbox.env
+Environment=OTEL_RESOURCE_ATTRIBUTES=repo=%i,lane=claude,service=agentbox
 WorkingDirectory={{ home }}/repos/%i
 ExecStart=/usr/bin/env claude remote-control --name %i
 Restart=on-failure

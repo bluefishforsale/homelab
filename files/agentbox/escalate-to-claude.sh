@@ -34,6 +34,8 @@ no_prod_effect() {  # $1 = newline-separated changed files
 
 for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
+  # Per-repo/per-lane telemetry labels for everything claude emits this pass.
+  export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox"
   issues=$(gh issue list --repo "$slug" --state open --label "$LABEL_CLAUDE" \
     --json number --jq '.[].number') || continue
 

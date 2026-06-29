@@ -36,6 +36,8 @@ no_prod_effect() {  # $1 = newline-separated changed files
 
 for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
+  # Per-repo/per-lane telemetry labels for everything opencode emits this pass.
+  export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=free,service=agentbox"
 
   # Open issues not already claimed (agent-working) or escalated (needs-claude).
   issues=$(gh issue list --repo "$slug" --state open --json number,labels \

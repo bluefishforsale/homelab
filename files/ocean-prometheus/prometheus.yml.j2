@@ -166,9 +166,10 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9080']  # Ocean (with syslog listener)
     - targets: ['node005.home:9080']
-    - targets: ['node006.home:9080'] 
+    - targets: ['node006.home:9080']
     - targets: ['dns01.home:9080']
     - targets: ['dns02.home:9080']
+    - targets: ['agentbox.home:9080']
 
   - job_name: 'powerdns'
     relabel_configs: *dropPortNumber
@@ -215,6 +216,15 @@ scrape_configs:
     scrape_timeout: 10s
     static_configs:
     - targets: ['ocean.home:9092']
+
+  # agentbox OTel collector: Claude Code + opencode cost/token/request metrics.
+  # repo/lane/service arrive as labels (resource_to_telemetry_conversion).
+  - job_name: 'agentbox-otelcol'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+    - targets: ['agentbox.home:9464']
 
   # my-ta-jose paper grading app. /metrics is unauthenticated, so it is only
   # ever scraped over the internal host port (ocean.home -> 192.168.1.143),
@@ -570,6 +580,7 @@ scrape_configs:
         - http://192.168.1.143:8080    # LlamaCPP
         - http://192.168.1.3:8081      # PowerDNS API
         - http://192.168.1.3:8000      # Kea Control Agent
+        - http://192.168.1.31:4096/global/health   # agentbox opencode server
         labels:
           probe_type: "http"
           category: "internal_services"
