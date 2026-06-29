@@ -125,7 +125,7 @@
   # official installer drops a self-contained binary. Install as the user (it
   # hardcodes $HOME/.opencode/bin) and symlink onto PATH for the systemd units.
   - name: Install opencode (official installer)
-    ansible.builtin.shell: curl -fsSL https://opencode.ai/install | bash
+    ansible.builtin.shell: timeout 300 bash -c 'curl -fsSL --connect-timeout 20 --max-time 240 https://opencode.ai/install | bash'
     args:
       creates: "{{ home }}/.opencode/bin/opencode"
     become_user: "{{ user }}"
@@ -330,18 +330,22 @@
 
   # MCP into Claude is added (not templated): ~/.claude.json also holds Claude's
   # own runtime state, so we merge via the CLI instead of overwriting the file.
+  # Whole section is gated on having servers so a fresh/unauthenticated `claude`
+  # is never invoked at deploy time (it can block on first-run). `timeout` is a
+  # belt-and-suspenders guard against any CLI hang.
   - name: List Claude MCP servers (user scope)
-    ansible.builtin.command: claude mcp list
+    ansible.builtin.command: timeout 30 claude mcp list
     become_user: "{{ user }}"
     environment:
       HOME: "{{ home }}"
     register: claude_mcp_list
     changed_when: false
     failed_when: false
+    when: agentbox_mcp_servers | length > 0
 
   - name: Register shared MCP servers in Claude Code (user scope)
     ansible.builtin.command: >
-      claude mcp add-json {{ item.name | quote }}
+      timeout 30 claude mcp add-json {{ item.name | quote }}
       {{ ({'type': 'http', 'url': item.url} if item.url is defined
           else {'type': 'stdio', 'command': item.command, 'args': item.args | default([]), 'env': item.env | default({})}) | to_json | quote }}
       --scope user
@@ -349,7 +353,9 @@
     environment:
       HOME: "{{ home }}"
     loop: "{{ agentbox_mcp_servers }}"
-    when: item.name not in (claude_mcp_list.stdout | default(''))
+    when:
+      - agentbox_mcp_servers | length > 0
+      - item.name not in (claude_mcp_list.stdout | default(''))
     notify: Restart RC sessions
 
   handlers:
