@@ -18,6 +18,19 @@
 
   tasks:
 
+    # Disabled in code: terminalbench is a multi-hour GPU benchmark with no
+    # ongoing value here (it hijacks the 3090 from production llamacpp). Kept for
+    # reference / ops experience. To run on-demand, dispatch with:
+    #   -e terminalbench_enabled=true
+    - name: Note terminalbench is disabled
+      ansible.builtin.debug:
+        msg: "terminalbench is disabled in code. Dispatch with -e terminalbench_enabled=true to run."
+      when: not (terminalbench_enabled | default(false) | bool)
+
+    - name: End play unless terminalbench is explicitly enabled
+      ansible.builtin.meta: end_play
+      when: not (terminalbench_enabled | default(false) | bool)
+
     - name: Ensure terminalbench llamacpp + output directories exist
       ansible.builtin.file:
         path: "{{ item }}"

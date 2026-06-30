@@ -1,4 +1,9 @@
 # Terminal-bench evaluation configuration
+# Disabled in code: terminalbench is a multi-hour benchmark with no ongoing
+# value here. The playbook no-ops unless this is overridden true. To run
+# on-demand: dispatch main-apply with -e terminalbench_enabled=true.
+terminalbench_enabled: false
+
 terminalbench_dataset: "terminal-bench@2.0"
 terminalbench_agent: "terminus-2"
 terminalbench_benchmark_ctx_size: 8192
