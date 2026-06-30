@@ -41,6 +41,15 @@ emit() {
   local pb="$1"
   # Skip playbooks that no longer exist (e.g., deleted/renamed in this commit).
   [[ -f "$REPO_ROOT/$pb" ]] || return 0
+  # Terminalbench is a multi-hour GPU benchmark and must NEVER auto-apply on
+  # push — not even when a shared vars file (e.g. vars_service_ports.yaml)
+  # reverse-maps it into the impacted set. The per-path skip below only catches
+  # edits to terminalbench's own files; this is the catch-all at the single
+  # emit chokepoint. On-demand runs go through workflow_dispatch, which bypasses
+  # this detector entirely.
+  case "$pb" in
+    playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
+  esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"
   fi
