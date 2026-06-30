@@ -18,6 +18,10 @@
     agentbox_vm_disk_size_increase: "+48G"  # repos + node toolchain + worktrees
     agentbox_vm_template_id: 9999  # Debian 12 cloud-init template
     agentbox_vm_onboot: 1  # Start on Proxmox host boot
+    # Passthrough host CPU features. The default kvm64 masks AVX2/AVX/SSE4.2,
+    # which Bun-compiled binaries (Claude Code, opencode) require — without them
+    # they deadlock at startup. node005 (E5-2690 v4) has AVX2.
+    agentbox_vm_cpu: host
 
     # Network: resolve via DNS if present, else the static .31 allocation.
     agentbox_vm_ip: "{{ lookup('dig', agentbox_vm_hostname + '.home', errors='ignore') | default('192.168.1.31', true) }}"
@@ -51,6 +55,7 @@
         qm set {{ agentbox_vm_id }} --ipconfig0 ip={{ agentbox_vm_ip }}/{{ agentbox_vm_netmask }},gw={{ agentbox_vm_gateway }}
         qm set {{ agentbox_vm_id }} --nameserver {{ agentbox_vm_nameserver }}
         qm set {{ agentbox_vm_id }} --onboot {{ agentbox_vm_onboot }}
+        qm set {{ agentbox_vm_id }} --cpu {{ agentbox_vm_cpu }}
       when: agentbox_vm_status.rc != 0 or agentbox_vm_status.stdout is not search('running')
       changed_when: true
 
