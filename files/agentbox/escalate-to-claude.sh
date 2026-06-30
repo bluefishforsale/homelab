@@ -10,7 +10,9 @@ set -euo pipefail
 unset ANTHROPIC_API_KEY
 
 OWNER="bluefishforsale"
-WORKROOT="{{ home }}/repos"
+# Separate from repos/ (the RC sessions' cwd) so escalate's clone + commits can't
+# collide with a live remote-control session on the same repo.
+WORKROOT="{{ home }}/work"
 LABEL_WORKING="agent-working"
 LABEL_CLAUDE="needs-claude"
 LABEL_REVIEW="needs-human-merge"
@@ -18,6 +20,14 @@ LABEL_REVIEW="needs-human-merge"
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
 unset ANTHROPIC_API_KEY  # the env file must not set it; enforce here too
+
+# gh add-label fails if the label doesn't exist in the repo; create them first.
+ensure_labels() {
+  local slug="$1"
+  gh label create "$LABEL_WORKING" --repo "$slug" --color FBCA04 --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_CLAUDE"  --repo "$slug" --color 5319E7 --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_REVIEW"  --repo "$slug" --color D93F0B --force >/dev/null 2>&1 || true
+}
 
 # Tiered autonomy (ADR 0001) applies regardless of lane: auto-merge only an
 # opted-in repo whose diff touches no prod-affecting paths; else open + label.
@@ -36,6 +46,7 @@ for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
   # Per-repo/per-lane telemetry labels for everything claude emits this pass.
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox"
+  ensure_labels "$slug"
   issues=$(gh issue list --repo "$slug" --state open --label "$LABEL_CLAUDE" \
     --json number --jq '.[].number') || continue
 

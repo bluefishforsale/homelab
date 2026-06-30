@@ -179,7 +179,26 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
-    loop: "{{ [home + '/repos', home + '/.config/opencode', home + '/.config/opencode/skills', home + '/.config/opencode/commands', home + '/.config/agentbox', home + '/.claude', home + '/.claude/skills', home + '/.claude/commands'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
+    loop: "{{ [home + '/repos', home + '/work', home + '/agent-logs', home + '/.config/opencode', home + '/.config/opencode/skills', home + '/.config/opencode/commands', home + '/.config/agentbox', home + '/.claude', home + '/.claude/skills', home + '/.claude/commands'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
+
+  # --- git config for the agent lanes (commit identity + token-backed https) ---
+  - name: Set git commit identity for the agent user
+    ansible.builtin.command: "git config --global {{ item.k }} \"{{ item.v }}\""
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    loop:
+      - { k: user.name, v: agentbox }
+      - { k: user.email, v: agentbox@terrac.com }
+    changed_when: false
+
+  - name: Register gh as the git credential helper (authenticated https)
+    ansible.builtin.command: gh auth setup-git
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+      GH_TOKEN: "{{ (agentbox | default({})).github_pat | default('') }}"
+    changed_when: false
 
   # --- Config + secrets ---
   - name: Render opencode config

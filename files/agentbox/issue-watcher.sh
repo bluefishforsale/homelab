@@ -10,7 +10,11 @@
 set -euo pipefail
 
 OWNER="bluefishforsale"
-WORKROOT="{{ home }}/repos"
+# Separate from repos/ (the RC sessions' cwd) so the watcher's clone + commits
+# can't collide with a live remote-control session on the same repo.
+WORKROOT="{{ home }}/work"
+# Draft logs live OUTSIDE the worktree so `git add -A` never commits them.
+LOGDIR="{{ home }}/agent-logs"
 LABEL_WORKING="agent-working"
 LABEL_CLAUDE="needs-claude"
 LABEL_REVIEW="needs-human-merge"
@@ -18,7 +22,15 @@ LABEL_REVIEW="needs-human-merge"
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
 
-mkdir -p "$WORKROOT"
+mkdir -p "$WORKROOT" "$LOGDIR"
+
+# gh add-label fails if the label doesn't exist in the repo; create them first.
+ensure_labels() {
+  local slug="$1"
+  gh label create "$LABEL_WORKING" --repo "$slug" --color FBCA04 --description "Agent fleet is drafting a fix" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_CLAUDE"  --repo "$slug" --color 5319E7 --description "Escalated to the Claude Code premium lane" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_REVIEW"  --repo "$slug" --color D93F0B --description "Agent PR open; a human merges" --force >/dev/null 2>&1 || true
+}
 
 # Paths that, if a diff touches anything outside them, mean the change can
 # affect prod (Shape-A images, homelab plays, app code). Only when EVERY changed
@@ -38,6 +50,7 @@ for repo in ${AGENTBOX_REPOS:-}; do
   slug="$OWNER/$repo"
   # Per-repo/per-lane telemetry labels for everything opencode emits this pass.
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=free,service=agentbox"
+  ensure_labels "$slug"
 
   # Open issues not already claimed (agent-working) or escalated (needs-claude).
   issues=$(gh issue list --repo "$slug" --state open --json number,labels \
@@ -60,14 +73,31 @@ $body
 
 Make the minimal, correct change. Do not touch unrelated code. Keep the build and tests green."
 
-    if (cd "$wt" && opencode run "$prompt") >"$wt/.agent-$num.log" 2>&1 \
+    if (cd "$wt" && opencode run "$prompt") >"$LOGDIR/$repo-issue-$num.log" 2>&1 \
        && [ -n "$(git -C "$wt" status --porcelain)" ]; then
       git -C "$wt" add -A
       git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
       git -C "$wt" push -q -u origin "agent/issue-$num"
-      gh pr create --repo "$slug" --head "agent/issue-$num" \
+      pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
         --title "fix: $title (#$num)" \
-        --body "Resolves #$num. Drafted by agentbox on the free lane." || true
+        --body "Resolves #$num. Drafted by agentbox on the free lane.") || pr_url=""
+
+      # Independent premium-lane review: a stronger model (Claude, on the
+      # fixed-cost subscription) reviews the free lane's draft and comments. The
+      # human still merges — this only informs that decision. Diff is passed in
+      # the prompt (no tools), so no extra permissions are needed.
+      if [ -n "$pr_url" ]; then
+        /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
+        diff=$(git -C "$wt" diff origin/HEAD...HEAD); diff=${diff:0:60000}
+        review=$( cd "$wt" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox" \
+          claude -p "Review this agent-drafted diff resolving issue #$num ($title) in $slug. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
+
+$diff" 2>/dev/null ) || review=""
+        [ -n "$review" ] && gh pr comment "$pr_url" --repo "$slug" \
+          --body "Premium-lane review (Claude):
+
+$review" >/dev/null 2>&1 || true
+      fi
 
       # Tiered autonomy (ADR 0001): default is open PR + label + stop, a human
       # merges from the phone. Auto-merge only when the repo opted in AND the
