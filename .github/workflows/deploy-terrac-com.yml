@@ -174,11 +174,13 @@ jobs:
 
       - name: Generate deployment summary
         if: always()
+        env:
+          DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
         run: |
           BRANCH="${{ steps.params.outputs.branch }}"
           FORCE_CLEAN="${{ steps.params.outputs.force_clean }}"
           COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
-          COMMIT_MESSAGE="${{ steps.params.outputs.commit_message }}"
+          COMMIT_MESSAGE="$DEPLOY_COMMIT_MESSAGE"
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
 
