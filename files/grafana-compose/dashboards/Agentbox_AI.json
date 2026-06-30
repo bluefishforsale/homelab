@@ -9,14 +9,14 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "30s",
   "time": {
     "from": "now-24h",
     "to": "now"
   },
-  "description": "Agentbox AI fleet: Claude Code + opencode cost/tokens/requests by repo and lane, lane liveness, and the agent event log. NOTE: OTel->Prometheus metric names (claude_code_*_total, opencode_*) and the Loki label set are verify-at-deploy; adjust queries once the collector is emitting.",
+  "description": "Agentbox AI fleet: Claude Code + opencode cost/tokens by repo and lane, lane liveness, and the agent event log. Scoped by job=agentbox-otelcol (the collector's scrape job). Per-repo/lane panels populate once the watcher/escalate/RC lanes run (they set OTEL_RESOURCE_ATTRIBUTES). PR/commit and opencode_* series appear after that activity.",
   "templating": {
     "list": []
   },
@@ -52,7 +52,18 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD"
+          "unit": "currencyUSD",
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "0"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -75,7 +86,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(claude_code_cost_usage_USD_total{service=\"agentbox\"})",
+          "expr": "sum(claude_code_cost_usage_USD_total{job=\"agentbox-otelcol\"})",
           "refId": "A"
         }
       ]
@@ -96,7 +107,18 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "0"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -119,7 +141,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(claude_code_session_count_total{service=\"agentbox\"})",
+          "expr": "sum(claude_code_session_count_total{job=\"agentbox-otelcol\"})",
           "refId": "A"
         }
       ]
@@ -140,7 +162,18 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "0"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -163,7 +196,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(claude_code_pull_request_count_total{service=\"agentbox\"})",
+          "expr": "sum(claude_code_pull_request_count_total{job=\"agentbox-otelcol\"})",
           "refId": "A"
         }
       ]
@@ -184,7 +217,18 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "0"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -207,7 +251,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(claude_code_commit_count_total{service=\"agentbox\"})",
+          "expr": "sum(claude_code_commit_count_total{job=\"agentbox-otelcol\"})",
           "refId": "A"
         }
       ]
@@ -253,7 +297,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum by(repo) (increase(claude_code_cost_usage_USD_total{service=\"agentbox\"}[5m]))",
+          "expr": "sum by(repo) (increase(claude_code_cost_usage_USD_total{job=\"agentbox-otelcol\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{repo}}"
         }
@@ -300,7 +344,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum by(type) (rate(claude_code_token_usage_tokens_total{service=\"agentbox\"}[5m]))",
+          "expr": "sum by(type) (rate(claude_code_token_usage_tokens_total{job=\"agentbox-otelcol\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{type}}"
         }
@@ -309,7 +353,7 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Requests by lane (rate)",
+      "title": "Cost by lane (USD / 5m)",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -322,7 +366,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "currencyUSD",
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
@@ -347,7 +391,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum by(lane) (rate(claude_code_api_request_count_total{service=\"agentbox\"}[5m]))",
+          "expr": "sum by(lane) (increase(claude_code_cost_usage_USD_total{job=\"agentbox-otelcol\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{lane}}"
         }
@@ -394,7 +438,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "node_systemd_unit_state{instance=\"agentbox\",name=~\"agentbox-rc@.*|agentbox-issue-watcher.*|agentbox-escalate.*\",state=\"active\"}",
+          "expr": "node_systemd_unit_state{instance=~\"agentbox.*\",name=~\"agentbox-(rc@.*|issue-watcher.*|escalate.*)\",state=\"active\"}",
           "refId": "A",
           "legendFormat": "{{name}}"
         }
@@ -441,7 +485,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum by(repo) (increase(opencode_cost_usage_USD_total{service=\"agentbox\"}[5m]))",
+          "expr": "sum by(repo) (increase(opencode_cost_usage_USD_total{job=\"agentbox-otelcol\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{repo}}"
         }
@@ -488,7 +532,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum by(repo) (rate(opencode_token_usage_tokens_total{service=\"agentbox\"}[5m]))",
+          "expr": "sum by(repo) (rate(opencode_token_usage_tokens_total{job=\"agentbox-otelcol\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{repo}}"
         }
@@ -522,7 +566,7 @@
             "uid": "P8E80F9AEF21F6940"
           },
           "editorMode": "code",
-          "expr": "{service=\"agentbox\"}",
+          "expr": "{service_name=~\"claude-code|opencode\"}",
           "queryType": "range",
           "refId": "A"
         }
