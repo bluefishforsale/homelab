@@ -14,7 +14,10 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 EnvironmentFile={{ home }}/.config/agentbox/agentbox.env
 Environment=OTEL_RESOURCE_ATTRIBUTES=repo=%i,lane=claude,service=agentbox
 WorkingDirectory={{ home }}/repos/%i
-ExecStart=/usr/bin/env claude remote-control --name %i
+# Wrapper seeds workspace trust and answers the per-launch "Enable Remote
+# Control?" prompt under a pty (Claude Code has no flag for either). See
+# files/agentbox/rc-launch.sh.
+ExecStart=/usr/local/bin/agentbox-rc-launch.sh %i
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal

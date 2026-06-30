@@ -73,6 +73,7 @@
         - git
         - jq
         - tmux
+        - expect
         - nodejs
         - npm
       state: present
@@ -228,6 +229,8 @@
     loop:
       - { src: issue-watcher.sh, dest: agentbox-issue-watcher.sh }
       - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
+      - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
+      - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
 
   # --- systemd units ---
   - name: Install systemd units
