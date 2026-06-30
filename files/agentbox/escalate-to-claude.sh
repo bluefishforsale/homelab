@@ -56,6 +56,9 @@ $body
 
 Make the minimal, correct change; keep the build and tests green."
 
+    # Worktrees are cloned on the fly; trust each before claude reads it
+    # (no flag for the workspace-trust gate).
+    /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
     (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) || true
 
     if [ -n "$(git -C "$wt" status --porcelain)" ]; then
