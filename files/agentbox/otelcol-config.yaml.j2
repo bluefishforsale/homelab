@@ -22,6 +22,10 @@ exporters:
     endpoint: 0.0.0.0:9464
     resource_to_telemetry_conversion:
       enabled: true
+    # Agent turns are intermittent; the default 5m expiry drops the cumulative
+    # cost/token/session counters between runs and the dashboard goes blank.
+    # Keep last-seen series exposed for a week so totals persist.
+    metric_expiration: 168h
   otlphttp/loki:
     endpoint: {{ LOKI_OTLP_URL }}
 
