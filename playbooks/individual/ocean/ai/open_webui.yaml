@@ -105,6 +105,37 @@
       timeout: 60
     ignore_errors: yes
 
+  # Open WebUI's PersistentConfig freezes OPENAI_API_KEYS into webui.db on
+  # first boot; after that the env var is ignored and the stored value wins.
+  # Reconcile the stored key to the vault so key changes actually take effect.
+  - name: Reconcile stored llama.cpp API key in open-webui DB
+    ansible.builtin.command:
+      argv:
+        - docker
+        - exec
+        - "-e"
+        - "NEW_KEY={{ ai_services.llamacpp.api_keys.openwebui }}"
+        - "{{ service }}"
+        - python3
+        - "-c"
+        - |
+          import sqlite3, json, os
+          desired = json.dumps([os.environ["NEW_KEY"]])
+          conn = sqlite3.connect("/data/webui.db")
+          row = conn.execute("select value from config where key='openai.api_keys'").fetchone()
+          if row is None:
+              print("NOROW"); raise SystemExit(0)
+          if row[0] == desired:
+              print("OK"); raise SystemExit(0)
+          conn.execute("update config set value=? where key='openai.api_keys'", (desired,))
+          conn.commit()
+          print("CHANGED")
+    register: owui_key_reconcile
+    changed_when: "'CHANGED' in owui_key_reconcile.stdout"
+    no_log: true
+    notify:
+    - Restart open-webui service
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
