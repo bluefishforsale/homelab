@@ -88,9 +88,7 @@ jobs:
           # `hosts` key or an `*import_playbook` key (FQCN ansible.builtin.import_playbook
           # is the house style, so match the suffix, not the bare name).
           is_playbook() {
-            python3 -c "import yaml,sys
-d=yaml.safe_load(open(sys.argv[1]))
-sys.exit(0 if isinstance(d,list) and d and all(isinstance(i,dict) and any(k=='hosts' or k.endswith('import_playbook') for k in i) for i in d) else 1)" "$1"
+            python3 -c "import yaml,sys; d=yaml.safe_load(open(sys.argv[1])); sys.exit(0 if isinstance(d,list) and d and all(isinstance(i,dict) and any(k=='hosts' or k.endswith('import_playbook') for k in i) for i in d) else 1)" "$1"
           }
 
           echo "Validating Ansible playbook syntax..."
