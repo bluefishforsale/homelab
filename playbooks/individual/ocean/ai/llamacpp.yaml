@@ -11,7 +11,10 @@
 
   vars:
     service: llamacpp
-    image: ghcr.io/ggerganov/llama.cpp
+    # ggml-org is the maintained org (ggerganov/* is frozen post-rename and too
+    # old for newer archs, e.g. Qwen3.6's qwen35moe). Verified loading Qwen3.6
+    # on server-cuda before this bump.
+    image: ghcr.io/ggml-org/llama.cpp
     version: server-cuda
     port: "{{ service_ports.llamacpp.port }}"  # noqa: var-naming[no-reserved]
     data: /data01
