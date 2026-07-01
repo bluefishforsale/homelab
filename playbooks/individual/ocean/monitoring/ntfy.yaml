@@ -7,6 +7,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
   vars:
     ntfy_service: ntfy
     ntfy_image: binwiederhier/ntfy
@@ -14,7 +17,10 @@
     ntfy_port: 8090
     ntfy_home: /data01/services/ntfy
     ntfy_files: "{{ playbook_dir }}/../../../../files/ntfy"
-    ntfy_base_url: "http://ntfy.home:8090"
+    # Public base URL (Cloudflare tunnel). Used for UI links + the iOS upstream
+    # poll callback; the listener itself still binds :80 in the container.
+    ntfy_base_url: "https://ntfy.terrac.com"
+    ntfy_topic: homelab
     uid: 1001
     gid: 1001
 
@@ -58,3 +64,24 @@
         enabled: true
         state: started
         daemon_reload: true
+
+    # --- auth: deny-all means we must provision the one user by hand ---
+    - name: Wait for ntfy auth CLI to be ready
+      ansible.builtin.command: docker exec {{ ntfy_service }} ntfy user list
+      register: ntfy_users
+      changed_when: false
+      retries: 10
+      delay: 3
+      until: ntfy_users.rc == 0
+
+    - name: Create ntfy user (password from vault)
+      ansible.builtin.command: >
+        docker exec -e NTFY_PASSWORD={{ ntfy.password }}
+        {{ ntfy_service }} ntfy user add {{ ntfy.user }}
+      when: ('user ' ~ ntfy.user ~ ' (') not in ntfy_users.stdout
+      no_log: true
+
+    - name: Grant {{ ntfy.user }} read-write on the {{ ntfy_topic }} topic
+      ansible.builtin.command: >
+        docker exec {{ ntfy_service }} ntfy access {{ ntfy.user }} {{ ntfy_topic }} rw
+      changed_when: true

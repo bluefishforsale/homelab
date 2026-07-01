@@ -55,6 +55,13 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:8080"
         
+        # ntfy push server. Access bypassed (in fully_public_services); the app
+        # can't do CF Access SSO, so ntfy's own auth (deny-all + homelab user)
+        # is the gate. iOS/Android background push land here over https.
+        - hostname: "ntfy.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8090"
+
         # Blog services (running on ocean - 192.168.1.143)
         # Route through nginx for proper X-Forwarded-Proto handling.
         # Intentionally PUBLIC — covered by `fully_public_services` in
