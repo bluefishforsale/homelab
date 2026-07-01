@@ -5,6 +5,7 @@
   gather_facts: true
 
   vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
