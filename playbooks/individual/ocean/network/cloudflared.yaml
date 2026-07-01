@@ -335,7 +335,7 @@
         domain: "{{ item.domain }}"
         type: "self_hosted"
         session_duration: "24h"
-      status_code: [200, 400]
+      status_code: [200, 201, 400]  # CF returns 201 on create
     register: ocean_access_app_create
     loop: "{{ ocean_access_apps }}"
     when:
@@ -845,7 +845,9 @@
         type: "self_hosted"
         app_type: "ssh"
         session_duration: "24h"
-      status_code: [200]
+      # CF now returns 201 on create (was 200); tolerate both, plus 400 for the
+      # already-exists race so a re-run doesn't hard-fail the whole play.
+      status_code: [200, 201, 400]
     register: cf_access_app_create
     when:
       - inventory_hostname != 'ocean'
@@ -854,6 +856,9 @@
       - cf_access_app_existing is not defined or cf_access_app_existing == None
     delegate_to: localhost
     become: false
+    failed_when:
+      - cf_access_app_create.status == 400
+      - "'already exists' not in cf_access_app_create.json.errors[0].message | default('')"
 
   - name: Determine Access app ID
     ansible.builtin.set_fact:
@@ -967,11 +972,19 @@
       - "'already exists' not in ssh_dns_create.json.errors[0].message | default('')"
 
   # SSH Server Setup (required for SSH tunnels)
+  # Refresh the cache best-effort: a broken unrelated third-party repo (e.g. a
+  # GPU host's stale nvidia apt source with a rotated key) must not fail the
+  # whole tunnel deploy. apt still indexes the good repos on partial failure.
+  - name: Refresh apt cache (best-effort)
+    apt:
+      update_cache: yes
+    become: yes
+    failed_when: false
+
   - name: Install OpenSSH server
     apt:
       name: openssh-server
       state: present
-      update_cache: yes
     become: yes
 
   - name: Ensure SSH service is enabled and started
@@ -1033,9 +1046,16 @@
         deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main
       mode: '0644'
 
-  - name: Install cloudflared
+  # Best-effort refresh so the just-added cloudflare repo is indexed, without
+  # letting a broken unrelated repo abort the play (apt still indexes the good
+  # repos on partial failure; cloudflared is already installed fleet-wide).
+  - name: Refresh apt cache after adding cloudflare repo (best-effort)
     ansible.builtin.apt:
       update_cache: yes
+    failed_when: false
+
+  - name: Install cloudflared
+    ansible.builtin.apt:
       name: cloudflared
       state: present
 
