@@ -44,6 +44,14 @@
         loop_var: user
       when: user.gid is defined
 
+    # Users are added to the docker group below, but docker (and its group)
+    # is installed by a later playbook. Pre-create the group so user creation
+    # doesn't fail on fresh hosts; docker's postinst reuses an existing group.
+    - name: Ensure docker group exists
+      ansible.builtin.group:
+        name: docker
+        state: present
+
     - name: Ensure the user exists with specified UIDs/GIDs
       ansible.builtin.user:
         name: "{{ user.user_name }}"
