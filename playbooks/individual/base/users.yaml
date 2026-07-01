@@ -31,7 +31,8 @@
         users:
           - { user_name: "media", user_home: "/home/media", uid: "{{ system_users.media.uid }}", gid: "{{ system_users.media.gid }}" }
           - { user_name: "terrac", user_home: "/home/terrac", uid: "{{ system_users.terrac.uid }}", gid: "{{ system_users.terrac.gid }}" }
-          - { user_name: "debian", user_home: "/home/debian", uid: "{{ system_users.debian.uid }}", gid: "{{ system_users.debian.gid }}" }
+          # 'debian' is the cloud-init login user Ansible connects as on VMs;
+          # usermod can't modify an in-use account, so it is not managed here.
           - { user_name: "root", user_home: "/root" }
 
     - name: Ensure user groups exist with specified GIDs
