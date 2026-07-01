@@ -13,6 +13,9 @@ EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
 Environment=ALERT_NTFY_URL={{ alert_ntfy_url }}
 Environment=ALERT_ISSUE_REPO={{ alert_issue_repo }}
 Environment=ALERT_LISTEN_PORT={{ alert_receiver_port }}
+# Critical alerts kick agentbox-escalate-to-claude.sh for an immediate premium-
+# lane fix PR. Set 0 to disable unattended infra edits (issue + ntfy still fire).
+Environment=ALERT_REMEDIATE=1
 ExecStart=/usr/bin/python3 /usr/local/bin/agentbox-alert-receiver.py
 Restart=on-failure
 RestartSec=10
