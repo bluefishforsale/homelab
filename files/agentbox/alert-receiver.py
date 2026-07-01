@@ -13,6 +13,7 @@ Deliberately dependency-free (stdlib only) and single-file: it reads config from
 the environment (rendered into the systemd unit) and shells out to `gh`.
 Idempotent on issues: an open issue carrying the alert fingerprint is reused.
 """
+import base64
 import json
 import os
 import subprocess
@@ -28,6 +29,9 @@ REMEDIATE = os.environ.get("ALERT_REMEDIATE", "1") == "1"
 RC_URL = os.environ.get("ALERT_RC_URL", "https://claude.ai/code")  # live RC console
 ESCALATE = "/usr/local/bin/agentbox-escalate-to-claude.sh"
 REPO_NAME = ISSUE_REPO.split("/")[-1]
+# ntfy is deny-all (public via ntfy.terrac.com); publish with basic auth.
+NTFY_USER = os.environ.get("ALERT_NTFY_USER", "")
+NTFY_PASS = os.environ.get("ALERT_NTFY_PASS", "")
 FP_MARKER = "alert-fp:"  # embedded in the issue body to dedupe by fingerprint
 
 PRIO = {"critical": "urgent", "warning": "high", "info": "default"}
@@ -37,6 +41,9 @@ def ntfy(title, message, priority="default", tags="", click=""):
     headers = {"Title": title, "Priority": priority, "Tags": tags}
     if click:
         headers["Click"] = click
+    if NTFY_USER:
+        cred = base64.b64encode(f"{NTFY_USER}:{NTFY_PASS}".encode()).decode()
+        headers["Authorization"] = f"Basic {cred}"
     req = urllib.request.Request(NTFY_URL, data=message.encode(), headers=headers)
     try:
         urllib.request.urlopen(req, timeout=10).read()

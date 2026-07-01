@@ -15,9 +15,15 @@ services:
       - NTFY_BEHIND_PROXY=true
       - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
       - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
-      # Anyone on the LAN may read/write by default; lock down with ntfy access
-      # later if this is exposed publicly.
-      - NTFY_AUTH_DEFAULT_ACCESS=read-write
+      # Publicly reachable via ntfy.terrac.com (Cloudflare Access bypassed), so
+      # ntfy's own auth is the ONLY gate: deny-all, then the playbook grants the
+      # 'homelab' user rw on the 'homelab' topic. Anonymous = no access.
+      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      # iOS background delivery for a self-hosted server: ntfy forwards a
+      # zero-payload poll trigger to ntfy.sh (which owns the APNS cert); the
+      # phone then fetches the real message from our server. Message content
+      # never leaves the homelab.
+      - NTFY_UPSTREAM_BASE_URL=https://ntfy.sh
 
     ports:
       - "{{ ntfy_port }}:80"
