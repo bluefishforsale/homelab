@@ -25,15 +25,18 @@
         - sudo
       ignore_errors: yes
 
-    # Define user details with centralized uid/gid from vault
+    # Define user details with centralized uid/gid from vault.
+    # 'debian' is the cloud-init login user Ansible connects as on VMs;
+    # usermod can't modify an in-use account, so it is not managed here.
+    # Appliance hosts (e.g. pihole) set manage_service_users=false to skip
+    # media/terrac, whose uid/gid collide with pre-existing service accounts.
     - name: Set user details
       set_fact:
-        users:
+        users: "{{ (service_users if (manage_service_users | default(true) | bool) else []) + [{'user_name': 'root', 'user_home': '/root'}] }}"
+      vars:
+        service_users:
           - { user_name: "media", user_home: "/home/media", uid: "{{ system_users.media.uid }}", gid: "{{ system_users.media.gid }}" }
           - { user_name: "terrac", user_home: "/home/terrac", uid: "{{ system_users.terrac.uid }}", gid: "{{ system_users.terrac.gid }}" }
-          # 'debian' is the cloud-init login user Ansible connects as on VMs;
-          # usermod can't modify an in-use account, so it is not managed here.
-          - { user_name: "root", user_home: "/root" }
 
     - name: Ensure user groups exist with specified GIDs
       ansible.builtin.group:
@@ -66,6 +69,13 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      register: user_result
+      # A managed user that is also the account Ansible logged in as (e.g.
+      # terrac on ocean, uid 1000 vs the vault's 1002) can't be usermod'd while
+      # in use. Tolerate only that case; its uid keeps its existing value.
+      failed_when:
+        - user_result.failed | default(false)
+        - "'is currently used by process' not in (user_result.msg | default(''))"
 
     - name: Add user to sudoers with no password
       ansible.builtin.lineinfile:
