@@ -28,6 +28,11 @@
     user: debian
     home: "/home/debian"
     files: "{{ playbook_dir }}/../../../files/agentbox"
+    # Alert receiver: Alertmanager -> ntfy push + GitHub issues on the infra repo.
+    # Ports hardcoded (not in vars_service_ports) so this deploy stays scoped.
+    alert_receiver_port: 9098
+    alert_ntfy_url: "http://ntfy.home:8090/homelab"
+    alert_issue_repo: bluefishforsale/homelab
     # Deployable repos (Shape A/B) whose open issues the fleet resolves.
     agentbox_repos:
       - paia
@@ -250,6 +255,7 @@
       - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
       - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
+      - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
 
   # --- systemd units ---
   - name: Install systemd units
@@ -262,6 +268,7 @@
       - agentbox-issue-watcher.timer
       - agentbox-escalate.service
       - agentbox-escalate.timer
+      - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
     notify: Reload systemd daemon
 
@@ -277,6 +284,13 @@
     loop:
       - agentbox-issue-watcher.timer
       - agentbox-escalate.timer
+
+  - name: Enable and start the alert receiver
+    ansible.builtin.systemd:
+      name: agentbox-alert-receiver.service
+      enabled: yes
+      state: restarted
+      daemon_reload: yes
 
   # Per-repo remote-control instances are enabled (start on boot) but not
   # started now: they need the one-time interactive `claude /login` and a clone

@@ -41,6 +41,19 @@ groups:
       summary: "Service {{ "{{ $labels.job }}" }} is down"
       description: "Service {{ "{{ $labels.job }}" }} on {{ "{{ $labels.instance }}" }} has been down for more than 5 minutes"
 
+  # Any systemd unit in the failed state. Catches breakage that up==0 can't see
+  # because the thing isn't a scrape target — crash-looping docker services (the
+  # GitHub runners), agentbox lanes, promtail, etc. Needs node-exporter's
+  # systemd collector (enabled fleet-wide).
+  - alert: SystemdUnitFailed
+    expr: node_systemd_unit_state{state="failed"} == 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "systemd unit {{ "{{ $labels.name }}" }} failed on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} has been in the failed state for 5m on {{ "{{ $labels.instance }}" }}"
+
   # Plex unreachable from plex-exporter (exporter is scraping but Plex isn't
   # responding). Catches OOM/crash loops the generic ServiceDown alert misses
   # because the exporter itself stays up.
