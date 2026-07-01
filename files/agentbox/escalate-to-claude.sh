@@ -42,51 +42,68 @@ no_prod_effect() {  # $1 = newline-separated changed files
   return 0
 }
 
-for repo in ${AGENTBOX_REPOS:-}; do
-  slug="$OWNER/$repo"
+resolve_issue() {  # $1 = repo (short name); $2 = issue number
+  local repo="$1" num="$2" slug="$OWNER/$1"
   # Per-repo/per-lane telemetry labels for everything claude emits this pass.
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox"
   ensure_labels "$slug"
-  issues=$(gh issue list --repo "$slug" --state open --label "$LABEL_CLAUDE" \
-    --json number --jq '.[].number') || continue
 
-  for num in $issues; do
-    title=$(gh issue view "$num" --repo "$slug" --json title --jq .title)
-    body=$(gh issue view "$num" --repo "$slug" --json body --jq .body)
-    gh issue edit "$num" --repo "$slug" \
-      --remove-label "$LABEL_CLAUDE" --add-label "$LABEL_WORKING" >/dev/null
+  local title body
+  title=$(gh issue view "$num" --repo "$slug" --json title --jq .title)
+  body=$(gh issue view "$num" --repo "$slug" --json body --jq .body)
+  gh issue edit "$num" --repo "$slug" \
+    --remove-label "$LABEL_CLAUDE" --add-label "$LABEL_WORKING" >/dev/null 2>&1 || true
 
-    wt="$WORKROOT/$repo"
-    [ -d "$wt/.git" ] || gh repo clone "$slug" "$wt" -- -q
-    git -C "$wt" fetch -q origin
-    git -C "$wt" checkout -q -B "agent/issue-$num" origin/HEAD
+  local wt="$WORKROOT/$repo"
+  [ -d "$wt/.git" ] || gh repo clone "$slug" "$wt" -- -q
+  git -C "$wt" fetch -q origin
+  git -C "$wt" checkout -q -B "agent/issue-$num" origin/HEAD
 
-    prompt="Resolve GitHub issue #$num: $title
+  local prompt="Resolve GitHub issue #$num: $title
 
 $body
 
 Make the minimal, correct change; keep the build and tests green."
 
-    # Worktrees are cloned on the fly; trust each before claude reads it
-    # (no flag for the workspace-trust gate).
-    /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
-    (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) || true
+  # Worktrees are cloned on the fly; trust each before claude reads it
+  # (no flag for the workspace-trust gate).
+  /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
+  (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) || true
 
-    if [ -n "$(git -C "$wt" status --porcelain)" ]; then
-      git -C "$wt" add -A
-      git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
-      git -C "$wt" push -q -u origin "agent/issue-$num"
-      gh pr create --repo "$slug" --head "agent/issue-$num" \
-        --title "fix: $title (#$num)" \
-        --body "Resolves #$num. Shipped by the Claude Code premium lane." || true
+  [ -n "$(git -C "$wt" status --porcelain)" ] || return 0
+  git -C "$wt" add -A
+  git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+  git -C "$wt" push -q -u origin "agent/issue-$num"
+  gh pr create --repo "$slug" --head "agent/issue-$num" \
+    --title "fix: $title (#$num)" \
+    --body "Resolves #$num. Shipped by the Claude Code premium lane." || true
 
-      changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
-      if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
-         && no_prod_effect "$changed"; then
-        gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
-      else
-        gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
-      fi
-    fi
+  local changed
+  changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
+  if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
+     && no_prod_effect "$changed"; then
+    gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+  else
+    gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
+  fi
+}
+
+# Triggered single-issue mode: `escalate-to-claude.sh <repo> <issue#>`. Used by
+# the alert receiver for immediate critical-alert remediation, and it works for
+# ANY repo (the infra repo is deliberately absent from AGENTBOX_REPOS, so the
+# periodic drain below never touches it). Never auto-merges unless the repo is
+# opted into AGENTBOX_AUTOMERGE_REPOS — homelab isn't, so it opens a PR a human
+# merges, the correct autonomy tier for infra (ADR 0001).
+if [ "$#" -ge 2 ]; then
+  resolve_issue "$1" "$2"
+  exit 0
+fi
+
+# Periodic drain: every needs-claude issue across the deployable repos.
+for repo in ${AGENTBOX_REPOS:-}; do
+  issues=$(gh issue list --repo "$OWNER/$repo" --state open --label "$LABEL_CLAUDE" \
+    --json number --jq '.[].number') || continue
+  for num in $issues; do
+    resolve_issue "$repo" "$num"
   done
 done

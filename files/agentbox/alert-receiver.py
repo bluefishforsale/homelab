@@ -22,15 +22,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 NTFY_URL = os.environ["ALERT_NTFY_URL"]           # e.g. http://ntfy.home:8090/homelab
 ISSUE_REPO = os.environ["ALERT_ISSUE_REPO"]       # e.g. bluefishforsale/homelab
 LISTEN_PORT = int(os.environ.get("ALERT_LISTEN_PORT", "9098"))
+# Critical alerts kick an immediate premium-lane remediation. Set 0 to disable
+# unattended infra edits (issue + ntfy still fire).
+REMEDIATE = os.environ.get("ALERT_REMEDIATE", "1") == "1"
+RC_URL = os.environ.get("ALERT_RC_URL", "https://claude.ai/code")  # live RC console
+ESCALATE = "/usr/local/bin/agentbox-escalate-to-claude.sh"
+REPO_NAME = ISSUE_REPO.split("/")[-1]
 FP_MARKER = "alert-fp:"  # embedded in the issue body to dedupe by fingerprint
 
 PRIO = {"critical": "urgent", "warning": "high", "info": "default"}
 
 
-def ntfy(title, message, priority="default", tags=""):
-    req = urllib.request.Request(
-        NTFY_URL, data=message.encode(),
-        headers={"Title": title, "Priority": priority, "Tags": tags})
+def ntfy(title, message, priority="default", tags="", click=""):
+    headers = {"Title": title, "Priority": priority, "Tags": tags}
+    if click:
+        headers["Click"] = click
+    req = urllib.request.Request(NTFY_URL, data=message.encode(), headers=headers)
     try:
         urllib.request.urlopen(req, timeout=10).read()
     except Exception as e:  # awareness is best-effort; never crash the receiver
@@ -54,11 +61,13 @@ def issue_exists(fp):
 
 
 def open_issue(alert):
+    """Create (or reuse) the tracking issue; return its number, or None if it
+    already exists / creation failed."""
     labels = alert["labels"]
     ann = alert.get("annotations", {})
     fp = alert.get("fingerprint", labels.get("alertname", "unknown"))
     if issue_exists(fp):
-        return
+        return None
     sev = labels.get("severity", "warning")
     name = labels.get("alertname", "alert")
     inst = labels.get("instance", labels.get("job", ""))
@@ -74,7 +83,28 @@ def open_issue(alert):
            "--color", "5319E7", "--force")  # idempotent; ignore result
         args += ["--label", "needs-claude"]
     r = gh(*args)
-    print((r.stdout or r.stderr).strip(), flush=True)
+    out = (r.stdout or r.stderr).strip()
+    print(out, flush=True)
+    if r.returncode != 0:
+        return None
+    try:
+        return int(out.rsplit("/", 1)[-1])  # gh prints the new issue URL
+    except ValueError:
+        return None
+
+
+def remediate(num):
+    """Kick an immediate premium-lane fix for a critical alert. Detached so a
+    multi-minute claude run never blocks the HTTP handler; it only ever opens a
+    PR (never auto-merges infra), so a human still gates the change.
+    ponytail: child dies if the receiver service restarts mid-run (cgroup kill);
+    acceptable — the needs-claude issue survives and the periodic drain retries.
+    """
+    if not os.path.exists(ESCALATE):
+        print(f"escalate script missing: {ESCALATE}", flush=True)
+        return
+    print(f"remediating critical alert via issue #{num}", flush=True)
+    subprocess.Popen([ESCALATE, REPO_NAME, str(num)], start_new_session=True)
 
 
 def handle(payload):
@@ -87,9 +117,16 @@ def handle(payload):
         # NB: emoji must go in Tags (ntfy renders them), never the Title header —
         # HTTP headers are latin-1 and non-ASCII there raises.
         if alert.get("status") == "firing":
-            ntfy(f"{name} ({sev})", f"{inst}\n{summary}".strip(),
-                 PRIO.get(sev, "default"), "rotating_light,homelab")
-            open_issue(alert)
+            num = open_issue(alert)
+            issue_url = f"https://github.com/{ISSUE_REPO}/issues/{num}" if num else ""
+            body = "\n".join(x for x in (inst, summary, issue_url) if x)
+            # Critical: one-tap into the live RC console to supervise; warning:
+            # tap opens the tracking issue.
+            ntfy(f"{name} ({sev})", body, PRIO.get(sev, "default"),
+                 "rotating_light,homelab",
+                 click=RC_URL if sev == "critical" else issue_url)
+            if num and sev == "critical" and REMEDIATE:
+                remediate(num)
         else:
             ntfy(f"resolved: {name}", f"{inst}\n{summary}".strip(),
                  "min", "white_check_mark,homelab")
