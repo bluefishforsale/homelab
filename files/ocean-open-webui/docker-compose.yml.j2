@@ -15,7 +15,7 @@ services:
       - DO_NOT_TRACK=true
       # Configure to connect to llama.cpp via host IP
       - OPENAI_API_BASE_URL=http://{{ ansible_default_ipv4.address }}:8080/v1
-      - OPENAI_API_KEY=llamacpp-homelab-key
+      - OPENAI_API_KEY={{ ai_services.llamacpp.api_keys.openwebui }}
       # Enable local API models
       - ENABLE_OPENAI_API=true
       - ENABLE_OLLAMA_API=false
@@ -24,10 +24,10 @@ services:
       - WEBUI_URL=http://{{ ansible_default_ipv4.address }}:{{ port }}
       - DEFAULT_MODELS=Phi-3.5-mini-instruct-Q4_K_M.gguf
       # Pre-configure OpenAI API connection
-      - OPENAI_API_KEYS=[{"api_key":"dummy","api_base_url":"http://{{ ansible_default_ipv4.address }}:8080/v1","api_name":"llama.cpp Local"}]
+      - OPENAI_API_KEYS=[{"api_key":"{{ ai_services.llamacpp.api_keys.openwebui }}","api_base_url":"http://{{ ansible_default_ipv4.address }}:8080/v1","api_name":"llama.cpp Local"}]
       # Auto-enable OpenAI API
       - DEFAULT_OPENAI_API_BASE_URL=http://{{ ansible_default_ipv4.address }}:8080/v1
-      - DEFAULT_OPENAI_API_KEY=dummy
+      - DEFAULT_OPENAI_API_KEY={{ ai_services.llamacpp.api_keys.openwebui }}
       # Database and storage - Use SQLite for stability
       - DATABASE_URL=sqlite:////data/webui.db
       - DATA_DIR=/data
