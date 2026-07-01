@@ -22,7 +22,7 @@ route:
   repeat_interval: 1h
   
   # Default receiver (fallback)
-  receiver: 'web.hook'
+  receiver: 'agentbox'
 
 # Inhibition rules allow to mute a set of alerts given that another alert is firing.
 inhibit_rules:
@@ -34,9 +34,11 @@ inhibit_rules:
     equal: ['alertname', 'dev', 'instance']
 
 receivers:
-- name: 'web.hook'
+# agentbox alert receiver: fans out to ntfy (push) + GitHub issues, and routes
+# critical alerts to the premium lane. See files/agentbox/alert-receiver.py.
+- name: 'agentbox'
   webhook_configs:
-  - url: 'http://127.0.0.1:5001/'
+  - url: 'http://agentbox.home:9098/'
     send_resolved: true
 
 # Example email receiver (commented out)

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  ntfy:
+    image: {{ ntfy_image }}:{{ ntfy_version }}
+    container_name: {{ ntfy_service }}
+    hostname: {{ ntfy_service }}
+    restart: unless-stopped
+    command: serve
+
+    environment:
+      - TZ=America/Los_Angeles
+      - NTFY_BASE_URL={{ ntfy_base_url }}
+      - NTFY_LISTEN_HTTP=:80
+      - NTFY_BEHIND_PROXY=true
+      - NTFY_CACHE_FILE=/var/lib/ntfy/cache.db
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+      # Anyone on the LAN may read/write by default; lock down with ntfy access
+      # later if this is exposed publicly.
+      - NTFY_AUTH_DEFAULT_ACCESS=read-write
+
+    ports:
+      - "{{ ntfy_port }}:80"
+
+    volumes:
+      - {{ ntfy_home }}/data:/var/lib/ntfy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

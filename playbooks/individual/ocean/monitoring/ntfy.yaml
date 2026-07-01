@@ -1,0 +1,60 @@
+---
+# ntfy self-hosted push server. Alertmanager posts here so breakage actually
+# reaches a phone (the missing "awareness" link). Subscribe to the 'homelab'
+# topic in the ntfy app pointed at {{ ntfy_base_url }}.
+- name: Deploy ntfy push notification server
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    ntfy_service: ntfy
+    ntfy_image: binwiederhier/ntfy
+    ntfy_version: latest
+    ntfy_port: 8090
+    ntfy_home: /data01/services/ntfy
+    ntfy_files: "{{ playbook_dir }}/../../../../files/ntfy"
+    ntfy_base_url: "http://ntfy.home:8090"
+    uid: 1001
+    gid: 1001
+
+  tasks:
+    - name: Ensure ntfy directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ uid }}"
+        group: "{{ gid }}"
+        mode: '0755'
+      loop:
+        - "{{ ntfy_home }}"
+        - "{{ ntfy_home }}/data"
+
+    - name: Render ntfy docker-compose.yml
+      ansible.builtin.template:
+        src: "{{ ntfy_files }}/ntfy-compose.yml.j2"
+        dest: "{{ ntfy_home }}/docker-compose.yml"
+        owner: "{{ uid }}"
+        group: "{{ gid }}"
+        mode: '0644'
+      register: ntfy_compose
+
+    - name: Install ntfy systemd service
+      ansible.builtin.template:
+        src: "{{ ntfy_files }}/ntfy.service.j2"
+        dest: /etc/systemd/system/ntfy.service
+        mode: '0644'
+      register: ntfy_unit
+
+    - name: Recreate ntfy when compose changed
+      ansible.builtin.shell: |
+        cd {{ ntfy_home }}
+        docker compose up -d --force-recreate --remove-orphans
+      when: ntfy_compose.changed
+
+    - name: Enable and start ntfy
+      ansible.builtin.systemd:
+        name: ntfy.service
+        enabled: true
+        state: started
+        daemon_reload: true
