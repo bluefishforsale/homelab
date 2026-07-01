@@ -121,5 +121,6 @@
           - ""
           - "Next steps:"
           - "1. agentbox is already in inventory under [vms] and [agentbox]"
-          - "2. Deploy the host config: ansible-playbook playbooks/individual/agentbox/agentbox.yaml"
-          - "3. One-time manual auth on the box (see playbook header): claude /login, gh auth login, gcloud auth"
+          - "2. Apply base system (users + authorized_keys refresh timer): ansible-playbook playbooks/01_base_system.yaml --limit agentbox"
+          - "3. Deploy the host config: ansible-playbook playbooks/individual/agentbox/agentbox.yaml"
+          - "4. One-time manual auth on the box (see playbook header): claude /login, gh auth login, gcloud auth"

@@ -114,4 +114,5 @@
           - ""
           - "Next steps:"
           - "1. Confirm {{ cache_vm_hostname }} is under [registry_cache] in inventories/production/hosts.ini"
-          - "2. Run: ansible-playbook playbooks/individual/infrastructure/registry_cache.yaml"
+          - "2. Apply base system (users + authorized_keys refresh timer): ansible-playbook playbooks/01_base_system.yaml --limit {{ cache_vm_hostname }}"
+          - "3. Run: ansible-playbook playbooks/individual/infrastructure/registry_cache.yaml"

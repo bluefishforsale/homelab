@@ -15,6 +15,9 @@
 - name: Configure System Users and Groups
   ansible.builtin.import_playbook: individual/base/users.yaml
 
+- name: Install authorized_keys refresh timer
+  ansible.builtin.import_playbook: individual/base/authorized_keys.yaml
+
 - name: Configure Timezone, Sysctl, and Udev
   ansible.builtin.import_playbook: individual/base/tz_sysctl_udev.yaml
 

@@ -116,5 +116,6 @@
           - ""
           - "Next steps:"
           - "1. Add {{ runner_vm_hostname }} to your inventory under [github_runners] group"
-          - "2. Configure group_vars/github_runners.yml with GitHub token and settings"
-          - "3. Run: ansible-playbook github-docker-runners.yml"
+          - "2. Apply base system (users + authorized_keys refresh timer): ansible-playbook playbooks/01_base_system.yaml --limit {{ runner_vm_hostname }}"
+          - "3. Configure group_vars/github_runners.yml with GitHub token and settings"
+          - "4. Run: ansible-playbook github-docker-runners.yml"
