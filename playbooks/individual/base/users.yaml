@@ -22,6 +22,7 @@
         - zsh
         - git
         - cron
+        - sudo
       ignore_errors: yes
 
     # Define user details with centralized uid/gid from vault
