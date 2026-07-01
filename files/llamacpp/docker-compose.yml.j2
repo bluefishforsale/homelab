@@ -28,34 +28,27 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # RTX 3090: Qwen3.6-35B-A3B (MoE, ~3B active) for agentic coding + tool use.
-    # ~18GB model + q8_0 KV @ 32K fits the 24GB card. --jinja loads the model's
-    # tool-call chat template (required for tool-calling). Verify at deploy:
-    # CUDA 12.8+ in the image (13.2 reportedly produces gibberish); sanity-test
-    # a tool round-trip before trusting it in the agent loop.
-    command:
+    # RTX 3090 Optimized: Qwen3-14B for single-user reasoning with max context
+    # Model: 8.5GB + ~7GB KV cache = fits in 16GB VRAM budget
+    # Supports /think mode for step-by-step reasoning
+    command: 
       - "--host"
       - "0.0.0.0"
-      - "--port"
+      - "--port" 
       - "{{ port }}"
       - "--model"
-      - "/models/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+      - "/models/Qwen3-14B-Q4_K_M.gguf"
       - "--n-gpu-layers"
-      - "-1"
+      - "41"
       - "--ctx-size"
-      - "32768"
-      - "--parallel"
+      - "40960"
+      - "--parallel" 
       - "1"
       - "--batch-size"
       - "2048"
-      - "--ubatch-size"
+      - "--ubatch-size" 
       - "512"
       - "--flash-attn"
-      - "--cache-type-k"
-      - "q8_0"
-      - "--cache-type-v"
-      - "q8_0"
-      - "--jinja"
       - "--api-key-file"
       - "/config/keys.txt"
       # API only — the built-in chat UI at / is unauthenticated, so disable
