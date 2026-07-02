@@ -32,3 +32,6 @@
 
 - name: Configure RAM Disk (if applicable)
   ansible.builtin.import_playbook: individual/base/ramdisk.yaml
+
+- name: Mask deprecated/absent systemd units
+  ansible.builtin.import_playbook: individual/base/mask_deprecated_units.yaml
