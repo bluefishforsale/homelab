@@ -66,20 +66,27 @@ groups:
       summary: "Plex is unreachable from plex-exporter on {{ "{{ $labels.instance }}" }}"
       description: "plex_up has been 0 for more than 5 minutes on {{ "{{ $labels.instance }}" }} — Plex is down or in a restart loop"
 
-  # WAN path to Plex is degraded — TCP/443 to Plex API or pubsub failing
-  # or losing >5%. Excludes 1.1.1.1:443 (control), so this fires only when
-  # Plex's network specifically is bad, not when the entire internet is bad.
+  # WAN path to Plex is degraded: TCP/443 to Plex API or pubsub either fully
+  # down for 5m, or losing >5% over 30m. Excludes 1.1.1.1:443 (control), so this
+  # fires only when Plex's network specifically is bad, not the whole internet.
+  #
+  # The loss arm averages over 30m, not 5m: blackbox-tcp-plex scrapes at 1m, so a
+  # 5m window holds only 5 samples and a single transient TCP-connect blip to
+  # plex.tv (AWS/CDN-fronted, so occasional resets are normal) reads as 1/5 = 20%
+  # loss, tripping the 5% threshold and paging critical on noise. A 30m window
+  # (~30 samples) makes 5% resolvable so it takes >=2 failures to fire; the
+  # down-for-5m arm still catches a genuinely dead path fast.
   - alert: PlexPathDegraded
     expr: |
       probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"} == 0
       or
-      (1 - avg_over_time(probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"}[5m])) > 0.05
+      (1 - avg_over_time(probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"}[30m])) > 0.05
     for: 5m
     labels:
       severity: critical
     annotations:
       summary: "Plex WAN path degraded ({{ "{{ $labels.instance }}" }})"
-      description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} failing or losing >5% for 5m. Open the WAN Path Diagnosis dashboard to see which hop."
+      description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} down for 5m, or losing >5% over 30m. Open the WAN Path Diagnosis dashboard to see which hop."
 
   # General internet WAN path degraded — both Cloudflare and Google anchors
   # losing >5%. Distinguishes 'internet bad' from 'specifically Plex bad'.
