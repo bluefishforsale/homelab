@@ -18,7 +18,9 @@ WorkingDirectory={{ home }}/repos/%i
 # Control?" prompt under a pty (Claude Code has no flag for either). See
 # files/agentbox/rc-launch.sh.
 ExecStart=/usr/local/bin/agentbox-rc-launch.sh %i
-Restart=on-failure
+# always (not on-failure): the RC session can exit 0 on a claude.ai disconnect;
+# bring it back regardless. An intentional `systemctl stop` is still respected.
+Restart=always
 RestartSec=30
 StandardOutput=journal
 StandardError=journal

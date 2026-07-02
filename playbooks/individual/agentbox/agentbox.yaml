@@ -296,10 +296,11 @@
   # started now: they need the one-time interactive `claude /login` and a clone
   # of each repo into repos/<repo> first (see header). After bootstrap they
   # come up on the next boot or via `systemctl start`.
-  - name: Enable per-repo remote-control instances
+  - name: Enable and start per-repo remote-control instances
     ansible.builtin.systemd:
       name: "agentbox-rc@{{ item }}.service"
       enabled: yes
+      state: started
       daemon_reload: yes
     loop: "{{ agentbox_rc_repos }}"
 
@@ -412,5 +413,8 @@
   # try-restart only touches active instances (no-op before first login), so a
   # shared-config change reloads any live RC session without starting new ones.
   - name: Restart RC sessions
-    ansible.builtin.command: systemctl try-restart 'agentbox-rc@*.service'
+    # restart, not try-restart: try-restart skips units that are stopped/failed,
+    # leaving a dead lane dead. restart revives them so config changes reconcile
+    # every configured lane back up.
+    ansible.builtin.command: systemctl restart 'agentbox-rc@*.service'
     changed_when: true
