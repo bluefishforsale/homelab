@@ -12,6 +12,11 @@ TimeoutStopSec=60
 WorkingDirectory={{ home }}
 ExecStartPre=/usr/bin/docker compose pull --quiet
 ExecStart=/usr/bin/docker compose up -d --remove-orphans
+# Reclaim images left dangling by the :latest pull above. This host has no
+# docker-cleanup timer (that lives in the standalone docker_ce.yaml, which the
+# site pipeline does not run on dns hosts), so without this the old images pile
+# up in /var/lib/docker and fill / over repeated deploys/reboots.
+ExecStartPost=-/usr/bin/docker image prune -f
 ExecStop=/usr/bin/docker compose down
 ExecReload=/usr/bin/docker compose up -d --remove-orphans
 Restart=on-failure
