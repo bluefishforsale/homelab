@@ -178,6 +178,72 @@
         state: started
         daemon_reload: yes
 
+    # The registry exposes no on-disk cache-size metric, so publish one via
+    # node-exporter's textfile collector: du each per-upstream data dir.
+    - name: Ensure node-exporter textfile dir exists
+      ansible.builtin.file:
+        path: /data01/services/node-exporter/text_files
+        state: directory
+        mode: '0777'
+
+    - name: Install registry cache-size metric script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/registry-cache-size-metric
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          set -eu
+          DATA={{ home }}/data
+          OUT=/data01/services/node-exporter/text_files/registry_cache_size.prom
+          TMP=$(mktemp "$OUT.XXXXXX")
+          trap 'rm -f "$TMP"' EXIT
+          printf '# HELP registry_cache_size_bytes On-disk size of the registry pull-through cache per upstream.\n' > "$TMP"
+          printf '# TYPE registry_cache_size_bytes gauge\n' >> "$TMP"
+          for d in docker-hub ghcr gitlab nvcr; do
+            [ -d "$DATA/$d" ] || continue
+            bytes=$(du -sb "$DATA/$d" | cut -f1)
+            printf 'registry_cache_size_bytes{upstream="%s"} %s\n' "$d" "$bytes" >> "$TMP"
+          done
+          chmod 0644 "$TMP"
+          mv "$TMP" "$OUT"
+          trap - EXIT
+
+    - name: Publish cache size metric now (don't wait for the timer)
+      ansible.builtin.command: /usr/local/sbin/registry-cache-size-metric
+      changed_when: false
+
+    - name: Install registry cache-size metric service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/registry-cache-size-metric.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Publish registry cache size to node-exporter textfile collector
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/registry-cache-size-metric
+
+    - name: Install registry cache-size metric timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/registry-cache-size-metric.timer
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Refresh registry cache size metric every 10 minutes
+          [Timer]
+          OnBootSec=3min
+          OnUnitActiveSec=10min
+          Unit=registry-cache-size-metric.service
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable registry cache-size metric timer
+      ansible.builtin.systemd:
+        name: registry-cache-size-metric.timer
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
   handlers:
     - name: Reload systemd daemon
       ansible.builtin.systemd:
