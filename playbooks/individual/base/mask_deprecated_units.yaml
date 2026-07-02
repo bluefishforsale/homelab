@@ -1,0 +1,25 @@
+---
+# Mask systemd units that are deprecated or can never succeed on a given host,
+# so they stop firing SystemdUnitFailed. Per-host list via the `masked_units`
+# inventory var (default empty):
+#   - named.service on dns01/dns02  (replaced by the powerdns container)
+#   - openipmi.service on VMs        (no IPMI hardware)
+#   - nvidia-gpu-exporter on non-GPU hosts
+- name: Mask deprecated/absent systemd units
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Mask units listed in masked_units
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        masked: true
+        enabled: false
+        state: stopped
+      loop: "{{ masked_units | default([]) }}"
+
+    - name: Clear failed state so the alert drops
+      ansible.builtin.command: "systemctl reset-failed {{ item }}"
+      loop: "{{ masked_units | default([]) }}"
+      changed_when: false
+      failed_when: false
