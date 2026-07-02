@@ -73,25 +73,25 @@ groups:
     expr: |
       probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"} == 0
       or
-      (1 - avg_over_time(probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"}[5m])) > 0.05
-    for: 5m
+      (1 - avg_over_time(probe_success{job="blackbox-tcp-plex", instance!="1.1.1.1:443"}[10m])) > 0.15
+    for: 10m
     labels:
       severity: critical
     annotations:
       summary: "Plex WAN path degraded ({{ "{{ $labels.instance }}" }})"
-      description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} failing or losing >5% for 5m. Open the WAN Path Diagnosis dashboard to see which hop."
+      description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} failing or losing >15% over 10m, for 10m. Open the WAN Path Diagnosis dashboard to see which hop."
 
   # General internet WAN path degraded — both Cloudflare and Google anchors
   # losing >5%. Distinguishes 'internet bad' from 'specifically Plex bad'.
   - alert: WANInternetDegraded
     expr: |
-      (1 - avg_over_time(probe_success{job="blackbox-icmp", instance=~"1\\.1\\.1\\.1|8\\.8\\.8\\.8"}[5m])) > 0.05
-    for: 5m
+      (1 - avg_over_time(probe_success{job="blackbox-icmp", instance=~"1\\.1\\.1\\.1|8\\.8\\.8\\.8"}[10m])) > 0.15
+    for: 10m
     labels:
       severity: warning
     annotations:
       summary: "WAN internet path degraded ({{ "{{ $labels.instance }}" }})"
-      description: "ICMP loss to {{ "{{ $labels.instance }}" }} >5% for 5m — general internet anchor unhealthy."
+      description: "ICMP loss to {{ "{{ $labels.instance }}" }} >15% over 10m, for 10m — general internet anchor unhealthy."
 
   # ConntrackTablePressure deferred — unpoller is not exposing metrics on
   # this gateway (service not running on ocean / endpoint returns empty).
