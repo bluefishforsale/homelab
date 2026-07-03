@@ -10,13 +10,22 @@
   become: true
   gather_facts: false
   tasks:
+    # Stop/disable first (tolerant): can't stop a unit in the same call that
+    # masks it, and the unit may already be inactive or absent.
+    - name: Stop and disable units before masking
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ masked_units | default([]) }}"
+      failed_when: false
+
     - name: Mask units listed in masked_units
       ansible.builtin.systemd:
         name: "{{ item }}"
         masked: true
-        enabled: false
-        state: stopped
       loop: "{{ masked_units | default([]) }}"
+      failed_when: false
 
     - name: Clear failed state so the alert drops
       ansible.builtin.command: "systemctl reset-failed {{ item }}"
