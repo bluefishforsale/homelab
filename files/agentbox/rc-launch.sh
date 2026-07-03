@@ -8,6 +8,10 @@
 #  2. "Enable Remote Control? (y/n)" is re-asked on EVERY launch and needs a
 #     TTY; cached grove_enabled does not suppress it. Run under `expect` to
 #     give it a pty, auto-answer y, then block on eof so the unit stays active.
+# The spawn-mode prompt ([1] same-dir / [2] worktree) that newer Claude Code
+# shows on first launch of a project IS flagged: pass --spawn=same-dir so a
+# fresh lane doesn't hang forever waiting for a keypress (it never connects,
+# no :443 socket). same-dir matches the previous default behaviour.
 #
 # ponytail: auto-confirming the prompt + the undocumented trust key are both
 # unsupported community patterns; re-verify after a Claude Code upgrade.
@@ -18,7 +22,7 @@ repo="$1"
 
 exec expect -c "
   set timeout -1
-  spawn -noecho claude remote-control --name ${repo}
+  spawn -noecho claude remote-control --name ${repo} --spawn=same-dir
   expect {
     \"Enable Remote Control?\" { send \"y\r\"; exp_continue }
     eof
