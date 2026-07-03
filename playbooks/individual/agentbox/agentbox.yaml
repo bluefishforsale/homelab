@@ -304,6 +304,79 @@
       daemon_reload: yes
     loop: "{{ agentbox_rc_repos }}"
 
+  # An RC lane's websocket to claude.ai can die silently: the process stays
+  # alive (so Restart=always never fires) but stops receiving, and the app sees
+  # a dead environment. A healthy lane receives keepalive data every few seconds,
+  # so a lane with no claude child, no ESTABLISHED :443 socket, or no inbound for
+  # 3 minutes is hung — restart it.
+  - name: Install RC liveness watchdog script
+    ansible.builtin.copy:
+      dest: /usr/local/sbin/agentbox-rc-watchdog
+      mode: '0755'
+      content: |
+        #!/bin/sh
+        set -eu
+        STALE_MS=180000
+        systemctl list-units 'agentbox-rc@*.service' --state=active --no-legend --plain 2>/dev/null \
+          | awk '{print $1}' | while read -r unit; do
+            lane=$(echo "$unit" | sed -E 's/agentbox-rc@(.*)\.service/\1/')
+            exp=$(pgrep -f "claude remote-control --name $lane" | head -1 || true)
+            cpid=""
+            [ -n "$exp" ] && cpid=$(pgrep -P "$exp" -x claude | head -1 || true)
+            reason=""
+            if [ -z "$cpid" ]; then
+              reason="no claude process"
+            else
+              age=$(ps -o etimes= -p "$cpid" 2>/dev/null | tr -d ' ' || echo 0)
+              maxrcv=$(ss -tinp state established "dst :443" 2>/dev/null \
+                | grep -A1 "pid=$cpid," | grep -oE 'lastrcv:[0-9]+' \
+                | cut -d: -f2 | sort -n | tail -1 || true)
+              if [ -z "$maxrcv" ]; then
+                # grace: a freshly-spawned claude takes a few seconds to connect
+                [ "${age:-0}" -ge 90 ] && reason="no :443 socket"
+              elif [ "$maxrcv" -gt "$STALE_MS" ]; then
+                reason="stale lastrcv=${maxrcv}ms"
+              fi
+            fi
+            if [ -n "$reason" ]; then
+              logger -t agentbox-rc-watchdog "restarting $lane: $reason"
+              systemctl restart "$unit"
+            fi
+          done
+
+  - name: Install RC watchdog service and timer
+    ansible.builtin.copy:
+      dest: "/etc/systemd/system/{{ item.name }}"
+      mode: '0644'
+      content: "{{ item.content }}"
+    loop:
+      - name: agentbox-rc-watchdog.service
+        content: |
+          [Unit]
+          Description=Restart hung agentbox RC lanes (dead websocket)
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/agentbox-rc-watchdog
+      - name: agentbox-rc-watchdog.timer
+        content: |
+          [Unit]
+          Description=Run the agentbox RC liveness watchdog every 2 minutes
+          [Timer]
+          OnBootSec=3min
+          OnUnitActiveSec=2min
+          Unit=agentbox-rc-watchdog.service
+          [Install]
+          WantedBy=timers.target
+    loop_control:
+      label: "{{ item.name }}"
+
+  - name: Enable RC watchdog timer
+    ansible.builtin.systemd:
+      name: agentbox-rc-watchdog.timer
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
   - name: Note remote-control requires manual login + repo clones
     ansible.builtin.debug:
       msg: "On agentbox: 'claude /login', clone each agentbox_rc_repos into repos/<repo>, then 'systemctl start agentbox-rc@<repo>.service'."
