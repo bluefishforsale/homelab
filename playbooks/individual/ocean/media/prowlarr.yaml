@@ -53,6 +53,13 @@
     - Reload exporter systemd daemon
     - Restart exporter service
 
+  - name: Enable and start prowlarr-exporter service
+    ansible.builtin.systemd:
+      name: prowlarr-exporter.service
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
   handlers:
   - name: Reload prowlarr systemd daemon
     ansible.builtin.systemd:

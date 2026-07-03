@@ -62,6 +62,13 @@
         - Reload exporter systemd daemon
         - Restart exporter service
 
+    - name: Enable and start radarr-exporter service
+      ansible.builtin.systemd:
+        name: radarr-exporter.service
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
   handlers:
     - name: Reload radarr systemd daemon
       ansible.builtin.systemd:
