@@ -231,6 +231,28 @@
       register: password_result
       until: password_result.rc == 0
 
+    # Host metrics: native node_exporter (pihole runs no docker), same as agentbox.
+    # Placed before DNS validation so a validation failure doesn't skip it.
+    - name: Install Prometheus node exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Enable systemd + processes collectors
+      ansible.builtin.copy:
+        dest: /etc/default/prometheus-node-exporter
+        content: |
+          # Managed by ansible (pi_hole.yaml)
+          ARGS="--collector.systemd --collector.processes"
+        mode: '0644'
+      notify: Restart node exporter
+
+    - name: Enable and start node exporter
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        enabled: true
+        state: started
+
     ############  DNS validation #####################
     - name: Wait for DNS service to be fully ready
       ansible.builtin.pause:
@@ -253,27 +275,6 @@
         msg:
           - "✓ Local DNS working - ocean.home resolves to: {{ local_dns_result.stdout }}"
           - "✓ External DNS working - google.com resolves to: {{ external_dns_result.stdout_lines[0] }}"
-
-    # Host metrics: native node_exporter (pihole runs no docker), same as agentbox.
-    - name: Install Prometheus node exporter
-      ansible.builtin.apt:
-        name: prometheus-node-exporter
-        state: present
-
-    - name: Enable systemd + processes collectors
-      ansible.builtin.copy:
-        dest: /etc/default/prometheus-node-exporter
-        content: |
-          # Managed by ansible (pi_hole.yaml)
-          ARGS="--collector.systemd --collector.processes"
-        mode: '0644'
-      notify: Restart node exporter
-
-    - name: Enable and start node exporter
-      ansible.builtin.systemd:
-        name: prometheus-node-exporter
-        enabled: true
-        state: started
 
   handlers:
     - name: Restart pihole-FTL
