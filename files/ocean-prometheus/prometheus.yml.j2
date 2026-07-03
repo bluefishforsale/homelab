@@ -48,7 +48,8 @@ scrape_configs:
     scrape_timeout: 30s
     relabel_configs: *dropPortNumber
     static_configs:
-{% for host in groups['all'] %}
+{# pihole runs no node_exporter (no Docker, no binary) #}
+{% for host in groups['all'] if host != 'pihole' %}
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 
@@ -60,14 +61,16 @@ scrape_configs:
   - job_name: 'cadvisor'
     relabel_configs: *dropPortNumber
     static_configs:
-{% for host in groups['all'] %}
+{# agentbox and pihole run no Docker, so no cadvisor container #}
+{% for host in groups['all'] if host not in ['agentbox', 'pihole'] %}
     - targets: ['{{ host }}.home:8912']
 {% endfor %}
 
   - job_name: 'fail2ban-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
-{% for host in groups['all'] %}
+{# agentbox and pihole run no Docker, so no fail2ban-exporter container #}
+{% for host in groups['all'] if host not in ['agentbox', 'pihole'] %}
     - targets: ['{{ host }}.home:9191']
 {% endfor %}
 
