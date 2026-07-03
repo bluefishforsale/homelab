@@ -1,34 +1,39 @@
 ---
 # Mask systemd units that are deprecated or can never succeed on a given host,
 # so they stop firing SystemdUnitFailed. Per-host list via the `masked_units`
-# inventory var (default empty):
+# inventory var (comma-separated string, default empty):
 #   - named.service on dns01/dns02  (replaced by the powerdns container)
 #   - openipmi.service on VMs        (no IPMI hardware)
 #   - nvidia-gpu-exporter on non-GPU hosts
+# ini host vars arrive as strings, so split on comma rather than expecting a list.
 - name: Mask deprecated/absent systemd units
   hosts: all
   become: true
   gather_facts: false
   tasks:
+    - name: Compute unit list from the masked_units string
+      ansible.builtin.set_fact:
+        _masked_units: "{{ (masked_units | default('') | string).split(',') | map('trim') | select | list }}"
+
     # Stop/disable first (tolerant): can't stop a unit in the same call that
-    # masks it, and the unit may already be inactive or absent.
+    # masks it, and the unit may already be inactive, masked, or absent.
     - name: Stop and disable units before masking
       ansible.builtin.systemd:
         name: "{{ item }}"
         state: stopped
         enabled: false
-      loop: "{{ masked_units | default([]) }}"
+      loop: "{{ _masked_units }}"
       failed_when: false
 
-    - name: Mask units listed in masked_units
+    - name: Mask units
       ansible.builtin.systemd:
         name: "{{ item }}"
         masked: true
-      loop: "{{ masked_units | default([]) }}"
+      loop: "{{ _masked_units }}"
       failed_when: false
 
     - name: Clear failed state so the alert drops
       ansible.builtin.command: "systemctl reset-failed {{ item }}"
-      loop: "{{ masked_units | default([]) }}"
+      loop: "{{ _masked_units }}"
       changed_when: false
       failed_when: false
