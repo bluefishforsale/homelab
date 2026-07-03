@@ -48,8 +48,7 @@ scrape_configs:
     scrape_timeout: 30s
     relabel_configs: *dropPortNumber
     static_configs:
-{# pihole runs no node_exporter (no Docker, no binary) #}
-{% for host in groups['all'] if host != 'pihole' %}
+{% for host in groups['all'] %}
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 
