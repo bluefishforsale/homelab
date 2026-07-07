@@ -119,13 +119,17 @@
   # loop needs only gh + claude + opencode). Its apt repo also breaks on Google's
   # rotated signing key. Re-add later by dearmoring the key:
   #   curl -fsSL .../apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+  # state: latest, not present: remote-control is a fast-moving beta whose
+  # client/server protocol desyncs when the CLI falls behind (an old CLI holds
+  # a live socket but spawns no session). Keep claude-code current so RC works.
   - name: Install Claude Code and GitHub CLI
     ansible.builtin.apt:
       name:
         - claude-code
         - gh
-      state: present
+      state: latest
       update_cache: yes
+    notify: Restart RC sessions
 
   # The npm package's postinstall is flaky at fetching the platform binary; the
   # official installer drops a self-contained binary. Install as the user (it
