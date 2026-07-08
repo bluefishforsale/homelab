@@ -79,9 +79,15 @@ services:
       RACK_ENV: "production"
     ports:
       - "{{ exporter_port }}:{{ exporter_port }}"
+    # Gate only on plex having started, not on it being healthy. The exporter
+    # must stay up while Plex is unhealthy or in a restart loop, since that is
+    # exactly when its metrics matter most. Waiting for service_healthy meant a
+    # sick Plex left the exporter uncreated, so Prometheus saw the target down
+    # (ServiceDown) and the outage went unobserved. The exporter already
+    # tolerates a not-yet-ready Plex via PLEX_TIMEOUT/PLEX_RETRIES_COUNT.
     depends_on:
       plex:
-        condition: service_healthy
+        condition: service_started
     deploy:
       resources:
         limits:
