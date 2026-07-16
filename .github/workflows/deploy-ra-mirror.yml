@@ -1,0 +1,68 @@
+---
+name: Deploy ra_mirror
+
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_branch:
+        description: "Git branch in the ra_mirror repo to deploy (image tag, informational)"
+        required: false
+        default: "main"
+        type: string
+
+  # Webhook trigger from the ra_mirror repository
+  repository_dispatch:
+    types: [deploy-ra-mirror]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  deploy:
+    name: Deploy ra_mirror
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Run deployment playbook
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ansible-playbook \
+            -i inventories/production/hosts.ini \
+            --vault-password-file=/tmp/.vault_pass \
+            playbooks/individual/ocean/services/ra_mirror.yaml
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      - name: Post-deployment health check
+        if: success()
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 5
+          if timeout 10 bash -c "curl -f -s -o /dev/null http://192.168.1.143:8099/radiantatmospheres.com/"; then
+            echo "✅ ra_mirror responding on ocean:8099"
+          else
+            echo "⚠️  ra_mirror not responding on port 8099"
+            exit 1
+          fi

@@ -1,0 +1,78 @@
+---
+# ra_mirror: static nginx mirror of radiantatmospheres.com on ocean
+- name: Deploy ra_mirror static site using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: ra_mirror
+    image: ghcr.io/bluefishforsale/ra_mirror
+    version: latest
+    http_port: 8099
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/ra_mirror"
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    uid: 1001
+    gid: 1001
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull ra_mirror image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart ra_mirror service
+
+  - name: Create ra_mirror systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/ra_mirror.service.j2"
+      dest: "/etc/systemd/system/ra_mirror.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart ra_mirror service
+
+  - name: Enable ra_mirror service
+    ansible.builtin.systemd:
+      name: ra_mirror.service
+      enabled: yes
+      daemon_reload: yes
+
+  # Always restart so a new :latest image gets pulled.
+  - name: Restart ra_mirror service to pick up latest image
+    ansible.builtin.systemd:
+      name: ra_mirror.service
+      state: restarted
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart ra_mirror service
+    ansible.builtin.systemd:
+      name: ra_mirror.service
+      state: restarted

@@ -1,0 +1,21 @@
+services:
+  ra_mirror:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    ports:
+      - "0.0.0.0:{{ http_port }}:80"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/radiantatmospheres.com/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    security_opt:
+      - no-new-privileges:true
+
+    network_mode: bridge
