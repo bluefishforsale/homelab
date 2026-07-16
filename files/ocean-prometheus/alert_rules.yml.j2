@@ -57,14 +57,24 @@ groups:
   # Plex unreachable from plex-exporter (exporter is scraping but Plex isn't
   # responding). Catches OOM/crash loops the generic ServiceDown alert misses
   # because the exporter itself stays up.
+  #
+  # The second clause is what actually catches a restart loop: a bare
+  # `plex_up == 0` flips to false on every brief "up" between crashes, which
+  # resets the `for` timer so a flapping loop never fires. avg_over_time stays
+  # low across the whole window, so a Plex that is up less than half the time
+  # over 10m trips the alert too. The hard-down clause keeps the original 5m
+  # latency for a clean outage.
   - alert: PlexDown
-    expr: plex_up == 0
+    expr: |
+      plex_up == 0
+      or
+      avg_over_time(plex_up[10m]) < 0.5
     for: 5m
     labels:
       severity: critical
     annotations:
       summary: "Plex is unreachable from plex-exporter on {{ "{{ $labels.instance }}" }}"
-      description: "plex_up has been 0 for more than 5 minutes on {{ "{{ $labels.instance }}" }} — Plex is down or in a restart loop"
+      description: "plex_up has been 0 for 5m, or up less than half the time over 10m, on {{ "{{ $labels.instance }}" }}. Plex is down or in a restart loop."
 
   # WAN path to Plex is degraded — TCP/443 to Plex API or pubsub failing
   # or losing >5%. Excludes 1.1.1.1:443 (control), so this fires only when
