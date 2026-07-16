@@ -106,10 +106,11 @@
     - Reload systemd daemon
     - Restart tautulli service
   
-  - name: Enable tautulli service
+  - name: Enable and start tautulli service
     ansible.builtin.systemd:
       name: tautulli.service
       enabled: yes
+      state: started
       daemon_reload: yes
 
   - name: Recreate containers if config changed
