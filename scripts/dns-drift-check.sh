@@ -54,7 +54,7 @@ diff_zone() {
     printf "  ${GREEN}in sync${NC}   %-28s (%s records)\n" "$zone" "$(wc -l <"$tmp/a")"
   else
     printf "  ${RED}DIVERGED${NC}  %s\n" "$zone"
-    diff "$tmp/a" "$tmp/b" | grep -E '^[<>]' | sed "s/^</    ${A} only:/;s/^>/    ${B} only:/"
+    diff "$tmp/a" "$tmp/b" | grep -E '^[<>]' | sed "s/^</    ${A} only:/;s/^>/    ${B} only:/" || true
     fail=1
   fi
 }
