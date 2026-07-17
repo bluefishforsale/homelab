@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DNS Parity Check - Compare BIND (dns01) vs PowerDNS (dns02)
+# DNS Parity Check - Compare the two PowerDNS HA nodes (dns01 vs dns02)
 #
 # Queries every known record against both DNS servers using dig,
 # compares responses, and reports pass/fail with color-coded output.
@@ -66,20 +66,20 @@ check_record() {
 
   if [[ -z "$old_result" && -z "$new_result" ]]; then
     printf "  ${YELLOW}⊘ SKIP${NC}  %-45s (both empty)\n" "$label"
-    ((SKIP++))
+    SKIP=$((SKIP+1))
     return
   fi
 
   if [[ "$old_result" == "$new_result" ]]; then
     printf "  ${GREEN}✅ PASS${NC}  %-45s %s\n" "$label" "$old_result"
-    ((PASS++))
+    PASS=$((PASS+1))
   else
     printf "  ${RED}❌ FAIL${NC}  %-45s\n" "$label"
     if [[ "$VERBOSE" == true ]] || true; then
       printf "           ${CYAN}old:${NC} %s\n" "${old_result:-<empty>}"
       printf "           ${CYAN}new:${NC} %s\n" "${new_result:-<empty>}"
     fi
-    ((FAIL++))
+    FAIL=$((FAIL+1))
   fi
 
   if [[ "$VERBOSE" == true ]]; then
@@ -99,25 +99,25 @@ check_soa() {
 
   if [[ -z "$old_result" && -z "$new_result" ]]; then
     printf "  ${YELLOW}⊘ SKIP${NC}  %-45s (both empty)\n" "$label"
-    ((SKIP++))
+    SKIP=$((SKIP+1))
     return
   fi
 
   if [[ "$old_result" == "$new_result" ]]; then
     printf "  ${GREEN}✅ PASS${NC}  %-45s (serial ignored)\n" "$label"
-    ((PASS++))
+    PASS=$((PASS+1))
   else
     printf "  ${RED}❌ FAIL${NC}  %-45s\n" "$label"
     printf "           ${CYAN}old:${NC} %s\n" "${old_result:-<empty>}"
     printf "           ${CYAN}new:${NC} %s\n" "${new_result:-<empty>}"
-    ((FAIL++))
+    FAIL=$((FAIL+1))
   fi
 }
 
 echo ""
 echo -e "${BOLD}DNS Parity Check${NC}"
-echo -e "  Old server (BIND):     ${OLD_SERVER}"
-echo -e "  New server (PowerDNS): ${NEW_SERVER}"
+echo -e "  dns01 (PowerDNS):      ${OLD_SERVER}"
+echo -e "  dns02 (PowerDNS):      ${NEW_SERVER}"
 echo ""
 
 # ---------------------------------------------------------------------------
