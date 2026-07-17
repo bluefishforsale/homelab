@@ -29,6 +29,7 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 ### Troubleshooting
 
 - **Common Issues** → [`docs/troubleshooting/common-issues.md`](docs/troubleshooting/common-issues.md)
+- **Internal DNS flapping / hostname collisions** → [`docs/troubleshooting/common-issues.md#internal-dns-intermittent--flapping-home-answers`](docs/troubleshooting/common-issues.md#internal-dns-intermittent--flapping-home-answers) · check with [`scripts/dns-drift-check.sh`](scripts/dns-drift-check.sh)
 
 ### CI/CD & Automation
 
