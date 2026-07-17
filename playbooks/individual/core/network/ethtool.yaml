@@ -12,7 +12,7 @@
 
     - name: Gather list of all network interfaces excluding unwanted types
       ansible.builtin.shell: |
-        ip -o link show | awk -F': ' '{print $2}' | grep -Ev '^(lo|vmbr|tap|veth|bond)'
+        ip -o link show | awk -F': ' '{print $2}' | grep -Ev '^(lo|vmbr|tap|veth|bond|docker|br-|dummy|virbr)'
       register: network_interfaces
       changed_when: false
 
