@@ -1,6 +1,11 @@
 # llamacpp Model Configuration for RTX 3090 (24GB VRAM)
 # Optimized for single-user reasoning with max context in 16GB VRAM budget
 
+# The one model actually loaded at runtime. Single source of truth: the deploy
+# downloads ONLY this file (skipped if already present) and docker-compose loads
+# it via --model. Change this one value to switch models.
+llamacpp_active_model: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+
 llamacpp_models:
   reasoning:
     # Active model: MoE 35B / ~3B active, native tool-calling, ~100 tok/s on a

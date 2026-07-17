@@ -74,8 +74,8 @@
       - "{{ llamacpp_models | dict2items }}"
       - value
     when:
+      - item.1.name == llamacpp_active_model
       - item.1.requires_auth | default(false)
-      - item.1.priority <= 2
       - ai_services.huggingface.token is defined
       - ai_services.huggingface.token != ''
     tags:
@@ -99,8 +99,8 @@
       - "{{ llamacpp_models | dict2items }}"
       - value
     when:
+      - item.1.name == llamacpp_active_model
       - not (item.1.requires_auth | default(false))
-      - item.1.priority <= 2
     tags:
       - models
       - download
