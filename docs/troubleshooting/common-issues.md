@@ -588,4 +588,39 @@ memtest86+ (boot from USB)
 stress-ng --cpu 4 --timeout 60s
 ```
 
+## Internal DNS: intermittent / flapping `.home` answers
+
+**Symptom:** a `.home` name resolves to a different IP on repeat lookups, or works
+sometimes and not others.
+
+**Architecture that makes it happen:** the dns-stack is **dual-primary with no
+replication**. dns01 (192.168.1.2) and dns02 (192.168.1.3) each run their own
+PowerDNS + Kea DHCP + kea-dhcp-ddns, and Kea DDNS-updates only its *local*
+PowerDNS (`127.0.0.1:53`). pihole (192.168.1.9) forwards `.home` to **both**
+(`server=/home/192.168.1.2` and `/home/192.168.1.3` in
+`files/pihole/etc/dnsmasq.d/02-local-dns.conf`), answering from whichever
+replies first. So any per-server divergence surfaces to clients as flapping.
+
+**Root cause of the divergence:** a multi-interface device announcing **one DHCP
+hostname on two MACs**. Each NIC gets its own pool IP (pool `.150–.239`), each
+DDNS-registers the same name, and Kea's DHCID conflict-checking then locks a
+*different* winner on each PowerDNS. Result: forward A flaps between the two IPs
+and both IPs get a PTR back to the name. `ddns-update-on-renew: true` means the
+two servers intermittently reconverge and re-split, so a one-shot `dig` can look
+fine.
+
+**Diagnose:**
+```bash
+# cross-server AXFR diff (symptom) + Kea lease hostname-collision scan (cause)
+./scripts/dns-drift-check.sh                 # exit 1 if drift/collisions found
+./scripts/dns-parity-check.sh                # static/reserved records only
+```
+
+**Fix:** for each colliding device, add a Kea reservation per interface MAC in
+`files/dns-stack/kea-dhcp4.conf.j2` (`reservations`) with a stable IP and a
+**distinct** hostname (e.g. `tautog` / `tautog-wifi`), deploy, then delete the
+stale dynamic A/PTR records from both PowerDNS via the API. Reservations are how
+stable hosts (ocean-bond0/eth0) already avoid this. There is no lease-DB or zone
+replication between the two servers by design — do not assume AXFR sync.
+
 This troubleshooting guide addresses the most common issues encountered in your homelab environment, providing systematic approaches to diagnosis and resolution while maintaining the idempotency principles essential to your infrastructure.
