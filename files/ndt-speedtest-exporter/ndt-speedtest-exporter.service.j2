@@ -1,0 +1,26 @@
+[Unit]
+Description={{ ndt_exporter_service }}
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=30s
+TimeoutStartSec=120s
+ExecStartPre=-docker rm -f {{ ndt_exporter_service }}
+ExecStart=docker run --rm \
+    --name {{ ndt_exporter_service }} \
+    --hostname {{ ndt_exporter_service }} \
+    -e TZ=America/Los_Angeles \
+    -e NDT_INTERVAL_SECONDS={{ ndt_exporter_interval }} \
+    -e NDT_MAX_SERVERS={{ ndt_exporter_max_servers }} \
+    -p {{ ndt_exporter_port }}:9140 \
+    {{ ndt_exporter_image }}
+ExecStop=docker rm -f {{ ndt_exporter_service }}
+
+[Install]
+WantedBy=multi-user.target

@@ -150,6 +150,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:8096']
 
+  - job_name: 'ndt-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 5m
+    scrape_timeout: 90s
+    static_configs:
+    - targets: ['ocean.home:9140']
+
   - job_name: 'mtr-exporter'
     relabel_configs: *dropPortNumber
     scrape_interval: 60s
