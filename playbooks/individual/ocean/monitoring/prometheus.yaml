@@ -24,10 +24,6 @@
     blackbox_exporter_image: prom/blackbox-exporter
     blackbox_exporter_version: master
     blackbox_exporter_port: "{{ service_ports.blackbox_exporter.port }}"
-    ndt_exporter_service: ndt-exporter
-    ndt_exporter_image: bluefishforsale/ndt-speedtest-exporter
-    ndt_exporter_version: latest
-    ndt_exporter_port: "{{ service_ports.ndt_exporter.port }}"
     mtr_exporter_service: mtr-exporter
     mtr_exporter_image: dragoonaethis/mtr-exporter
     mtr_exporter_version: "0.3.0"
@@ -281,17 +277,6 @@
     - Reload systemd daemon
     - Restart blackbox-exporter service
 
-  - name: Create systemd ndt-exporter.service
-    ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - ndt-exporter.service
-    notify:
-    - Reload systemd daemon
-    - Restart ndt-exporter service
-
   - name: Create systemd mtr-exporter.service
     ansible.builtin.template:
       src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
@@ -313,12 +298,6 @@
   - name: Start and enable blackbox-exporter service
     ansible.builtin.systemd:
       name: blackbox-exporter.service
-      state: started
-      enabled: true
-
-  - name: Start and enable ndt-exporter service
-    ansible.builtin.systemd:
-      name: ndt-exporter.service
       state: started
       enabled: true
 
@@ -365,11 +344,6 @@
   - name: Restart blackbox-exporter service
     ansible.builtin.systemd:
       name: blackbox-exporter.service
-      state: restarted
-
-  - name: Restart ndt-exporter service
-    ansible.builtin.systemd:
-      name: ndt-exporter.service
       state: restarted
 
   - name: Restart mtr-exporter service

@@ -54,9 +54,6 @@ service_ports:
   blackbox_exporter:
     port: 9115
 
-  ndt_exporter:
-    port: 9140
-
   mtr_exporter:
     port: 9141
 
@@ -104,15 +101,6 @@ service_ports:
 
   nzbget_exporter:
     port: 9452
-
-  # =============================================================================
-  # Log Anomaly Detection (host APIs only)
-  # =============================================================================
-  log_anomaly_detector:
-    port: 8086
-
-  log_anomaly_ml:
-    port: 8087
 
   # =============================================================================
   # AI/ML Services
