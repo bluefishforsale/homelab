@@ -1,0 +1,2 @@
+websockets>=12,<15
+prometheus_client>=0.20

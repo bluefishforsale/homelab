@@ -1,0 +1,72 @@
+---
+# NDT7 (M-Lab) multi-location speed-test exporter. Replaces the retired
+# bluefishforsale/ndt-speedtest-exporter. Builds a small python image on ocean
+# and runs it as a systemd docker service; Prometheus scrapes :9140 every 5m,
+# which is also the test cadence (NDT7 tests are light, so 5m does not saturate
+# the link).
+- name: Deploy NDT speedtest exporter
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars:
+    ndt_exporter_service: ndt-speedtest-exporter
+    ndt_exporter_image: "ndt-speedtest-exporter:local"
+    # Hardcoded (not vars_service_ports) so this deploy doesn't fan out to every
+    # playbook that references that shared file. Matches the prometheus scrape job.
+    ndt_exporter_port: 9140
+    ndt_exporter_interval: 300
+    ndt_exporter_max_servers: 4
+    src: "{{ playbook_dir }}/../../../../files/ndt-speedtest-exporter"
+    home: /data01/services/ndt-speedtest-exporter
+
+  tasks:
+    - name: Ensure build context dir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy build context (exporter, deps, Dockerfile)
+      ansible.builtin.copy:
+        src: "{{ src }}/{{ item }}"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - exporter.py
+        - requirements.txt
+        - Dockerfile
+      register: build_context
+
+    - name: Build exporter image
+      ansible.builtin.command:
+        cmd: "docker build -t {{ ndt_exporter_image }} ."
+        chdir: "{{ home }}"
+      when: build_context is changed
+      notify: Restart ndt-speedtest-exporter
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ src }}/ndt-speedtest-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ ndt_exporter_service }}.service"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart ndt-speedtest-exporter
+
+    - name: Enable and start ndt-speedtest-exporter
+      ansible.builtin.systemd:
+        name: "{{ ndt_exporter_service }}.service"
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart ndt-speedtest-exporter
+      ansible.builtin.systemd:
+        name: "{{ ndt_exporter_service }}.service"
+        state: restarted
