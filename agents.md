@@ -116,6 +116,30 @@ explicit-path staging.
 
 ---
 
+## Choice preferences (how terrac wants homelab work done)
+
+Distilled from prior decisions. Defaults, not laws, but don't override without a reason.
+
+- **Live through CI/CD.** Push, watch the pipeline, iterate. Keep responses terse and
+  evidence-backed; terrac is a strong critic of his own ideas, so push back rather than agree.
+- **PRD before code.** For non-trivial work, write a zero-ambiguity PRD with explicit
+  goals AND anti-goals first, then implement only against that scope. Grill the
+  requirements before writing code.
+- **New repos inherit the CI/CD deploy pattern** ([`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)) automatically.
+- **Fix through code, never manual SSH.** A playbook / workflow / runner-config change
+  is the fix; manual SSH to a host is the escape hatch, not the default. Manual edits
+  drift from IaC and get overwritten by the next apply.
+- **No `Co-Authored-By: Claude` trailers** on commits. Considered weak; never add them.
+- **Ansible house style:** FQCN modules (`ansible.builtin.*`), bare `true`/`false` (not
+  `yes`/`no`), quoted octal file modes, and pass package lists to `apt`'s `name` rather
+  than looping per item.
+- **Vault is a nested tree** (`ai_services.openai.api_key`, `network.unifi.monitoring_user`).
+  Reuse existing keys; never duplicate a secret across two locations.
+- **Local-first for sensitive data.** PII / FERPA / HIPAA-adjacent work defaults to
+  on-prem inference; cloud LLMs are explicit opt-in phase 2, never suggested unprompted.
+
+---
+
 ## Quick Reference
 
 **Primary Host:** ocean (192.168.1.143)
