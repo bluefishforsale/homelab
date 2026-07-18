@@ -11,15 +11,28 @@ groups:
       summary: "High CPU usage on {{ "{{ $labels.instance }}" }}"
       description: "CPU usage is above 80% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
 
-  # High memory usage alert
+  # High memory usage alert. The Proxmox hypervisors (node005/node006) run VMs
+  # that pre-allocate RAM, so they sit near-full by design; they get a higher
+  # 95% bar in the companion rule below. All other hosts alert at 85%.
   - alert: HighMemoryUsage
-    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+    expr: (node_memory_MemTotal_bytes{instance!~"node00[56].home"} - node_memory_MemAvailable_bytes{instance!~"node00[56].home"}) / node_memory_MemTotal_bytes{instance!~"node00[56].home"} * 100 > 85
     for: 5m
     labels:
       severity: warning
     annotations:
       summary: "High memory usage on {{ "{{ $labels.instance }}" }}"
       description: "Memory usage is above 85% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
+
+  # Hypervisor memory: node005/node006 run near-full by design, so only alert
+  # them at 95% — real host-memory exhaustion, not normal VM allocation.
+  - alert: HighMemoryUsageHypervisor
+    expr: (node_memory_MemTotal_bytes{instance=~"node00[56].home"} - node_memory_MemAvailable_bytes{instance=~"node00[56].home"}) / node_memory_MemTotal_bytes{instance=~"node00[56].home"} * 100 > 95
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on hypervisor {{ "{{ $labels.instance }}" }}"
+      description: "Memory usage is above 95% for more than 5 minutes on hypervisor {{ "{{ $labels.instance }}" }}"
 
   # High disk usage alert
   - alert: HighDiskUsage

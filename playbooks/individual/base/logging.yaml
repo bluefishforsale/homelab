@@ -65,6 +65,11 @@
     - Restart systemd-journald
 
   ########### System log rotation
+  - name: Remove stale logrotate.d/homelab (old filename; duplicates syslog/kern.log with the rsyslog config below and breaks logrotate)
+    ansible.builtin.file:
+      path: /etc/logrotate.d/homelab
+      state: absent
+
   - name: Configure logrotate for system logs
     ansible.builtin.copy:
       dest: /etc/logrotate.d/rsyslog
