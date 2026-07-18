@@ -1,5 +1,9 @@
 - name: Install Docker CE on Debian 12
   hosts: all
+  # Roll one host at a time: the daemon.json handler restarts dockerd, which
+  # bounces every container on the host. Never bounce the whole fleet at once.
+  serial: 1
+  max_fail_percentage: 0
   become: yes
   vars_files:
     - ../../../vault/secrets.yaml
@@ -111,6 +115,7 @@
       owner: root
       group: root
       mode: '0644'
+    notify: restart docker
 
   - name: Ensure docker service override directory exists
     ansible.builtin.file:
