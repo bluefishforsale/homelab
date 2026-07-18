@@ -24,7 +24,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import media_clients as mc  # noqa: E402
 
-APP = {"movies": ("radarr", "movie", "tmdbId"), "tv": ("sonarr", "series", "tvdbId")}
+# exclusion param name differs: radarr=addImportExclusion, sonarr=addImportListExclusion
+APP = {"movies": ("radarr", "movie", "tmdbId", "addImportExclusion"),
+       "tv": ("sonarr", "series", "tvdbId", "addImportListExclusion")}
 
 
 def size_of(it):
@@ -94,7 +96,7 @@ def main():
     p.add_argument("--yes", action="store_true")
     a = p.parse_args()
 
-    svc, kind, idfield = APP[a.service]
+    svc, kind, idfield, excl = APP[a.service]
     items = mc.get(svc, f"/api/v3/{kind}")
     targets = sorted(select(items, a), key=size_of, reverse=True)
     if not targets:
@@ -122,7 +124,7 @@ def main():
     ok = err = 0
     for it in todo:
         try:
-            mc.delete(svc, f"/api/v3/{kind}/{it['id']}", deleteFiles="true", addImportExclusion="true")
+            mc.delete(svc, f"/api/v3/{kind}/{it['id']}", deleteFiles="true", **{excl: "true"})
             ok += 1
             print(f"deleted {it['id']} {it.get('title')}")
         except Exception as e:
