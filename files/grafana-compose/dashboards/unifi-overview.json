@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {"type": "datasource", "uid": "grafana"},
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -23,80 +26,197 @@
       "id": 1,
       "type": "stat",
       "title": "Controller",
-      "description": "unifi_controller_up — 1 if unpoller is authenticating and scraping.",
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "unifi_controller_up \u2014 1 if unpoller is authenticating and scraping.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_controller_up", "legendFormat": "controller", "refId": "A"}
+        {
+          "expr": "unifi_controller_up",
+          "legendFormat": "controller",
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            {"type": "value", "options": {"0": {"color": "red", "text": "DOWN"}, "1": {"color": "green", "text": "UP"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "UP"
+                }
+              }
+            }
           ],
-          "color": {"mode": "thresholds"},
-          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         }
       },
-      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "value"}
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      }
     },
     {
       "id": 2,
       "type": "stat",
       "title": "Devices by type",
       "description": "Count of unifi_device_info series grouped by device type (uap, usw, ugw).",
-      "gridPos": {"h": 4, "w": 8, "x": 4, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "count by (type) (unifi_device_info)", "legendFormat": "{{type}}", "refId": "A"}
+        {
+          "expr": "count by (type) (unifi_device_info)",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"}
+          "color": {
+            "mode": "palette-classic"
+          }
         }
       },
-      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "textMode": "value_and_name"}
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      }
     },
     {
       "id": 3,
       "type": "stat",
       "title": "Connected clients",
       "description": "Distinct client MACs reporting transmit/receive series. Includes wired and wireless.",
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "count(group by (mac) (unifi_client_transmit_bytes_total))", "legendFormat": "total", "refId": "A"},
-        {"expr": "count(group by (mac) (unifi_client_transmit_bytes_total{wired=\"true\"}))", "legendFormat": "wired", "refId": "B"},
-        {"expr": "count(group by (mac) (unifi_client_transmit_bytes_total{wired=\"false\"}))", "legendFormat": "wireless", "refId": "C"}
+        {
+          "expr": "count(group by (mac) (unifi_client_transmit_bytes_total))",
+          "legendFormat": "total",
+          "refId": "A"
+        },
+        {
+          "expr": "count(group by (mac) (unifi_client_transmit_bytes_total{wired=\"true\"}))",
+          "legendFormat": "wired",
+          "refId": "B"
+        },
+        {
+          "expr": "count(group by (mac) (unifi_client_transmit_bytes_total{wired=\"false\"}))",
+          "legendFormat": "wireless",
+          "refId": "C"
+        }
       ],
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "textMode": "value_and_name"}
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      }
     },
     {
       "id": 4,
       "type": "stat",
       "title": "Controller info",
       "description": "Reference info: unpoller version, controller endpoint.",
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_controller_info", "legendFormat": "{{source}}", "refId": "A"}
+        {
+          "expr": "unifi_controller_info",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
       ],
-      "options": {"colorMode": "none", "graphMode": "none", "justifyMode": "center", "textMode": "name"}
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "name"
+      }
     },
     {
       "id": 5,
       "type": "timeseries",
       "title": "Device CPU utilization",
       "description": "Per-device CPU as a fraction of total. Watch for APs/switches climbing toward 1.",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_device_cpu_utilization_ratio", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "expr": "unifi_device_cpu_utilization_ratio",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "min": 0, "max": 1
+          "min": 0,
+          "max": 1
         }
       }
     },
@@ -105,15 +225,28 @@
       "type": "timeseries",
       "title": "Device memory utilization",
       "description": "Per-device memory as a fraction of installed.",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_device_memory_utilization_ratio", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "expr": "unifi_device_memory_utilization_ratio",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "min": 0, "max": 1
+          "min": 0,
+          "max": 1
         }
       }
     },
@@ -122,11 +255,27 @@
       "type": "timeseries",
       "title": "Gateway LAN throughput",
       "description": "UCG Max LAN-side receive (downstream to clients) and transmit (upstream from clients). Rate over 5m.",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "rate(unifi_device_lan_receive_bytes_total{name=\"UCG Max\"}[5m]) * 8", "legendFormat": "rx {{port}}", "refId": "A"},
-        {"expr": "rate(unifi_device_lan_transmit_bytes_total{name=\"UCG Max\"}[5m]) * 8", "legendFormat": "tx {{port}}", "refId": "B"}
+        {
+          "expr": "rate(unifi_device_lan_receive_bytes_total{name=\"UCG Max\"}[5m]) * 8",
+          "legendFormat": "rx {{port}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(unifi_device_lan_transmit_bytes_total{name=\"UCG Max\"}[5m]) * 8",
+          "legendFormat": "tx {{port}}",
+          "refId": "B"
+        }
       ],
       "fieldConfig": {
         "defaults": {
@@ -139,27 +288,56 @@
       "type": "timeseries",
       "title": "AP stations per radio",
       "description": "Number of clients associated with each AP radio (2.4 GHz / 5 GHz). Useful for spotting AP/band imbalance.",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_device_radio_stations", "legendFormat": "{{name}} {{radio_name}}", "refId": "A"}
+        {
+          "expr": "unifi_device_radio_stations",
+          "legendFormat": "{{name}} {{radio_name}}",
+          "refId": "A"
+        }
       ],
-      "fieldConfig": {"defaults": {"unit": "short"}}
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
     },
     {
       "id": 9,
       "type": "timeseries",
       "title": "AP channel utilization (total)",
       "description": "Combined airtime utilization per AP radio. Sustained >0.5 means the channel is congested.",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_device_radio_channel_utilization_total_ratio", "legendFormat": "{{name}} {{radio_name}}", "refId": "A"}
+        {
+          "expr": "unifi_device_radio_channel_utilization_total_ratio",
+          "legendFormat": "{{name}} {{radio_name}}",
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "min": 0, "max": 1
+          "min": 0,
+          "max": 1
         }
       }
     },
@@ -168,43 +346,274 @@
       "type": "timeseries",
       "title": "Switch port throughput (top 8 by current rate)",
       "description": "Bytes-per-second by switch port. Limited to the 8 ports with the most traffic over the current window to keep the legend usable.",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "topk(8, rate(unifi_device_port_receive_bytes_total[5m]) + rate(unifi_device_port_transmit_bytes_total[5m])) * 8", "legendFormat": "{{name}} :{{port_idx}}", "refId": "A"}
+        {
+          "expr": "topk(8, rate(unifi_device_port_receive_bytes_total[5m]) + rate(unifi_device_port_transmit_bytes_total[5m])) * 8",
+          "legendFormat": "{{name}} :{{port_idx}}",
+          "refId": "A"
+        }
       ],
-      "fieldConfig": {"defaults": {"unit": "bps"}}
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        }
+      }
     },
     {
       "id": 11,
       "type": "timeseries",
       "title": "Top 10 clients by combined rate",
       "description": "Rolling 5m rate of transmit + receive bytes per client (legend = client name or MAC).",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "topk(10, rate(unifi_client_transmit_bytes_total[5m]) + rate(unifi_client_receive_bytes_total[5m])) * 8", "legendFormat": "{{name}}", "refId": "A"}
+        {
+          "expr": "topk(10, rate(unifi_client_transmit_bytes_total[5m]) + rate(unifi_client_receive_bytes_total[5m])) * 8",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
       ],
-      "fieldConfig": {"defaults": {"unit": "bps"}}
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        }
+      }
     },
     {
       "id": 12,
       "type": "timeseries",
       "title": "Client wireless signal (RSSI)",
       "description": "Per-client RSSI in dB. Closer to 0 is stronger. Useful for spotting weak-signal clients.",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44},
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        {"expr": "unifi_client_rssi_db{wired=\"false\"}", "legendFormat": "{{name}} ({{ap_name}})", "refId": "A"}
+        {
+          "expr": "unifi_client_rssi_db{wired=\"false\"}",
+          "legendFormat": "{{name}} ({{ap_name}})",
+          "refId": "A"
+        }
       ],
-      "fieldConfig": {"defaults": {"unit": "none"}}
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "WiFi Client Quality (by band)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Client PHY rx-rate by band (low lines = stuck on 2.4GHz)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "unifi_client_radio_receive_rate_bps{wired=\"false\"}",
+          "refId": "A",
+          "legendFormat": "{{name}} \u00b7 {{radio_proto}} ch{{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Wireless clients by band",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 62
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count by (radio) (unifi_client_rssi_db{wired=\"false\"})",
+          "refId": "A",
+          "legendFormat": "{{radio}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "WiFi client quality (current)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 18,
+        "x": 6,
+        "y": 62
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "unifi_client_radio_receive_rate_bps{wired=\"false\"}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "bssid": true,
+              "gw_name": true,
+              "instance": true,
+              "job": true,
+              "mac": true,
+              "oui": true,
+              "site_name": true,
+              "source": true,
+              "network": true,
+              "radio_name": true,
+              "radio_desc": true,
+              "wired": true,
+              "ip": true,
+              "essid": true
+            },
+            "renameByName": {
+              "Value": "rx_phy_bps",
+              "name": "client",
+              "radio_proto": "band",
+              "ap_name": "AP",
+              "channel": "ch"
+            }
+          }
+        }
+      ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 38,
-  "tags": ["unifi", "network", "unpoller"],
-  "templating": {"list": []},
-  "time": {"from": "now-6h", "to": "now"},
+  "tags": [
+    "unifi",
+    "network",
+    "unpoller"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "UniFi Overview",
