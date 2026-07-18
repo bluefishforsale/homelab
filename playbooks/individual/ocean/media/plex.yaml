@@ -85,13 +85,25 @@
       state: absent
     tags: [config, plex]
 
-  - name: Create preferences file
+  - name: Check for Plex preferences seed (gitignored bootstrap file, absent in CI)
+    ansible.builtin.stat:
+      path: "{{ files }}/config/preferences.xml"
+    delegate_to: localhost
+    become: false
+    register: plex_prefs_seed
+    tags: [config, plex]
+
+  # Plex generates Preferences.xml (server identity + token) on first run and it
+  # must not be clobbered on every deploy; the seed is gitignored so it is absent
+  # on the CI runner. Only template it for a genuine first-time bootstrap.
+  - name: Create preferences file (first-time bootstrap only; skipped when seed absent)
     ansible.builtin.template:
       src: "{{ files }}/config/preferences.xml"
       dest: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/Preferences.xml"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
+    when: plex_prefs_seed.stat.exists
     register: plex_preferences_result
     tags: [config, plex]
 
@@ -140,7 +152,7 @@
 
   - name: Create meta_manager_home preferences file
     ansible.builtin.template:
-      src: "{{ files }}/meta-manager/config.yml"
+      src: "{{ files }}/meta-manager/config.yml.j2"
       dest: "{{ meta_manager_home }}/config/config.yml"
       mode: '0644'
       owner: "{{ user }}"
