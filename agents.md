@@ -40,6 +40,29 @@ Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD acro
 
 ---
 
+## Deploy gotchas (READ before shipping a change)
+
+These bite every agent that doesn't know them up front:
+
+- **Default branch is `master`, not `main`.** Open PRs against `master`.
+- **Merge to `master` auto-deploys to production.** `main-apply.yml` runs a real
+  `ansible-playbook` apply (not a dry run) on push to master. Merge IS deploy —
+  there is no separate deploy step to gate.
+- **CI green is lint/syntax only.** `ci-validate.yml` never touches live hosts, so a
+  playbook can pass CI and still fail at deploy. After merging, watch the
+  `main-apply.yml` run — that is where the deploy actually succeeds or fails.
+- **`main-apply`'s own post-deploy health is `continue-on-error`.** A DEGRADED deploy
+  still reports the job green. For real health verification use `health-check.yml`
+  (exits 1 on unhealthy), the `scripts/*-check.sh` tools, or `scripts/homelab-health.sh`
+  (fleet-wide diff).
+- **Squash-merge only.** `main-apply` detects impact via `git diff HEAD~1 HEAD`, which
+  assumes one commit per merge.
+- **Deploy path filter.** Only `playbooks/**`, `files/**`, `roles/**`,
+  `vars/**/*.yaml`, `.github/workflows/**` trigger CI + `main-apply`. Changes outside
+  those (e.g. `scripts/`, `docs/`, `.claude/`) silently do NOT deploy — no CI, no apply.
+
+---
+
 ## Multi-agent coordination
 
 Rules for when more than one agent (or a human plus agents) changes this repo.
