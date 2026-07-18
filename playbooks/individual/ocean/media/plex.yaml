@@ -45,7 +45,7 @@
     exporter_version: latest
     exporter_port: "{{ service_ports.plex_exporter.port }}"
     meta_manager_service: plex-meta-manager
-    meta_manager_image: meisnate12/plex-meta-manager
+    meta_manager_image: kometateam/kometa
     meta_manager_version: latest
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-plex"

@@ -4,30 +4,29 @@ libraries:                                      # This is called out once within
     metadata_path:
     - file: config/Movies.yml                   # This is a local file on the system
     - folder: config/movies/                    # This is a local directory on the system
-    - pmm: seasonal
-    - pmm: basic                                # This is a file within the defaults folder in the Repository
-    - pmm: imdb                                 # This is a file within the defaults folder in the Repository
-    - pmm: franchise
+    - default: seasonal
+    - default: basic                                # This is a file within the defaults folder in the Repository
+    - default: imdb                                 # This is a file within the defaults folder in the Repository
+    - default: franchise
       template_variables:
         collection_order: release
         build_collection: true
         radarr_add_missing: true
-    - pmm: studio
-    - pmm: tautulli
-    - pmm: content_rating_us
-    - pmm: oscars
-    - pmm: cannes
-    - pmm: sundance
-    - pmm: director
+    - default: studio
+    - default: tautulli
+    - default: content_rating_us
+    - default: oscars
+    - default: cannes
+    - default: sundance
+    - default: director
     operations:
       delete_unmanaged_collections: true
     overlay_path:
     - remove_overlays: false                    # Set this to true to remove all overlays
     - file: config/Overlays.yml                 # This is a local file on the system
-    - pmm: ribbon                               # This is a file within the defaults folder in the Repository
+    - default: ribbon                               # This is a file within the defaults folder in the Repository
 playlist_files:
-- file: config/playlists.yml
-- pmm: playlist                                 # This is a file within the defaults folder in the Repository
+- default: playlist                                 # This is a file within the defaults folder in the Repository
 settings:
   cache: true
   cache_expiration: 60
