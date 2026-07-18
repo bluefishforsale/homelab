@@ -220,16 +220,23 @@ scrape_configs:
   # my-ta-jose paper grading app. /metrics is unauthenticated, so it is only
   # ever scraped over the internal host port (ocean.home -> 192.168.1.143),
   # never via the public ta.terrac.com tunnel (nginx blocks /metrics there).
-  - job_name: 'my-ta-jose'
-    relabel_configs: *dropPortNumber
-    scrape_interval: 30s
-    scrape_timeout: 10s
-    metrics_path: /metrics
-    static_configs:
-    - targets: ['ocean.home:8092']
-      labels:
-        service: my-ta-jose
-        host: ocean
+  #
+  # DISABLED until Phase 2 ships a real container image. The service is
+  # scaffolded ahead of the web layer (see playbooks/individual/ocean/services/
+  # my_ta_jose.yaml and deploy-my-ta-jose.yml): no image exists yet, so nothing
+  # listens on :8092 and this target would sit at up==0, tripping the generic
+  # ServiceDown critical alert forever. Re-enable this job in the same PR that
+  # ships the my-ta-jose image, alongside the already-present Grafana dashboard.
+  # - job_name: 'my-ta-jose'
+  #   relabel_configs: *dropPortNumber
+  #   scrape_interval: 30s
+  #   scrape_timeout: 10s
+  #   metrics_path: /metrics
+  #   static_configs:
+  #   - targets: ['ocean.home:8092']
+  #     labels:
+  #       service: my-ta-jose
+  #       host: ocean
 
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'

@@ -34,6 +34,19 @@
         mode: '0644'
       notify: Restart dcgm-exporter
 
+    # Guarantee the exporter is up on every converge, not just when a template
+    # changes. The Restart handler only fires on a template change, so a run that
+    # finds both files unchanged never (re)starts the service. If dcgm-exporter
+    # stopped meanwhile (reboot, a docker restart, crash) the ocean.home:9400
+    # scrape target stayed down and Prometheus fired ServiceDown for the
+    # nvidia-exporter job. This idempotent task is a no-op once running.
+    - name: Enable and start dcgm-exporter service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
   handlers:
     - name: Reload systemd
       systemd:
