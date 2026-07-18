@@ -38,7 +38,10 @@
           enabled = true
           port = ssh
           filter = sshd
-          logpath = /var/log/auth.log
+          # These hosts log ssh to journald, not /var/log/auth.log (which does
+          # not exist), so read from systemd — otherwise fail2ban fails to start
+          # with "Have not found any log file for sshd jail".
+          backend = systemd
           maxretry = 3
           findtime = 120
           bantime = 86400
