@@ -1,5 +1,12 @@
 - name: Install Docker CE on Debian 12
-  hosts: all
+  # Exclude the CI runner host: this play restarts dockerd, and the deploy runs
+  # inside a container on gh-runner-01 (group github_runners). Restarting docker
+  # there kills the running job. Runner-host docker changes are applied manually.
+  hosts: 'all:!github_runners'
+  # Roll one host at a time: the daemon.json handler restarts dockerd, which
+  # bounces every container on the host. Never bounce the whole fleet at once.
+  serial: 1
+  max_fail_percentage: 0
   become: yes
   vars_files:
     - ../../../vault/secrets.yaml
@@ -111,6 +118,7 @@
       owner: root
       group: root
       mode: '0644'
+    notify: restart docker
 
   - name: Ensure docker service override directory exists
     ansible.builtin.file:
