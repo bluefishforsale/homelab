@@ -45,22 +45,32 @@ def requested_ids(service, block_any):
     """
     want = "movie" if service == "movies" else "tv"
     idfield = "tmdbId" if service == "movies" else "tvdbId"
-    reqs = mc.get("overseerr", "/api/v1/request", take=2000, filter="all")["results"]
     out = set()
-    for r in reqs:
-        m = r["media"]
-        if m["mediaType"] != want or not m.get(idfield):
-            continue
-        inflight = r["status"] == 1 or m["status"] in (2, 3, 4)
-        if block_any or inflight:
-            out.add(m[idfield])
-    return out
+    skip, take = 0, 100
+    while True:  # paginate: never trust one page to hold every request
+        page = mc.get("overseerr", "/api/v1/request", take=take, skip=skip, filter="all")
+        results = page.get("results", [])
+        for r in results:
+            m = r.get("media") or {}
+            if m.get("mediaType") != want or not m.get(idfield):
+                continue
+            inflight = r.get("status") == 1 or m.get("status") in (2, 3, 4)
+            if block_any or inflight:
+                out.add(m[idfield])
+        total = (page.get("pageInfo") or {}).get("results", 0)
+        skip += take
+        if not results or skip >= total:
+            return out
 
 
 def select(items, a):
     if a.ids:
         want = set(a.ids)
-        return [i for i in items if i["id"] in want]
+        found = [i for i in items if i["id"] in want]
+        missing = want - {i["id"] for i in found}
+        if missing:
+            print(f"warning: ids not in library, skipped: {sorted(missing)}", file=sys.stderr)
+        return found
     out = items
     if a.unmonitored:
         out = [i for i in out if not i.get("monitored")]
@@ -92,7 +102,7 @@ def main():
 
     reqset = set() if a.ignore_overseerr else requested_ids(a.service, a.block_any_request)
     print("ACT\tGB\tCUM_TB\tMON\tID\tTITLE")
-    cum = free = 0
+    cum = 0
     todo = []
     for it in targets:
         gb = size_of(it) / 1e9
@@ -103,17 +113,22 @@ def main():
         act = "SKIP-req" if blocked else "DELETE"
         print(f"{act}\t{gb:.0f}\t{cum/1e12:.2f}\t{it.get('monitored')}\t{it['id']}"
               f"\t{it.get('title')} ({it.get('year','')})")
-    free = cum / 1e12
-    print(f"\n{len(todo)} titles, {free:.2f} TB to free "
+    print(f"\n{len(todo)} titles, {cum/1e12:.2f} TB to free "
           f"({len(targets)-len(todo)} skipped as Overseerr-requested)")
 
     if not a.yes:
-        print("DRY RUN — re-run with --yes to delete files + add import exclusion")
+        print("DRY RUN: re-run with --yes to delete files + add import exclusion")
         return
+    ok = err = 0
     for it in todo:
-        mc.delete(svc, f"/api/v3/{kind}/{it['id']}", deleteFiles="true", addImportExclusion="true")
-        print(f"deleted {it['id']} {it.get('title')}")
-    print(f"done: freed ~{free:.2f} TB")
+        try:
+            mc.delete(svc, f"/api/v3/{kind}/{it['id']}", deleteFiles="true", addImportExclusion="true")
+            ok += 1
+            print(f"deleted {it['id']} {it.get('title')}")
+        except Exception as e:
+            err += 1
+            print(f"FAILED {it['id']} {it.get('title')}: {e}", file=sys.stderr)
+    print(f"done: {ok} deleted, {err} failed, ~{cum/1e12:.2f} TB freed")
 
 
 def selftest():

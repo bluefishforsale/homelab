@@ -7,47 +7,21 @@ the profile lines up with what the *arr apps will later unmonitor + delete.
 This reports what you HAVE and what you're still chasing (monitored). It does
 not rank by watch history. Deletion + *arr unmonitor is a separate script.
 
-Env (each falls back to the live config.xml on ocean):
-  RADARR_URL  default http://localhost:8903   RADARR_APIKEY
-  SONARR_URL  default http://localhost:8902   SONARR_APIKEY
+Endpoints + key discovery come from media_clients (RADARR_URL/RADARR_APIKEY etc.
+env override, else the live config.xml on ocean).
 
 Usage: media-reclaim-report.py [movies|tv|all]   (default all)
 Sizes double-count across multi-valued dims (a title has several genres); the
 per-genre size answers "how much disk is my western habit", not a disk sum.
 """
-import json
 import os
-import re
 import sys
-import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import media_clients as mc  # noqa: E402
 
 TB = 1e12
-APPS = {
-    "movies": {"url_env": "RADARR_URL", "key_env": "RADARR_APIKEY",
-               "url": "http://localhost:8903", "cfg": "/data01/services/radarr/config.xml",
-               "endpoint": "/api/v3/movie"},
-    "tv": {"url_env": "SONARR_URL", "key_env": "SONARR_APIKEY",
-           "url": "http://localhost:8902", "cfg": "/data01/services/sonarr/config.xml",
-           "endpoint": "/api/v3/series"},
-}
-
-
-def apikey(app):
-    k = os.environ.get(app["key_env"])
-    if k:
-        return k
-    with open(app["cfg"]) as f:
-        m = re.search(r"<ApiKey>([a-f0-9]+)</ApiKey>", f.read())
-    if not m:
-        sys.exit("no api key for " + app["cfg"])
-    return m.group(1)
-
-
-def fetch(app):
-    base = os.environ.get(app["url_env"], app["url"])
-    req = urllib.request.Request(base + app["endpoint"] + "?apikey=" + apikey(app))
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.load(r)
+SVC = {"movies": ("radarr", "/api/v3/movie"), "tv": ("sonarr", "/api/v3/series")}
 
 
 def size_of(item):
@@ -92,8 +66,8 @@ def table(title, groups, limit=None):
 
 
 def profile(name):
-    app = APPS[name]
-    items = fetch(app)
+    svc, endpoint = SVC[name]
+    items = mc.get(svc, endpoint)
     total = sum(size_of(i) for i in items)
     mon = [i for i in items if i.get("monitored")]
     mon_sz = sum(size_of(i) for i in mon)
@@ -137,7 +111,7 @@ if __name__ == "__main__":
     elif arg == "all":
         profile("movies")
         profile("tv")
-    elif arg in APPS:
+    elif arg in SVC:
         profile(arg)
     else:
         sys.exit(__doc__)
