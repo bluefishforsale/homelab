@@ -14,6 +14,15 @@
     docker_keyring_path: /etc/apt/keyrings/docker.asc
 
   tasks:
+  # Deprecated nvidia-docker debian10 repos ship an unsigned/rotated key
+  # (NO_PUBKEY DDCAE044F796ECB0) that makes every apt update fail. The current
+  # nvidia-container-toolkit repo (added later in this play) supersedes them, so
+  # remove the stale list before the first cache update. Absent elsewhere = no-op.
+  - name: Remove deprecated nvidia-docker debian10 apt repos
+    ansible.builtin.file:
+      path: /etc/apt/sources.list.d/nvidia-docker.list
+      state: absent
+
   - name: Install prerequisite packages
     apt:
       name:
