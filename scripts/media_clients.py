@@ -66,7 +66,7 @@ def _url(name):
     return os.environ.get(f"{name.upper()}_URL", SERVICES[name]["url"])
 
 
-def _request(name, path, params, data=None):
+def _request(name, path, params, data=None, method=None):
     s = SERVICES[name]
     params = dict(params or {})
     headers = {"Accept": "application/json"}
@@ -84,9 +84,12 @@ def _request(name, path, params, data=None):
     body = json.dumps(data).encode() if data is not None else None
     if body:
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST" if body else "GET")
+    if method is None:
+        method = "POST" if body else "GET"
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(req, timeout=120) as r:
-        return json.load(r)
+        txt = r.read()
+        return json.loads(txt) if txt else None
 
 
 def get(name, path, **params):
@@ -95,6 +98,10 @@ def get(name, path, **params):
 
 def post(name, path, data, **params):
     return _request(name, path, params, data=data)
+
+
+def delete(name, path, **params):
+    return _request(name, path, params, method="DELETE")
 
 
 def tdarr_stats():
