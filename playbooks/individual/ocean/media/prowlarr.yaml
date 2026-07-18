@@ -4,6 +4,7 @@
   become: true
   vars_files:
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
     service: prowlarr

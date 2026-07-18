@@ -23,7 +23,7 @@ ExecStart=docker run --rm \
     -e VERSION=${VERSION} \
     -e PORT={{ exporter_port }} \
     -e URL="http://ocean.home:{{ prowlarr_port }}" \
-    -e APIKEY="83e44c481a5d4060a3c8f9214ed3fba5" \
+    -e APIKEY="{{ media_services.prowlarr.api_key }}" \
     -e ENABLE_ADDITIONAL_METRICS=true \
     -p {{ exporter_port }}:9710 \
     {{ exporter_image }}:{{ exporter_version }} prowlarr
