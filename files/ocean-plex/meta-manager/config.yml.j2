@@ -87,7 +87,7 @@ plex:                                           # Can be individually specified 
   db_cache:
   verify_ssl:
 tmdb:                                           # REQUIRED for the script to run
-  apikey: {{ media_services.tmdb.api_key }}
+  apikey: {{ external_apis.tmdb.api_key }}
   language: en
   cache_expiration: 60
   region:
