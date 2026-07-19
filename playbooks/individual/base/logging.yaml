@@ -56,11 +56,21 @@
         StandardError=journal
         Compress=true
         LineMax=10K
-        SystemMaxUse=500M
-        SystemMaxFileSize=100M
-        SystemMaxFiles=5
+        # Storage=volatile keeps journals in RAM (/run/log/journal); the
+        # Runtime* caps bound that RAM use. SystemMax* only applies to on-disk
+        # /var/log/journal, which volatile never uses, so it is not set here.
+        RuntimeMaxUse=100M
+        RuntimeMaxFileSize=20M
+        RuntimeMaxFiles=5
         MaxRetentionSec=2week
         ForwardToSyslog=false
+    notify:
+    - Restart systemd-journald
+
+  - name: Purge on-disk journal so journals live in RAM only (Storage=volatile)
+    ansible.builtin.file:
+      path: /var/log/journal
+      state: absent
     notify:
     - Restart systemd-journald
 
