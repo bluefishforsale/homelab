@@ -34,15 +34,39 @@ groups:
       summary: "High memory usage on hypervisor {{ "{{ $labels.instance }}" }}"
       description: "Memory usage is above 95% for more than 5 minutes on hypervisor {{ "{{ $labels.instance }}" }}"
 
-  # High disk usage alert
+  # Disk space: warn early, critical near-full, and predict rapid fills.
+  # Uses avail_bytes (what df/apps actually see, excludes root-reserved blocks)
+  # and ignores ephemeral filesystems (tmpfs/overlay/etc).
+  - alert: DiskSpaceWarning
+    expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}) * 100 > 80
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Disk over 80% on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
+      description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is {{ "{{ $value }}" }}% used."
+
   - alert: HighDiskUsage
-    expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 90
+    expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}) * 100 > 90
     for: 5m
     labels:
       severity: critical
     annotations:
-      summary: "High disk usage on {{ "{{ $labels.instance }}" }}"
-      description: "Disk usage is above 90% on filesystem {{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }}"
+      summary: "Disk over 90% on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
+      description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is {{ "{{ $value }}" }}% used - risk of service failure."
+
+  # Catch steady fills (e.g. growing journals/logs) before they hit the threshold.
+  - alert: DiskWillFillSoon
+    expr: |
+      predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}[6h], 24 * 3600) < 0
+      and
+      (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}) * 100 > 60
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Disk filling on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
+      description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is projected to run out of space within 24h at the current rate."
 
   # Service down alert (excluding all blackbox probes)
   - alert: ServiceDown
