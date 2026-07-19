@@ -63,6 +63,13 @@
         - Reload exporter systemd daemon
         - Restart exporter service
 
+    - name: Enable and start sonarr-exporter service
+      ansible.builtin.systemd:
+        name: sonarr-exporter.service
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
     - name: Ensure Sonarr is responding before API call
       ansible.builtin.uri:
         url: "http://localhost:{{ sonarr_port }}/api/v3/system/status"
