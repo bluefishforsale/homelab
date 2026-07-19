@@ -7,7 +7,8 @@ Alertmanager POSTs its webhook JSON here. For each FIRING alert we:
   - push a notification to ntfy so a human is aware (all severities);
   - open a GitHub issue on the infra repo so it becomes trackable/fixable —
     critical alerts get `needs-claude` (premium lane / drive via RC), others get
-    a plain issue. Resolved alerts just push a "resolved" ntfy.
+    a plain issue. Resolved alerts close the matching tracking issue (by
+    fingerprint) and push a "resolved" ntfy — completing the fire->fix->close loop.
 
 Deliberately dependency-free (stdlib only) and single-file: it reads config from
 the environment (rendered into the systemd unit) and shells out to `gh`.
@@ -65,6 +66,26 @@ def issue_exists(fp):
         return len(json.loads(r.stdout or "[]")) > 0
     except json.JSONDecodeError:
         return True
+
+
+def close_issue(alert):
+    """Resolve half of the loop: close the open tracking issue(s) carrying this
+    alert's fingerprint when Alertmanager reports it resolved."""
+    fp = alert.get("fingerprint", alert["labels"].get("alertname", "unknown"))
+    r = gh("issue", "list", "--repo", ISSUE_REPO, "--state", "open",
+           "--search", f"{FP_MARKER}{fp} in:body", "--json", "number")
+    if r.returncode != 0:
+        print(f"gh issue list failed (close): {r.stderr.strip()}", flush=True)
+        return
+    try:
+        nums = [i["number"] for i in json.loads(r.stdout or "[]")]
+    except json.JSONDecodeError:
+        return
+    for num in nums:
+        c = gh("issue", "close", str(num), "--repo", ISSUE_REPO,
+               "--reason", "completed",
+               "--comment", "Alert resolved in Alertmanager; auto-closing.")
+        print((c.stdout or c.stderr).strip(), flush=True)
 
 
 def open_issue(alert):
@@ -135,6 +156,7 @@ def handle(payload):
             if num and sev == "critical" and REMEDIATE:
                 remediate(num)
         else:
+            close_issue(alert)
             ntfy(f"resolved: {name}", f"{inst}\n{summary}".strip(),
                  "min", "white_check_mark,homelab")
 
