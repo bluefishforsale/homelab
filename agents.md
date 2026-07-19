@@ -1,6 +1,6 @@
 # Homelab Infrastructure — Agent Reference
 
-Ansible-driven homelab managing Docker services, GPU passthrough, and CI/CD across a multi-host Proxmox cluster.
+Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthrough, and CI/CD across a multi-host Proxmox cluster.
 
 ---
 
@@ -91,7 +91,9 @@ deploy races, and resource hijacking.
    borrow it; if you need another instance, run a separate one (own
    dir/container/port) with CPU/RAM caps. The single GPU is allocated
    deliberately — production keeps it; experiments run on CPU or a declared VRAM
-   budget.
+   budget. Exception: a docker-compose collection, or a playbook deploying a
+   service alongside its exporters/sidecars, is one owned unit — co-deployed
+   from the same playbook.
 
 6. **CI-mediated vs manual.** Ordinary ocean services deploy via CI/dispatch.
    Self-referential infra (the GitHub Actions runners themselves) and anything
