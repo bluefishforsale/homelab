@@ -143,12 +143,9 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9452']
 
-  - job_name: 'jellyfin'
-    relabel_configs: *dropPortNumber
-    scrape_interval: 30s
-    scrape_timeout: 15s
-    static_configs:
-    - targets: ['ocean.home:8096']
+  # Jellyfin has no native /metrics endpoint (:8096/metrics 404s); its metrics
+  # come from the jellyfin-exporter job above. This direct scrape only produced
+  # a chronic false ServiceDown, so it is removed.
 
   - job_name: 'ndt-exporter'
     relabel_configs: *dropPortNumber

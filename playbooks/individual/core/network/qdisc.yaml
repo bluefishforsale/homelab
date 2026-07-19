@@ -30,9 +30,10 @@
         RemainAfterExit=true
         ExecStartPre=/bin/echo "Starting qdisc configuration on {{ primary_interface.stdout.strip() }}"
         ExecStartPre=/usr/bin/logger "Executing tc commands for qdisc configuration"
-        {% if qdisc_exists.rc == 0 %}
-        ExecStart=/sbin/tc qdisc del dev {{ primary_interface.stdout.strip() }} root
-        {% endif %}
+        # '-' prefix: the unit runs at boot when there may be no custom qdisc to
+        # delete (only the default), so tolerate del failure instead of failing
+        # the whole unit. A deploy-time guard can't know the boot-time state.
+        ExecStart=-/sbin/tc qdisc del dev {{ primary_interface.stdout.strip() }} root
         ExecStart=/sbin/tc qdisc add dev {{ primary_interface.stdout.strip() }} root handle 1: htb default 12
         ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1: classid 1:1 htb rate 10gbit burst 15k
         ExecStart=/sbin/tc class add dev {{ primary_interface.stdout.strip() }} parent 1:1 classid 1:12 htb rate 9gbit ceil 10gbit burst 15k
