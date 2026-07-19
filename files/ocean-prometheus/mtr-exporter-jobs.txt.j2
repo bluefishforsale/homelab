@@ -13,5 +13,6 @@ google -- @every 60s -- --no-dns --report-cycles 5 8.8.8.8
 # Plex API path (TCP/443; plex.tv hosted on AWS, blocks ICMP)
 plex_api -- @every 60s -- --no-dns --report-cycles 5 --tcp --port 443 plex.tv
 
-# Plex pubsub (TCP/443; the host EventSourceClient retried on 2026-04-26)
-plex_pubsub -- @every 60s -- --no-dns --report-cycles 5 --tcp --port 443 pubsub04.pop.fmt.plex.bz
+# The pubsub POP node from the 2026-04-26 incident (pubsub04.pop.fmt.plex.bz)
+# was dropped: Plex assigns pubsub POP nodes dynamically, so a hardcoded node
+# is not a stable MTR/probe target (issue #175). plex_api covers the Plex path.

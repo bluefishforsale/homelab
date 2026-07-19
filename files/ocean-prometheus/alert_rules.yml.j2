@@ -103,8 +103,8 @@ groups:
       summary: "Plex is unreachable from plex-exporter on {{ "{{ $labels.instance }}" }}"
       description: "plex_up has been 0 for more than 5 minutes on {{ "{{ $labels.instance }}" }} — Plex is down or in a restart loop"
 
-  # WAN path to Plex is degraded — TCP/443 to Plex API or pubsub failing
-  # or losing >5%. Excludes 1.1.1.1:443 (control), so this fires only when
+  # WAN path to Plex is degraded — TCP/443 to the Plex API (plex.tv) failing
+  # or losing >15%. Excludes 1.1.1.1:443 (control), so this fires only when
   # Plex's network specifically is bad, not when the entire internet is bad.
   - alert: PlexPathDegraded
     expr: |
