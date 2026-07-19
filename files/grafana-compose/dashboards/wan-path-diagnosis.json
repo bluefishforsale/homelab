@@ -23,7 +23,7 @@
       "id": 1,
       "type": "stat",
       "title": "Plex path probe success",
-      "description": "TCP/443 probes to plex.tv and pubsub04 (excluding the 1.1.1.1 control). Red = bad, green = good.",
+      "description": "TCP/443 probe to plex.tv (excluding the 1.1.1.1 control). Red = bad, green = good.",
       "gridPos": {"h": 4, "w": 12, "x": 0, "y": 0},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [

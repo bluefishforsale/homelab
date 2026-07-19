@@ -457,7 +457,13 @@ scrape_configs:
       - target_label: __address__
         replacement: ocean.home:9115
 
-  # TCP Probes - Plex WAN path (IPv4-forced; pubsub04 is dual-stack but ocean has no IPv6 uplink)
+  # TCP Probes - Plex WAN path (IPv4-forced; targets are dual-stack but ocean has no IPv6 uplink).
+  # Only stable, published endpoints belong here: plex.tv is the Plex API control
+  # plane; 1.1.1.1 is the internet control to tell 'Plex path bad' from 'internet
+  # bad'. The pubsub POP node from the 2026-04-26 incident (pubsub04.pop.fmt.plex.bz)
+  # was intentionally dropped: Plex assigns pubsub POP nodes dynamically, so a
+  # hardcoded node hard-fails permanently once Plex retires it, firing a chronic
+  # false PlexPathDegraded critical (issue #175).
   - job_name: 'blackbox-tcp-plex'
     metrics_path: /probe
     params:
@@ -467,7 +473,6 @@ scrape_configs:
       - targets:
         # Plex path
         - plex.tv:443
-        - pubsub04.pop.fmt.plex.bz:443
         - 1.1.1.1:443
         labels:
           probe_type: "tcp"
