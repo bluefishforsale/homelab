@@ -272,13 +272,6 @@
         update_cache: yes
       when: cuda_keyring_installed is changed
 
-    - name: Upgrade NVIDIA driver packages to latest (CUDA 12.6+ support)
-      ansible.builtin.apt:
-        upgrade: full
-        update_cache: yes
-      register: nvidia_upgrade_result
-      changed_when: "'nvidia' in nvidia_upgrade_result.stdout"
-
     - name: Install NVIDIA cuda-drivers package (includes nvidia-smi)
       ansible.builtin.apt:
         name: cuda-drivers
@@ -360,7 +353,7 @@
     - name: Determine if reboot is needed
       ansible.builtin.set_fact:
         reboot_needed: >-
-          {{ nvidia_upgrade_result is changed or 
+          {{ cuda_drivers_install is changed or
              nvidia_smi_check_post_upgrade.rc != 0 or
              current_driver_version.stdout is version('580', '<') }}
 
