@@ -190,6 +190,19 @@
       state: started
     tags: [service, meta-manager]
 
+  # Guarantee the plex compose stack (which contains the plex-exporter
+  # container) is enabled and running on every deploy, not just when a config
+  # or service file changed. Without this, a no-op deploy or a host reboot left
+  # plex.service down, so plex-exporter never came up and Prometheus reported
+  # ServiceDown on ocean.home:9594. Mirrors the meta-manager enable above.
+  - name: Enable and start plex service
+    ansible.builtin.systemd:
+      name: plex.service
+      enabled: true
+      state: started
+      daemon_reload: yes
+    tags: [service, plex]
+
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
       daemon_reload: yes
