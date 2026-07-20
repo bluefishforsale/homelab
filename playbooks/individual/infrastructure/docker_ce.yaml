@@ -82,6 +82,7 @@
       name: media
       gid: "{{ system_users.media.gid }}"
       state: present
+    when: manage_service_users | default(true) | bool
 
   - name: Create media user with UID from vault
     ansible.builtin.user:
@@ -93,6 +94,7 @@
       home: /home/media
       create_home: yes
       state: present
+    when: manage_service_users | default(true) | bool
 
   - name: Add terrac user to docker group
     ansible.builtin.user:
