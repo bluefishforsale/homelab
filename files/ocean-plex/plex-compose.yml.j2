@@ -71,10 +71,16 @@ services:
     environment:
       PLEX_ADDR: http://plex:32400
       PLEX_TOKEN: "{{ media_services.plex.api_key }}"
-      # Keep below Prometheus scrape_timeout (default 10s) so scrapes don't
-      # time out while the exporter waits on a hung Plex.
+      # The exporter queries Plex synchronously on each /metrics scrape, so its
+      # worst-case wait is PLEX_TIMEOUT * PLEX_RETRIES_COUNT. The plex-exporter
+      # scrape job sets scrape_timeout: 15s; the old 5s * 3 = 15s left zero
+      # margin, so a hung Plex stalled the scrape past 15s and Prometheus marked
+      # the *exporter* down (a misleading ServiceDown) instead of the exporter
+      # reporting plex_up=0 (the dedicated PlexDown alert). Drop retries to 1 so
+      # the worst case (~5s) stays well under scrape_timeout and scrapes always
+      # return in time.
       PLEX_TIMEOUT: "5"
-      PLEX_RETRIES_COUNT: "3"
+      PLEX_RETRIES_COUNT: "1"
       PLEX_SSL_VERIFY: "false"
       RACK_ENV: "production"
     ports:
