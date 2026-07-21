@@ -77,6 +77,14 @@ services:
       PLEX_RETRIES_COUNT: "3"
       PLEX_SSL_VERIFY: "false"
       RACK_ENV: "production"
+      # Collect the expensive library-item metrics on a background thread
+      # instead of inline on every scrape. Without this the exporter scans the
+      # whole Plex library on each /metrics request; on a large library that
+      # exceeds the 15s scrape_timeout (PLEX_TIMEOUT 5s x PLEX_RETRIES_COUNT 3),
+      # so Prometheus records up=0 for plex-exporter and fires ServiceDown even
+      # though Plex itself is healthy. Background collection keeps /metrics fast
+      # and always-200 by serving cached values.
+      METRICS_MEDIA_COLLECTING_INTERVAL_SECONDS: "300"
     ports:
       - "{{ exporter_port }}:{{ exporter_port }}"
     # Gate only on plex having started, not on it being healthy. The exporter
