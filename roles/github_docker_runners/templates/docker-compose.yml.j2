@@ -63,6 +63,7 @@ services:
 {% else %}
       EPHEMERAL: "false"
 {% endif %}
+      DISABLE_AUTO_UPDATE: "true"
       
       # Runner scope (for organization-level runners)
 {% if github_scope == 'org' %}
