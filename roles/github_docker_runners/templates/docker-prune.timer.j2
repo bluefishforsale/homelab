@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic Docker image/build-cache prune on the runner host
+
+[Timer]
+OnCalendar={{ github_runner_docker_prune_on_calendar }}
+# Persistent: if the host was off at the scheduled time, run once on next boot
+# so a powered-down runner does not skip cleanup and drift toward full.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

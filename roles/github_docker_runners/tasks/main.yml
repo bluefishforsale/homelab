@@ -222,6 +222,51 @@
     enabled: true
     state: started
 
+# The compose stack reads GITHUB_TOKEN from the systemd EnvironmentFile
+# (.github_token_env). A stray root-owned .env in the working dir shadows that
+# and, because the service runs as the github-runner user, makes `docker compose`
+# fail with "open .env: permission denied" — which silently breaks the service's
+# ability to recreate runners (they survive only on Docker's restart:always until
+# something forces a recreate). Keep the working dir free of it.
+- name: Remove stray root-owned compose .env (token comes from EnvironmentFile)
+  ansible.builtin.file:
+    path: "{{ github_runners_base_dir }}/.env"
+    state: absent
+
+# Disk hygiene: ephemeral CI runs pull job images that accumulate unreferenced in
+# the local image store and eventually fill the disk (which corrupts a mid-flight
+# runner auto-update and takes CI down). A daily prune of unused images/build
+# cache caps the growth. Deliberately does NOT prune containers and does NOT
+# notify the runner restart handler, so applying this via CI never bounces the
+# runner that is running the deploy.
+- name: Template docker-prune oneshot service
+  ansible.builtin.template:
+    src: docker-prune.service.j2
+    dest: /etc/systemd/system/docker-prune.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd daemon
+
+- name: Template docker-prune timer
+  ansible.builtin.template:
+    src: docker-prune.timer.j2
+    dest: /etc/systemd/system/docker-prune.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd daemon
+
+- name: Reload systemd so the prune units are known before enabling
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start the docker-prune timer
+  ansible.builtin.systemd:
+    name: docker-prune.timer
+    enabled: true
+    state: started
+
 - name: Display runner configuration summary
   ansible.builtin.debug:
     msg:

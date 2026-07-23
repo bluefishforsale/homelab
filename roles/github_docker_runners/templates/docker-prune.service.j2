@@ -1,0 +1,14 @@
+[Unit]
+Description=Prune unused Docker images and build cache (runner host disk hygiene)
+Documentation=https://docs.docker.com/engine/reference/commandline/image_prune/
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# -a removes every image not referenced by an existing container, so the runner
+# image and the exporter images (all have live containers) are kept, while the
+# job images that ephemeral runs pull and abandon are reclaimed. Container logs
+# go to journald (RAM-capped), so no on-disk log rotation is needed here.
+ExecStart=/usr/bin/docker image prune -af
+ExecStart=/usr/bin/docker builder prune -af
