@@ -85,6 +85,10 @@ github_runner_cloudflared_url: "https://github.com/cloudflare/cloudflared/releas
 github_runners_compose_file: "{{ github_runners_base_dir }}/docker-compose.yml"
 github_runners_service_name: "github-docker-runners"
 
+# Docker image/build-cache prune schedule (systemd OnCalendar syntax).
+# Keeps the runner host's local image store from growing until the disk fills.
+github_runner_docker_prune_on_calendar: "daily"
+
 # Runner container resource limits (optional)
 # Uncomment to set CPU and memory limits per container
 # github_runner_cpus: "2.0"
