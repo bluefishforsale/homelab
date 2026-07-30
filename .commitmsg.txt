@@ -1,0 +1,17 @@
+fix(tautulli): don't health-gate exporter startup (ServiceDown #214)
+
+The tautulli-exporter container declared `depends_on: tautulli:
+condition: service_healthy`. `docker compose up -d` blocks until a
+service_healthy dependency reports healthy, but Tautulli's healthcheck
+(120s start_period + up to 5x30s retries) can exceed the systemd unit's
+TimeoutStartSec=180. When it does, systemd SIGTERMs the compose start
+before the exporter container is ever created, so Prometheus sees
+ocean.home:8913 down (ServiceDown critical) even though Tautulli itself
+is running fine.
+
+Downgrade to start-ordering only (`depends_on: - tautulli`). The
+exporter connects to Tautulli per-scrape and tolerates it being briefly
+unavailable, so it must stay independently scrapeable rather than be
+gated on Tautulli health.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
