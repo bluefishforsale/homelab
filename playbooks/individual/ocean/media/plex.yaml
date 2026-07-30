@@ -144,6 +144,17 @@
     register: plex_service_result
     tags: [service, plex]
 
+  - name: Create plex autoheal systemd units
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - plex-autoheal.service
+    - plex-autoheal.timer
+    register: plex_autoheal_result
+    tags: [service, plex]
+
   - name: Ensure meta-manager basedir exists
     ansible.builtin.file:
       path: "{{ meta_manager_home }}"
@@ -198,6 +209,14 @@
       daemon_reload: yes
     when: plex_service_result is defined and plex_service_result is changed
     tags: [restart, service, plex]
+
+  - name: Enable and start plex autoheal timer
+    ansible.builtin.systemd:
+      name: plex-autoheal.timer
+      state: started
+      enabled: true
+      daemon_reload: "{{ plex_autoheal_result is changed }}"
+    tags: [service, plex]
 
   - name: Reload systemd daemon if meta-manager service changed
     ansible.builtin.systemd:

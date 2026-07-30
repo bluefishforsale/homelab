@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll Plex health every 15 minutes and restart if unhealthy
+Requires=plex-autoheal.service
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
