@@ -1,0 +1,12 @@
+[Unit]
+Description=Restart Plex container if Docker reports it unhealthy
+After=plex.service
+Wants=plex.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if [ "$(/usr/bin/docker inspect -f {% raw %}{{.State.Health.Status}}{% endraw %} {{ service }} 2>/dev/null)" = "unhealthy" ]; then logger -t plex-autoheal "plex unhealthy, restarting"; /usr/bin/docker restart {{ service }}; fi'
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
