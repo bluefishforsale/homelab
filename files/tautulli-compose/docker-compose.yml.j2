@@ -71,10 +71,15 @@ services:
     networks:
       - plex_network
 
-    # Service dependencies - wait for Tautulli to be healthy
+    # Start-ordering only: do NOT gate on Tautulli's health. `up -d` blocks until
+    # a service_healthy dependency reports healthy, and Tautulli's healthcheck
+    # (120s start_period + 5x30s retries) can exceed the unit's TimeoutStartSec=180.
+    # When it does, systemd kills the compose start before this exporter is ever
+    # created, leaving it permanently down (ServiceDown) while Tautulli itself runs.
+    # The exporter connects to Tautulli per-scrape and tolerates it being briefly
+    # unavailable, so it must stay independently scrapeable.
     depends_on:
-      tautulli:
-        condition: service_healthy
+      - tautulli
 
     # Resource limits
     cpus: '0.5'
