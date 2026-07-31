@@ -45,6 +45,10 @@ g_rtt = Gauge("ndt_min_rtt_ms", "NDT7 minimum round-trip time (ms)", LABELS)
 g_last_success = Gauge("ndt_last_success_timestamp_seconds", "Unix time of last fully successful cycle")
 g_cycle_seconds = Gauge("ndt_cycle_duration_seconds", "Wall-clock seconds for the last full test cycle")
 g_up = Gauge("ndt_server_up", "1 if the last test against this server succeeded", LABELS)
+# HTTP status of the last M-Lab Locate request: 200 ok, 429 rate-limited, 0
+# non-HTTP error. Stays populated even when we can't run tests, so a dashboard
+# panel shows exactly when the 429s stop.
+g_locate_status = Gauge("ndt_locate_http_status", "HTTP status of the last M-Lab Locate request (200 ok, 429 rate-limited, 0 error)")
 
 
 def locate_servers():
@@ -66,10 +70,12 @@ def cached_servers():
         return _locate["servers"]  # reuse cache; or backing off -> stale/empty
     try:
         servers = locate_servers()
+        g_locate_status.set(200)
         if servers:
             _locate.update(servers=servers, at=now, fails=0, cooldown_until=0.0)
         return _locate["servers"]
     except Exception as e:
+        g_locate_status.set(getattr(e, "code", 0))  # HTTPError has .code (e.g. 429); other errors -> 0
         _locate["fails"] += 1
         backoff = min(LOCATE_TTL, 300 * 2 ** (_locate["fails"] - 1))
         _locate["cooldown_until"] = now + backoff
