@@ -15,6 +15,7 @@ the others.
 import asyncio
 import json
 import os
+import random
 import time
 import urllib.request
 
@@ -24,10 +25,18 @@ from prometheus_client import Gauge, start_http_server
 SUBPROTO = "net.measurementlab.ndt.v7"
 LOCATE_URL = "https://locate.measurementlab.net/v2/nearest/ndt/ndt7"
 
-INTERVAL = int(os.environ.get("NDT_INTERVAL_SECONDS", "300"))
+INTERVAL = int(os.environ.get("NDT_INTERVAL_SECONDS", "1800"))
 DURATION = int(os.environ.get("NDT_TEST_SECONDS", "8"))
 PORT = int(os.environ.get("NDT_PORT", "9140"))
 MAX_SERVERS = int(os.environ.get("NDT_MAX_SERVERS", "4"))
+# M-Lab rate-limits fixed-interval "periodic" Locate callers per-IP (429 "too
+# many periodic requests"). Reuse the servers/tokens from one Locate response
+# across several test cycles instead of re-locating every cycle. LOCATE_TTL must
+# stay under the access-token lifetime (~2h); the all-fail path below forces an
+# early refresh if a token expires sooner.
+LOCATE_TTL = int(os.environ.get("NDT_LOCATE_TTL_SECONDS", "5400"))
+# +/- fraction of jitter on the sleep so we are not perfectly periodic.
+JITTER = float(os.environ.get("NDT_JITTER_FRACTION", "0.2"))
 
 LABELS = ["machine", "city", "country"]
 g_download = Gauge("ndt_download_mbps", "NDT7 download throughput (Mbps)", LABELS)
@@ -42,6 +51,30 @@ def locate_servers():
     with urllib.request.urlopen(LOCATE_URL, timeout=15) as r:
         data = json.load(r)
     return data.get("results", [])[:MAX_SERVERS]
+
+
+# Cached Locate result plus a backoff clock. On a Locate failure (typically 429)
+# we keep the last-known servers so the dashboard never blanks, and refuse to
+# re-hit Locate until cooldown_until, doubling the wait each consecutive failure.
+_locate = {"servers": [], "at": 0.0, "fails": 0, "cooldown_until": 0.0}
+
+
+def cached_servers():
+    now = time.time()
+    fresh = _locate["servers"] and now - _locate["at"] < LOCATE_TTL
+    if fresh or now < _locate["cooldown_until"]:
+        return _locate["servers"]  # reuse cache; or backing off -> stale/empty
+    try:
+        servers = locate_servers()
+        if servers:
+            _locate.update(servers=servers, at=now, fails=0, cooldown_until=0.0)
+        return _locate["servers"]
+    except Exception as e:
+        _locate["fails"] += 1
+        backoff = min(LOCATE_TTL, 300 * 2 ** (_locate["fails"] - 1))
+        _locate["cooldown_until"] = now + backoff
+        print(f"[err] locate failed (#{_locate['fails']}, backoff {backoff:.0f}s): {e}", flush=True)
+        return _locate["servers"]
 
 
 def _server_mbps(measurement, field="BytesAcked"):
@@ -151,15 +184,16 @@ async def test_server(result):
 
 async def cycle():
     start = time.monotonic()
-    try:
-        servers = locate_servers()
-    except Exception as e:
-        print(f"[err] locate failed: {e}", flush=True)
+    servers = cached_servers()
+    if not servers:
+        print("[warn] no servers available (locate rate-limited?)", flush=True)
         return
     results = [await test_server(s) for s in servers]  # serial: don't let tests contend
     g_cycle_seconds.set(round(time.monotonic() - start, 2))
     if results and all(results):
         g_last_success.set(time.time())
+    elif not any(results):
+        _locate["at"] = 0.0  # every server failed: tokens likely expired, re-locate next cycle
 
 
 def main():
@@ -167,7 +201,7 @@ def main():
     print(f"ndt-speedtest-exporter on :{PORT}, interval={INTERVAL}s, duration={DURATION}s", flush=True)
     while True:
         asyncio.run(cycle())
-        time.sleep(INTERVAL)
+        time.sleep(INTERVAL * (1 + random.uniform(-JITTER, JITTER)))
 
 
 if __name__ == "__main__":
