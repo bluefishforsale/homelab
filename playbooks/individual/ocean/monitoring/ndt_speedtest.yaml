@@ -1,9 +1,10 @@
 ---
 # NDT7 (M-Lab) multi-location speed-test exporter. Replaces the retired
 # bluefishforsale/ndt-speedtest-exporter. Builds a small python image on ocean
-# and runs it as a systemd docker service; Prometheus scrapes :9140 every 5m,
-# which is also the test cadence (NDT7 tests are light, so 5m does not saturate
-# the link).
+# and runs it as a systemd docker service; Prometheus scrapes :9140. Tests run
+# every 30m (with jitter): M-Lab rate-limits fixed-interval callers of its
+# Locate API per-IP (429), so the exporter caches Locate results and re-locates
+# at most a few times an hour rather than every cycle.
 - name: Deploy NDT speedtest exporter
   hosts: ocean
   become: true
@@ -15,7 +16,7 @@
     # Hardcoded (not vars_service_ports) so this deploy doesn't fan out to every
     # playbook that references that shared file. Matches the prometheus scrape job.
     ndt_exporter_port: 9140
-    ndt_exporter_interval: 300
+    ndt_exporter_interval: 1800
     ndt_exporter_max_servers: 4
     src: "{{ playbook_dir }}/../../../../files/ndt-speedtest-exporter"
     home: /data01/services/ndt-speedtest-exporter
