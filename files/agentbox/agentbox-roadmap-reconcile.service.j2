@@ -1,0 +1,16 @@
+[Unit]
+Description=agentbox roadmap reconciler (daily; Claude Code premium lane)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME=/home/{{ user }}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
+WorkingDirectory={{ home }}
+ExecStart=/usr/local/bin/agentbox-roadmap-reconcile.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-roadmap

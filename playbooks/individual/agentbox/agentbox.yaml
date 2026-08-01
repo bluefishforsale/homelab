@@ -257,6 +257,7 @@
     loop:
       - { src: issue-watcher.sh, dest: agentbox-issue-watcher.sh }
       - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
+      - { src: roadmap-reconcile.sh, dest: agentbox-roadmap-reconcile.sh }
       - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
@@ -272,6 +273,8 @@
       - agentbox-issue-watcher.timer
       - agentbox-escalate.service
       - agentbox-escalate.timer
+      - agentbox-roadmap-reconcile.service
+      - agentbox-roadmap-reconcile.timer
       - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
     notify: Reload systemd daemon
@@ -288,6 +291,7 @@
     loop:
       - agentbox-issue-watcher.timer
       - agentbox-escalate.timer
+      - agentbox-roadmap-reconcile.timer
 
   - name: Enable and start the alert receiver
     ansible.builtin.systemd:
