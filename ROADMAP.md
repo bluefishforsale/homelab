@@ -37,6 +37,8 @@ Status and future plans for the homelab infrastructure.
 - **Dynamic DNS**: Cloudflare DDNS for home IP updates
 - **GitHub runners**: Self-hosted ephemeral Docker runners (gh-runner-01)
 - **Network optimization**: Multiqueue (128 queues) for VMs and interfaces
+- **DNS HA**: Secondary DNS with zone transfers
+- **Registry cache**: Pull-through Docker registry cache VM
 
 ### Media Stack
 
@@ -50,6 +52,7 @@ Status and future plans for the homelab infrastructure.
 - **Tdarr**: Automated media transcoding
 - **Plex Meta Manager**: Library metadata automation
 - **Audible Downloader**: Audiobook acquisition
+- **Jellyfin**: Media server (alternative to Plex)
 
 ### AI/ML Stack
 
@@ -70,6 +73,7 @@ Status and future plans for the homelab infrastructure.
 - **Karma**: AlertManager dashboard for alert visualization
 - **UnPoller**: UniFi network metrics
 - **NVIDIA DCGM**: GPU metrics exporter
+- **NDT Speedtest**: Network diagnostic speedtest monitoring
 
 ### Cloud/CMS Services
 
@@ -90,6 +94,7 @@ Status and future plans for the homelab infrastructure.
 - **Cloudflare Access**: Reusable policies (admin, plex-users, public)
 - **Docker journald logging**: Centralized container logs
 - **Idempotent playbooks**: Safe multiple runs
+- **Fail2ban**: SSH and service protection with Prometheus exporter
 
 ---
 
@@ -115,7 +120,6 @@ Status and future plans for the homelab infrastructure.
 
 ### Phase 4: Security Hardening
 
-- **Fail2ban**: SSH and service protection with Prometheus exporter
 - **CrowdSec**: Collaborative security
 - **Trivy**: Container vulnerability scanning
 - **Gatus**: Endpoint health monitoring
@@ -125,7 +129,6 @@ Status and future plans for the homelab infrastructure.
 - **WireGuard VPN**: Secure remote access
 - **Proxmox HA**: Automatic VM failover
 - **Keepalived**: Virtual IPs for critical services
-- **DNS HA**: Secondary DNS with zone transfers
 
 ### Phase 6: Advanced Features
 
