@@ -154,6 +154,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9140']
 
+  - job_name: 'cloudflare-exporter-terrac'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 5m
+    scrape_timeout: 60s
+    static_configs:
+    - targets: ['ocean.home:9199']
+
   - job_name: 'mtr-exporter'
     relabel_configs: *dropPortNumber
     scrape_interval: 60s

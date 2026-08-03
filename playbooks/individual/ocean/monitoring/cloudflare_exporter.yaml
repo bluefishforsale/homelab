@@ -1,0 +1,86 @@
+---
+# Cloudflare analytics -> Prometheus exporter (read-only).
+#
+# lablabs/cloudflare_exporter polls Cloudflare's GraphQL Analytics API and serves
+# pre-aggregated metrics at /metrics; Prometheus scrapes :{{ cf_port }}. No raw
+# log lines are stored anywhere. Logpush is Enterprise-only and these zones are
+# Free/Pro, so this is the supported path on the current plans.
+#
+# One instance per Cloudflare account. This is the "terrac" account
+# (Terracnosaur@gmail.com's Account). A second account = copy this playbook, bump
+# cf_account_slug / cf_zones / cf_port, and add a scoped token under
+# cloudflare.exporter_tokens.<slug> in the vault.
+- name: Cloudflare exporter (terrac account)
+  hosts: ocean
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    cf_account_slug: terrac
+    service: "cloudflare-exporter-{{ cf_account_slug }}"
+    image: "cloudflare-exporter:local"
+    files: "{{ playbook_dir }}/../../../../files/ocean-cloudflare-exporter"
+    home: "/data01/services/cloudflare-exporter-{{ cf_account_slug }}"
+    # Hardcoded (not vars_service_ports) so this deploy does not fan out to every
+    # playbook referencing that shared file. Matches the prometheus scrape job.
+    cf_port: 9199
+    cf_internal_port: 8080
+    cf_poll_seconds: 300
+    # tag=name pairs; name becomes the zone label on the metrics.
+    cf_zones: "f3be74ced16c63d68b522f569ecba43b=terrac.com,427cd2f89d3669d1704f61f3d37d4149=saetnere.com,87401274f499c81d52527080d0588e7f=radiantatmospheres.com"
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy build context (exporter, deps, Dockerfile)
+      ansible.builtin.copy:
+        src: "{{ files }}/{{ item }}"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - exporter.py
+        - requirements.txt
+        - Dockerfile
+      register: cf_build_context
+
+    - name: Build exporter image
+      ansible.builtin.command:
+        cmd: "docker build -t {{ image }} ."
+        chdir: "{{ home }}"
+      when: cf_build_context is changed
+
+    - name: Template env file (holds the scoped read-only API token)
+      ansible.builtin.template:
+        src: "{{ files }}/cloudflare-exporter.env.j2"
+        dest: "{{ home }}/cloudflare-exporter.env"
+        mode: '0600'
+      register: cf_env
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/cloudflare-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: cf_unit
+      notify: Reload systemd daemon
+
+    - name: Flush handlers so the unit is registered before enabling
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start the exporter (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (cf_env is changed or cf_unit is changed or cf_build_context is changed) else 'started' }}"
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
