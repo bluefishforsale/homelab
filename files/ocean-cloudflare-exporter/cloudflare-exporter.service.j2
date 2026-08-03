@@ -1,0 +1,25 @@
+[Unit]
+Description={{ service }}
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=7d
+Restart=always
+RestartSec=30s
+TimeoutStartSec=120s
+ExecStartPre=-/usr/bin/docker rm -f {{ service }}
+ExecStart=/usr/bin/docker run --rm \
+    --name {{ service }} \
+    --hostname {{ service }} \
+    --env-file {{ home }}/cloudflare-exporter.env \
+    -p {{ cf_port }}:{{ cf_internal_port }} \
+    {{ image }}
+ExecStop=/usr/bin/docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target
