@@ -16,6 +16,7 @@ ExecStartPre=-/usr/bin/docker rm -f {{ service }}
 ExecStart=/usr/bin/docker run --rm \
     --name {{ service }} \
     --hostname {{ service }} \
+    --security-opt no-new-privileges \
     --env-file {{ home }}/cloudflare-exporter.env \
     -p {{ cf_port }}:{{ cf_internal_port }} \
     {{ image }}
