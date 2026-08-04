@@ -1,0 +1,14 @@
+[Unit]
+Description=Weekly WordPress update (pull latest image + recreate)
+After=wordpress.service docker.service
+Wants=wordpress.service
+
+[Service]
+Type=oneshot
+# wordpress.service already does `down -> pull --quiet -> up -d` on start, so a
+# restart re-pulls wordpress:latest and recreates the containers. Reuse that
+# rather than duplicating the compose commands here.
+ExecStart=/usr/bin/systemctl restart wordpress.service
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wordpress-update
