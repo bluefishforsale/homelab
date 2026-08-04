@@ -187,6 +187,27 @@
       name: wordpress.service
       state: started
 
+  - name: Install weekly WordPress update units (pull latest + recreate)
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - wordpress-update.service
+    - wordpress-update.timer
+    notify:
+    - Reload systemd daemon
+
+  - name: Flush handlers so the units are registered before enabling
+    ansible.builtin.meta: flush_handlers
+
+  - name: Enable and start the weekly WordPress update timer
+    ansible.builtin.systemd:
+      name: wordpress-update.timer
+      enabled: yes
+      state: started
+      daemon_reload: yes
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
