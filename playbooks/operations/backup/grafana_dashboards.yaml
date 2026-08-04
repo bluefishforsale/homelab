@@ -32,6 +32,14 @@
       method: GET
       status_code: 200
     delegate_to: localhost
+    register: grafana_health
+    # This backup runs right after grafana_compose recreates the Grafana
+    # containers (any dashboard-file change triggers both), so /api/health can
+    # be connection-refused for ~60s while Grafana boots. Retry instead of
+    # failing the whole deploy.
+    until: grafana_health.status == 200
+    retries: 20
+    delay: 5
     tags: [verify, execute]
 
   - name: Get list of all dashboards from Grafana API
