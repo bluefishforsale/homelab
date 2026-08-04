@@ -34,6 +34,7 @@ for entry in os.environ.get("CF_ZONES", "").split(","):
     ZONES.append((tag.strip(), (name.strip() or tag.strip())))
 POLL_SECONDS = int(os.environ.get("CF_POLL_SECONDS", "300"))
 PORT = int(os.environ.get("CF_PORT", "8080"))
+ACCOUNT = os.environ.get("CF_ACCOUNT", "")  # account tag for account-scoped R2 billing
 # Per-URL breakdown (httpRequestsAdaptiveGroups; path dimension works on Free/Pro,
 # contentType does not, so static vs dynamic is classified by URL extension).
 URL_WINDOW = int(os.environ.get("CF_URL_WINDOW_SECONDS", "3600"))
@@ -67,6 +68,11 @@ g_url_bytes = Gauge("cloudflare_zone_url_bytes", "Edge bytes for a top non-stati
 g_static_requests = Gauge("cloudflare_zone_static_requests", "Requests for a top static-asset URL (latest window)", ["zone", "path"])
 g_static_bytes = Gauge("cloudflare_zone_static_bytes", "Edge bytes for a top static-asset URL (latest window)", ["zone", "path"])
 g_last_success = Gauge("cloudflare_exporter_last_success_timestamp_seconds", "Unix time of the last fully successful poll cycle")
+g_r2_storage = Gauge("cloudflare_r2_storage_bytes", "R2 stored payload bytes (billable storage)", ["bucket"])
+g_r2_metadata = Gauge("cloudflare_r2_metadata_bytes", "R2 stored metadata bytes", ["bucket"])
+g_r2_objects = Gauge("cloudflare_r2_objects", "R2 object count", ["bucket"])
+g_r2_ops = Gauge("cloudflare_r2_operations_month", "R2 operations month-to-date by class", ["bucket", "action", "opclass"])
+g_r2_up = Gauge("cloudflare_r2_up", "1 if the last R2 billing query succeeded")
 
 QUERY = """
 query($z:String!,$s:Time!,$u:Time!){viewer{zones(filter:{zoneTag:$z}){
@@ -96,7 +102,7 @@ def _graphql(query, variables):
         payload = json.load(r)
     if payload.get("errors"):
         raise RuntimeError(payload["errors"])
-    return payload["data"]["viewer"]["zones"][0]
+    return payload["data"]["viewer"]
 
 
 def query_urls(tag):
@@ -105,9 +111,73 @@ def query_urls(tag):
         "z": tag,
         "s": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - URL_WINDOW)),
         "u": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
-    })
+    })["zones"][0]
     return [{"path": g["dimensions"]["clientRequestPath"], "count": g["count"],
              "bytes": g["sum"]["edgeResponseBytes"]} for g in zone["httpRequestsAdaptiveGroups"]]
+
+
+# R2 billing (account-scoped). Class A = writes/mutations/lists ($4.50/M, 1M free),
+# Class B = reads ($0.36/M, 10M free), storage $0.015/GB-month (10 GB-month free),
+# egress free. Pricing per developers.cloudflare.com/r2/pricing (2026-08). Any
+# actionType not listed (DeleteObject, AbortMultipartUpload) is free -> class "free".
+R2_CLASS_A = {
+    "PutObject", "CopyObject", "CompleteMultipartUpload", "CreateMultipartUpload",
+    "UploadPart", "UploadPartCopy", "ListObjects", "ListBuckets", "PutBucket",
+    "ListMultipartUploads", "ListParts", "PutBucketEncryption", "PutBucketCors",
+    "PutBucketLifecycleConfiguration",
+}
+R2_CLASS_B = {
+    "GetObject", "HeadObject", "HeadBucket", "UsageSummary", "GetBucketEncryption",
+    "GetBucketLocation", "GetBucketCors", "GetBucketLifecycleConfiguration",
+}
+
+
+def r2_class(action):
+    if action in R2_CLASS_A:
+        return "A"
+    if action in R2_CLASS_B:
+        return "B"
+    return "free"
+
+
+R2_STORAGE_QUERY = """
+query($a:String!,$s:Time!,$u:Time!){viewer{accounts(filter:{accountTag:$a}){
+ r2StorageAdaptiveGroups(limit:100,filter:{datetime_geq:$s,datetime_leq:$u},orderBy:[datetime_DESC]){
+  max{payloadSize metadataSize objectCount} dimensions{bucketName datetime}}}}}
+"""
+
+R2_OPS_QUERY = """
+query($a:String!,$s:Time!,$u:Time!){viewer{accounts(filter:{accountTag:$a}){
+ r2OperationsAdaptiveGroups(limit:200,filter:{datetime_geq:$s,datetime_leq:$u}){
+  sum{requests} dimensions{bucketName actionType}}}}}
+"""
+
+
+def query_r2_storage():
+    now = time.time()
+    acct = _graphql(R2_STORAGE_QUERY, {
+        "a": ACCOUNT,
+        "s": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 21600)),
+        "u": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+    })["accounts"][0]
+    latest = {}  # bucket -> most-recent datapoint (query is datetime_DESC)
+    for g in acct["r2StorageAdaptiveGroups"]:
+        b = g["dimensions"]["bucketName"]
+        if b not in latest:
+            latest[b] = g["max"]
+    return latest
+
+
+def query_r2_ops_mtd():
+    now = time.gmtime()
+    month_start = "%04d-%02d-01T00:00:00Z" % (now.tm_year, now.tm_mon)
+    acct = _graphql(R2_OPS_QUERY, {
+        "a": ACCOUNT,
+        "s": month_start,
+        "u": time.strftime("%Y-%m-%dT%H:%M:%SZ", now),
+    })["accounts"][0]
+    return [{"bucket": g["dimensions"]["bucketName"], "action": g["dimensions"]["actionType"],
+             "requests": g["sum"]["requests"]} for g in acct["r2OperationsAdaptiveGroups"]]
 
 
 def query_zone(tag):
@@ -142,6 +212,10 @@ def poll():
     g_url_bytes.clear()
     g_static_requests.clear()
     g_static_bytes.clear()
+    g_r2_storage.clear()
+    g_r2_metadata.clear()
+    g_r2_objects.clear()
+    g_r2_ops.clear()
     for tag, name in ZONES:
         try:
             g = query_zone(tag)
@@ -181,6 +255,19 @@ def poll():
                 g_static_bytes.labels(zone=name, path=r["path"]).set(r["bytes"])
         except Exception as e:
             print(f"[err] zone {name} urls: {e}", flush=True)
+    # R2 billing is account-scoped, so it runs once per cycle (not per zone).
+    if ACCOUNT:
+        try:
+            for bucket, m in query_r2_storage().items():
+                g_r2_storage.labels(bucket=bucket).set(m["payloadSize"])
+                g_r2_metadata.labels(bucket=bucket).set(m["metadataSize"])
+                g_r2_objects.labels(bucket=bucket).set(m["objectCount"])
+            for r in query_r2_ops_mtd():
+                g_r2_ops.labels(bucket=r["bucket"], action=r["action"], opclass=r2_class(r["action"])).set(r["requests"])
+            g_r2_up.set(1)
+        except Exception as e:
+            g_r2_up.set(0)
+            print(f"[err] r2: {e}", flush=True)
     if all_ok:
         g_last_success.set(time.time())
 
