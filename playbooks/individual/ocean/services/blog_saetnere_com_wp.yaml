@@ -94,6 +94,24 @@
       mode: '0755'
       recurse: yes
 
+  # mu-plugins auto-load with no activation and survive image updates (wp-content is the
+  # persistent volume). Used here to disable the XML-RPC attack surface at the app layer.
+  - name: Ensure mu-plugins directory exists
+    ansible.builtin.file:
+      path: "{{ home }}/wp-content/mu-plugins"
+      state: directory
+      owner: "33"
+      group: "33"
+      mode: '0755'
+
+  - name: Install WordPress hardening mu-plugin
+    ansible.builtin.copy:
+      src: "{{ files }}/mu-plugins/harden.php"
+      dest: "{{ home }}/wp-content/mu-plugins/harden.php"
+      owner: "33"
+      group: "33"
+      mode: '0644'
+
   - name: Create MySQL configuration from template
     ansible.builtin.template:
       src: "{{ files }}/mysql-custom.cnf.j2"
