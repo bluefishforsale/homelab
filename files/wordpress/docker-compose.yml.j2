@@ -126,8 +126,9 @@ services:
       - wordpress_internal
 
 networks:
+  # No hardcoded subnet: a hardcoded /16 collided with a stale network from the
+  # old compose project name and left wordpress.service unable to restart for ~2
+  # weeks (crash-loop, "invalid pool request: Pool overlaps"). Let Docker
+  # auto-assign a free subnet instead.
   wordpress_internal:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.26.0.0/16
