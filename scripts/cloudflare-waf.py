@@ -62,19 +62,22 @@ def vault():
     return yaml.safe_load(out)
 
 
-def api(method, path, headers, body=None):
+def api(method, path, headers, body=None, ok404=False):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
+        if e.code == 404 and ok404:
+            return None  # phase entrypoint doesn't exist yet -> the PUT below creates it
         sys.exit(f"{method} {path} -> {e.code}\n{e.read().decode()}")
 
 
 def apply_phase(headers, zone, phase, rules):
-    ep = api("GET", f"/zones/{zone}/rulesets/phases/{phase}/entrypoint", headers)
-    existing = ep.get("result", {}).get("rules") or []
+    # A zone with no rules in this phase has no entrypoint ruleset yet -> GET 404s; PUT creates it.
+    ep = api("GET", f"/zones/{zone}/rulesets/phases/{phase}/entrypoint", headers, ok404=True)
+    existing = ((ep or {}).get("result") or {}).get("rules") or []
     kept = [r for r in existing if not (r.get("description") or "").startswith(TAG)]
     merged = kept + rules
     api(
