@@ -19,7 +19,6 @@ services:
     volumes:
       - {{ home }}/config:/app/config
       - {{ home }}/images:/app/public/images
-      - {{ home }}/.next:/app/.next
       - /data01:/data01:ro
 
     healthcheck:
