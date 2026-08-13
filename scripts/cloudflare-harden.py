@@ -38,6 +38,18 @@ ZONES = {
     "radiantatmospheres_com": "87401274f499c81d52527080d0588e7f",
 }
 
+# "Cache Everything" edge-cache rule, scoped to ONLY these hostnames per zone. CF does
+# not cache HTML by default, so pure-static sites show ~0% cache hit; this fixes that.
+# CRITICAL: an allowlist, never zone-wide — the terrac.com zone also hosts ~25 dynamic
+# apps (grafana, portainer, home assistant, *arr, ssh proxies) that must NOT be cached.
+# saetnere.com is intentionally absent: it is WordPress (dynamic), cache-everything would
+# serve stale/broken admin + login pages.
+CACHE_HOSTS = {
+    "terrac_com": ["terrac.com", "www.terrac.com", "blog.terrac.com"],
+    "radiantatmospheres_com": ["radiantatmospheres.com", "www.radiantatmospheres.com"],
+}
+CACHE_EDGE_TTL = 7200  # 2h at the edge; new content lags up to this until a cache purge
+
 # Zone-level SSL/TLS settings (PATCH /zones/{id}/settings/{name}).
 SETTINGS = {
     "always_use_https": "on",
@@ -116,6 +128,26 @@ def apply_headers(headers, zone):
     print(f"  headers: {len(kept)} preserved + 1 homelab = {len(kept) + 1} rules")
 
 
+def apply_cache(headers, zone, hosts):
+    phase = "http_request_cache_settings"
+    ep = api("GET", f"/zones/{zone}/rulesets/phases/{phase}/entrypoint", headers, ok404=True)
+    existing = ((ep or {}).get("result") or {}).get("rules") or []
+    kept = [r for r in existing if not (r.get("description") or "").startswith(TAG)]
+    hostlist = " ".join(f'"{h}"' for h in hosts)
+    rule = {
+        "action": "set_cache_settings",
+        "action_parameters": {
+            "cache": True,
+            "edge_ttl": {"mode": "override_origin", "default": CACHE_EDGE_TTL},
+            "browser_ttl": {"mode": "respect_origin"},
+        },
+        "expression": f"(http.host in {{{hostlist}}})",
+        "description": TAG + "cache static html",
+    }
+    api("PUT", f"/zones/{zone}/rulesets/phases/{phase}/entrypoint", headers, {"rules": kept + [rule]})
+    print(f"  cache: {len(kept)} preserved + 1 homelab (hosts: {', '.join(hosts)})")
+
+
 def main():
     keys = sys.argv[1:] or list(ZONES)
     cf = vault()["cloudflare"]
@@ -131,6 +163,8 @@ def main():
         print(f"zone {key} ({zone}):")
         apply_settings(headers, zone)
         apply_headers(headers, zone)
+        if key in CACHE_HOSTS:
+            apply_cache(headers, zone, CACHE_HOSTS[key])
     print("done")
 
 
