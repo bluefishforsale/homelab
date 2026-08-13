@@ -19,9 +19,21 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 | `docker.sh` | containers across the fleet: `ps [host]` / `where <c>` / `status <c> [host]` / `logs <c> [host] [n]` | `docker.sh where plex` |
 | `alerts.sh` | Alertmanager: active alerts (default), `all`, `silences` | `alerts.sh` |
 | `exporter-scrape-check.sh` | Prometheus targets that are down + their exporter | `exporter-scrape-check.sh` |
-| `dns-drift-check.sh` | divergence between the two authoritative PowerDNS nodes | `dns-drift-check.sh` |
-| `dns-parity-check.sh` | compare dns01 vs dns02 HA nodes record-by-record | `dns-parity-check.sh` |
+| `dns-drift-check.sh` | divergence between the two authoritative PowerDNS nodes (internal) | `dns-drift-check.sh` |
+| `dns-parity-check.sh` | compare dns01 vs dns02 HA nodes record-by-record (internal) | `dns-parity-check.sh` |
 | `homelab-health.sh` | fleet health gate by diff: `snapshot <f>` / `verify <f>` (used by the ship flow) | `homelab-health.sh verify /tmp/base.json` |
+
+## DNS & mail-auth (external / public domains)
+
+These inspect a domain's *public* DNS + mail-auth posture (any domain, e.g. the Cloudflare
+zones) — distinct from the internal PowerDNS HA checks above. Copied from the
+artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
+
+| Script | What | Example |
+|---|---|---|
+| `dns-records.sh` | dump mail-relevant records: NS/A/MX/TXT/SPF/DMARC + probe common DKIM selectors | `dns-records.sh saetnere.com` |
+| `dns-snapshot.sh` | snapshot full DNS + mail-auth state to a dated file, so changes are diffable | `dns-snapshot.sh terrac.com snapshots/` |
+| `dns-timeline.py` | merge dated signals (whois, SOA serial, crt.sh, DMARC reports via `--reports`) into one timeline | `dns-timeline.py terrac.com` |
 
 ## Actions (mutating — used deliberately)
 
