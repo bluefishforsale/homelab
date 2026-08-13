@@ -1,0 +1,14 @@
+[Unit]
+Description=WordPress scheduled tasks (wp-cron, run in-container)
+After=wordpress.service docker.service
+Wants=wordpress.service
+
+[Service]
+Type=oneshot
+# WP loopback cron is disabled (DISABLE_WP_CRON) because the http self-request was
+# being 301'd at the Cloudflare edge and never executing. Run wp-cron.php directly
+# inside the container instead: no HTTP, no redirect, no external dependency.
+ExecStart=/usr/bin/docker exec {{ service }} php /var/www/html/wp-cron.php
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wordpress-cron

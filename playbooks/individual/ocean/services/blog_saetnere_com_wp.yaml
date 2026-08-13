@@ -205,7 +205,7 @@
       name: wordpress.service
       state: started
 
-  - name: Install weekly WordPress update units (pull latest + recreate)
+  - name: Install WordPress update + cron units
     ansible.builtin.template:
       src: "{{ files }}/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
@@ -213,18 +213,23 @@
     with_items:
     - wordpress-update.service
     - wordpress-update.timer
+    - wordpress-cron.service
+    - wordpress-cron.timer
     notify:
     - Reload systemd daemon
 
   - name: Flush handlers so the units are registered before enabling
     ansible.builtin.meta: flush_handlers
 
-  - name: Enable and start the weekly WordPress update timer
+  - name: Enable and start the WordPress update + cron timers
     ansible.builtin.systemd:
-      name: wordpress-update.timer
+      name: "{{ item }}"
       enabled: yes
       state: started
       daemon_reload: yes
+    with_items:
+    - wordpress-update.timer
+    - wordpress-cron.timer
 
   handlers:
   - name: Reload systemd daemon

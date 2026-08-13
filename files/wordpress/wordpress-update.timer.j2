@@ -1,11 +1,13 @@
 [Unit]
-Description=Weekly WordPress image update (keep core patched)
+Description=Hourly WordPress image refresh (stay on latest core)
 Requires=wordpress-update.service
 
 [Timer]
-OnCalendar=Sun *-*-* 04:00:00
-RandomizedDelaySec=1800
-Persistent=true
+OnCalendar=hourly
+# No Persistent: the service is digest-aware, but a catch-up burst on deploy/boot
+# could recreate the container right after the deploy already did. Skip a missed
+# tick; the next hour catches it.
+RandomizedDelaySec=300
 
 [Install]
 WantedBy=timers.target
