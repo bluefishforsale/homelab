@@ -51,6 +51,7 @@ want most often:
 - **Active alerts** → [`scripts/alerts.sh`](scripts/alerts.sh)
 - **Cloudflare (DNS / cache-status / purge)** → [`scripts/cf.sh`](scripts/cf.sh) — `purge` after editing a cached static site
 - **Restart/bounce a service on one host** → [`scripts/fleet-restart.sh`](scripts/fleet-restart.sh) (guarded; the only mutating fleet tool)
+- **Public DNS + mail-auth for a domain** → [`scripts/dns-records.sh`](scripts/dns-records.sh) (SPF/DKIM/DMARC), [`scripts/dns-snapshot.sh`](scripts/dns-snapshot.sh) (diffable), [`scripts/dns-timeline.py`](scripts/dns-timeline.py) — external domains, distinct from the internal PowerDNS `dns-drift-check.sh`
 
 ---
 
