@@ -1,14 +1,24 @@
 [Unit]
-Description=Weekly WordPress update (pull latest image + recreate)
+Description=WordPress image refresh (pull latest, recreate only if changed)
 After=wordpress.service docker.service
 Wants=wordpress.service
 
 [Service]
 Type=oneshot
-# wordpress.service already does `down -> pull --quiet -> up -d` on start, so a
-# restart re-pulls wordpress:latest and recreates the containers. Reuse that
-# rather than duplicating the compose commands here.
-ExecStart=/usr/bin/systemctl restart wordpress.service
+# Pull wordpress:latest and recreate ONLY when the digest actually moved, so this
+# can run frequently to stay fresh without a gratuitous ~10s outage every tick.
+# wordpress.service start does `down -> pull --quiet -> up -d`, so a restart applies
+# the just-pulled image.
+ExecStart=/bin/bash -c '\
+  docker pull -q {{ image }}:{{ version }} >/dev/null; \
+  running=$(docker inspect --format "{% raw %}{{.Image}}{% endraw %}" {{ service }} 2>/dev/null || echo none); \
+  latest=$(docker image inspect --format "{% raw %}{{.Id}}{% endraw %}" {{ image }}:{{ version }}); \
+  if [ "$running" != "$latest" ]; then \
+    echo "wordpress image changed ($running -> $latest), recreating"; \
+    systemctl restart wordpress.service; \
+  else \
+    echo "wordpress image unchanged, skipping recreate"; \
+  fi'
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=wordpress-update
