@@ -38,6 +38,20 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
 - **GitHub Actions Workflows** → [`.github/workflows/`](.github/workflows/)
 - **Playbook Documentation** → [`playbooks/README.md`](playbooks/README.md)
 
+### Diagnostics & Admin Scripts
+
+**Reach for [`scripts/`](scripts/README.md) before hand-rolling `ssh host 'docker …'` or
+`curl prometheus | jq`.** Full index: [`scripts/README.md`](scripts/README.md). The ones you
+want most often:
+
+- **Metrics** → [`scripts/prom.sh`](scripts/prom.sh) `q '<promql>'` / `names` / `targets down`
+- **Logs for a service on a host** → [`scripts/loki.sh`](scripts/loki.sh) `<svc> <host> [since] [limit] [match]`
+- **systemd across the fleet** → [`scripts/fleet-systemctl.sh`](scripts/fleet-systemctl.sh) `all` / `<service> [host]` / `host <host>`
+- **Docker across the fleet** → [`scripts/docker.sh`](scripts/docker.sh) `where <c>` / `status <c> [host]` / `logs`
+- **Active alerts** → [`scripts/alerts.sh`](scripts/alerts.sh)
+- **Cloudflare (DNS / cache-status / purge)** → [`scripts/cf.sh`](scripts/cf.sh) — `purge` after editing a cached static site
+- **Restart/bounce a service on one host** → [`scripts/fleet-restart.sh`](scripts/fleet-restart.sh) (guarded; the only mutating fleet tool)
+
 ---
 
 ## Deploy gotchas (READ before shipping a change)
