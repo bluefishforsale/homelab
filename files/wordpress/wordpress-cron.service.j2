@@ -8,7 +8,14 @@ Type=oneshot
 # WP loopback cron is disabled (DISABLE_WP_CRON) because the http self-request was
 # being 301'd at the Cloudflare edge and never executing. Run wp-cron.php directly
 # inside the container instead: no HTTP, no redirect, no external dependency.
-ExecStart=/usr/bin/docker exec {{ service }} php /var/www/html/wp-cron.php
+# Guard on the container being up so a tick during a recreate (deploy / hourly image
+# refresh) is a clean no-op, not a terminal-failed unit that trips SystemdUnitFailed.
+ExecStart=/bin/bash -c '\
+  if docker inspect -f "{% raw %}{{.State.Running}}{% endraw %}" {{ service }} 2>/dev/null | grep -q true; then \
+    docker exec {{ service }} php /var/www/html/wp-cron.php; \
+  else \
+    echo "{{ service }} not running, skipping cron tick"; \
+  fi'
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=wordpress-cron
