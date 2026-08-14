@@ -92,7 +92,13 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 256M
+          # This Ruby/Rack exporter loads Plex library data into memory when it
+          # collects media metrics; on a large library the 256M cap it shipped
+          # with gets OOM-killed mid-collection, and the resulting restart loop
+          # left the :9594 endpoint unreachable during Prometheus scrapes
+          # (up==0 -> ServiceDown). Raise the ceiling well clear of the working
+          # set; the host has 351G, so 1G is still a hard, safe bound.
+          memory: 1G
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:{{ exporter_port }}/metrics"]
       interval: 30s
