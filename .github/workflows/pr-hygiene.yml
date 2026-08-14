@@ -1,0 +1,202 @@
+---
+# Backstop for agentbox-generated PRs. agentbox files a PR per firing alert and
+# is not trusted to dedup, to re-verify the alert still fires, or to keep its
+# scratch files out of the tree. These jobs enforce that at the PR gate:
+#   scratch-files  - block commit-message scratch files committed into the repo
+#   alert-resolved - if the PR's alert is no longer firing, close the PR + issue
+#   overlap        - flag other open PRs touching the same files (advisory)
+# No `paths` filter: a PR that only adds a stray root file must still be caught.
+name: PR Hygiene
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  HOMELAB_ALERTMANAGER: "http://192.168.1.143:9093"
+
+jobs:
+  scratch-files:
+    name: No scratch commit-message files
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Reject committed commit-message files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Commit messages belong in the commit, never in a tracked file.
+          # agentbox has dumped its message to `.commitmsg.txt` and `git add`ed
+          # it; block that and its variants (COMMIT_EDITMSG, commit-message.*).
+          python3 - <<'PY'
+          import json, os, re, sys, urllib.request
+          repo, pr, tok = os.environ["REPO"], os.environ["PR"], os.environ["GH_TOKEN"]
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/pulls/{pr}/files?per_page=100",
+              headers={"Authorization": f"Bearer {tok}",
+                       "Accept": "application/vnd.github+json"})
+          with urllib.request.urlopen(req, timeout=10) as r:
+              files = json.load(r)
+          junk = re.compile(r'(^|/)(\.?commit[-_]?(msg|message)[-_.a-z0-9]*|COMMIT_EDITMSG)$', re.I)
+          bad = [f['filename'] for f in files
+                 if f.get('status') in ('added', 'modified') and junk.search(f['filename'])]
+          if bad:
+              print("ERROR: commit-message scratch file(s) committed:")
+              for b in bad:
+                  print(f"  {b}")
+              print("Put the message in the commit (git commit -m / -F), not a tracked file.")
+              sys.exit(1)
+          print("OK: no scratch commit-message files")
+          PY
+
+  alert-resolved:
+    name: Alert still firing
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Close PR if its alert no longer fires
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # agentbox alert PRs are titled `fix: [alert] <AlertName> on <host> (#N)`
+          # on branch `agent/issue-N`. Parse the alert + host, ask Alertmanager if
+          # it is still active, and close the PR (and its issue) if not.
+          python3 - <<'PY'
+          import json, os, re, sys, urllib.request
+
+          title  = os.environ["TITLE"]
+          branch = os.environ.get("BRANCH", "")
+          if "[alert]" not in title and not branch.startswith("agent/issue-"):
+              print("Not an alert PR; skipping.")
+              sys.exit(0)
+
+          m = re.search(r'\[alert\]\s+(\S+)\s+on\s+(\S+?)\s*\(#', title)
+          if not m:
+              print(f"Could not parse alert/host from title: {title!r}; skipping (not blocking).")
+              sys.exit(0)
+          alertname, host = m.group(1), m.group(2)
+
+          am = os.environ["HOMELAB_ALERTMANAGER"].rstrip("/")
+          url = f"{am}/api/v2/alerts?active=true&silenced=false&inhibited=false"
+          try:
+              with urllib.request.urlopen(url, timeout=5) as r:
+                  alerts = json.load(r)
+          except Exception as e:
+              # Do not block a PR on a monitoring-stack hiccup.
+              print(f"Alertmanager unreachable ({e}); skipping (not blocking).")
+              sys.exit(0)
+
+          def matches(a):
+              lbl = a.get("labels", {})
+              if lbl.get("alertname") != alertname:
+                  return False
+              hay = " ".join(str(lbl.get(k, "")) for k in ("instance", "host", "nodename", "hostname"))
+              return host in hay
+
+          firing = [a for a in alerts if a.get("status", {}).get("state") == "active" and matches(a)]
+          if firing:
+              print(f"Alert {alertname} for {host} is still firing ({len(firing)} instance(s)); proceeding.")
+              sys.exit(0)
+
+          # Not firing -> the premise is gone. Close PR + linked issue.
+          print(f"Alert {alertname} for {host} is not firing. Closing PR and issue.")
+          repo, pr = os.environ["REPO"], os.environ["PR"]
+          tok = os.environ["GH_TOKEN"]
+
+          def api(method, path, body=None):
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/{path}",
+                  data=json.dumps(body).encode() if body else None,
+                  method=method,
+                  headers={"Authorization": f"Bearer {tok}",
+                           "Accept": "application/vnd.github+json"})
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  return json.load(r)
+
+          note = (f"Closing automatically: Alertmanager reports **{alertname}** on "
+                  f"`{host}` is no longer active, so this alert-driven change has no "
+                  f"live condition to fix. Reopen if it refires and the fix is still wanted.")
+          api("POST", f"issues/{pr}/comments", {"body": note})
+          api("PATCH", f"pulls/{pr}", {"state": "closed"})
+
+          im = re.search(r'agent/issue-(\d+)', branch) or re.search(r'\(#(\d+)\)', title)
+          if im:
+              issue = im.group(1)
+              api("POST", f"issues/{issue}/comments",
+                  {"body": f"Closing: alert **{alertname}** on `{host}` is no longer firing (see PR #{pr})."})
+              api("PATCH", f"issues/{issue}", {"state": "closed"})
+              print(f"Closed issue #{issue}.")
+          print(f"Closed PR #{pr}.")
+          PY
+
+  overlap:
+    name: Overlapping open PRs
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Warn on file overlap with other open PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Two agentbox PRs touching the same file are almost always duplicate or
+          # competing fixes for the same alert. We can't mechanically pick the
+          # winner, so label + comment and let the human decide at merge.
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          repo, pr, tok = os.environ["REPO"], os.environ["PR"], os.environ["GH_TOKEN"]
+          def get(path):
+              req = urllib.request.Request(f"https://api.github.com/repos/{repo}/{path}",
+                                           headers={"Authorization": f"Bearer {tok}",
+                                                    "Accept": "application/vnd.github+json"})
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  return json.load(r)
+          def post(path, body):
+              req = urllib.request.Request(f"https://api.github.com/repos/{repo}/{path}",
+                                           data=json.dumps(body).encode(), method="POST",
+                                           headers={"Authorization": f"Bearer {tok}",
+                                                    "Accept": "application/vnd.github+json"})
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  return json.load(r)
+
+          mine = {f["filename"] for f in get(f"pulls/{pr}/files?per_page=100")}
+          hits = []
+          for other in get("pulls?state=open&per_page=100"):
+              n = other["number"]
+              if n == int(pr):
+                  continue
+              theirs = {f["filename"] for f in get(f"pulls/{n}/files?per_page=100")}
+              shared = mine & theirs
+              if shared:
+                  hits.append((n, other["title"], sorted(shared)))
+
+          if not hits:
+              print("No file overlap with other open PRs.")
+              raise SystemExit(0)
+
+          lines = ["Overlaps with other open PR(s) on the same file(s) - likely duplicate or competing fixes:\n"]
+          for n, title, shared in hits:
+              lines.append(f"- #{n} ({title})")
+              for f in shared:
+                  lines.append(f"    - `{f}`")
+          lines.append("\nOnly one of these should merge. Close the redundant ones.")
+          post(f"issues/{pr}/comments", {"body": "\n".join(lines)})
+          post(f"issues/{pr}/labels", {"labels": ["overlap-suspect"]})
+          print(f"Flagged overlap with {len(hits)} PR(s).")
+          PY
