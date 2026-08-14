@@ -1,0 +1,72 @@
+---
+# Configure ocean's exim4 as a smarthost relay: local + homelab mail is authenticated-
+# relayed out through a free SMTP provider that DKIM-signs as terrac.com. Port 25 egress
+# is blocked and a home IP has no sending reputation, so direct-to-MX is not viable — the
+# provider is the egress + signer. exim4 is already installed (Debian default), so this
+# only reconfigures it; it deliberately does NOT run apt (ocean's apt is wedged by stale
+# nvidia repos — see docker_ce landmine).
+#
+# REQUIRES in vault: external_apis.smtp_relay.login / .password (the provider's SMTP key).
+- name: Configure exim4 smarthost mail relay
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    files: "{{ playbook_dir }}/../../../../files/exim-smarthost"
+    mail_domain: terrac.com
+    smtp_relay_host: smtp-relay.brevo.com
+    smtp_relay_port: 587
+    smtp_relay_login: "{{ external_apis.smtp_relay.login }}"
+    smtp_relay_password: "{{ external_apis.smtp_relay.password }}"
+    mail_local_interfaces: '127.0.0.1 ; ::1'
+    # Widen to the docker bridge / LAN CIDR when on-host containers submit here (task 31).
+    mail_relay_nets: ''
+
+  tasks:
+
+  - name: Set /etc/mailname to the sending domain
+    ansible.builtin.copy:
+      content: "{{ mail_domain }}\n"
+      dest: /etc/mailname
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Rebuild exim config
+
+  - name: Install smarthost SASL credentials
+    ansible.builtin.template:
+      src: "{{ files }}/passwd.client.j2"
+      dest: /etc/exim4/passwd.client
+      owner: root
+      group: Debian-exim
+      mode: '0640'
+    notify: Rebuild exim config
+
+  - name: Write exim4 smarthost configuration
+    ansible.builtin.template:
+      src: "{{ files }}/update-exim4.conf.conf.j2"
+      dest: /etc/exim4/update-exim4.conf.conf
+      owner: root
+      group: root
+      mode: '0644'
+    notify: Rebuild exim config
+
+  - name: Ensure exim4 is enabled and running
+    ansible.builtin.systemd:
+      name: exim4
+      enabled: yes
+      state: started
+
+  handlers:
+  - name: Rebuild exim config
+    ansible.builtin.command: /usr/sbin/update-exim4.conf
+    notify: Restart exim4
+
+  - name: Restart exim4
+    ansible.builtin.systemd:
+      name: exim4
+      state: restarted
