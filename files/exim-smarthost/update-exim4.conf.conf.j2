@@ -1,0 +1,17 @@
+# /etc/exim4/update-exim4.conf.conf  — MANAGED BY ANSIBLE (playbooks/individual/ocean/network/mail_relay.yaml)
+# exim4 as a smarthost relay: local + homelab mail is authenticated-relayed out through
+# a free SMTP provider (port 25 egress is blocked, and a home IP has no sending
+# reputation — the provider DKIM-signs as {{ mail_domain }} and delivers).
+dc_eximconfig_configtype='smarthost'
+dc_other_hostnames='{{ mail_domain }}'
+dc_local_interfaces='{{ mail_local_interfaces }}'
+dc_readhost='{{ mail_domain }}'
+dc_relay_domains=''
+dc_minimaldns='false'
+dc_relay_nets='{{ mail_relay_nets }}'
+dc_smarthost='{{ smtp_relay_host }}::{{ smtp_relay_port }}'
+CFILEMODE='644'
+dc_use_split_config='false'
+dc_hide_mailname='true'
+dc_mailname_in_oh='true'
+dc_localdelivery='mail_spool'

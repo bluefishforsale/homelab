@@ -1,0 +1,4 @@
+# /etc/exim4/passwd.client — MANAGED BY ANSIBLE. SASL creds for the smarthost relay.
+# Format: target:login:password. exim authenticates (over STARTTLS) when relaying to it.
+{{ smtp_relay_host }}:{{ smtp_relay_login }}:{{ smtp_relay_password }}
+*.{{ smtp_relay_host.split('.')[1:] | join('.') }}:{{ smtp_relay_login }}:{{ smtp_relay_password }}
