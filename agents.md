@@ -143,6 +143,13 @@ Distilled from prior decisions. Defaults, not laws, but don't override without a
   goals AND anti-goals first, then implement only against that scope. Grill the
   requirements before writing code.
 - **New repos inherit the CI/CD deploy pattern** ([`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)) automatically.
+- **Every service is monitored — no exceptions.** Part of shipping any new service:
+  (1) it has at least a **health check** (compose `healthcheck:` / systemd health / a
+  blackbox probe) so failure is visible, and (2) if it exposes a **Prometheus metrics
+  endpoint, add a scrape job** (`files/ocean-prometheus/prometheus.yml.j2`) so the metrics
+  land in Prometheus and a Grafana panel. A service that ships unmonitored is unfinished.
+  Verify with [`scripts/exporter-scrape-check.sh`](scripts/exporter-scrape-check.sh) (targets down)
+  and [`scripts/prom.sh`](scripts/prom.sh) `targets`.
 - **Fix through code, never manual SSH.** A playbook / workflow / runner-config change
   is the fix; manual SSH to a host is the escape hatch, not the default. Manual edits
   drift from IaC and get overwritten by the next apply.
