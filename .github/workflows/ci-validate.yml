@@ -179,9 +179,15 @@ jobs:
   check-vault:
     name: Verify Vault Files
     runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Check vault encryption
         run: |
@@ -209,6 +215,7 @@ jobs:
           # the decrypted KEY PATHS (never values - this log is not a safe place for
           # them) against the base branch and fail on anything that disappeared.
           set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
           trap 'rm -f /tmp/.vault_pass /tmp/vault-base.yaml' EXIT
