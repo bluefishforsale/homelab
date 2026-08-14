@@ -16,7 +16,6 @@ Assumes the vault's 2-space indentation. A deeper file is refused, never mangled
 Exit codes: 0 ok, 1 `check` mismatch, 2 error.
 """
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -61,7 +60,7 @@ def write(text):
         "--vault-password-file", PASS, "--output", tmp, "-", stdin=text)
     if run("ansible-vault", "view", "--vault-password-file", PASS, tmp) != text:
         die(f"re-encrypted vault does not decrypt to what we wrote; it is at {tmp}, {VAULT} untouched")
-    os.chmod(tmp, os.stat(VAULT).st_mode)
+    os.chmod(tmp, 0o600)  # ciphertext, but no reason to leave it readable to other local users
     os.replace(tmp, VAULT)
     print(f"wrote {VAULT}", file=sys.stderr)
 
@@ -150,16 +149,17 @@ def value_at(data, path):
     return v
 
 
-def sha(v):
-    return hashlib.sha256(str(v).encode()).hexdigest()[:8]
+def supplied(value):
+    return sys.stdin.read().rstrip("\n") if value == "-" else value
 
 
 def redact(v):
+    # no digest, and no passthrough for numbers: `list` output ends up in agent
+    # transcripts and CI logs, and an unsalted hash of a short secret is a crackable
+    # oracle there. `check` answers "does my value match" without publishing anything
     if isinstance(v, list):
         return f"[list: {len(v)} items]"
-    if isinstance(v, (bool, int, float)):
-        return str(v)
-    return f"**** len={len(str(v))} sha256:{sha(v)}"
+    return f"**** len={len(str(v))}"
 
 
 def strip_scalar(rest):
@@ -224,29 +224,35 @@ def cmd_get(args):
     print(value_at(load(read()), args.path.split(".")))
 
 
+def same(stored, expected):
+    # a YAML-native `true` stringifies as "True", and answering "differ" to
+    # `check flag true` is a false negative on exactly the question this tool exists for
+    return str(stored).lower() == expected.lower() if isinstance(stored, bool) else str(stored) == expected
+
+
 def cmd_check(args):
     stored = value_at(load(read()), args.path.split("."))
-    expected = sys.stdin.read().rstrip("\n") if args.value == "-" else args.value
-    if str(stored) == expected:
+    if same(stored, supplied(args.value)):
         print("match")
         return 0
-    print(f"differ (stored sha256:{sha(stored)})")
+    print("differ")
     return 1
 
 
 def cmd_set(args):
     text = read()
     path = args.path.split(".")
+    value = supplied(args.value)
     current, ok = resolve(load(text), path)
     if ok and args.cmd == "set":
         die(f"{args.path} exists; use `rotate` to replace it")
     if not ok and args.cmd == "rotate":
         die(f"{args.path} does not exist; use `set` to add it")
-    if ok and str(current) == args.value:
+    if ok and same(current, value):
         # the asked-for end state already holds; a rerun of a rotation script is not a failure
         print(f"{args.path} already holds that value", file=sys.stderr)
         return 0
-    write(edit(text, path, args.value))
+    write(edit(text, path, value))
     return 0
 
 
@@ -270,7 +276,7 @@ def main():
     for name, helptext in (("set", "add a new key"), ("rotate", "replace an existing value")):
         s = sub.add_parser(name, help=helptext)
         s.add_argument("path")
-        s.add_argument("value")
+        s.add_argument("value", help="new value, or - to read stdin (keeps it out of shell history and ps)")
         s.set_defaults(fn=cmd_set)
 
     args = p.parse_args()
