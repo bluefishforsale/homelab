@@ -13,6 +13,7 @@ on:
       - "files/**"
       - "roles/**"
       - "vars/**/*.yaml"
+      - "vault/**"
       - ".github/workflows/**"
   pull_request:
     branches:
@@ -24,6 +25,7 @@ on:
       - "files/**"
       - "roles/**"
       - "vars/**/*.yaml"
+      - "vault/**"
       - ".github/workflows/**"
 
 env:
@@ -195,3 +197,37 @@ jobs:
             fi
           done
           echo "✓ All vault files are properly encrypted"
+
+      - name: Check no vault keys were dropped
+        if: github.event_name == 'pull_request'
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A vault edit that merges an older copy silently deletes secrets, and the
+          # ciphertext diff shows every line changed, so review can't see it. Compare
+          # the decrypted KEY PATHS (never values - this log is not a safe place for
+          # them) against the base branch and fail on anything that disappeared.
+          set -euo pipefail
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+          trap 'rm -f /tmp/.vault_pass /tmp/vault-base.yaml' EXIT
+          export ANSIBLE_VAULT_PASSWORD_FILE=/tmp/.vault_pass
+
+          git fetch --depth=1 origin "$BASE_SHA"
+          git show "$BASE_SHA:vault/secrets.yaml" > /tmp/vault-base.yaml
+
+          HOMELAB_VAULT=/tmp/vault-base.yaml scripts/vault.py list | cut -d: -f1 | sort > /tmp/keys-base
+          scripts/vault.py list | cut -d: -f1 | sort > /tmp/keys-head
+
+          removed=$(comm -23 /tmp/keys-base /tmp/keys-head)
+          if [ -n "$removed" ]; then
+            echo "ERROR: this PR removes vault keys that exist on the base branch:"
+            echo "$removed" | sed 's/^/  - /'
+            echo ""
+            echo "If the removal is intentional, a human must confirm it and override this check."
+            echo "If it is not, you have merged an older copy of the vault - re-do the edit"
+            echo "on top of the current file (scripts/vault.py rotate) instead of replacing it."
+            exit 1
+          fi
+          echo "✓ no vault keys dropped ($(wc -l < /tmp/keys-head) keys, $(comm -13 /tmp/keys-base /tmp/keys-head | wc -l) added)"

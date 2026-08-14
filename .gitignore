@@ -18,6 +18,7 @@ qemu-output/
 # ignore unencrypted secrets files (encrypted vault_secrets.yaml is safe to commit)
 vault/secrets_plain.yaml
 vault/secrets.yaml.new
+vault/secrets.yaml.lock
 
 # plaintext config files with hardcoded secrets (use .j2 templates instead)
 files/ocean-nzbget/config/nzbget.conf

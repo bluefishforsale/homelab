@@ -16,6 +16,8 @@ Assumes the vault's 2-space indentation. A deeper file is refused, never mangled
 Exit codes: 0 ok, 1 `check` mismatch, 2 error.
 """
 import argparse
+import fcntl
+import hmac
 import json
 import os
 import re
@@ -46,8 +48,16 @@ def run(*cmd, stdin=None):
     return r.stdout
 
 
+def lock():
+    """Exclusive for the whole read-modify-write. Two concurrent rotations would
+    otherwise both report success, with one silently overwritten."""
+    f = open(VAULT + ".lock", "w")
+    fcntl.flock(f, fcntl.LOCK_EX)
+    return f  # the caller must keep this alive; closing it drops the lock
+
+
 def read():
-    text = run("ansible-vault", "view", "--vault-password-file", PASS, VAULT)
+    text = run("ansible-vault", "view", "--vault-password-file", PASS, "--", VAULT)
     if not text.strip():
         die(f"{VAULT} decrypted to nothing; refusing to treat that as an empty tree")
     return text
@@ -58,7 +68,7 @@ def write(text):
     tmp = VAULT + ".new"
     run("ansible-vault", "encrypt", "--encrypt-vault-id", "default",
         "--vault-password-file", PASS, "--output", tmp, "-", stdin=text)
-    if run("ansible-vault", "view", "--vault-password-file", PASS, tmp) != text:
+    if run("ansible-vault", "view", "--vault-password-file", PASS, "--", tmp) != text:
         die(f"re-encrypted vault does not decrypt to what we wrote; it is at {tmp}, {VAULT} untouched")
     os.chmod(tmp, 0o600)  # ciphertext, but no reason to leave it readable to other local users
     os.replace(tmp, VAULT)
@@ -227,7 +237,9 @@ def cmd_get(args):
 def same(stored, expected):
     # a YAML-native `true` stringifies as "True", and answering "differ" to
     # `check flag true` is a false negative on exactly the question this tool exists for
-    return str(stored).lower() == expected.lower() if isinstance(stored, bool) else str(stored) == expected
+    if isinstance(stored, bool):
+        return expected.lower() == str(stored).lower()
+    return hmac.compare_digest(str(stored), expected)
 
 
 def cmd_check(args):
@@ -240,6 +252,7 @@ def cmd_check(args):
 
 
 def cmd_set(args):
+    held = lock()  # noqa: F841 - the lock lives as long as this reference does
     text = read()
     path = args.path.split(".")
     value = supplied(args.value)
