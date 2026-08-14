@@ -45,8 +45,10 @@ def write(text):
     """Re-encrypt `text` over the vault file, keeping the previous ciphertext in TMPDIR."""
     with open(VAULT) as f:
         prev = f.read()
-    bak = os.path.join(tempfile.gettempdir(), "secrets.yaml.bak")
-    with open(bak, "w") as f:
+    # mkstemp, not a fixed $TMPDIR name: a predictable path in a shared /tmp is a
+    # symlink-overwrite target on the Linux boxes this repo also gets run from
+    fd, bak = tempfile.mkstemp(prefix="secrets.yaml.", suffix=".bak")
+    with os.fdopen(fd, "w") as f:
         f.write(prev)
     r = subprocess.run(
         ["ansible-vault", "encrypt", "--encrypt-vault-id", "default",
@@ -129,13 +131,6 @@ def redact(v):
     return f"**** len={len(s)} sha256:{digest}"
 
 
-def render(value):
-    """YAML scalar for a value supplied on the command line."""
-    if value.lower() in ("true", "false", "null") or re.fullmatch(r"-?\d+(\.\d+)?", value):
-        return value
-    return json.dumps(value)  # double-quoted YAML is JSON-compatible for strings
-
-
 def strip_scalar(rest):
     """Everything after the value on a `key: value` line, quotes respected."""
     if rest[:1] in ("\"", "'"):
@@ -155,7 +150,9 @@ def strip_scalar(rest):
 def edit(text, path, value):
     lines = text.split("\n")
     depth, idx, end, indent = locate(lines, path)
-    scalar = render(value)
+    # always double-quoted (JSON is a YAML subset for strings): everything here came
+    # from argv as a string, and bare `0755`/`TRUE` would come back as 493/True
+    scalar = json.dumps(value)
 
     if depth == len(path):
         ln = lines[idx]
@@ -170,7 +167,9 @@ def edit(text, path, value):
     else:
         block = [" " * ((depth + i) * 2) + f"{p}:" for i, p in enumerate(path[depth:-1])]
         block.append(" " * (len(path[:-1]) * 2) + f"{path[-1]}: {scalar}")
-        while end > 0 and not lines[end - 1].strip():
+        # back up over trailing blanks AND comments: a banner comment sits above the
+        # section it labels, so inserting under it would steal the next section's header
+        while end > 0 and (not lines[end - 1].strip() or lines[end - 1].lstrip().startswith("#")):
             end -= 1
         lines[end:end] = block
 

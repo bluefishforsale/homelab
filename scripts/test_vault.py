@@ -28,6 +28,10 @@ lists:
   members:
     - one
     - two
+
+# banner for the section below
+last:
+  k: v
 """
 
 
@@ -56,10 +60,15 @@ def main():
     out = check(["a", "b", "c"], "v", '    c: "v"')
     assert "a:" in out.split("\n") and "  b:" in out.split("\n"), out
 
-    # scalars stay scalars, strings stay quoted
-    check(["top"], "42", "top: 42")
-    check(["top"], "true", "top: true")
-    check(["top"], "yes", 'top: "yes"')
+    # a new key lands under its own section, not under the next section's banner
+    out = check(["lists", "x"], "v", '  x: "v"')
+    lines = out.split("\n")
+    assert lines.index('  x: "v"') < lines.index("# banner for the section below"), out
+
+    # everything from argv is a string: bare 0755 would come back as 493, TRUE as True
+    check(["top"], "0755", 'top: "0755"')
+    check(["top"], "42", 'top: "42"')
+    check(["top"], "TRUE", 'top: "TRUE"')
     check(["top"], "pa ss: word", 'top: "pa ss: word"')
 
     # a list leaf is left alone rather than half-rewritten
