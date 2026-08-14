@@ -1,7 +1,9 @@
 global:
-  # Global configuration options
-  smtp_smarthost: 'localhost:587'
-  smtp_from: 'alertmanager@{{ ansible_default_ipv4.address }}'
+  # Global configuration options — relay through the ocean exim smarthost hub (-> Brevo,
+  # signed as terrac.com). Plaintext on the trusted LAN hop; the hub does TLS to Brevo.
+  smtp_smarthost: '{{ ansible_default_ipv4.address }}:25'
+  smtp_from: 'alertmanager@terrac.com'
+  smtp_require_tls: false
 
 # The directory from which notification templates are read.
 templates: []
@@ -39,6 +41,10 @@ receivers:
 - name: 'agentbox'
   webhook_configs:
   - url: 'http://agentbox.home:9098/'
+    send_resolved: true
+  # Email alongside the ntfy/GitHub fan-out, via the exim hub (as terrac.com).
+  email_configs:
+  - to: 'terracnosaur@gmail.com'
     send_resolved: true
 
 # Example email receiver (commented out)
