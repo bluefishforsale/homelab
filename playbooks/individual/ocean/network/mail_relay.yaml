@@ -22,9 +22,11 @@
     smtp_relay_port: 587
     smtp_relay_login: "{{ external_apis.smtp_relay.login }}"
     smtp_relay_password: "{{ external_apis.smtp_relay.password }}"
-    mail_local_interfaces: '127.0.0.1 ; ::1'
-    # Widen to the docker bridge / LAN CIDR when on-host containers submit here (task 31).
-    mail_relay_nets: ''
+    # Hub mode: listen on all interfaces (all private — ocean has no public IP and WAN:25
+    # is blocked) so on-host containers and LAN hosts can submit. mail_relay_nets is the
+    # trust boundary: only the docker bridge range + LAN may relay (not an open relay).
+    mail_local_interfaces: ''
+    mail_relay_nets: '172.16.0.0/12 ; 192.168.1.0/24'
 
   tasks:
 
