@@ -8,7 +8,12 @@ set/rotate a value in place.
 
 Writes are line-edits on the decrypted text, never a YAML round-trip, so comments,
 quoting, block scalars and ordering survive. The result is parsed and diffed against
-the original before it is re-encrypted: exactly one path may change.
+the original before it is re-encrypted (exactly one path may change), then encrypted
+to a sibling temp file and decrypted back to prove it round-trips before it replaces
+the vault. Nothing overwrites the vault until that check passes.
+
+Assumes the vault's 2-space indentation. A deeper file is refused, never mangled.
+Exit codes: 0 ok, 1 `check` mismatch, 2 error.
 """
 import argparse
 import hashlib
@@ -17,7 +22,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 
 import yaml
 
@@ -28,36 +32,38 @@ KEY_RE = re.compile(r"([A-Za-z0-9_.-]+):(\s*)(.*)$")
 
 
 def die(msg):
-    sys.exit(f"vault.py: {msg}")
+    print(f"vault.py: {msg}", file=sys.stderr)
+    sys.exit(2)
 
 
-def read():
-    r = subprocess.run(
-        ["ansible-vault", "view", "--vault-password-file", PASS, VAULT],
-        capture_output=True, text=True,
-    )
+def run(*cmd, stdin=None):
+    r = subprocess.run(cmd, input=stdin, capture_output=True, text=True)
+    if r.stderr.strip():
+        # ansible-vault warns and still exits 0 for a bad password file; that warning is
+        # the only signal the vault got encrypted with a fallback password
+        print(r.stderr.strip(), file=sys.stderr)
     if r.returncode:
-        die(r.stderr.strip() or "decrypt failed")
+        die(f"{' '.join(cmd[:2])} failed")
     return r.stdout
 
 
+def read():
+    text = run("ansible-vault", "view", "--vault-password-file", PASS, VAULT)
+    if not text.strip():
+        die(f"{VAULT} decrypted to nothing; refusing to treat that as an empty tree")
+    return text
+
+
 def write(text):
-    """Re-encrypt `text` over the vault file, keeping the previous ciphertext in TMPDIR."""
-    with open(VAULT) as f:
-        prev = f.read()
-    # mkstemp, not a fixed $TMPDIR name: a predictable path in a shared /tmp is a
-    # symlink-overwrite target on the Linux boxes this repo also gets run from
-    fd, bak = tempfile.mkstemp(prefix="secrets.yaml.", suffix=".bak")
-    with os.fdopen(fd, "w") as f:
-        f.write(prev)
-    r = subprocess.run(
-        ["ansible-vault", "encrypt", "--encrypt-vault-id", "default",
-         "--vault-password-file", PASS, "--output", VAULT, "-"],
-        input=text, capture_output=True, text=True,
-    )
-    if r.returncode:
-        die(r.stderr.strip() or "encrypt failed")
-    print(f"wrote {VAULT} (previous ciphertext: {bak})", file=sys.stderr)
+    """Encrypt beside the vault, prove it decrypts back to `text`, then replace it."""
+    tmp = VAULT + ".new"
+    run("ansible-vault", "encrypt", "--encrypt-vault-id", "default",
+        "--vault-password-file", PASS, "--output", tmp, "-", stdin=text)
+    if run("ansible-vault", "view", "--vault-password-file", PASS, tmp) != text:
+        die(f"re-encrypted vault does not decrypt to what we wrote; it is at {tmp}, {VAULT} untouched")
+    os.chmod(tmp, os.stat(VAULT).st_mode)
+    os.replace(tmp, VAULT)
+    print(f"wrote {VAULT}", file=sys.stderr)
 
 
 def children(lines, start, end, indent):
@@ -102,15 +108,28 @@ def locate(lines, path):
 
 
 def flatten(node, prefix=()):
+    """Leaf paths as tuples, not joined strings: a key containing a `.` must not
+    collide with a nested path and hide a change from the pre-write diff."""
     if isinstance(node, dict):
         for k, v in node.items():
             yield from flatten(v, prefix + (str(k),))
     else:
-        yield ".".join(prefix), node
+        yield prefix, node
 
 
-def load(text):
-    return yaml.safe_load(text) or {}
+def load(text, what="vault plaintext"):
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as e:
+        # never echo the exception: its message quotes the offending line, i.e. a secret
+        mark = getattr(e, "problem_mark", None)
+        die(f"{what} is not valid YAML" + (f" (line {mark.line + 1})" if mark else ""))
+    dotted = [k for k, _ in flatten(data) if any("." in part for part in k)]
+    if dotted:
+        # `a.b.c` would be ambiguous between a nested path and a literal `a.b` key, and
+        # the tool would quietly create the nested one alongside it
+        die(f"{what} has a key containing a dot ({'.'.join(dotted[0])}); this tool cannot address it")
+    return data
 
 
 def resolve(data, path):
@@ -121,14 +140,26 @@ def resolve(data, path):
     return data, True
 
 
+def value_at(data, path):
+    v, ok = resolve(data, path)
+    dotted = ".".join(path)
+    if not ok:
+        die(f"no such path: {dotted}")
+    if isinstance(v, (dict, list)):
+        die(f"{dotted} is a {type(v).__name__}, not a value; use `list {dotted}`")
+    return v
+
+
+def sha(v):
+    return hashlib.sha256(str(v).encode()).hexdigest()[:8]
+
+
 def redact(v):
     if isinstance(v, list):
         return f"[list: {len(v)} items]"
-    if isinstance(v, bool) or isinstance(v, int) or isinstance(v, float):
+    if isinstance(v, (bool, int, float)):
         return str(v)
-    s = str(v)
-    digest = hashlib.sha256(s.encode()).hexdigest()[:8]
-    return f"**** len={len(s)} sha256:{digest}"
+    return f"**** len={len(str(v))} sha256:{sha(v)}"
 
 
 def strip_scalar(rest):
@@ -142,7 +173,7 @@ def strip_scalar(rest):
             if rest[i] == q:
                 return rest[i + 1:].strip()
             i += 1
-        return ""
+        die("cannot edit a scalar whose quotes do not close on the key line")
     _, _, tail = rest.partition(" #")
     return f"#{tail}" if tail else ""
 
@@ -155,8 +186,7 @@ def edit(text, path, value):
     scalar = json.dumps(value)
 
     if depth == len(path):
-        ln = lines[idx]
-        m = KEY_RE.match(ln.strip())
+        m = KEY_RE.match(lines[idx].strip())
         if m.group(3).strip() in ("|", ">", "|-", ">-", ""):
             die(f"{'.'.join(path)} is a block scalar or a map, not an inline value")
         # keep any trailing comment, but only a real one: a `#` inside the quoted
@@ -174,54 +204,49 @@ def edit(text, path, value):
         lines[end:end] = block
 
     new = "\n".join(lines)
-    try:
-        after = dict(flatten(load(new)))
-    except yaml.YAMLError as e:
-        die(f"edit produced invalid YAML: {e}")
-    before = dict(flatten(load(text)))
+    before, after = dict(flatten(load(text))), dict(flatten(load(new, "the edited vault")))
     touched = {k for k in before.keys() | after.keys() if before.get(k, ()) != after.get(k, ())}
-    if touched != {".".join(path)}:
-        die(f"refusing to write: edit would change {sorted(touched) or 'nothing'}")
+    if touched != {tuple(path)}:
+        die(f"refusing to write: edit would change {sorted('.'.join(t) for t in touched) or 'nothing'}")
     return new
 
 
 def cmd_list(args):
-    data = load(read())
-    prefix = args.path.split(".") if args.path else []
-    node, ok = resolve(data, prefix)
+    prefix = tuple(args.path.split(".")) if args.path else ()
+    node, ok = resolve(load(read()), prefix)
     if not ok:
         die(f"no such path: {args.path}")
-    for k, v in flatten(node, tuple(prefix)):
-        print(f"{k}: {redact(v)}")
+    for k, v in flatten(node, prefix):
+        print(f"{'.'.join(k)}: {redact(v)}")
 
 
 def cmd_get(args):
-    v, ok = resolve(load(read()), args.path.split("."))
-    if not ok:
-        die(f"no such path: {args.path}")
-    print(v if isinstance(v, str) else yaml.safe_dump(v, default_flow_style=False).rstrip())
+    print(value_at(load(read()), args.path.split(".")))
 
 
 def cmd_check(args):
-    v, ok = resolve(load(read()), args.path.split("."))
-    if not ok:
-        die(f"no such path: {args.path}")
+    stored = value_at(load(read()), args.path.split("."))
     expected = sys.stdin.read().rstrip("\n") if args.value == "-" else args.value
-    match = str(v) == expected
-    print("match" if match else f"differ (stored sha256:{hashlib.sha256(str(v).encode()).hexdigest()[:8]})")
-    return 0 if match else 1
+    if str(stored) == expected:
+        print("match")
+        return 0
+    print(f"differ (stored sha256:{sha(stored)})")
+    return 1
 
 
 def cmd_set(args):
     text = read()
-    current, ok = resolve(load(text), args.path.split("."))
+    path = args.path.split(".")
+    current, ok = resolve(load(text), path)
     if ok and args.cmd == "set":
         die(f"{args.path} exists; use `rotate` to replace it")
     if not ok and args.cmd == "rotate":
         die(f"{args.path} does not exist; use `set` to add it")
     if ok and str(current) == args.value:
-        die(f"{args.path} already holds that value; nothing to rotate")
-    write(edit(text, args.path.split("."), args.value))
+        # the asked-for end state already holds; a rerun of a rotation script is not a failure
+        print(f"{args.path} already holds that value", file=sys.stderr)
+        return 0
+    write(edit(text, path, args.value))
     return 0
 
 

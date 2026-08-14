@@ -45,7 +45,7 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | `cloudflare-waf.py` | per-zone WAF block + rate-limit rules (WordPress zones) | idempotent; run by hand |
 | `media-reclaim-report.py` / `media-reclaim-delete.py` | profile the library / delete via Radarr+Sonarr with unmonitor + import-exclusion | delete is destructive |
 | `media_clients.py` | one client wrapping radarr/sonarr/tdarr/plex/overseerr/tautulli | library used by the media scripts |
-| `vault.py` | `vault/secrets.yaml`: `list [path]` (redacted) / `get <path>` / `check <path> <value>` / `set <path> <value>` / `rotate <path> <value>` | writes are line-edits (comments + ordering survive) and are diffed before re-encrypting, so exactly one path can change; `check` exits 1 on mismatch, which is how you tell whether a rotation landed. Old ciphertext lands in `$TMPDIR/secrets.yaml.bak`. Self-check: `python3 scripts/test_vault.py` |
+| `vault.py` | `vault/secrets.yaml`: `list [path]` (redacted) / `get <path>` / `check <path> <value>` / `set <path> <value>` / `rotate <path> <value>` | writes are line-edits (comments + ordering survive), diffed before re-encrypting so exactly one path can change, then encrypted beside the vault and decrypted back to prove it round-trips before `os.replace` — the vault is never overwritten by an unverified write. Exit codes: `0` ok, `1` `check` mismatch, `2` error, which is how you tell "rotation didn't land" from "typo'd the path". Self-check: `python3 scripts/test_vault.py` |
 
 ## Environment overrides
 

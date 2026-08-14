@@ -71,12 +71,18 @@ def main():
     check(["top"], "TRUE", 'top: "TRUE"')
     check(["top"], "pa ss: word", 'top: "pa ss: word"')
 
-    # a list leaf is left alone rather than half-rewritten
-    try:
-        vault.edit(DOC, ["lists", "members"], "x")
-        raise AssertionError("expected refusal to overwrite a map/list key")
-    except SystemExit:
-        pass
+    for doc, path, why in (
+        # a list leaf must not be half-rewritten into a scalar
+        (DOC, ["lists", "members"], "overwriting a list key"),
+        # `svc.api.key` is ambiguous against a literal `api.key` key: refuse rather than
+        # quietly create a nested twin that shadows the real one
+        ('svc:\n  api.key: "old"\n', ["svc", "api", "key"], "a dotted key in the file"),
+    ):
+        try:
+            vault.edit(doc, path, "x")
+            raise AssertionError(f"expected refusal: {why}")
+        except SystemExit:
+            pass
 
     print("ok")
 
