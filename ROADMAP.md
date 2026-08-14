@@ -39,6 +39,8 @@ Status and future plans for the homelab infrastructure.
 - **Network optimization**: Multiqueue (128 queues) for VMs and interfaces
 - **DNS HA**: Secondary DNS with zone transfers
 - **Registry cache**: Pull-through Docker registry cache VM
+- **NFS server**: NFS exports for shared storage
+- **AFP**: Apple Filing Protocol file sharing
 
 ### Media Stack
 
@@ -74,6 +76,8 @@ Status and future plans for the homelab infrastructure.
 - **UnPoller**: UniFi network metrics
 - **NVIDIA DCGM**: GPU metrics exporter
 - **NDT Speedtest**: Network diagnostic speedtest monitoring
+- **Cloudflare Exporter**: Cloudflare metrics exporter for Prometheus
+- **ntfy**: Push notification service
 
 ### Cloud/CMS Services
 
@@ -85,6 +89,7 @@ Status and future plans for the homelab infrastructure.
 - **Home Assistant**: Smart home automation
 - **Homepage**: Service status dashboard
 - **GlobalView**: Custom service monitoring stack
+- **my-ta-jose**: Application service (healthy metrics target)
 
 ### Automation & Security
 
