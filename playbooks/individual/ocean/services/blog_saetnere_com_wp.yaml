@@ -112,6 +112,14 @@
       group: "33"
       mode: '0644'
 
+  - name: Install WordPress SMTP-relay mu-plugin
+    ansible.builtin.copy:
+      src: "{{ files }}/mu-plugins/smtp.php"
+      dest: "{{ home }}/wp-content/mu-plugins/smtp.php"
+      owner: "33"
+      group: "33"
+      mode: '0644'
+
   - name: Create MySQL configuration from template
     ansible.builtin.template:
       src: "{{ files }}/mysql-custom.cnf.j2"
