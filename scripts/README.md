@@ -45,6 +45,7 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | `cloudflare-waf.py` | per-zone WAF block + rate-limit rules (WordPress zones) | idempotent; run by hand |
 | `media-reclaim-report.py` / `media-reclaim-delete.py` | profile the library / delete via Radarr+Sonarr with unmonitor + import-exclusion | delete is destructive |
 | `media_clients.py` | one client wrapping radarr/sonarr/tdarr/plex/overseerr/tautulli | library used by the media scripts |
+| `vault.py` | `vault/secrets.yaml`: `list [path]` (redacted) / `get <path>` / `check <path> <value>` / `set <path> <value>` / `rotate <path> <value>` | writes are line-edits (comments + ordering survive) and are diffed before re-encrypting, so exactly one path can change; `check` exits 1 on mismatch, which is how you tell whether a rotation landed. Old ciphertext lands in `$TMPDIR/secrets.yaml.bak`. Self-check: `python3 scripts/test_vault.py` |
 
 ## Environment overrides
 
@@ -55,6 +56,8 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | `HOMELAB_LOKI` | `http://192.168.1.143:3100` | loki.sh |
 | `HOMELAB_INVENTORY` | `inventories/production/hosts.ini` | fleet-systemctl.sh, docker.sh, fleet-restart.sh |
 | `SSH_TIMEOUT` | `5` | the ssh-based fleet tools |
+| `HOMELAB_VAULT` | `vault/secrets.yaml` | vault.py (point it at a copy to rehearse a rotation) |
+| `ANSIBLE_VAULT_PASSWORD_FILE` | `~/.ansible_vault_pass` | vault.py |
 | `~/.ansible_vault_pass` | — | cf.sh, cloudflare-*.py |
 
 The ssh-based tools resolve hosts from the ansible inventory (reached as
