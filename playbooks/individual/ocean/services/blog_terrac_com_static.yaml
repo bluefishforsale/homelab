@@ -28,6 +28,9 @@
     uid: 1001
     gid: 1001
     accept_hostkey: yes
+    # Public identifier, not a secret. Canonical list lives in
+    # scripts/cloudflare-harden.py (ZONES) and monitoring/cloudflare_exporter.yaml (cf_zones).
+    cloudflare_zone_id: f3be74ced16c63d68b522f569ecba43b
 
   tasks:
 
@@ -161,6 +164,28 @@
     ansible.builtin.debug:
       msg: "WARNING: index.html not found in {{ web_root }}. The website may not load correctly."
     when: not index_file.stat.exists
+    tags: [deploy]
+
+  # scripts/cloudflare-harden.py pins these hosts to a 2h edge TTL with
+  # mode "override_origin", so Cloudflare ignores any Cache-Control nginx
+  # sends and serves stale HTML for up to 2h after a deploy. Purging by host
+  # is the only thing that shortens that; adding origin headers does nothing.
+  - name: Purge Cloudflare edge cache for blog.terrac.com
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/purge_cache"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+      body_format: json
+      body:
+        hosts:
+          - blog.terrac.com
+      status_code: 200
+    delegate_to: localhost
+    become: false
+    no_log: true
+    when: index_file.stat.exists
     tags: [deploy]
 
   - name: Display deployment success
