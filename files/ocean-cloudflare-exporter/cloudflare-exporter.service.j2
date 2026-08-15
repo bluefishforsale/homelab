@@ -11,12 +11,20 @@ StandardError=journal
 RuntimeMaxSec=7d
 Restart=always
 RestartSec=30s
-TimeoutStartSec=120s
+# Cold rebuild (below) can pull the python base + pip install, so allow headroom
+# beyond the usual fast start.
+TimeoutStartSec=300s
 ExecStartPre=-/usr/bin/docker rm -f {{ service }}
+# {{ image }} is built locally (not pulled from a registry), so any restart after
+# the image is GC'd/pruned would otherwise try to pull a tag that exists nowhere
+# and crash-loop. Rebuild from the on-disk context if the image is missing so the
+# service self-heals across reboots and prunes.
+ExecStartPre=/bin/sh -c 'docker image inspect {{ image }} >/dev/null 2>&1 || docker build -t {{ image }} {{ home }}'
 ExecStart=/usr/bin/docker run --rm \
     --name {{ service }} \
     --hostname {{ service }} \
     --security-opt no-new-privileges \
+    --pull never \
     --env-file {{ home }}/cloudflare-exporter.env \
     -p {{ cf_port }}:{{ cf_internal_port }} \
     {{ image }}

@@ -1,9 +1,11 @@
 [Unit]
 Description={{ exporter_service }}
-After=docker.service zfs-mount.service zfs-import.target
-Requires=docker.service zfs-mount.service zfs-import.target
-RequiresMountsFor=/data01
-
+# HTTP client of Prowlarr's API only; it never touches /data01 or ZFS. Keep the
+# deps minimal (like the sonarr/radarr exporters) so a zfs-mount/import flap can't
+# hard-stop this unit and leave it permanently down (ServiceDown).
+After=docker.service prowlarr.service
+Requires=docker.service
+Wants=prowlarr.service
 
 [Service]
 Type=simple
@@ -20,7 +22,7 @@ ExecStart=docker run --rm \
     --name=%N \
     --hostname=%H \
     -e TZ="America/Los_Angeles" \
-    -e VERSION=${VERSION} \
+    -e VERSION={{ exporter_version }} \
     -e PORT={{ exporter_port }} \
     -e URL="http://ocean.home:{{ prowlarr_port }}" \
     -e APIKEY="{{ media_services.prowlarr.api_key }}" \
