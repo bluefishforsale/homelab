@@ -304,9 +304,11 @@ while IFS= read -r path; do
     continue
   fi
 
-  # Anything else under a tracked path resolved to no owner: record it as
-  # unmapped so the run fails loudly instead of replaying the whole fleet.
-  unmap "$path"
+  # Anything else (.github/, scripts/, docs/, .claude/, root files, or a loose
+  # path outside the owned files/<svc> | vars/vars_<name> | roles/<role> shapes)
+  # does not deploy to hosts — ignore it. Hard-fail is reserved for OWNED inputs
+  # that resolve to nothing, which their branches above already record via unmap.
+  : # no-op: non-deploying path
 done
 
 # Hard-fail on any owned input we could not map to a playbook.

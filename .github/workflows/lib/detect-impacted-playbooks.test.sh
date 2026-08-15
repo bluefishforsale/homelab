@@ -165,6 +165,18 @@ assert_ne "port change with no base falls back to consumers, not orchestrators" 
 assert_ne "port fallback is non-empty (never under-deploys)" "[]" "$out"
 rm -f "$BASE_SAME" "$BASE_PLEX"
 
+# 26-28. Non-deploying paths are ignored, never hard-failed. A workflow/scripts
+#        edit must not fail the run, and a mixed commit keeps its real target.
+out=$(printf '.github/workflows/ci-validate.yml\n' | bash "$SCRIPT")
+assert_eq ".github change is ignored (no-op)" "[]" "$out"
+
+out=$(printf 'scripts/prom.sh\n' | bash "$SCRIPT")
+assert_eq "scripts change is ignored (no-op)" "[]" "$out"
+
+out=$(printf 'playbooks/individual/ocean/ai/llamacpp.yaml\n.github/workflows/main-apply.yml\n' | bash "$SCRIPT")
+assert_eq "mixed playbook+workflow commit keeps only the playbook" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
