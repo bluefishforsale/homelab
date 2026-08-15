@@ -4,20 +4,29 @@
 # Reads changed-file paths from stdin (one per line), writes a compact JSON
 # array of playbook paths to apply on stdout.
 #
+# Ownership model: every changed input must resolve to exactly one owning
+# playbook (or, for shared files, its precise set of consumers). We never
+# replay the whole fleet just because a mapping was missed — an owned input
+# that resolves to nothing is a hard error (exit 3), so the owner is forced to
+# wire it. Only genuinely-global inputs replay the orchestrators.
+#
 # Rules (first match wins per input line):
 #   playbooks/individual/**/*.ya?ml      -> that playbook
-#   playbooks/0[0-9]_*.ya?ml             -> that orchestrator
-#   files/cloudflared/**                 -> cloudflared playbook
-#   vars/vars_cloudflared.yaml           -> cloudflared playbook
+#   playbooks/0[0-9]_*.ya?ml, operations -> that orchestrator/playbook
+#   files/cloudflared/**, vars_cloudflared -> cloudflared playbook
 #   files/nginx-compose/**               -> nginx playbook
-#   files/<service-dir>/**               -> playbooks grep-referencing files/<service-dir>
-#   roles/<role>/**                      -> playbooks grep-referencing the role name
-#   vars/vars_service_ports.yaml         -> playbooks grep-referencing it
-#   inventories/**, group_vars/all*.yaml -> fallback (orchestrator replay)
+#   files/<svc>/**                       -> playbook referencing files/<svc>, else
+#                                           the one declaring `service: <svc>`
+#   roles/<role>/**                      -> playbooks referencing the role name
+#   vars/vars_<name>.yaml                -> playbooks that load it by name
+#                                           (shared file -> its real consumers)
+#   inventories/**, group_vars/all*      -> orchestrator replay (truly global)
 #   anything ending in .md               -> ignored
-#   anything else under tracked paths    -> fallback
+#   any other owned input that resolves  -> UNMAPPED -> exit 3 (hard error)
+#     to zero playbooks
 #
-# Output: sorted, deduplicated JSON array. Empty input → "[]".
+# Output: sorted, deduplicated JSON array on stdout. Empty input → "[]".
+# Unmapped input → error on stderr, exit 3.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -31,11 +40,25 @@ FALLBACK=(
 CLOUDFLARED_PB="playbooks/individual/ocean/network/cloudflared.yaml"
 NGINX_PB="playbooks/individual/ocean/network/nginx_compose.yaml"
 
-# Use a temp file for dedup (bash 3-compatible, no associative arrays)
+# Use temp files for dedup (bash 3-compatible, no associative arrays)
 SEEN_FILE="$(mktemp)"
-trap 'rm -f "$SEEN_FILE"' EXIT
+UNMAPPED_FILE="$(mktemp)"
+trap 'rm -f "$SEEN_FILE" "$UNMAPPED_FILE"' EXIT
 
-need_fallback=0
+# need_global is set only by genuinely site-wide inputs (inventories,
+# group_vars/all). Everything else must resolve to a specific owning playbook or
+# be recorded as unmapped — we never silently replay the whole site for an input
+# we simply failed to map.
+need_global=0
+
+# Record a path that matched an owned-input rule (files/, vars/, roles/) but
+# resolved to zero playbooks. Allowlisted paths are a no-op; everything else is
+# a hard error so the run fails and the owner wires the input, rather than
+# fanning out across the fleet.
+unmap() {
+  is_known_unowned "$1" && return 0
+  printf '%s\n' "$1" >> "$UNMAPPED_FILE"
+}
 
 emit() {
   local pb="$1"
@@ -84,6 +107,38 @@ grep_playbooks_service() {
     | grep -E '\.ya?ml$' \
     | grep -v '/tasks/' \
     || true)
+}
+
+# Match a playbook whose basename equals the dir/service name (e.g. files/gpu-test
+# -> playbooks/individual/ocean/gpu-test.yaml). Last-resort resolver for services
+# whose playbook neither references the dir literally nor declares `service:`.
+grep_playbooks_basename() {
+  local name="$1"
+  (cd "$REPO_ROOT" && find playbooks -type f \( -name "${name}.yaml" -o -name "${name}.yml" \) 2>/dev/null \
+    | grep -v '/tasks/' \
+    | grep -v '/deprecated/' \
+    || true)
+}
+
+# Inputs deliberately owned by no service playbook: dead dirs, or state managed
+# inline by an orchestrator/role via a computed path the rules can't see. A
+# change to one is a no-op (deploys nothing), NOT a hard error. This is the
+# baseline of pre-existing debt — the coverage test keeps it in sync with
+# reality, so it doubles as a cleanup ledger: verify each is dead-and-deletable
+# or wire it to an owner, then delete it from here.
+is_known_unowned() {
+  case "$1" in
+    files/gitlab-packages/*  \
+    | files/isc-dhcp-server/* \
+    | files/navidrome/*       \
+    | files/netplan/*         \
+    | files/ocean-cloudflared/* \
+    | files/ocean-data01/*    \
+    | files/ocean-docker/*    \
+    | files/spotube/*         \
+    | vars/vars_users.yaml) return 0 ;;
+  esac
+  return 1
 }
 
 while IFS= read -r path; do
@@ -142,50 +197,77 @@ while IFS= read -r path; do
     dir="files/${BASH_REMATCH[1]}"
     out="$(grep_playbooks "$dir")"
     [[ -z "$out" ]] && out="$(grep_playbooks_service "${BASH_REMATCH[1]}")"
-    while IFS= read -r pb; do
-      [[ -n "$pb" ]] && emit "$pb"
-    done <<< "$out"
+    [[ -z "$out" ]] && out="$(grep_playbooks_basename "${BASH_REMATCH[1]}")"
+    if [[ -z "$out" ]]; then
+      unmap "$path"
+    else
+      while IFS= read -r pb; do
+        [[ -n "$pb" ]] && emit "$pb"
+      done <<< "$out"
+    fi
     continue
   fi
 
   # roles/<role>/** — grep playbooks that import the role by name
   if [[ "$path" =~ ^roles/([^/]+)/ ]]; then
     role="${BASH_REMATCH[1]}"
-    while IFS= read -r pb; do
-      [[ -n "$pb" ]] && emit "$pb"
-    done < <(grep_playbooks_role "$role")
+    out="$(grep_playbooks_role "$role")"
+    if [[ -z "$out" ]]; then
+      unmap "$path"
+    else
+      while IFS= read -r pb; do
+        [[ -n "$pb" ]] && emit "$pb"
+      done <<< "$out"
+    fi
     continue
   fi
 
   # vars/vars_<name>.yaml — map to the playbook(s) that load it by name. A shared
   # vars file (vars_service_ports) still fans out to every referencing playbook;
   # a service-specific one (vars_llamacpp_models) maps only to its playbook. If
-  # no playbook names it, fall through to the fallback trigger below.
+  # no playbook names it, it is unmapped (hard error), not a site-wide replay.
   if [[ "$path" =~ ^vars/(vars_[A-Za-z0-9_]+)\.ya?ml$ ]]; then
     out="$(grep_playbooks "${BASH_REMATCH[1]}")"
-    if [[ -n "$out" ]]; then
+    if [[ -z "$out" ]]; then
+      unmap "$path"
+    else
       while IFS= read -r pb; do
         [[ -n "$pb" ]] && emit "$pb"
       done <<< "$out"
-      continue
     fi
-  fi
-
-  # Fallback triggers
-  if [[ "$path" == inventories/* ]] \
-     || [[ "$path" =~ ^group_vars/all ]] \
-     || [[ "$path" == vars/* ]] \
-     || [[ "$path" == roles/* ]] \
-     || [[ "$path" == files/* ]]; then
-    need_fallback=1
     continue
   fi
 
-  # Anything else: fallback (defensive)
-  need_fallback=1
+  # Genuinely site-wide inputs: inventory and global group_vars really do affect
+  # every host, so the orchestrator replay is the correct mapping, not a guess.
+  if [[ "$path" == inventories/* ]] \
+     || [[ "$path" =~ ^group_vars/all ]]; then
+    need_global=1
+    continue
+  fi
+
+  # Anything else under a tracked path resolved to no owner: record it as
+  # unmapped so the run fails loudly instead of replaying the whole fleet.
+  unmap "$path"
 done
 
-if [[ $need_fallback -eq 1 ]] && [[ ! -s "$SEEN_FILE" ]]; then
+# Hard-fail on any owned input we could not map to a playbook.
+if [[ -s "$UNMAPPED_FILE" ]]; then
+  {
+    echo "ERROR: changed path(s) map to no playbook owner:"
+    sed 's/^/  - /' "$UNMAPPED_FILE"
+    echo ""
+    echo "Add an owner: put the file under an existing service's files/<svc>/ or"
+    echo "vars/vars_<svc>*.yaml, have its playbook declare 'service: <svc>', or map"
+    echo "it explicitly in detect-impacted-playbooks.sh. Do NOT let it fall through"
+    echo "to a site-wide replay."
+  } >&2
+  exit 3
+fi
+
+# Genuinely-global inputs replay the site-wide orchestrators, unioned with any
+# specific playbooks also impacted this commit.
+if [[ $need_global -eq 1 ]]; then
   for pb in "${FALLBACK[@]}"; do
     emit "$pb"
   done

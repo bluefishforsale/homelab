@@ -31,6 +31,19 @@ assert_ne() {
   fi
 }
 
+# Asserts the detector exits non-zero (hard-fail on an unmapped input).
+# The `if` guard keeps `set -e` from aborting the suite on the expected failure.
+assert_fails() {
+  local name="$1" input="$2"
+  if printf '%s\n' "$input" | bash "$SCRIPT" >/dev/null 2>&1; then
+    echo "FAIL: $name (expected non-zero exit, got 0)"
+    FAIL=$((FAIL + 1))
+  else
+    echo "PASS: $name"
+    PASS=$((PASS + 1))
+  fi
+}
+
 # 1. Empty input → []
 out=$(printf '' | bash "$SCRIPT")
 assert_eq "empty input" "[]" "$out"
@@ -116,6 +129,26 @@ assert_eq "llamacpp commit stays scoped to its playbook" \
 out=$(printf 'vars/vars_service_ports.yaml\n' | bash "$SCRIPT")
 assert_ne "vars_service_ports still fans out (not fallback)" "$FALLBACK" "$out"
 assert_ne "vars_service_ports non-empty" "[]" "$out"
+
+# 17. files/<dir> with no literal ref and no service: decl resolves by matching a
+#     playbook named <dir>.yaml (e.g. files/gpu-test -> gpu-test.yaml).
+out=$(printf 'files/gpu-test/probe\n' | bash "$SCRIPT")
+assert_eq "files/gpu-test resolves by playbook basename" \
+  '["playbooks/individual/ocean/gpu-test.yaml"]' "$out"
+
+# 18. An allowlisted (known-unowned) input is a no-op: [] and exit 0, not a fail.
+out=$(printf 'files/navidrome/config\n' | bash "$SCRIPT")
+assert_eq "allowlisted unowned input is a no-op" "[]" "$out"
+
+# 19. A genuinely new, unowned service dir hard-fails (exit != 0), never fans out.
+assert_fails "unmapped new files/<dir> hard-fails" "files/totally-new-service-xyz/x"
+
+# 20. A vars file no playbook loads and that is not allowlisted hard-fails.
+assert_fails "unmapped vars_<name> hard-fails" "vars/vars_nonexistent_xyz.yaml"
+
+# 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
+out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+assert_eq "inventory change is the site-wide fallback" "$FALLBACK" "$out"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
