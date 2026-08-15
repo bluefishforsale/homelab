@@ -4,13 +4,29 @@
 # The one model actually loaded at runtime. Single source of truth: the deploy
 # downloads ONLY this file (skipped if already present) and docker-compose loads
 # it via --model. Change this one value to switch models.
-llamacpp_active_model: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+llamacpp_active_model: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
 
 llamacpp_models:
   reasoning:
-    # Active model: MoE 35B / ~3B active, native tool-calling, ~100 tok/s on a
-    # 3090. IQ4_NL (18GB) over Q4_K_M (22.1GB) to leave VRAM for q8_0 KV @ 32K.
-    # Verify HF card + a coding leaderboard at deploy (released 2026-04-15).
+    # Active model: coding-specialized MoE 30B / ~3B active, native tool-calling,
+    # ~60-90 tok/s on a 3090. Q4_K_M (18.6GB) + q8_0 KV @ 32K fits the 24GB card
+    # (measured Plex transcode only costs ~0.9GB, so headroom is real). Picked as
+    # the best coder that fits: ~64% SWE-bench Verified, purpose-built for
+    # agentic/repo-level coding. Verify HF card + a tool round-trip at deploy.
+    - name: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+      url: "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+      size: "18.6GB"
+      parameters: "30B-A3B (MoE, ~3B active)"
+      vram_usage: "~18.6GB + q8_0 KV cache (fits 24GB, ~4GB spare for transcode)"
+      capabilities: ["agentic-coding", "tool-calling", "repo-level", "reasoning"]
+      context_size: "32K"
+      timeout: 7200
+      priority: 1
+      requires_auth: false
+      benchmark_eligible: true
+
+    # Previous active: general MoE 35B / ~3B active, ~100 tok/s. Kept available
+    # for a fast general/reasoning swap. IQ4_NL (18GB) + q8_0 KV @ 32K.
     - name: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
       url: "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
       size: "18GB"
@@ -19,7 +35,7 @@ llamacpp_models:
       capabilities: ["agentic-coding", "tool-calling", "reasoning", "thinking", "repo-level"]
       context_size: "32K"
       timeout: 7200
-      priority: 1
+      priority: 5
       requires_auth: false
       benchmark_eligible: true
 
@@ -65,7 +81,7 @@ rtx_3090_profiles:
   # Active profile. q8_0 KV (needs flash-attn) keeps 32K context inside 24GB
   # alongside the 18GB model. --jinja enables the model's tool-call template.
   single_user_agentic:
-    model: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+    model: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
     gpu_layers: -1
     context_size: 32768
     batch_size: 2048
@@ -102,7 +118,8 @@ rtx_3090_profiles:
 
 # Model download priorities (1 = download first)
 download_priority:
-  1: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
+  1: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
   2: "Qwen3-8B-Q4_K_M.gguf"
   3: "Qwen3-14B-Q4_K_M.gguf"
   4: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+  5: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"

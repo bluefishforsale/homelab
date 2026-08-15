@@ -28,11 +28,12 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # RTX 3090: Qwen3.6-35B-A3B (MoE, ~3B active) for agentic coding + tool use.
-    # ~18GB model + q8_0 KV @ 32K fits the 24GB card. --jinja loads the model's
-    # tool-call chat template (required for tool-calling). Verify at deploy:
-    # CUDA 12.8+ in the image (13.2 reportedly produces gibberish); sanity-test
-    # a tool round-trip before trusting it in the agent loop.
+    # RTX 3090: Qwen3-Coder-30B-A3B-Instruct (MoE, ~3B active) coding model.
+    # 18.6GB model + q8_0 KV @ 32K fits the 24GB card; measured Plex NVENC only
+    # costs ~0.9GB so headroom is real. --jinja loads the model's tool-call chat
+    # template (required for tool-calling). Verify at deploy: CUDA 12.8+ in the
+    # image (13.2 reportedly produces gibberish); sanity-test a tool round-trip
+    # before trusting it in the agent loop.
     command:
       - "--host"
       - "0.0.0.0"
