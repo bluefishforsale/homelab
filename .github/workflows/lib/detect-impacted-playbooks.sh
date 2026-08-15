@@ -75,6 +75,17 @@ grep_playbooks_role() {
     || true)
 }
 
+# Grep playbooks declaring `service: <name>`. A few playbooks build their files
+# dir via `files/{{ service }}` indirection (llamacpp, cloudflared, nginx), so a
+# literal `files/<dir>` grep can't find them; this resolves <dir> as a service.
+grep_playbooks_service() {
+  local svc="$1"
+  (cd "$REPO_ROOT" && grep -rlE "^[[:space:]]+service:[[:space:]]+${svc}[[:space:]]*$" playbooks/ 2>/dev/null \
+    | grep -E '\.ya?ml$' \
+    | grep -v '/tasks/' \
+    || true)
+}
+
 while IFS= read -r path; do
   [[ -z "$path" ]] && continue
 
@@ -124,12 +135,16 @@ while IFS= read -r path; do
     continue
   fi
 
-  # files/<service-dir>/** — find playbooks that reference this dir
+  # files/<service-dir>/** — find playbooks that reference this dir. If none do
+  # literally (the playbook builds the path via `files/{{ service }}`), resolve
+  # <dir> as a service name instead of dropping to the site-wide fallback.
   if [[ "$path" =~ ^files/([^/]+)/ ]]; then
     dir="files/${BASH_REMATCH[1]}"
+    out="$(grep_playbooks "$dir")"
+    [[ -z "$out" ]] && out="$(grep_playbooks_service "${BASH_REMATCH[1]}")"
     while IFS= read -r pb; do
       [[ -n "$pb" ]] && emit "$pb"
-    done < <(grep_playbooks "$dir")
+    done <<< "$out"
     continue
   fi
 
@@ -142,12 +157,18 @@ while IFS= read -r path; do
     continue
   fi
 
-  # vars/vars_service_ports.yaml — grep playbooks that reference it
-  if [[ "$path" == vars/vars_service_ports.yaml ]]; then
-    while IFS= read -r pb; do
-      [[ -n "$pb" ]] && emit "$pb"
-    done < <(grep_playbooks "vars_service_ports")
-    continue
+  # vars/vars_<name>.yaml — map to the playbook(s) that load it by name. A shared
+  # vars file (vars_service_ports) still fans out to every referencing playbook;
+  # a service-specific one (vars_llamacpp_models) maps only to its playbook. If
+  # no playbook names it, fall through to the fallback trigger below.
+  if [[ "$path" =~ ^vars/(vars_[A-Za-z0-9_]+)\.ya?ml$ ]]; then
+    out="$(grep_playbooks "${BASH_REMATCH[1]}")"
+    if [[ -n "$out" ]]; then
+      while IFS= read -r pb; do
+        [[ -n "$pb" ]] && emit "$pb"
+      done <<< "$out"
+      continue
+    fi
   fi
 
   # Fallback triggers

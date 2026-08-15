@@ -20,6 +20,17 @@ assert_eq() {
   fi
 }
 
+assert_ne() {
+  local name="$1" notexpected="$2" actual="$3"
+  if [[ "$notexpected" != "$actual" ]]; then
+    echo "PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: $name (should NOT equal $notexpected)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 # 1. Empty input → []
 out=$(printf '' | bash "$SCRIPT")
 assert_eq "empty input" "[]" "$out"
@@ -79,6 +90,32 @@ assert_eq "github_docker_runners role" \
 #     We test that .md under playbooks/ does NOT trigger fallback.
 out=$(printf 'playbooks/README.md\n' | bash "$SCRIPT")
 assert_eq "playbooks markdown ignored" "[]" "$out"
+
+FALLBACK='["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]'
+
+# 13. files/llamacpp/** -> llamacpp playbook via `service: llamacpp` indirection.
+#     Regression: this used to grep-miss (playbook uses files/{{ service }}) and
+#     fan out to the site-wide fallback, dragging in unrelated hosts/services.
+out=$(printf 'files/llamacpp/docker-compose.yml.j2\n' | bash "$SCRIPT")
+assert_eq "files/llamacpp via service indirection" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 14. vars/vars_llamacpp_models.yaml -> only the llamacpp playbook.
+#     terminalbench also loads this vars file but is filtered at emit().
+out=$(printf 'vars/vars_llamacpp_models.yaml\n' | bash "$SCRIPT")
+assert_eq "vars_llamacpp_models maps to its playbook (terminalbench excluded)" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 15. The exact llamacpp deploy commit (both files) -> just the llamacpp playbook,
+#     NOT the site-wide fallback. This is the collateral-blast-radius bug.
+out=$(printf 'files/llamacpp/docker-compose.yml.j2\nvars/vars_llamacpp_models.yaml\n' | bash "$SCRIPT")
+assert_eq "llamacpp commit stays scoped to its playbook" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 16. Regression: a genuinely shared vars file still fans out (not scoped, not fallback).
+out=$(printf 'vars/vars_service_ports.yaml\n' | bash "$SCRIPT")
+assert_ne "vars_service_ports still fans out (not fallback)" "$FALLBACK" "$out"
+assert_ne "vars_service_ports non-empty" "[]" "$out"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
