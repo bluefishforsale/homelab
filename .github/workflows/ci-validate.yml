@@ -245,6 +245,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # detector's service_ports key-diff reads the base commit
+
+      - name: Install Python deps
+        run: python3 -m pip install --user --quiet pyyaml
 
       # The push-time detector decides which playbooks a change deploys. These
       # tests are the guardrail against a change silently fanning out across the

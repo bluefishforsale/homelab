@@ -125,10 +125,8 @@ out=$(printf 'files/llamacpp/docker-compose.yml.j2\nvars/vars_llamacpp_models.ya
 assert_eq "llamacpp commit stays scoped to its playbook" \
   '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
 
-# 16. Regression: a genuinely shared vars file still fans out (not scoped, not fallback).
-out=$(printf 'vars/vars_service_ports.yaml\n' | bash "$SCRIPT")
-assert_ne "vars_service_ports still fans out (not fallback)" "$FALLBACK" "$out"
-assert_ne "vars_service_ports non-empty" "[]" "$out"
+# (vars_service_ports mapping is covered by the key-level cases 22-25 below,
+#  which supersede the old "always fans out" guard now that it maps by key.)
 
 # 17. files/<dir> with no literal ref and no service: decl resolves by matching a
 #     playbook named <dir>.yaml (e.g. files/gpu-test -> gpu-test.yaml).
@@ -149,6 +147,23 @@ assert_fails "unmapped vars_<name> hard-fails" "vars/vars_nonexistent_xyz.yaml"
 # 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
 out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
 assert_eq "inventory change is the site-wide fallback" "$FALLBACK" "$out"
+
+# 22-25. vars_service_ports.yaml maps by WHICH port key changed, not the filename.
+PORTS="vars/vars_service_ports.yaml"
+BASE_SAME="$(mktemp)"; cp "$PORTS" "$BASE_SAME"
+BASE_PLEX="$(mktemp)"; sed 's/port: 9594/port: 9999/' "$PORTS" > "$BASE_PLEX"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_PORTS_BASE_FILE="$BASE_PLEX" bash "$SCRIPT")
+assert_eq "single port key change maps to only that service" \
+  '["playbooks/individual/ocean/media/plex.yaml"]' "$out"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_PORTS_BASE_FILE="$BASE_SAME" bash "$SCRIPT")
+assert_eq "port file comment/format-only change is a no-op" "[]" "$out"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_BASE=nonexistent_ref_xyz bash "$SCRIPT")
+assert_ne "port change with no base falls back to consumers, not orchestrators" "$FALLBACK" "$out"
+assert_ne "port fallback is non-empty (never under-deploys)" "[]" "$out"
+rm -f "$BASE_SAME" "$BASE_PLEX"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
