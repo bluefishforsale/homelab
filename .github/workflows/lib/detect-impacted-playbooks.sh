@@ -64,14 +64,18 @@ emit() {
   local pb="$1"
   # Skip playbooks that no longer exist (e.g., deleted/renamed in this commit).
   [[ -f "$REPO_ROOT/$pb" ]] || return 0
-  # Terminalbench is a multi-hour GPU benchmark and must NEVER auto-apply on
-  # push — not even when a shared vars file (e.g. vars_service_ports.yaml)
-  # reverse-maps it into the impacted set. The per-path skip below only catches
-  # edits to terminalbench's own files; this is the catch-all at the single
-  # emit chokepoint. On-demand runs go through workflow_dispatch, which bypasses
-  # this detector entirely.
+  # Never-auto-apply playbooks, enforced at the single emit chokepoint so nothing
+  # (not even a shared vars file reverse-mapping in) can schedule them on push.
+  # On-demand runs go through workflow_dispatch, which bypasses this detector.
+  #   - terminalbench: multi-hour GPU benchmark.
+  #   - *zfs* (storage): touching the ZFS pool must be a coordinated, hand-run,
+  #     snapshot-first task — an automated mount/import/remount can break open
+  #     file handles or lose data. Name any storage play *zfs*.yaml to inherit
+  #     this guard. (The play itself is read-only; a CI guardrail also forbids
+  #     mutating ZFS verbs in any playbook.)
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
+    playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"
@@ -201,6 +205,13 @@ while IFS= read -r path; do
   if [[ "$path" == playbooks/individual/ocean/ai/terminalbench*.yaml ]] \
      || [[ "$path" == vars/vars_terminalbench.yaml ]] \
      || [[ "$path" == files/ocean-terminalbench/* ]]; then
+    continue
+  fi
+
+  # Storage/ZFS playbooks are dispatch-only — touching the pool must be a
+  # coordinated, hand-run task, never a push side effect. Editing one maps to
+  # nothing; run it deliberately via workflow_dispatch.
+  if [[ "$path" == playbooks/*zfs*.yaml ]] || [[ "$path" == playbooks/*zfs*.yml ]]; then
     continue
   fi
 

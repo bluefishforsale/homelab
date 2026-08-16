@@ -104,6 +104,30 @@ runs only those. The model is **explicit ownership**, not best-effort guessing:
   (asserts every `files/`, `vars/`, `roles/` input resolves to an owner or a declared
   no-op). A new unwired service is caught at PR time, not as a fleet-wide fan-out on push.
 
+### ZFS / storage: NEVER automate (data-safety invariant)
+
+`/data01` (the ZFS pool) is the most critical infrastructure in the fleet; losing data
+is the worst possible outcome. So storage is exempt from "merge = deploy":
+
+- **No committed playbook may mutate ZFS.** Enforced by CI: `check-no-zfs-mutations.sh`
+  (in the Validate Deploy Mapping job) fails the build on any mutating `zfs`/`zpool` verb
+  (`create/destroy/set/mount/unmount/import/export/rollback/replace/...`), the
+  `community.general.zfs|zpool` modules, or a `fstype: zfs` mount. Reads (`zpool list`,
+  `zfs get`) and non-ZFS mounts (tmpfs) are fine.
+- **Storage playbooks are dispatch-only.** The detector treats any `playbooks/**/*zfs*.yaml`
+  as never-auto-apply (like terminalbench). Name a storage play `*zfs*.yaml` to inherit the
+  guard; run it deliberately via `workflow_dispatch`.
+- **The only in-repo ZFS play is read-only.** `playbooks/individual/ocean/data01_zfs.yaml`
+  runs `become: false` (unprivileged — cannot mutate), timeout-bounds every command (a
+  suspended pool blocks `zfs`/`zpool` forever), asserts `/data01` is mounted (fails if not),
+  warns on non-ONLINE health, and records the live layout. It treats the running config as
+  gold: it asserts reality is functional, never imposes config.
+- **Real pool changes** (replacing a degraded disk, dataset work) are coordinated, hand-run,
+  snapshot-first tasks with a backout plan — a runbook, not a committed auto-runnable play.
+  Beware side effects: an unmount with open file handles makes services write into the empty
+  mountpoint on root (invisible after remount), and property changes (`mountpoint`,
+  `canmount`) silently trigger remounts.
+
 ---
 
 ## Multi-agent coordination

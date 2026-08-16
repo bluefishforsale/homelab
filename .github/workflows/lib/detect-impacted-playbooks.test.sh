@@ -176,6 +176,11 @@ out=$(printf 'playbooks/individual/ocean/ai/llamacpp.yaml\n.github/workflows/mai
 assert_eq "mixed playbook+workflow commit keeps only the playbook" \
   '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
 
+# 29. Storage/ZFS playbooks are dispatch-only: a direct edit maps to nothing, so
+#     merge can never auto-apply a change to the ZFS pool.
+out=$(printf 'playbooks/individual/ocean/data01_zfs.yaml\n' | bash "$SCRIPT")
+assert_eq "zfs playbook is dispatch-only (never auto-applies)" "[]" "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

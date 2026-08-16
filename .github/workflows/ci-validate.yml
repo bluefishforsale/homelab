@@ -264,3 +264,11 @@ jobs:
 
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
+
+      # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
+      # changes are coordinated, hand-run tasks — never a commit/CI side effect.
+      - name: No ZFS mutations in playbooks
+        run: bash .github/workflows/lib/check-no-zfs-mutations.sh
+
+      - name: ZFS guardrail self-test
+        run: bash .github/workflows/lib/check-no-zfs-mutations.test.sh
