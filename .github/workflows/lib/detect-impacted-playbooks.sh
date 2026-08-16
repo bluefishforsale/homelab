@@ -57,6 +57,10 @@ need_global=0
 # fanning out across the fleet.
 unmap() {
   is_known_unowned "$1" && return 0
+  # A path DELETED in this commit that maps to nothing is a clean removal of a
+  # dead input (e.g. deleting an orphan dir) — no-op, not an error. Only a
+  # still-present unmapped input is a hard error (a new service left unwired).
+  [[ -e "$REPO_ROOT/$1" ]] || return 0
   printf '%s\n' "$1" >> "$UNMAPPED_FILE"
 }
 

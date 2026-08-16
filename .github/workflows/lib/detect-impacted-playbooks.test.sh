@@ -137,11 +137,21 @@ assert_eq "files/gpu-test resolves by playbook basename" \
 # 18. (Allowlist is currently empty — every input maps to an owner. The
 #      is_known_unowned no-op path is exercised again if an entry is ever added.)
 
-# 19. A genuinely new, unowned service dir hard-fails (exit != 0), never fans out.
-assert_fails "unmapped new files/<dir> hard-fails" "files/totally-new-service-xyz/x"
+# 19. A STILL-PRESENT unowned service dir hard-fails (a new service left unwired).
+#     Uses a real temp file so the deleted-path no-op (case 20b) is distinguished.
+mkdir -p files/zz_unmapped_probe && : > files/zz_unmapped_probe/x.txt
+assert_fails "present unmapped files/<dir> hard-fails" "files/zz_unmapped_probe/x.txt"
+rm -rf files/zz_unmapped_probe
 
-# 20. A vars file no playbook loads and that is not allowlisted hard-fails.
-assert_fails "unmapped vars_<name> hard-fails" "vars/vars_nonexistent_xyz.yaml"
+# 20. A still-present vars file no playbook loads hard-fails.
+: > vars/vars_zz_unmapped_probe.yaml
+assert_fails "present unmapped vars_<name> hard-fails" "vars/vars_zz_unmapped_probe.yaml"
+rm -f vars/vars_zz_unmapped_probe.yaml
+
+# 20b. A DELETED path that maps to nothing is a no-op (clean orphan removal), NOT
+#      a hard error — this is exactly what a merge that deletes dead files emits.
+out=$(printf 'files/deleted-orphan-xyz/gone.j2\n' | bash "$SCRIPT")
+assert_eq "deleted unmapped path is a no-op, not a hard fail" "[]" "$out"
 
 # 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
 out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
