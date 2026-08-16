@@ -68,6 +68,12 @@
       depth: 1
       update: yes
       accept_hostkey: yes
+    # The play runs as root, and root has no GitHub key. Point git at terrac's
+    # authorized key (same one terrac_com/blog use) so the private-repo SSH clone
+    # authenticates. IdentitiesOnly avoids offering root's keys and tripping
+    # GitHub's "too many authentication failures".
+    environment:
+      GIT_SSH_COMMAND: "ssh -i /home/terrac/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
 
   - name: Create tdarr service
     ansible.builtin.template:
