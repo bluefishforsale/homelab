@@ -105,6 +105,20 @@
       name: photonic_inventory.service
       state: restarted
 
+  # Weekly chase-up digest: gear past its return date and still out, bookings
+  # waiting on an owner to approve, and returns with something missing or in
+  # repair. Sends only to BOOTSTRAP_ADMIN_EMAIL, and sends nothing on a quiet
+  # week. Monday 08:10 local, after the container is certain to be up.
+  - name: Schedule photonic_inventory weekly digest
+    ansible.builtin.cron:
+      name: "photonic_inventory weekly digest"
+      weekday: "1"
+      hour: "8"
+      minute: "10"
+      job: "/usr/bin/docker exec photonic_inventory python -m app.digest_cli >/dev/null 2>&1"
+      user: root
+      state: present
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
