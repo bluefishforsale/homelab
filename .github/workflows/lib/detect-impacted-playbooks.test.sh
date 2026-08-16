@@ -135,7 +135,7 @@ assert_eq "files/gpu-test resolves by playbook basename" \
   '["playbooks/individual/ocean/gpu-test.yaml"]' "$out"
 
 # 18. An allowlisted (known-unowned) input is a no-op: [] and exit 0, not a fail.
-out=$(printf 'files/navidrome/config\n' | bash "$SCRIPT")
+out=$(printf 'files/ocean-data01/data01.mount.j2\n' | bash "$SCRIPT")
 assert_eq "allowlisted unowned input is a no-op" "[]" "$out"
 
 # 19. A genuinely new, unowned service dir hard-fails (exit != 0), never fans out.

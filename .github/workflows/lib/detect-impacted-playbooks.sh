@@ -128,15 +128,9 @@ grep_playbooks_basename() {
 # or wire it to an owner, then delete it from here.
 is_known_unowned() {
   case "$1" in
-    files/gitlab-packages/*  \
-    | files/isc-dhcp-server/* \
-    | files/navidrome/*       \
-    | files/netplan/*         \
-    | files/ocean-cloudflared/* \
-    | files/ocean-data01/*    \
-    | files/ocean-docker/*    \
-    | files/spotube/*         \
-    | vars/vars_users.yaml) return 0 ;;
+    # Stale 9p mount template; /data01 is actually ZFS-mounted. Left as a no-op
+    # pending a decision to delete it or replace it with a ZFS-correct play.
+    files/ocean-data01/*) return 0 ;;
   esac
   return 1
 }
