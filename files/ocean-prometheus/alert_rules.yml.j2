@@ -156,3 +156,37 @@ groups:
     annotations:
       summary: "SMART health check failed for {{ "{{ $labels.device }}" }}"
       description: "Drive {{ "{{ $labels.device }}" }} on {{ "{{ $labels.instance }}" }} has failed SMART health check"
+
+- name: zfs_alerts
+  rules:
+  # Pool not ONLINE. SMART can still report PASSED while ZFS sees a device
+  # faulted, so this is the alert that actually catches a degraded pool.
+  - alert: ZpoolDegraded
+    expr: zpool_health > 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "ZFS pool {{ "{{ $labels.pool }}" }} is not healthy ({{ "{{ $labels.instance }}" }})"
+      description: "zpool_health={{ "{{ $value }}" }} (1=DEGRADED, 2=FAULTED) for {{ "{{ $labels.pool }}" }} on {{ "{{ $labels.instance }}" }}. Check `zpool status`."
+
+  # Per-device read/write/cksum errors accumulating. `for` is long to ride out
+  # transient blips during a resilver.
+  - alert: ZpoolDeviceErrors
+    expr: zpool_device_errors > 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "ZFS device {{ "{{ $labels.device }}" }} has {{ "{{ $labels.type }}" }} errors ({{ "{{ $labels.pool }}" }})"
+      description: "{{ "{{ $value }}" }} {{ "{{ $labels.type }}" }} errors on {{ "{{ $labels.device }}" }} in pool {{ "{{ $labels.pool }}" }} on {{ "{{ $labels.instance }}" }}. A drive is likely failing; see the disk-replacement runbook."
+
+  # Informational: a resilver/scrub is running (visibility, not paging).
+  - alert: ZpoolResilverActive
+    expr: zpool_resilver_active > 0
+    for: 15m
+    labels:
+      severity: info
+    annotations:
+      summary: "ZFS pool {{ "{{ $labels.pool }}" }} is resilvering/scrubbing ({{ "{{ $labels.instance }}" }})"
+      description: "A scan is in progress on {{ "{{ $labels.pool }}" }}. Avoid unnecessary drive operations until it completes."

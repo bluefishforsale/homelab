@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish ZFS pool health to the node_exporter textfile collector
+Documentation=file://{{ node_exporter_files | default('files/node-exporter') }}/zpool-metrics.sh
+After=zfs.target
+
+[Service]
+Type=oneshot
+# Read-only collector: parses `zpool status` and writes zpool.prom. It never
+# mutates the pool. Short-lived; the timer re-runs it.
+ExecStart=/usr/local/bin/zpool-metrics.sh {{ node_exporter_textfiles }}
+Nice=10
+IOSchedulingClass=idle

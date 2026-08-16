@@ -73,6 +73,35 @@
       group: root
       mode: '0644'
 
+  # ZFS pool health -> node_exporter textfile collector. Read-only: the script
+  # only parses `zpool status` and NEVER mutates a pool. No-op on non-ZFS hosts.
+  - name: Install zpool-metrics collector script
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/zpool-metrics.sh"
+      dest: /usr/local/bin/zpool-metrics.sh
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create zpool-metrics systemd service
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/zpool-metrics.service.j2"
+      dest: /etc/systemd/system/zpool-metrics.service
+      mode: '0644'
+
+  - name: Create zpool-metrics systemd timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/zpool-metrics.timer.j2"
+      dest: /etc/systemd/system/zpool-metrics.timer
+      mode: '0644'
+
+  - name: Start and enable zpool-metrics timer
+    ansible.builtin.systemd:
+      name: zpool-metrics.timer
+      state: started
+      enabled: true
+      daemon_reload: yes
+
   - name: Create node exporter Docker Compose directory
     ansible.builtin.file:
       path: "{{ node_exporter_home }}"
