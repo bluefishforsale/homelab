@@ -1,0 +1,44 @@
+---
+# Manages ocean's /data01 ZFS pool mount. Replaces the old files/ocean-data01
+# 9p mount unit (dead since /data01 moved to ZFS). ZFS owns the actual mount, so
+# this play only makes that explicit and safe: ensure the auto-import/mount
+# services are enabled, then ASSERT /data01 is mounted (every service lives on
+# it). It never force-mounts or touches the pool — a degraded/exported pool is a
+# monitoring concern, surfaced here as a warning, not a deploy action.
+- name: Manage ocean /data01 ZFS mount
+  become: true
+  hosts: ocean
+  vars:
+    zpool: data01
+  tasks:
+    - name: Ensure ZFS auto-import/mount services are enabled
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+      loop:
+        - zfs-import-cache.service
+        - zfs-mount.service
+        - zfs-import.target
+        - zfs.target
+
+    - name: Read /data01 mount state
+      ansible.builtin.command: "zfs get -H -o value mounted {{ zpool }}"
+      register: data01_mounted
+      changed_when: false
+      check_mode: false
+
+    - name: Assert /data01 is mounted (all services depend on it)
+      ansible.builtin.assert:
+        that: data01_mounted.stdout == "yes"
+        fail_msg: "ZFS dataset {{ zpool }} is NOT mounted at /data01 — services will fail."
+        success_msg: "{{ zpool }} is mounted at /data01."
+
+    - name: Read pool health
+      ansible.builtin.command: "zpool list -H -o health {{ zpool }}"
+      register: data01_health
+      changed_when: false
+      check_mode: false
+
+    - name: Surface pool health (warn only; does not fail the deploy)
+      ansible.builtin.debug:
+        msg: "zpool {{ zpool }} health is {{ data01_health.stdout }} (investigate if not ONLINE)."

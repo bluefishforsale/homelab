@@ -127,11 +127,10 @@ grep_playbooks_basename() {
 # reality, so it doubles as a cleanup ledger: verify each is dead-and-deletable
 # or wire it to an owner, then delete it from here.
 is_known_unowned() {
-  case "$1" in
-    # Stale 9p mount template; /data01 is actually ZFS-mounted. Left as a no-op
-    # pending a decision to delete it or replace it with a ZFS-correct play.
-    files/ocean-data01/*) return 0 ;;
-  esac
+  # No inputs are currently allowlisted — every files/, vars/, roles/ input maps
+  # to an owning playbook. Add a case here (e.g. `files/foo/*) return 0 ;;`) ONLY
+  # for an input genuinely deployed by nothing (dead-but-kept), and treat any
+  # entry as debt to clear.
   return 1
 }
 

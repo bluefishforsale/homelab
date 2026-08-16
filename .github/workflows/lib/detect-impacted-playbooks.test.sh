@@ -134,9 +134,8 @@ out=$(printf 'files/gpu-test/probe\n' | bash "$SCRIPT")
 assert_eq "files/gpu-test resolves by playbook basename" \
   '["playbooks/individual/ocean/gpu-test.yaml"]' "$out"
 
-# 18. An allowlisted (known-unowned) input is a no-op: [] and exit 0, not a fail.
-out=$(printf 'files/ocean-data01/data01.mount.j2\n' | bash "$SCRIPT")
-assert_eq "allowlisted unowned input is a no-op" "[]" "$out"
+# 18. (Allowlist is currently empty — every input maps to an owner. The
+#      is_known_unowned no-op path is exercised again if an entry is ever added.)
 
 # 19. A genuinely new, unowned service dir hard-fails (exit != 0), never fans out.
 assert_fails "unmapped new files/<dir> hard-fails" "files/totally-new-service-xyz/x"
