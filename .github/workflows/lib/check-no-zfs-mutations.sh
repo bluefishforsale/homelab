@@ -36,8 +36,10 @@ PATTERN+="|(^|$B)zfs[[:space:]]+(create|destroy|set|mount|unmount|rollback|renam
 PATTERN+="|community\\.general\\.(zfs|zpool)($B|\$)"
 PATTERN+="|fstype:[[:space:]]*zfs($B|\$)"
 
-# Drop comment lines (grep output is file:line:content; ignore content starting with #).
-hits="$(grep -rnE "$PATTERN" "${SCAN[@]}" 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*#' || true)"
+# -H forces the "file:line:content" format even for a single file (GNU grep omits
+# the filename otherwise), so the comment-line filter below is portable. The
+# filter drops lines whose content (after file:line:) starts with a YAML comment.
+hits="$(grep -rHnE "$PATTERN" "${SCAN[@]}" 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true)"
 
 if [[ -n "$hits" ]]; then
   echo "FAIL: ZFS mutation found in a playbook/role. Storage changes must be"
