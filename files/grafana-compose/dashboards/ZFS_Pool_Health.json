@@ -1,0 +1,122 @@
+{
+  "title": "ZFS Pool Health",
+  "uid": "zfs-pool-health",
+  "tags": ["zfs", "storage"],
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Pool Health",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "zpool_health", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [ { "type": "value", "options": {
+            "0": { "text": "ONLINE", "color": "green", "index": 0 },
+            "1": { "text": "DEGRADED", "color": "yellow", "index": 1 },
+            "2": { "text": "FAULTED", "color": "red", "index": 2 },
+            "3": { "text": "UNKNOWN", "color": "orange", "index": 3 } } } ],
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Faulted Devices",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "sum(zpool_device_faulted) by (pool)", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 3,
+      "type": "gauge",
+      "title": "Resilver / Scrub Progress",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "zpool_scan_percent", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": { "min": 0, "max": 100, "unit": "percent",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } },
+        "overrides": []
+      },
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Resilver Active",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "zpool_resilver_active", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": { "mappings": [ { "type": "value", "options": {
+          "0": { "text": "idle", "color": "green", "index": 0 },
+          "1": { "text": "RESILVERING", "color": "blue", "index": 1 } } } ] },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Per-device error counters (read/write/cksum)",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "zpool_device_errors > 0", "legendFormat": "{{pool}}/{{device}} {{type}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "yellow", "value": null } ] } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Current device state & errors",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "zpool_device_errors", "format": "table", "instant": true, "legendFormat": "", "refId": "A" } ],
+      "options": { "showHeader": true },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "SMART device health & error-log count",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "smart_device_health_ok", "format": "table", "instant": true, "refId": "A" },
+        { "expr": "smartctl_device_error_log_count", "format": "table", "instant": true, "refId": "B" }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    }
+  ]
+}
