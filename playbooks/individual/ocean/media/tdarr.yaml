@@ -22,7 +22,11 @@
     path_home: "{{ path_data01 }}/{{ service }}"
     transcode: /transcode
     repo: "bluefishforsale_tdarr_plugins"
-    github: "https://github.com/bluefishforsale/{{repo}}.git"
+    # SSH, not anonymous HTTPS: the plugins repo is private, so an unauthenticated
+    # HTTPS clone prompts for a username and fails on ocean ("could not read
+    # Username for https://github.com"). ocean's SSH key authenticates as
+    # bluefishforsale and has access, matching how blog/terrac_com clone.
+    github: "git@github.com:bluefishforsale/{{repo}}.git"
 
   tasks:
   - name: Ensure basedir exists
@@ -63,6 +67,7 @@
       dest: "{{ path_home }}/plugins/"
       depth: 1
       update: yes
+      accept_hostkey: yes
 
   - name: Create tdarr service
     ansible.builtin.template:
