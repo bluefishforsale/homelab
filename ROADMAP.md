@@ -41,6 +41,7 @@ Status and future plans for the homelab infrastructure.
 - **Registry cache**: Pull-through Docker registry cache VM
 - **NFS server**: NFS exports for shared storage
 - **AFP**: Apple Filing Protocol file sharing
+- **Agentbox**: Autonomous agent fleet VM (OpenTelemetry collector telemetry)
 
 ### Media Stack
 
@@ -78,6 +79,7 @@ Status and future plans for the homelab infrastructure.
 - **NDT Speedtest**: Network diagnostic speedtest monitoring
 - **Cloudflare Exporter**: Cloudflare metrics exporter for Prometheus
 - **ntfy**: Push notification service
+- **cAdvisor**: Per-container resource metrics exporter
 
 ### Cloud/CMS Services
 
