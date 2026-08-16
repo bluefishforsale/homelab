@@ -238,3 +238,37 @@ jobs:
             exit 1
           fi
           echo "✓ no vault keys dropped ($(wc -l < /tmp/keys-head) keys, $(comm -13 /tmp/keys-base /tmp/keys-head | wc -l) added)"
+
+  validate-deploy-mapping:
+    name: Validate Deploy Mapping
+    runs-on: [self-hosted, homelab, ansible]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # detector's service_ports key-diff reads the base commit
+
+      - name: Install Python deps
+        run: python3 -m pip install --user --quiet pyyaml
+
+      # The push-time detector decides which playbooks a change deploys. These
+      # tests are the guardrail against a change silently fanning out across the
+      # fleet (or a new service resolving to nothing): unit cases pin specific
+      # mappings, and the coverage check proves every files/, vars/, and roles/
+      # input resolves to an owner or a declared no-op.
+      - name: Detector unit tests
+        run: bash .github/workflows/lib/detect-impacted-playbooks.test.sh
+
+      - name: Concurrency-group unit tests
+        run: bash .github/workflows/lib/resolve-concurrency-group.test.sh
+
+      - name: Ownership coverage (no un-owned inputs)
+        run: bash .github/workflows/lib/ownership-coverage.test.sh
+
+      # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
+      # changes are coordinated, hand-run tasks — never a commit/CI side effect.
+      - name: No ZFS mutations in playbooks
+        run: bash .github/workflows/lib/check-no-zfs-mutations.sh
+
+      - name: ZFS guardrail self-test
+        run: bash .github/workflows/lib/check-no-zfs-mutations.test.sh

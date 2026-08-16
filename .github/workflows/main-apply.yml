@@ -46,6 +46,11 @@ jobs:
         with:
           fetch-depth: 2 # Need previous commit for diff
 
+      - name: Install Python deps
+        # pyyaml powers the detector's service_ports key-diff; without it the
+        # detector safely falls back to deploying every port consumer.
+        run: python3 -m pip install --user --quiet pyyaml
+
       - name: Find changed playbooks
         id: find-playbooks
         env:

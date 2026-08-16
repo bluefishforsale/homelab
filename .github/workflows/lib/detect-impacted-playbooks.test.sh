@@ -20,6 +20,30 @@ assert_eq() {
   fi
 }
 
+assert_ne() {
+  local name="$1" notexpected="$2" actual="$3"
+  if [[ "$notexpected" != "$actual" ]]; then
+    echo "PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: $name (should NOT equal $notexpected)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# Asserts the detector exits non-zero (hard-fail on an unmapped input).
+# The `if` guard keeps `set -e` from aborting the suite on the expected failure.
+assert_fails() {
+  local name="$1" input="$2"
+  if printf '%s\n' "$input" | bash "$SCRIPT" >/dev/null 2>&1; then
+    echo "FAIL: $name (expected non-zero exit, got 0)"
+    FAIL=$((FAIL + 1))
+  else
+    echo "PASS: $name"
+    PASS=$((PASS + 1))
+  fi
+}
+
 # 1. Empty input → []
 out=$(printf '' | bash "$SCRIPT")
 assert_eq "empty input" "[]" "$out"
@@ -79,6 +103,93 @@ assert_eq "github_docker_runners role" \
 #     We test that .md under playbooks/ does NOT trigger fallback.
 out=$(printf 'playbooks/README.md\n' | bash "$SCRIPT")
 assert_eq "playbooks markdown ignored" "[]" "$out"
+
+FALLBACK='["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]'
+
+# 13. files/llamacpp/** -> llamacpp playbook via `service: llamacpp` indirection.
+#     Regression: this used to grep-miss (playbook uses files/{{ service }}) and
+#     fan out to the site-wide fallback, dragging in unrelated hosts/services.
+out=$(printf 'files/llamacpp/docker-compose.yml.j2\n' | bash "$SCRIPT")
+assert_eq "files/llamacpp via service indirection" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 14. vars/vars_llamacpp_models.yaml -> only the llamacpp playbook.
+#     terminalbench also loads this vars file but is filtered at emit().
+out=$(printf 'vars/vars_llamacpp_models.yaml\n' | bash "$SCRIPT")
+assert_eq "vars_llamacpp_models maps to its playbook (terminalbench excluded)" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 15. The exact llamacpp deploy commit (both files) -> just the llamacpp playbook,
+#     NOT the site-wide fallback. This is the collateral-blast-radius bug.
+out=$(printf 'files/llamacpp/docker-compose.yml.j2\nvars/vars_llamacpp_models.yaml\n' | bash "$SCRIPT")
+assert_eq "llamacpp commit stays scoped to its playbook" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# (vars_service_ports mapping is covered by the key-level cases 22-25 below,
+#  which supersede the old "always fans out" guard now that it maps by key.)
+
+# 17. files/<dir> with no literal ref and no service: decl resolves by matching a
+#     playbook named <dir>.yaml (e.g. files/gpu-test -> gpu-test.yaml).
+out=$(printf 'files/gpu-test/probe\n' | bash "$SCRIPT")
+assert_eq "files/gpu-test resolves by playbook basename" \
+  '["playbooks/individual/ocean/gpu-test.yaml"]' "$out"
+
+# 18. (Allowlist is currently empty — every input maps to an owner. The
+#      is_known_unowned no-op path is exercised again if an entry is ever added.)
+
+# 19. A STILL-PRESENT unowned service dir hard-fails (a new service left unwired).
+#     Uses a real temp file so the deleted-path no-op (case 20b) is distinguished.
+mkdir -p files/zz_unmapped_probe && : > files/zz_unmapped_probe/x.txt
+assert_fails "present unmapped files/<dir> hard-fails" "files/zz_unmapped_probe/x.txt"
+rm -rf files/zz_unmapped_probe
+
+# 20. A still-present vars file no playbook loads hard-fails.
+: > vars/vars_zz_unmapped_probe.yaml
+assert_fails "present unmapped vars_<name> hard-fails" "vars/vars_zz_unmapped_probe.yaml"
+rm -f vars/vars_zz_unmapped_probe.yaml
+
+# 20b. A DELETED path that maps to nothing is a no-op (clean orphan removal), NOT
+#      a hard error — this is exactly what a merge that deletes dead files emits.
+out=$(printf 'files/deleted-orphan-xyz/gone.j2\n' | bash "$SCRIPT")
+assert_eq "deleted unmapped path is a no-op, not a hard fail" "[]" "$out"
+
+# 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
+out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+assert_eq "inventory change is the site-wide fallback" "$FALLBACK" "$out"
+
+# 22-25. vars_service_ports.yaml maps by WHICH port key changed, not the filename.
+PORTS="vars/vars_service_ports.yaml"
+BASE_SAME="$(mktemp)"; cp "$PORTS" "$BASE_SAME"
+BASE_PLEX="$(mktemp)"; sed 's/port: 9594/port: 9999/' "$PORTS" > "$BASE_PLEX"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_PORTS_BASE_FILE="$BASE_PLEX" bash "$SCRIPT")
+assert_eq "single port key change maps to only that service" \
+  '["playbooks/individual/ocean/media/plex.yaml"]' "$out"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_PORTS_BASE_FILE="$BASE_SAME" bash "$SCRIPT")
+assert_eq "port file comment/format-only change is a no-op" "[]" "$out"
+
+out=$(printf '%s\n' "$PORTS" | DETECT_BASE=nonexistent_ref_xyz bash "$SCRIPT")
+assert_ne "port change with no base falls back to consumers, not orchestrators" "$FALLBACK" "$out"
+assert_ne "port fallback is non-empty (never under-deploys)" "[]" "$out"
+rm -f "$BASE_SAME" "$BASE_PLEX"
+
+# 26-28. Non-deploying paths are ignored, never hard-failed. A workflow/scripts
+#        edit must not fail the run, and a mixed commit keeps its real target.
+out=$(printf '.github/workflows/ci-validate.yml\n' | bash "$SCRIPT")
+assert_eq ".github change is ignored (no-op)" "[]" "$out"
+
+out=$(printf 'scripts/prom.sh\n' | bash "$SCRIPT")
+assert_eq "scripts change is ignored (no-op)" "[]" "$out"
+
+out=$(printf 'playbooks/individual/ocean/ai/llamacpp.yaml\n.github/workflows/main-apply.yml\n' | bash "$SCRIPT")
+assert_eq "mixed playbook+workflow commit keeps only the playbook" \
+  '["playbooks/individual/ocean/ai/llamacpp.yaml"]' "$out"
+
+# 29. Storage/ZFS playbooks are dispatch-only: a direct edit maps to nothing, so
+#     merge can never auto-apply a change to the ZFS pool.
+out=$(printf 'playbooks/individual/ocean/data01_zfs.yaml\n' | bash "$SCRIPT")
+assert_eq "zfs playbook is dispatch-only (never auto-applies)" "[]" "$out"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

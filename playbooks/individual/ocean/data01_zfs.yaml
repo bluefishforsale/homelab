@@ -1,0 +1,82 @@
+---
+# READ-ONLY health assertion for ocean's /data01 ZFS pool. The most critical
+# infrastructure in the fleet — losing data here is the worst outcome — so this
+# play is built to be incapable of causing harm:
+#
+#   * NEVER AUTO-DEPLOYS. The detector treats any *zfs* playbook as dispatch-only
+#     (like terminalbench). Merge/push can never trigger it; run it deliberately.
+#   * UNPRIVILEGED (become: false). Reads work as the non-root ansible user, so
+#     the play literally lacks the privilege to mount/unmount/import/export/set/
+#     destroy anything. Least privilege as a hard safety floor.
+#   * READ-ONLY. Every task only reads (zfs get / zpool list / zpool status);
+#     changed_when: false; no mount modules; no zfs/zpool mutating verbs (a CI
+#     guardrail also forbids those in any playbook).
+#   * TIMEOUT-BOUNDED. A suspended pool blocks zfs/zpool forever; each command is
+#     wrapped in `timeout` so a hung pool fails the check instead of the run.
+#   * TREATS THE RUNNING CONFIG AS GOLD. It asserts the live pool is functional
+#     (imported + /data01 mounted) and records the live layout; it never imposes
+#     the repo's idea of config onto the pool. Real changes are a coordinated,
+#     snapshot-first, hand-run task — never automated.
+- name: Assert ocean /data01 ZFS health (read-only, unprivileged, dispatch-only)
+  hosts: ocean
+  become: false
+  gather_facts: false
+  vars:
+    zpool: data01
+    zfs_timeout: 30 # seconds; a suspended pool blocks zfs/zpool indefinitely
+  tasks:
+    - name: Read whether {{ zpool }} is mounted (timeout-bounded, read-only)
+      ansible.builtin.command: "timeout {{ zfs_timeout }} zfs get -H -o value mounted {{ zpool }}"
+      register: data01_mounted
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Assert {{ zpool }} is imported and /{{ zpool }} is mounted
+      ansible.builtin.assert:
+        that:
+          - data01_mounted.rc == 0
+          - data01_mounted.stdout == "yes"
+        fail_msg: >-
+          /{{ zpool }} is NOT confirmed mounted (rc={{ data01_mounted.rc }},
+          value='{{ data01_mounted.stdout | default('') }}',
+          err='{{ data01_mounted.stderr | default('') | trim }}'). A timeout or
+          nonzero rc can mean the pool is suspended or not imported. Do NOT
+          auto-remediate — investigate by hand.
+        success_msg: "/{{ zpool }} is mounted."
+
+    - name: Report mount state of the top-level datasets (depth 1, read-only)
+      ansible.builtin.command: "timeout {{ zfs_timeout }} zfs list -H -o name,mounted,mountpoint -d 1 {{ zpool }}"
+      register: data01_children
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Show top-level dataset mount state
+      ansible.builtin.debug:
+        msg: "{{ data01_children.stdout_lines | default(['<unavailable>']) }}"
+
+    - name: Read {{ zpool }} pool health (timeout-bounded, read-only)
+      ansible.builtin.command: "timeout {{ zfs_timeout }} zpool list -H -o health {{ zpool }}"
+      register: data01_health
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Surface pool health (warn only — non-ONLINE is a repair signal, not a deploy gate)
+      ansible.builtin.debug:
+        msg: >-
+          zpool {{ zpool }} health: '{{ data01_health.stdout | default('unknown') | trim }}'
+          (rc={{ data01_health.rc }}). Anything other than ONLINE needs a
+          coordinated look — do not auto-remediate.
+
+    - name: Record the live pool layout as the gold reference (timeout-bounded, read-only)
+      ansible.builtin.command: "timeout {{ zfs_timeout }} zpool status -v {{ zpool }}"
+      register: data01_status
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Show pool layout
+      ansible.builtin.debug:
+        msg: "{{ data01_status.stdout_lines | default(['<unavailable>']) }}"

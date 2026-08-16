@@ -77,6 +77,57 @@ These bite every agent that doesn't know them up front:
   `vars/**/*.yaml`, `.github/workflows/**` trigger CI + `main-apply`. Changes outside
   those (e.g. `scripts/`, `docs/`, `.claude/`) silently do NOT deploy — no CI, no apply.
 
+### How a change maps to playbooks (impact detection)
+
+`main-apply` does NOT run the whole site. `.github/workflows/lib/detect-impacted-playbooks.sh`
+maps each changed file to the fewest playbooks — ideally one — and `apply-playbooks`
+runs only those. The model is **explicit ownership**, not best-effort guessing:
+
+- **`files/<svc>/**`** → the playbook that references `files/<svc>` literally, else the
+  one declaring `service: <svc>`, else a playbook named `<svc>.yaml`. So a new service
+  maps cleanly if it follows any one of those conventions.
+- **`vars/vars_<name>.yaml`** → the playbook(s) that load it by name.
+- **`vars/vars_service_ports.yaml`** (the shared port registry) → mapped by **which
+  `service_ports.<key>` changed**, not the filename: a single port bump deploys only the
+  service(s) referencing that key; a comment/format-only edit deploys nothing; if the
+  key-diff can't be computed it falls back to every consumer. Needs `pyyaml` on the
+  runner (installed in the workflow) and the base commit (`fetch-depth: 2`).
+- **`roles/<role>/**`** → playbooks importing that role.
+- **`inventories/**`, `group_vars/all*`** → the ONLY inputs that replay the site-wide
+  orchestrators (`01_base_system`, `02_core_infrastructure`, `03_ocean_services`).
+- **Unmapped owned input → hard error (exit 3).** A `files/`/`vars/`/`roles/` change that
+  resolves to no playbook FAILS the run with a message, instead of silently fanning out
+  across the fleet. Wire it to an owner (or, if it is genuinely deployed by nothing, add
+  it to `is_known_unowned()` — that allowlist is the dead-input cleanup ledger).
+- **Enforced in CI.** `ci-validate.yml`'s **Validate Deploy Mapping** job runs
+  `detect-impacted-playbooks.test.sh` (pinned mappings) and `ownership-coverage.test.sh`
+  (asserts every `files/`, `vars/`, `roles/` input resolves to an owner or a declared
+  no-op). A new unwired service is caught at PR time, not as a fleet-wide fan-out on push.
+
+### ZFS / storage: NEVER automate (data-safety invariant)
+
+`/data01` (the ZFS pool) is the most critical infrastructure in the fleet; losing data
+is the worst possible outcome. So storage is exempt from "merge = deploy":
+
+- **No committed playbook may mutate ZFS.** Enforced by CI: `check-no-zfs-mutations.sh`
+  (in the Validate Deploy Mapping job) fails the build on any mutating `zfs`/`zpool` verb
+  (`create/destroy/set/mount/unmount/import/export/rollback/replace/...`), the
+  `community.general.zfs|zpool` modules, or a `fstype: zfs` mount. Reads (`zpool list`,
+  `zfs get`) and non-ZFS mounts (tmpfs) are fine.
+- **Storage playbooks are dispatch-only.** The detector treats any `playbooks/**/*zfs*.yaml`
+  as never-auto-apply (like terminalbench). Name a storage play `*zfs*.yaml` to inherit the
+  guard; run it deliberately via `workflow_dispatch`.
+- **The only in-repo ZFS play is read-only.** `playbooks/individual/ocean/data01_zfs.yaml`
+  runs `become: false` (unprivileged — cannot mutate), timeout-bounds every command (a
+  suspended pool blocks `zfs`/`zpool` forever), asserts `/data01` is mounted (fails if not),
+  warns on non-ONLINE health, and records the live layout. It treats the running config as
+  gold: it asserts reality is functional, never imposes config.
+- **Real pool changes** (replacing a degraded disk, dataset work) are coordinated, hand-run,
+  snapshot-first tasks with a backout plan — a runbook, not a committed auto-runnable play.
+  Beware side effects: an unmount with open file handles makes services write into the empty
+  mountpoint on root (invisible after remount), and property changes (`mountpoint`,
+  `canmount`) silently trigger remounts.
+
 ---
 
 ## Multi-agent coordination
