@@ -40,6 +40,11 @@ def _plex_token():
     return m.group(1) if m else None
 
 
+def _tautulli_key():
+    m = re.search(r"api_key\s*=\s*(\w+)", open(f"{DATA}/tautulli/config/config.ini").read())
+    return m.group(1) if m else None
+
+
 # auth: how the key rides the request. ('query', name) | ('header', name) | None
 SERVICES = {
     "radarr":    {"url": "http://localhost:8903", "auth": ("query", "apikey"),
@@ -52,6 +57,8 @@ SERVICES = {
                   "key_env": "PLEX_TOKEN", "key": _plex_token},
     "overseerr": {"url": "http://localhost:5055", "auth": ("header", "X-Api-Key"),
                   "key_env": "OVERSEERR_APIKEY", "key": _overseerr_key},
+    "tautulli":  {"url": "http://localhost:8905", "auth": ("query", "apikey"),
+                  "key_env": "TAUTULLI_APIKEY", "key": _tautulli_key},
 }
 
 
@@ -125,6 +132,9 @@ def ping():
         if n == "overseerr":
             c = get(n, "/api/v1/request/count")
             return f"v{get(n, '/api/v1/status')['version']}, {c['total']} requests, {c['pending']} pending"
+        if n == "tautulli":
+            r = get(n, "/api/v2", cmd="get_libraries")["response"]["data"]
+            return f"{len(r)} libraries"
 
     for n in SERVICES:
         try:
