@@ -190,3 +190,33 @@ groups:
     annotations:
       summary: "ZFS pool {{ "{{ $labels.pool }}" }} is resilvering/scrubbing ({{ "{{ $labels.instance }}" }})"
       description: "A scan is in progress on {{ "{{ $labels.pool }}" }}. Avoid unnecessary drive operations until it completes."
+
+- name: disk_wear_alerts
+  rules:
+  # Leading indicators SMART's binary health misses (it reports PASSED even at
+  # 65k reallocated sectors). Alert on the raw counts so a drive pages BEFORE
+  # ZFS faults it. Only clean-count attributes are used (Seagate packs
+  # Raw_Read_Error_Rate / Seek_Error_Rate, so those are deliberately excluded).
+
+  # Pending sectors = unreadable RIGHT NOW, about to reallocate or throw a read
+  # error. Strongest "this drive is actively failing" signal; acute during a
+  # resilver.
+  - alert: DiskPendingSectors
+    expr: smartctl_device_attribute{attribute_name="Current_Pending_Sector",attribute_value_type="raw"} > 0
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ "{{ $labels.device }}" }} has {{ "{{ $value }}" }} pending (unreadable) sectors ({{ "{{ $labels.instance }}" }})"
+      description: "Current_Pending_Sector={{ "{{ $value }}" }} on {{ "{{ $labels.device }}" }} — sectors unreadable now. The drive is developing bad sectors; plan a replacement (see the disk-replacement runbook)."
+
+  # Heavy cumulative reallocation. The drive is coping (remapped to spares) but
+  # this is real wear; at these counts it should be scheduled for replacement.
+  - alert: DiskReallocatedSectorsHigh
+    expr: smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",attribute_value_type="raw"} > 1000
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ "{{ $labels.device }}" }} has {{ "{{ $value }}" }} reallocated sectors ({{ "{{ $labels.instance }}" }})"
+      description: "Reallocated_Sector_Ct={{ "{{ $value }}" }} on {{ "{{ $labels.device }}" }}. SMART may still report PASSED; this is heavy wear — schedule replacement."
