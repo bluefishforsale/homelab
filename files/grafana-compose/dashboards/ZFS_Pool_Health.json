@@ -145,6 +145,26 @@
       },
       "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
         "tooltip": { "mode": "multi", "sort": "desc" } }
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "Drives per state",
+      "description": "Count of leaf devices in each ZFS state. FAULTED = disk out; DEGRADED/REMOVED/OFFLINE = impaired but not faulted (e.g. mid-replace or flaky-but-serving).",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [ { "expr": "count by (state) (zpool_device_state)", "legendFormat": "{{state}}", "refId": "A" } ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "FAULTED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+          { "matcher": { "id": "byName", "options": "DEGRADED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] },
+          { "matcher": { "id": "byName", "options": "REMOVED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } } ] },
+          { "matcher": { "id": "byName", "options": "ONLINE" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
+        ]
+      },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true,
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
     }
   ]
 }
