@@ -46,8 +46,10 @@ num() {
   echo "# TYPE zpool_health gauge"
   echo "# HELP zpool_device_errors Per-leaf-device error counter from zpool status"
   echo "# TYPE zpool_device_errors gauge"
-  echo "# HELP zpool_device_faulted 1 if a leaf device is not ONLINE"
+  echo "# HELP zpool_device_faulted 1 only if a leaf device is FAULTED (DEGRADED/REMOVED/OFFLINE are not faulted)"
   echo "# TYPE zpool_device_faulted gauge"
+  echo "# HELP zpool_device_state Current leaf-device state, 1 on the state label that is currently active"
+  echo "# TYPE zpool_device_state gauge"
   echo "# HELP zpool_resilver_active 1 if a resilver/scrub is in progress"
   echo "# TYPE zpool_resilver_active gauge"
   echo "# HELP zpool_scan_percent Percent complete of an in-progress scan"
@@ -79,11 +81,15 @@ num() {
         echo "zpool_device_errors{pool=\"$pool\",device=\"$dev\",type=\"read\"} $(num "$r")"
         echo "zpool_device_errors{pool=\"$pool\",device=\"$dev\",type=\"write\"} $(num "$w")"
         echo "zpool_device_errors{pool=\"$pool\",device=\"$dev\",type=\"cksum\"} $(num "$c")"
-        if [ "$state" = "ONLINE" ]; then
-          echo "zpool_device_faulted{pool=\"$pool\",device=\"$dev\"} 0"
-        else
+        # FAULTED means the disk is out; DEGRADED/REMOVED/OFFLINE are impaired but
+        # not faulted (e.g. a mid-replace REMOVED old drive, or a flaky-but-serving
+        # DEGRADED disk). Conflating them over-counts "faulted" (see #283 resilver).
+        if [ "$state" = "FAULTED" ]; then
           echo "zpool_device_faulted{pool=\"$pool\",device=\"$dev\"} 1"
+        else
+          echo "zpool_device_faulted{pool=\"$pool\",device=\"$dev\"} 0"
         fi
+        echo "zpool_device_state{pool=\"$pool\",device=\"$dev\",state=\"$state\"} 1"
       done
   done
 } > "$TMP"
