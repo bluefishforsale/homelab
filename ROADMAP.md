@@ -80,6 +80,10 @@ Status and future plans for the homelab infrastructure.
 - **Cloudflare Exporter**: Cloudflare metrics exporter for Prometheus
 - **ntfy**: Push notification service
 - **cAdvisor**: Per-container resource metrics exporter
+- **Blackbox Exporter**: HTTP, DNS, ICMP, and TCP endpoint probing
+- **Process Exporter**: Per-process resource metrics
+- **SMART Exporter**: Disk SMART health and drive-wear metrics
+- **MTR Exporter**: Network path latency metrics
 
 ### Cloud/CMS Services
 
