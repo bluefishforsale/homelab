@@ -92,6 +92,28 @@
       daemon_reload: true
     tags: [service]
 
+  # The certbot package ships its own certbot.timer/.service. Left enabled, it
+  # races our certbot-renew unit (both fire, collide on certbot's lock -> one
+  # exits 1 -> SystemdUnitFailed alert), and worse, if the Debian timer wins the
+  # race it renews WITHOUT our Plex deploy-hook. Mask it so certbot-renew is the
+  # only renewal path.
+  - name: Mask the Debian-packaged certbot timer and service
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      masked: true
+      enabled: false
+      state: stopped
+    loop:
+      - certbot.timer
+      - certbot.service
+    tags: [service]
+
+  - name: Clear any stale failed state on certbot-renew (from a past collision)
+    ansible.builtin.command: systemctl reset-failed {{ service }}.service
+    changed_when: false
+    failed_when: false
+    tags: [service]
+
   - name: Check if certificate already exists and is valid
     ansible.builtin.command:
       cmd: "certbot certificates --cert-name {{ domain }}"
