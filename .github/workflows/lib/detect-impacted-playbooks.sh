@@ -77,9 +77,13 @@ emit() {
   #     file handles or lose data. Name any storage play *zfs*.yaml to inherit
   #     this guard. (The play itself is read-only; a CI guardrail also forbids
   #     mutating ZFS verbs in any playbook.)
+  #   - operations/backup/**: backups pull live state INTO the repo; running one
+  #     as a push-deploy is backwards (e.g. the grafana backup exports live
+  #     dashboards over the committed change). Backups are scheduled/hand-run.
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
+    playbooks/operations/backup/*) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"

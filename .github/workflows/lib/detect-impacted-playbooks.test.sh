@@ -191,6 +191,19 @@ assert_eq "mixed playbook+workflow commit keeps only the playbook" \
 out=$(printf 'playbooks/individual/ocean/data01_zfs.yaml\n' | bash "$SCRIPT")
 assert_eq "zfs playbook is dispatch-only (never auto-applies)" "[]" "$out"
 
+# 30. A dashboard JSON change deploys ONLY via grafana_compose. The backup
+#     playbook grafana_dashboards.yaml also references files/grafana-compose but
+#     must NOT run as a deploy (it exports live dashboards over the committed
+#     change) — it is filtered at emit() as an operations/backup playbook.
+out=$(printf 'files/grafana-compose/dashboards/ZFS_Pool_Health.json\n' | bash "$SCRIPT")
+assert_eq "dashboard change maps to grafana_compose only (backup excluded)" \
+  '["playbooks/individual/ocean/monitoring/grafana_compose.yaml"]' "$out"
+
+# 31. A direct edit to a backup playbook maps to nothing (backups are
+#     scheduled/hand-run, never a push-deploy).
+out=$(printf 'playbooks/operations/backup/grafana_dashboards.yaml\n' | bash "$SCRIPT")
+assert_eq "backup playbook never auto-applies" "[]" "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

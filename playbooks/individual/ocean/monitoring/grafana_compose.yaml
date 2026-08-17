@@ -187,10 +187,16 @@
       mode: '0600'
     register: grafana_env
 
+  # NOTE: grafana_dashboards.changed is deliberately absent from the recreate
+  # gate below. Dashboard JSON is file-provisioned (updateIntervalSeconds: 30,
+  # allowUiUpdates) and hot-reloaded from the mounted dir with no restart;
+  # recreating Grafana+MySQL for a dashboard edit is a needless monitoring blip.
+  # The provider CONFIG (grafana_dashboard_provisioning) still recreates because
+  # Grafana only reads provisioning at startup.
   - name: Show what configuration files changed
     ansible.builtin.debug:
       msg: "Configuration files have been updated - containers will be recreated"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed or grafana_dashboards.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed
 
   - name: Create grafana systemd service
     ansible.builtin.template:
@@ -214,7 +220,7 @@
       docker compose down --timeout 30
       docker compose up -d --force-recreate
       echo "Container recreation completed"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed or grafana_dashboards.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed
 
   handlers:
   - name: Reload systemd daemon
