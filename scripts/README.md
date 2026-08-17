@@ -44,7 +44,8 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | `cloudflare-harden.py` | per-zone TLS/HSTS + security headers + host-scoped static cache rule | idempotent; classifier may block the live run → run by hand |
 | `cloudflare-waf.py` | per-zone WAF block + rate-limit rules (WordPress zones) | idempotent; run by hand |
 | `media-reclaim-report.py` / `media-reclaim-delete.py` | profile the library / delete via Radarr+Sonarr with unmonitor + import-exclusion | delete is destructive |
-| `media_clients.py` | one client wrapping radarr/sonarr/tdarr/plex/overseerr/tautulli | library used by the media scripts |
+| `media-cull-candidates.py` | `movies`/`tv` → taste-aware cull-candidate TSV (2011+, unwatched, unmonitored, not-requested, keep-genre, below rating bar); edit by hand, feed col-1 IDs to `media-reclaim-delete.py --ids` | read-only; pairs with the delete script |
+| `media_clients.py` | one client wrapping radarr/sonarr/tdarr/plex/overseerr/tautulli (`ping` / `get` / `delete` / `tdarr-stats`) | library used by the media scripts |
 | `vault.py` | `vault/secrets.yaml`: `list [path]` (redacted) / `get <path>` / `check <path> <value>` / `set <path> <value>` / `rotate <path> <value>` — pass `-` for any value to read it from stdin instead of argv (`printf '%s' "$new" \| vault.py rotate a.b.c -`), which keeps the secret out of shell history and `ps` | writes are line-edits (comments + ordering survive), diffed before re-encrypting so exactly one path can change, then encrypted beside the vault and decrypted back to prove it round-trips before `os.replace` — the vault is never overwritten by an unverified write. Exit codes: `0` ok, `1` `check` mismatch, `2` error, which is how you tell "rotation didn't land" from "typo'd the path". Self-check: `python3 scripts/test_vault.py` |
 
 ## Environment overrides
