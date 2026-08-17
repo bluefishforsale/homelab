@@ -168,7 +168,8 @@ groups:
       severity: critical
     annotations:
       summary: "ZFS pool {{ "{{ $labels.pool }}" }} is not healthy ({{ "{{ $labels.instance }}" }})"
-      description: "zpool_health={{ "{{ $value }}" }} (1=DEGRADED, 2=FAULTED) for {{ "{{ $labels.pool }}" }} on {{ "{{ $labels.instance }}" }}. Check `zpool status`."
+      description: "zpool_health={{ "{{ $value }}" }} (1=DEGRADED, 2=FAULTED) for {{ "{{ $labels.pool }}" }} on {{ "{{ $labels.instance }}" }}. Check `zpool status`. Recovery is a hand-run, never-automated drive replacement: follow the runbook."
+      runbook_url: "https://github.com/bluefishforsale/homelab/blob/master/docs/operations/zfs-data01-disk-replacement-runbook.md"
 
   # Per-device read/write/cksum errors accumulating. `for` is long to ride out
   # transient blips during a resilver.
@@ -180,6 +181,7 @@ groups:
     annotations:
       summary: "ZFS device {{ "{{ $labels.device }}" }} has {{ "{{ $labels.type }}" }} errors ({{ "{{ $labels.pool }}" }})"
       description: "{{ "{{ $value }}" }} {{ "{{ $labels.type }}" }} errors on {{ "{{ $labels.device }}" }} in pool {{ "{{ $labels.pool }}" }} on {{ "{{ $labels.instance }}" }}. A drive is likely failing; see the disk-replacement runbook."
+      runbook_url: "https://github.com/bluefishforsale/homelab/blob/master/docs/operations/zfs-data01-disk-replacement-runbook.md"
 
   # Informational: a resilver/scrub is running (visibility, not paging).
   - alert: ZpoolResilverActive
