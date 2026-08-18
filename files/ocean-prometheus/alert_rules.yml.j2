@@ -227,3 +227,33 @@ groups:
     annotations:
       summary: "{{ "{{ $labels.device }}" }} has {{ "{{ $value }}" }} reallocated sectors ({{ "{{ $labels.instance }}" }})"
       description: "Reallocated_Sector_Ct={{ "{{ $value }}" }} on {{ "{{ $labels.device }}" }}. SMART may still report PASSED; this is heavy wear — schedule replacement."
+
+- name: memory_alerts
+  rules:
+  # ECC-corrected memory errors. node_exporter's edac collector already exports
+  # these on the bare-metal hosts; before this rule nothing alerted, so a failing
+  # DIMM was only ever found by a hand-run ras-mc-ctl/EDAC check. Correctable =
+  # the bit-flip WAS fixed, but a rising count means a DIMM is degrading.
+  # remediation: manual -> ntfy the human, never the code lane (no PR swaps a DIMM).
+  - alert: EccCorrectableErrors
+    expr: increase(node_edac_correctable_errors_total[1h]) > 0
+    for: 15m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "ECC correctable errors on {{ "{{ $labels.instance }}" }} (mc{{ "{{ $labels.controller }}" }})"
+      description: "{{ "{{ $value }}" }} correctable ECC errors in the last hour on controller {{ "{{ $labels.controller }}" }} of {{ "{{ $labels.instance }}" }}. The error was corrected, but a rising count flags a failing DIMM; identify it (ras-mc-ctl / iDRAC) and schedule replacement."
+
+  # Uncorrectable ECC = data the ECC could NOT fix. Imminent DIMM failure and a
+  # real corruption risk (this is the class of fault we ruled out for the data01
+  # checksum errors); page immediately.
+  - alert: EccUncorrectableErrors
+    expr: increase(node_edac_uncorrectable_errors_total[1h]) > 0
+    for: 0m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "UNCORRECTABLE ECC errors on {{ "{{ $labels.instance }}" }} (mc{{ "{{ $labels.controller }}" }})"
+      description: "{{ "{{ $value }}" }} uncorrectable ECC errors on controller {{ "{{ $labels.controller }}" }} of {{ "{{ $labels.instance }}" }}. ECC could not correct these; a DIMM is failing and data integrity is at risk. Replace the DIMM."
