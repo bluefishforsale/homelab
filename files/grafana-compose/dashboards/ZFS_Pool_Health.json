@@ -165,6 +165,26 @@
       },
       "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true,
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Pool capacity & snapshot space",
+      "description": "Allocated/free pool bytes over time (capacity trend) plus bytes held by all snapshots. Snapshots are usually negligible here, so treat that line as a retention-leak detector; watch free trending toward zero for real capacity pressure.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 39 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "zpool_alloc_bytes", "legendFormat": "{{pool}} allocated", "refId": "A" },
+        { "expr": "zpool_free_bytes", "legendFormat": "{{pool}} free", "refId": "B" },
+        { "expr": "zpool_snapshot_used_bytes", "legendFormat": "{{pool}} snapshots", "refId": "C" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "C" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } } ] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
     }
   ]
 }
