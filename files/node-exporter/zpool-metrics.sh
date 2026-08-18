@@ -15,6 +15,7 @@ TMP="$OUT.$$.tmp"
 ZT=20 # per-command timeout seconds
 
 zp() { timeout "$ZT" zpool "$@" 2>/dev/null; }
+zf() { timeout "$ZT" zfs "$@" 2>/dev/null; }
 
 if ! command -v zpool >/dev/null 2>&1; then
   rm -f "$OUT"          # no ZFS here — clear any stale file
@@ -54,9 +55,28 @@ num() {
   echo "# TYPE zpool_resilver_active gauge"
   echo "# HELP zpool_scan_percent Percent complete of the active scan; 100 when idle/complete"
   echo "# TYPE zpool_scan_percent gauge"
+  echo "# HELP zpool_size_bytes Total pool size in bytes (raw, incl. parity)"
+  echo "# TYPE zpool_size_bytes gauge"
+  echo "# HELP zpool_alloc_bytes Allocated (used) pool bytes"
+  echo "# TYPE zpool_alloc_bytes gauge"
+  echo "# HELP zpool_free_bytes Free pool bytes"
+  echo "# TYPE zpool_free_bytes gauge"
+  echo "# HELP zpool_snapshot_used_bytes Bytes held by snapshots (sum of usedsnap over all datasets); reclaimable by destroying them"
+  echo "# TYPE zpool_snapshot_used_bytes gauge"
 
   for pool in $(zp list -H -o name); do
     echo "zpool_health{pool=\"$pool\"} $(health_num "$(zp list -H -o health "$pool")")"
+
+    # Capacity trend (parseable bytes). ${x:-0} guards a timed-out/empty read.
+    read -r psize palloc pfree < <(zp list -Hp -o size,alloc,free "$pool")
+    echo "zpool_size_bytes{pool=\"$pool\"} ${psize:-0}"
+    echo "zpool_alloc_bytes{pool=\"$pool\"} ${palloc:-0}"
+    echo "zpool_free_bytes{pool=\"$pool\"} ${pfree:-0}"
+    # Space held by snapshots: sum usedsnap across every dataset. Tiny in
+    # practice, so this reads as a snapshot-retention/leak detector, not a
+    # capacity lever (the bulk lives in live datasets, see zpool_alloc_bytes).
+    snap=$(zf list -Hp -o usedsnap -r "$pool" | awk '{s+=$1} END{printf "%d", s+0}')
+    echo "zpool_snapshot_used_bytes{pool=\"$pool\"} ${snap:-0}"
 
     status="$(zp status "$pool")"
     if printf '%s\n' "$status" | grep -qiE "scan:.*(resilver|scrub) in progress"; then
