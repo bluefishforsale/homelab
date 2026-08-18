@@ -52,7 +52,7 @@ num() {
   echo "# TYPE zpool_device_state gauge"
   echo "# HELP zpool_resilver_active 1 if a resilver/scrub is in progress"
   echo "# TYPE zpool_resilver_active gauge"
-  echo "# HELP zpool_scan_percent Percent complete of an in-progress scan"
+  echo "# HELP zpool_scan_percent Percent complete of the active scan; 100 when idle/complete"
   echo "# TYPE zpool_scan_percent gauge"
 
   for pool in $(zp list -H -o name); do
@@ -62,9 +62,13 @@ num() {
     if printf '%s\n' "$status" | grep -qiE "scan:.*(resilver|scrub) in progress"; then
       echo "zpool_resilver_active{pool=\"$pool\"} 1"
       pct=$(printf '%s\n' "$status" | grep -oE "[0-9]+\.[0-9]+% done" | grep -oE "[0-9]+\.[0-9]+" | head -1)
-      [ -n "$pct" ] && echo "zpool_scan_percent{pool=\"$pool\"} $pct"
+      echo "zpool_scan_percent{pool=\"$pool\"} ${pct:-0}"
     else
       echo "zpool_resilver_active{pool=\"$pool\"} 0"
+      # No scan running: emit 100 (idle/complete) every run. Emitting nothing
+      # here let the metric go stale, so the Grafana gauge's lastNotNull held
+      # the pre-completion value (stuck at 99.6% after this resilver finished).
+      echo "zpool_scan_percent{pool=\"$pool\"} 100"
     fi
 
     # Leaf devices only: skip the pool row and vdev-container rows (raidz*, mirror*, ...).
