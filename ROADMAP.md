@@ -42,6 +42,7 @@ Status and future plans for the homelab infrastructure.
 - **NFS server**: NFS exports for shared storage
 - **AFP**: Apple Filing Protocol file sharing
 - **Agentbox**: Autonomous agent fleet VM (OpenTelemetry collector telemetry)
+- **Kea DHCP**: DHCP server with Prometheus exporter
 
 ### Media Stack
 
