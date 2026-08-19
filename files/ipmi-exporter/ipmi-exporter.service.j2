@@ -1,0 +1,28 @@
+[Unit]
+Description=Prometheus IPMI Exporter (in-band BMC via /dev/ipmi0)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=30s
+TimeoutStartSec=60s
+Environment=IMAGE="{{ docker_image }}"
+Environment=VERSION="{{ docker_tag }}"
+Environment=LOCALDIR="{{ home }}"
+PassEnvironment=IMAGE VERSION LOCALDIR
+ExecStartPre=-docker rm -f {{ service }}
+ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
+ExecStart=docker run --rm \
+    --name={{ service }} \
+    --hostname=%H \
+    -e TZ=America/Los_Angeles \
+    --device=/dev/ipmi0:/dev/ipmi0 \
+    --cap-add=SYS_ADMIN \
+    -p {{ exporter_port }}:9290 \
+    -v ${LOCALDIR}/config.yml:/config.yml:ro \
+    ${IMAGE}:${VERSION} --config.file=/config.yml
+ExecStop=docker rm -f {{ service }}
+
+[Install]
+WantedBy=multi-user.target

@@ -38,6 +38,15 @@ scrape_configs:
       # exporter has no host to talk to and returns 500. node005 mgmt IP is stable.
       target: ['192.168.1.105']
 
+  # In-band IPMI on the Dell bare-metal hosts (PSU/fan/temp/voltage/SEL). freeipmi
+  # collection is slow, so a long interval/timeout keeps scrapes from overlapping.
+  - job_name: 'ipmi'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    static_configs:
+    - targets: ['node005.home:9290', 'node006.home:9290']
+
   - job_name: 'prometheus'
     relabel_configs: &dropPortNumber
     - source_labels: [__address__]
