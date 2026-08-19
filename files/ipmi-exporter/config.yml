@@ -1,0 +1,9 @@
+# In-band IPMI collection: the exporter runs ON the host whose BMC it reads,
+# talking to /dev/ipmi0 via freeipmi inside the container. No remote auth.
+modules:
+  default:
+    collectors:
+      - ipmi     # temps, fans, voltages, PSU status (all analog/discrete sensors)
+      - dcmi     # chassis power draw (watts)
+      - chassis  # chassis/power state
+      - sel      # system event log (records ECC / PSU / thermal events)

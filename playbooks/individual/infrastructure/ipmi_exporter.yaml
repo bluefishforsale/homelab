@@ -1,0 +1,69 @@
+---
+# In-band IPMI exporter on the Dell bare-metal hosts (node005/006). Reads the
+# local BMC over /dev/ipmi0 (no iDRAC LAN creds, no RO user), exposing
+# PSU/fan/temp/voltage/SEL to Prometheus. VMs mask openipmi.service and have no
+# BMC, so this targets [baremetal] only. Pattern mirrors pve_exporter.yaml.
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/ipmi_exporter.yaml
+- name: Configure IPMI Exporter
+  hosts: baremetal
+  become: true
+  gather_facts: true
+
+  vars:
+    service: ipmi-exporter
+    home: "/data01/services/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service }}"
+    docker_image: "prometheuscommunity/ipmi-exporter"
+    docker_tag: "latest"
+    exporter_port: 9290
+
+  tasks:
+    - name: Assert the BMC device is present
+      ansible.builtin.stat:
+        path: /dev/ipmi0
+      register: ipmi_dev
+
+    - name: Fail if no in-band BMC device
+      ansible.builtin.assert:
+        that: ipmi_dev.stat.exists
+        fail_msg: "/dev/ipmi0 missing on {{ inventory_hostname }} - load ipmi_si/ipmi_devintf"
+
+    - name: Ensure base directory exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy ipmi-exporter config
+      ansible.builtin.copy:
+        src: "{{ files }}/config.yml"
+        dest: "{{ home }}/config.yml"
+        mode: '0644'
+      notify: Restart ipmi-exporter
+
+    - name: Deploy systemd service
+      ansible.builtin.template:
+        src: "{{ files }}/ipmi-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      notify:
+        - Reload systemd daemon
+        - Restart ipmi-exporter
+
+    - name: Enable and start ipmi-exporter service
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart ipmi-exporter
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        state: restarted
