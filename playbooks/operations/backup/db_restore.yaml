@@ -1,0 +1,65 @@
+---
+# Restore a homelab service database from its GCS backup. DRY-RUN BY DEFAULT:
+# nothing that touches a live database runs unless restore_confirm=RESTORE. The
+# gate lives in db-restore.sh (an explicit variable), NOT ansible --check - a
+# command task with check_mode:false would execute in --check, so we never do
+# that; this command task is simply skipped in --check and, run normally, the
+# script itself dry-runs unless confirmed.
+#
+# Dispatch via main-apply.yml workflow_dispatch:
+#   playbooks=playbooks/operations/backup/db_restore.yaml
+#   extra_vars='restore_service=sonarr'                              # DRY-RUN, latest
+#   extra_vars='restore_service=sonarr restore_confirm=RESTORE'      # APPLY latest
+#   extra_vars='restore_service=sonarr restore_point_in_time=1699999999 restore_confirm=RESTORE'
+#   extra_vars='restore_service=all'                                 # DRY-RUN every service
+#
+# Lives under operations/backup/ -> dispatch-only (never auto-applies on push).
+- name: Restore a homelab service database from GCS
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars:
+    service: db-backup
+    home: "/data01/services/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service }}"
+    restore_service: ""
+    restore_point_in_time: ""
+    restore_confirm: ""
+
+  tasks:
+    - name: Require a target service
+      ansible.builtin.assert:
+        that: restore_service | length > 0
+        fail_msg: "Set -e restore_service=<name|all> (e.g. restore_service=sonarr). Use restore_service=all to dry-run everything."
+
+    - name: Ensure the backup toolkit is installed (env with creds + GCS key)
+      ansible.builtin.stat:
+        path: "{{ home }}/db-backup.env"
+      register: envstat
+
+    - name: Fail if toolkit missing
+      ansible.builtin.assert:
+        that: envstat.stat.exists
+        fail_msg: "{{ home }}/db-backup.env missing - dispatch db_backup.yaml first to install the toolkit + GCS key."
+
+    - name: Deploy restore script
+      ansible.builtin.copy:
+        src: "{{ files }}/db-restore.sh"
+        dest: "{{ home }}/db-restore.sh"
+        mode: '0755'
+
+    - name: "Run restore ({{ 'APPLY - live DBs will be overwritten' if restore_confirm == 'RESTORE' else 'DRY-RUN - no changes' }})"
+      ansible.builtin.command:
+        cmd: "{{ home }}/db-restore.sh"
+      environment:
+        DB_BACKUP_ENV: "{{ home }}/db-backup.env"
+        SERVICE: "{{ restore_service }}"
+        POINT_IN_TIME: "{{ restore_point_in_time }}"
+        CONFIRM: "{{ restore_confirm }}"
+      register: restore_out
+      changed_when: restore_confirm == 'RESTORE'
+
+    - name: Restore output
+      ansible.builtin.debug:
+        var: restore_out.stdout_lines
