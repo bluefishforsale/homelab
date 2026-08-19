@@ -34,7 +34,12 @@ snapshot_json() {
   printf '%s' "$up" | jq -e '.status=="success"' >/dev/null 2>&1 || return 2
   al=$(curl -fsS -m "$TIMEOUT" "$ALERT/api/v2/alerts?active=true&silenced=false&inhibited=false" 2>/dev/null) || return 2
   printf '%s' "$al" | jq -e 'type=="array"' >/dev/null 2>&1 || return 2
-  dd=$(curl -fsS -m "$TIMEOUT" -G "$PROM/api/v1/query" --data-urlencode 'query=time()-container_last_seen{name!=""}>120' 2>/dev/null) || return 2
+  # A container is "dead" only if it has NO fresh series. On a deploy that
+  # recreates a container, the old container id's container_last_seen freezes and
+  # reads as dead for ~5min while its replacement is already Up; exclude a stale
+  # series when a fresh one (<120s) exists for the same name AND instance (host),
+  # so a genuine dead container on one host isn't masked by a live one elsewhere.
+  dd=$(curl -fsS -m "$TIMEOUT" -G "$PROM/api/v1/query" --data-urlencode 'query=(time()-container_last_seen{name!=""}>120) unless on(name, instance) (time()-container_last_seen{name!=""}<120)' 2>/dev/null) || return 2
   jq -n --argjson up "$up" --argjson al "$al" --argjson dd "$dd" '{
     down:   [$up.data.result[]? | (.metric.job + "/" + .metric.instance)] | unique,
     alerts: [$al[]?             | (.labels.alertname + "@" + (.labels.instance // "-"))] | unique,
