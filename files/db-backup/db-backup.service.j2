@@ -1,0 +1,12 @@
+[Unit]
+Description=Homelab service-database backup to GCS
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=DB_BACKUP_ENV={{ home }}/db-backup.env
+ExecStart={{ home }}/db-backup.sh
+# Runs as root: needs docker + read of container-owned DB files + write to
+# /data01/backups. TimeoutStartSec generous for the dump+tar of the SQLite set.
+TimeoutStartSec=1800

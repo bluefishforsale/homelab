@@ -257,3 +257,29 @@ groups:
     annotations:
       summary: "UNCORRECTABLE ECC errors on {{ "{{ $labels.instance }}" }} (mc{{ "{{ $labels.controller }}" }})"
       description: "{{ "{{ $value }}" }} uncorrectable ECC errors on controller {{ "{{ $labels.controller }}" }} of {{ "{{ $labels.instance }}" }}. ECC could not correct these; a DIMM is failing and data integrity is at risk. Replace the DIMM."
+
+- name: backup_alerts
+  rules:
+  # The nightly DB backup writes homelab_db_backup_* to the node_exporter
+  # textfile collector. Staleness catches a backup that silently stopped
+  # running (timer dead, host down at 03:30, upload wedged); the value is
+  # carried forward on failure so the age keeps growing until a clean run.
+  - alert: DbBackupStale
+    expr: time() - homelab_db_backup_last_success_timestamp_seconds > 129600
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Homelab DB backup is stale ({{ "{{ $labels.instance }}" }})"
+      description: "No fully-successful homelab database backup in over 36h. The nightly timer may be dead, the host down at 03:30, or the GCS upload wedged. Check `systemctl status db-backup.service` and the last db_backup.prom on {{ "{{ $labels.instance }}" }}."
+
+  # A run that completed but with per-DB failures (a dump errored) - the tarball
+  # is incomplete even if it uploaded.
+  - alert: DbBackupFailing
+    expr: homelab_db_backup_failed > 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Homelab DB backup completed with {{ "{{ $value }}" }} failed database(s)"
+      description: "The last backup run on {{ "{{ $labels.instance }}" }} failed to dump {{ "{{ $value }}" }} in-scope database(s); the tarball is incomplete. Check the db-backup.service journal for which."

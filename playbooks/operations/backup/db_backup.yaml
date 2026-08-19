@@ -1,0 +1,78 @@
+---
+# Homelab service-database backup to GCS. Dumps every in-scope database (RDBMS
+# via `docker exec` logical dumps, SQLite via online `.backup`) into one tarball
+# and pushes it to a GCS bucket authenticated by a dedicated service-account key.
+# Runs ON ocean (where /data01 and the DB containers live), not the control node.
+#
+# Lives under playbooks/operations/backup/ so the impact detector keeps it
+# DISPATCH-ONLY (never auto-applies on push) - see
+# .github/workflows/lib/detect-impacted-playbooks.sh emit() guard. Recurring runs
+# come from the installed systemd timer, not the deploy pipeline.
+#
+# Until the GCS SA key exists in the vault (backup_storage.gcs.service_account_key),
+# the job runs local-only with a 2-tarball retention; add the key and re-run to
+# activate uploads.
+- name: Configure homelab database backup to GCS
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    service: db-backup
+    home: "/data01/services/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service }}"
+    backup_gcs_bucket: homelab-db-backups
+
+  tasks:
+    - name: Ensure base + staging directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ home }}"
+        - /data01/backups/db-staging
+
+    - name: Deploy backup script
+      ansible.builtin.copy:
+        src: "{{ files }}/db-backup.sh"
+        dest: "{{ home }}/db-backup.sh"
+        mode: '0755'
+
+    - name: Render backup env (DB creds from vault, mode 0600)
+      ansible.builtin.template:
+        src: "{{ files }}/db-backup.env.j2"
+        dest: "{{ home }}/db-backup.env"
+        mode: '0600'
+
+    - name: Land the GCS service-account key (skipped until vaulted - Phase 1)
+      ansible.builtin.copy:
+        content: "{{ backup_storage.gcs.service_account_key | default('') }}"
+        dest: "{{ home }}/gcs-sa.json"
+        mode: '0600'
+      when: (backup_storage.gcs.service_account_key | default('')) | length > 100
+
+    - name: Deploy systemd service + timer
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - db-backup.service
+        - db-backup.timer
+      notify: Reload systemd daemon
+
+    - name: Enable and start the daily backup timer
+      ansible.builtin.systemd:
+        name: db-backup.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
