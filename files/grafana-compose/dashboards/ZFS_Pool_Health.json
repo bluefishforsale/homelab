@@ -1,190 +1,1052 @@
 {
-  "title": "ZFS Pool Health",
-  "uid": "zfs-pool-health",
-  "tags": ["zfs", "storage"],
-  "schemaVersion": 40,
-  "version": 1,
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
   "editable": true,
-  "time": { "from": "now-24h", "to": "now" },
-  "refresh": "1m",
-  "templating": { "list": [] },
-  "annotations": { "list": [] },
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
   "panels": [
     {
+      "id": 100,
+      "type": "stat",
+      "title": "Redundancy budget \u2014 disks each pool can still lose",
+      "description": "Failure budget = vdev parity minus non-ONLINE disks (raidz2=2, N-way mirror=N-1). Any DEGRADED / REMOVED / mid-replace disk counts as consumed, so this is the conservative margin still in hand. 0 = at the edge: one more loss risks data. Pool value is the min across its vdevs.",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "targets": [
+        {
+          "expr": "min by (pool) (zpool_vdev_redundancy_budget{instance=~\"$host\"})",
+          "legendFormat": "{{pool}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "ONLINE"
+                },
+                "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "DEGRADED"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "FAULTED"
+                },
+                "3": {
+                  "color": "orange",
+                  "index": 3,
+                  "text": "UNKNOWN"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
       "id": 1,
-      "type": "stat",
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_health{instance=~\"$host\"}",
+          "legendFormat": "{{pool}}",
+          "refId": "A"
+        }
+      ],
       "title": "Pool Health",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "zpool_health", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
       "fieldConfig": {
         "defaults": {
-          "mappings": [ { "type": "value", "options": {
-            "0": { "text": "ONLINE", "color": "green", "index": 0 },
-            "1": { "text": "DEGRADED", "color": "yellow", "index": 1 },
-            "2": { "text": "FAULTED", "color": "red", "index": 2 },
-            "3": { "text": "UNKNOWN", "color": "orange", "index": 3 } } } ],
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 } ] }
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
-    },
-    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
       "id": 2,
-      "type": "stat",
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "sum(zpool_device_faulted{instance=~\"$host\"}) by (pool)",
+          "legendFormat": "{{pool}}",
+          "refId": "A"
+        }
+      ],
       "title": "Faulted Devices",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "sum(zpool_device_faulted) by (pool)", "legendFormat": "{{pool}}", "refId": "A" } ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
-      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
-    },
-    {
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
       "id": 3,
-      "type": "gauge",
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_scan_percent{instance=~\"$host\"}",
+          "legendFormat": "{{pool}}",
+          "refId": "A"
+        }
+      ],
       "title": "Resilver / Scrub Progress",
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "zpool_scan_percent", "legendFormat": "{{pool}}", "refId": "A" } ],
-      "fieldConfig": {
-        "defaults": { "min": 0, "max": 100, "unit": "percent",
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } },
-        "overrides": []
-      },
-      "options": { "showThresholdLabels": false, "showThresholdMarkers": true,
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "type": "gauge"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "idle"
+                },
+                "1": {
+                  "color": "blue",
+                  "index": 1,
+                  "text": "RESILVERING"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
       "id": 4,
-      "type": "stat",
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_resilver_active{instance=~\"$host\"}",
+          "legendFormat": "{{pool}}",
+          "refId": "A"
+        }
+      ],
       "title": "Resilver Active",
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "zpool_resilver_active", "legendFormat": "{{pool}}", "refId": "A" } ],
-      "fieldConfig": {
-        "defaults": { "mappings": [ { "type": "value", "options": {
-          "0": { "text": "idle", "color": "green", "index": 0 },
-          "1": { "text": "RESILVERING", "color": "blue", "index": 1 } } } ] },
-        "overrides": []
-      },
-      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "type": "stat"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
       "id": 5,
-      "type": "timeseries",
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_device_errors{instance=~\"$host\"} > 0",
+          "legendFormat": "{{pool}}/{{device}} {{type}}",
+          "refId": "A"
+        }
+      ],
       "title": "Per-device error counters (read/write/cksum)",
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "zpool_device_errors > 0", "legendFormat": "{{pool}}/{{device}} {{type}}", "refId": "A" } ],
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto" },
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "yellow", "value": null } ] } },
-        "overrides": []
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
       },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
-        "tooltip": { "mode": "multi", "sort": "desc" } }
-    },
-    {
-      "id": 6,
-      "type": "table",
-      "title": "Current device state & errors",
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "zpool_device_errors", "format": "table", "instant": true, "legendFormat": "", "refId": "A" } ],
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] }
-    },
-    {
-      "id": 7,
-      "type": "table",
-      "title": "SMART device health & error-log count",
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [
-        { "expr": "smart_device_health_ok", "format": "table", "instant": true, "refId": "A" },
-        { "expr": "smartctl_device_error_log_count", "format": "table", "instant": true, "refId": "B" }
-      ],
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] }
-    },
-    {
-      "id": 8,
-      "type": "table",
-      "title": "Drive wear: reallocated & pending sectors (SMART says PASSED anyway)",
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [
-        { "expr": "smartctl_device_attribute{attribute_name=\"Reallocated_Sector_Ct\",attribute_value_type=\"raw\"}", "format": "table", "instant": true, "refId": "A" },
-        { "expr": "smartctl_device_attribute{attribute_name=\"Current_Pending_Sector\",attribute_value_type=\"raw\"}", "format": "table", "instant": true, "refId": "B" }
-      ],
-      "options": { "showHeader": true },
-      "fieldConfig": { "defaults": {}, "overrides": [] }
-    },
-    {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Reallocated sectors over time (per drive)",
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "smartctl_device_attribute{attribute_name=\"Reallocated_Sector_Ct\",attribute_value_type=\"raw\"}", "legendFormat": "{{device}}", "refId": "A" } ],
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5 },
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "yellow", "value": null }, { "color": "red", "value": 1000 } ] } },
-        "overrides": []
-      },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "desc" } }
-    },
-    {
-      "id": 10,
-      "type": "bargauge",
-      "title": "Drives per state",
       "description": "Count of leaf devices in each ZFS state. FAULTED = disk out; DEGRADED/REMOVED/OFFLINE = impaired but not faulted (e.g. mid-replace or flaky-but-serving).",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 33 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "count by (state) (zpool_device_state)", "legendFormat": "{{state}}", "instant": true, "refId": "A" } ],
       "fieldConfig": {
-        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "text" } },
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "FAULTED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
-          { "matcher": { "id": "byName", "options": "DEGRADED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] },
-          { "matcher": { "id": "byName", "options": "REMOVED" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } } ] },
-          { "matcher": { "id": "byName", "options": "ONLINE" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FAULTED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DEGRADED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "REMOVED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ONLINE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true,
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 10,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "count by (state) (zpool_device_state{instance=~\"$host\"})",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Drives per state",
+      "type": "bargauge"
     },
     {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Pool capacity & snapshot space",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
       "description": "Allocated/free pool bytes over time (capacity trend) plus bytes held by all snapshots. Snapshots are usually negligible here, so treat that line as a retention-leak detector; watch free trending toward zero for real capacity pressure.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 39 },
-      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [
-        { "expr": "zpool_alloc_bytes", "legendFormat": "{{pool}} allocated", "refId": "A" },
-        { "expr": "zpool_free_bytes", "legendFormat": "{{pool}} free", "refId": "B" },
-        { "expr": "zpool_snapshot_used_bytes", "legendFormat": "{{pool}} snapshots", "refId": "C" }
-      ],
       "fieldConfig": {
-        "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
         "overrides": [
-          { "matcher": { "id": "byFrameRefID", "options": "C" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } } ] }
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_alloc_bytes{instance=~\"$host\"}",
+          "legendFormat": "{{pool}} allocated",
+          "refId": "A"
+        },
+        {
+          "expr": "zpool_free_bytes{instance=~\"$host\"}",
+          "legendFormat": "{{pool}} free",
+          "refId": "B"
+        },
+        {
+          "expr": "zpool_snapshot_used_bytes{instance=~\"$host\"}",
+          "legendFormat": "{{pool}} snapshots",
+          "refId": "C"
+        }
+      ],
+      "title": "Pool capacity & snapshot space",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "smartctl_device_attribute{instance=~\"$host\",attribute_name=\"Reallocated_Sector_Ct\",attribute_value_type=\"raw\"}",
+          "legendFormat": "{{device}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Reallocated sectors over time (per drive)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "zpool_device_errors{instance=~\"$host\"}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Current device state & errors",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "smartctl_device_attribute{instance=~\"$host\",attribute_name=\"Reallocated_Sector_Ct\",attribute_value_type=\"raw\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "smartctl_device_attribute{instance=~\"$host\",attribute_name=\"Current_Pending_Sector\",attribute_value_type=\"raw\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Drive wear: reallocated & pending sectors (SMART says PASSED anyway)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "expr": "smart_device_health_ok{instance=~\"$host\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "smartctl_device_error_log_count{instance=~\"$host\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "SMART device health & error-log count",
+      "type": "table"
     }
-  ]
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 40,
+  "tags": [
+    "zfs",
+    "storage"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(zpool_health, instance)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(zpool_health, instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "options": [],
+        "regex": "",
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-2d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "ZFS Pool Health",
+  "uid": "zfs-pool-health",
+  "version": 7,
+  "weekStart": ""
 }
