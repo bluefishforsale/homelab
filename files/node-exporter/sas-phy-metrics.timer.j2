@@ -1,0 +1,10 @@
+[Unit]
+Description=Run sas-phy-metrics every 60s
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
