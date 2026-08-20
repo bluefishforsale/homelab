@@ -1,0 +1,11 @@
+[Unit]
+Description=Publish SAS phy error counters to the node_exporter textfile collector
+Documentation=file://{{ node_exporter_files | default('files/node-exporter') }}/sas-phy-metrics.sh
+
+[Service]
+Type=oneshot
+# Read-only collector: reads /sys/class/sas_phy and writes sas_phy.prom. It never
+# touches a disk or the HBA. Short-lived; the timer re-runs it.
+ExecStart=/usr/local/bin/sas-phy-metrics.sh {{ node_exporter_textfiles }}
+Nice=10
+IOSchedulingClass=idle

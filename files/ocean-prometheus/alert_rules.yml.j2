@@ -283,3 +283,32 @@ groups:
     annotations:
       summary: "Homelab DB backup completed with {{ "{{ $value }}" }} failed database(s)"
       description: "The last backup run on {{ "{{ $labels.instance }}" }} failed to dump {{ "{{ $value }}" }} in-scope database(s); the tarball is incomplete. Check the db-backup.service journal for which."
+
+- name: sas_phy_alerts
+  rules:
+  # SAS transport counters are cumulative, so alert on the RATE of increase (a
+  # static historical count from one bad moment must not page). Invalid dwords
+  # climbing fast = a marginal cable / backplane lane / expander phy - the class
+  # of physical-layer fault behind correlated ZFS checksum errors. remediation:
+  # manual (reseat/replace the cable or drive caddy; no PR fixes a wire).
+  - alert: SasPhyErrorsRising
+    expr: increase(sas_phy_invalid_dword_total[1h]) + increase(sas_phy_running_disparity_error_total[1h]) > 1000
+    for: 15m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "SAS phy {{ "{{ $labels.phy }}" }} accumulating link errors ({{ "{{ $labels.instance }}" }})"
+      description: "{{ "{{ $value | humanize }}" }} invalid-dword/disparity errors in the last hour on SAS phy {{ "{{ $labels.phy }}" }} (sas_addr {{ "{{ $labels.sas_address }}" }}) of {{ "{{ $labels.instance }}" }}. A cable, backplane lane, or expander phy is degrading; reseat or replace it."
+
+  # Loss-of-dword-sync / phy resets = the link is actually dropping and
+  # re-syncing, more serious than dword errors. Any sustained increase pages.
+  - alert: SasPhyLinkResync
+    expr: increase(sas_phy_loss_of_dword_sync_total[1h]) + increase(sas_phy_reset_problem_total[1h]) > 10
+    for: 15m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "SAS phy {{ "{{ $labels.phy }}" }} link is resetting/losing sync ({{ "{{ $labels.instance }}" }})"
+      description: "{{ "{{ $value | humanize }}" }} loss-of-sync/reset events in the last hour on SAS phy {{ "{{ $labels.phy }}" }} of {{ "{{ $labels.instance }}" }}. The physical link is unstable; check the cable/backplane connection to that drive."
