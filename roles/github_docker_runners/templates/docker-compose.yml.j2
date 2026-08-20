@@ -72,7 +72,12 @@ services:
       
       # Working directory inside container
       RUNNER_WORKDIR: "/runner/_work"
-    
+
+      # Pre-cached action archives so the runner unpacks actions locally instead
+      # of fetching them from codeload.github.com (immune to its 429s, which were
+      # failing deploys). Populated by the action-archive-cache tasks.
+      ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE: "/action-archive-cache"
+
     volumes:
       # GitHub token file (shared by all runners, read-only)
       - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro
@@ -80,7 +85,10 @@ services:
       # Runner working directory on host
       # Each runner gets its own directory to avoid conflicts
       - {{ github_runners_base_dir }}/runner-{{ runner_index | string }}:/runner/_work
-      
+
+      # Pre-cached action archives (read-only, shared by all runners)
+      - {{ github_runners_base_dir }}/action-archive-cache:/action-archive-cache:ro
+
 {% if github_runner_mount_docker_socket %}
       # Docker socket mounting for Docker-on-host
       # RECOMMENDED: Mount the host's Docker socket to allow job steps to run Docker commands

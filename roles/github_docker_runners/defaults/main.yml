@@ -43,6 +43,17 @@ github_runner_image: "myoung34/github-runner"
 # (20.04 / Python 3.8), which crashes modern Python tooling.
 github_runner_version: "debian-bookworm"
 
+# Actions pre-cached on the runner host so runners never fetch them from
+# codeload.github.com (immune to GitHub's codeload 429s that were failing
+# deploys). Downloaded to
+# {{ github_runners_base_dir }}/action-archive-cache/{owner}_{repo}/{sha}.tar.gz
+# and mounted read-only; the runner resolves ref->sha and unpacks the local copy.
+# NOTE: bump the sha when a vN tag moves, else that action falls back to a
+# codeload download (get the current sha: gh api repos/<o>/<r>/commits/vN --jq .sha).
+github_runner_cached_actions:
+  - { owner: actions, repo: checkout, ref: v4, sha: "11d5960a326750d5838078e36cf38b85af677262" }
+  - { owner: actions, repo: upload-artifact, ref: v4, sha: "ea165f8d65b6e75b540449e92b4886f43607fa02" }
+
 # Ephemeral runner configuration
 # When true, runners will:
 # - Register as ephemeral (fresh per job)
