@@ -153,7 +153,7 @@
       "description": "Count of leaf devices in each ZFS state. FAULTED = disk out; DEGRADED/REMOVED/OFFLINE = impaired but not faulted (e.g. mid-replace or flaky-but-serving).",
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
-      "targets": [ { "expr": "count by (state) (zpool_device_state)", "legendFormat": "{{state}}", "refId": "A" } ],
+      "targets": [ { "expr": "count by (state) (zpool_device_state)", "legendFormat": "{{state}}", "instant": true, "refId": "A" } ],
       "fieldConfig": {
         "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "text" } },
         "overrides": [
