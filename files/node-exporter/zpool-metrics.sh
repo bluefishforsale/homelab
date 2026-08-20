@@ -63,6 +63,8 @@ num() {
   echo "# TYPE zpool_free_bytes gauge"
   echo "# HELP zpool_snapshot_used_bytes Bytes held by snapshots (sum of usedsnap over all datasets); reclaimable by destroying them"
   echo "# TYPE zpool_snapshot_used_bytes gauge"
+  echo "# HELP zpool_vdev_redundancy_budget Disks this vdev can still lose before data loss (parity minus non-ONLINE leaves; raidzN=N, N-way mirror=N-1). Pool budget = min across its vdevs. 0 = at the edge."
+  echo "# TYPE zpool_vdev_redundancy_budget gauge"
 
   for pool in $(zp list -H -o name); do
     echo "zpool_health{pool=\"$pool\"} $(health_num "$(zp list -H -o health "$pool")")"
@@ -115,6 +117,45 @@ num() {
         fi
         echo "zpool_device_state{pool=\"$pool\",device=\"$dev\",state=\"$state\"} 1"
       done
+
+    # Failure budget per vdev: parity minus non-ONLINE leaves. Parity comes from
+    # the vdev TYPE (raidzN -> N, N-way mirror -> N-1), so it is honest across
+    # layouts and needs no hardcoding. Any non-ONLINE leaf (DEGRADED, REMOVED, a
+    # mid-replace old disk) is counted as consumed - the conservative reading of
+    # "redundancy still in hand". Pool-level budget = min over its vdevs.
+    printf '%s\n' "$status" | awk -v pool="$pool" '
+      function flush(){
+        if(vdev==""){return}
+        p=parity; if(p==-1){p=nleaf-1}; if(p<0)p=0
+        b=p-nfail; if(b<0)b=0
+        printf "zpool_vdev_redundancy_budget{pool=\"%s\",vdev=\"%s\"} %d\n", pool, vdev, b
+      }
+      /NAME[ \t]+STATE/ {intable=1; next}
+      /^errors:/ {intable=0}
+      !intable {next}
+      {
+        line=$0; sub(/^\t/,"",line); match(line,/^ */); ind=RLENGTH
+        name=$1; state=$2
+        if(name==pool) next
+        if(ind==2){
+          flush(); vdev=name; nleaf=0; nfail=0; parity=0
+          if(name ~ /^raidz1/) parity=1
+          else if(name ~ /^raidz2/) parity=2
+          else if(name ~ /^raidz3/) parity=3
+          else if(name ~ /^draid1/) parity=1
+          else if(name ~ /^draid2/) parity=2
+          else if(name ~ /^draid3/) parity=3
+          else if(name ~ /^mirror/) parity=-1
+          else if(name ~ /^(logs?|cache|spares?)$/) { vdev=""; next }
+          else { nleaf=1; if(state!="ONLINE")nfail=1 }
+          next
+        }
+        if(name ~ /^(replacing|spare|indirect)/) next
+        if(state ~ /^(ONLINE|DEGRADED|FAULTED|UNAVAIL|OFFLINE|REMOVED|SUSPENDED)$/){
+          nleaf++; if(state!="ONLINE")nfail++
+        }
+      }
+      END{ flush() }'
   done
 } > "$TMP"
 
