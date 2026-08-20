@@ -47,6 +47,12 @@
     # that collides with :username, 500-ing /metrics. 2.1.0 is the current release.
     exporter_version: "2.1.0"
     exporter_port: "{{ service_ports.plex_exporter.port }}"
+    # Containers the autoheal timer polls. Both declare a healthcheck, and
+    # docker's restart policy only reacts to exit, not to health, so an
+    # unhealthy-but-running container needs this to be restarted at all.
+    autoheal_containers:
+    - "{{ service }}"
+    - "{{ exporter_service }}"
     meta_manager_service: plex-meta-manager
     meta_manager_image: kometateam/kometa
     meta_manager_version: latest

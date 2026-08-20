@@ -1,11 +1,16 @@
 [Unit]
-Description=Restart Plex container if Docker reports it unhealthy
+Description=Restart Plex containers if Docker reports them unhealthy
 After=plex.service
 Wants=plex.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'if [ "$(/usr/bin/docker inspect -f {% raw %}{{.State.Health.Status}}{% endraw %} {{ service }} 2>/dev/null)" = "unhealthy" ]; then logger -t plex-autoheal "plex unhealthy, restarting"; /usr/bin/docker restart {{ service }}; fi'
+# One ExecStart per container (Type=oneshot runs them in order). Kept as
+# separate literal commands rather than a shell loop because systemd expands
+# $var in ExecStart before /bin/sh ever sees it.
+{% for container in autoheal_containers %}
+ExecStart=/bin/sh -c 'if [ "$(/usr/bin/docker inspect -f {% raw %}{{.State.Health.Status}}{% endraw %} {{ container }} 2>/dev/null)" = "unhealthy" ]; then logger -t plex-autoheal "{{ container }} unhealthy, restarting"; /usr/bin/docker restart {{ container }}; fi'
+{% endfor %}
 TimeoutStartSec=120
 
 [Install]

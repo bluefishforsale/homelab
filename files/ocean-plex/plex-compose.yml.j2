@@ -104,6 +104,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # The first /metrics does a full library collection, so a cold exporter
+      # can miss checks purely from warm-up. plex-autoheal now restarts on
+      # unhealthy, so without this grace a slow start would restart-loop the
+      # exporter and cause the very ServiceDown it is meant to clear.
+      start_period: 60s
     security_opt:
       - no-new-privileges:true
     logging:
