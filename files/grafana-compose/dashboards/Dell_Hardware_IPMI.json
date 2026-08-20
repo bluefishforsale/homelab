@@ -1,0 +1,262 @@
+{
+  "title": "Dell Hardware (IPMI)",
+  "uid": "dell-hardware-ipmi",
+  "tags": ["hardware", "ipmi", "dell"],
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "BMC reachable",
+      "description": "ipmi_up per host: 1 = in-band ipmi_exporter is reading the iDRAC, 0 = hardware health is blind on that host.",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "min by (instance) (ipmi_up)", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": {
+              "0": { "text": "DOWN", "color": "red", "index": 1 },
+              "1": { "text": "UP", "color": "green", "index": 0 }
+            } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null }, { "color": "green", "value": 1 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "System power draw",
+      "description": "DCMI whole-chassis power consumption per host.",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_dcmi_power_consumption_watts", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value", "graphMode": "area", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Sensors not nominal",
+      "description": "Count of sensors the BMC reports in a warning/critical state, excluding the Entity Presence sensors that read non-nominal on healthy R620/R720 chassis.",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "count by (instance) (ipmi_sensor_state{type!=\"Entity Presence\"} > 0) or (min by (instance) (ipmi_up) * 0)", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 }
+          ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background", "graphMode": "none", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "SEL log entries",
+      "description": "System Event Log entry count per host. A sudden jump means the BMC logged new hardware events - open the iDRAC SEL.",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_sel_logs_count", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none", "graphMode": "area", "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Temperatures",
+      "description": "All BMC temperature sensors (inlet, exhaust, CPU, DIMM zones). The BMC's own thresholds drive the IpmiSensor* alerts, not a line on this graph.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_temperature_celsius", "legendFormat": "{{instance}} {{name}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Fan speeds",
+      "description": "All chassis fan tach readings.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_fan_speed_rpm", "legendFormat": "{{instance}} {{name}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rotrpm",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "min"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "System power draw over time",
+      "description": "DCMI whole-chassis watts, per host.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_dcmi_power_consumption_watts", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max", "mean"] },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Voltages",
+      "description": "All BMC voltage rails.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_voltage_volts", "legendFormat": "{{instance}} {{name}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Power supply status",
+      "description": "Per-PSU BMC state: 0 nominal, 1 warning, 2 critical (lost AC / redundancy). Both PSUs should read 0.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_sensor_state{type=\"Power Supply\"}", "format": "table", "instant": true, "refId": "A" }
+      ],
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "__name__": true, "job": true, "Time": true },
+          "renameByName": { "instance": "Host", "name": "Sensor", "type": "Type", "Value": "State" }
+        } }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "State" }, "properties": [
+            { "id": "mappings", "value": [
+              { "type": "value", "options": {
+                "0": { "text": "OK", "color": "green", "index": 0 },
+                "1": { "text": "WARN", "color": "yellow", "index": 1 },
+                "2": { "text": "CRIT", "color": "red", "index": 2 }
+              } }
+            ] },
+            { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+          ] }
+        ]
+      },
+      "options": { "showHeader": true }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Sensors not nominal (excl. Entity Presence)",
+      "description": "Live snapshot of every sensor the BMC reports as warning (1) or critical (2). Empty is healthy. Entity Presence is excluded because it reads non-nominal on healthy chassis.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "bf02tpxiz6m0wf" },
+      "targets": [
+        { "expr": "ipmi_sensor_state{type!=\"Entity Presence\"} > 0", "format": "table", "instant": true, "refId": "A" }
+      ],
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "__name__": true, "job": true, "Time": true, "id": true },
+          "renameByName": { "instance": "Host", "name": "Sensor", "type": "Type", "Value": "State" }
+        } }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "State" }, "properties": [
+            { "id": "mappings", "value": [
+              { "type": "value", "options": {
+                "1": { "text": "WARN", "color": "yellow", "index": 0 },
+                "2": { "text": "CRIT", "color": "red", "index": 1 }
+              } }
+            ] },
+            { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+          ] }
+        ]
+      },
+      "options": { "showHeader": true }
+    }
+  ]
+}
