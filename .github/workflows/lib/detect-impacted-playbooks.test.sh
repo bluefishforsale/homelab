@@ -93,10 +93,12 @@ out=$(printf 'roles/dns_infrastructure/templates/foo.j2\n' | bash "$SCRIPT")
 assert_eq "dns_infrastructure role" \
   '["playbooks/individual/core/services/dns_ha_stack.yaml"]' "$out"
 
-# 11. roles/github_docker_runners/** → runner playbook(s)
+# 11. roles/github_docker_runners/** is self-referential infra (main-apply runs
+#     ON these runners), so it is dispatch-only: a role edit maps to nothing and
+#     can never recreate the runner mid-apply. Hand-applied on the homelab network.
 out=$(printf 'roles/github_docker_runners/defaults/main.yml\n' | bash "$SCRIPT")
-assert_eq "github_docker_runners role" \
-  '["playbooks/individual/infrastructure/github_docker_runners.yaml"]' "$out"
+assert_eq "github_docker_runners role is dispatch-only (self-referential)" \
+  '[]' "$out"
 
 # 12. README / docs changes are not in the workflow's paths filter,
 #     but if smuggled in (e.g., trailing-doc edit), they should be no-op (fallback skipped — empty).
@@ -203,6 +205,11 @@ assert_eq "dashboard change maps to grafana_compose only (backup excluded)" \
 #     scheduled/hand-run, never a push-deploy).
 out=$(printf 'playbooks/operations/backup/grafana_dashboards.yaml\n' | bash "$SCRIPT")
 assert_eq "backup playbook never auto-applies" "[]" "$out"
+
+# 32. A direct edit to the runner playbook is also dispatch-only (self-referential
+#     infra; role coverage is asserted in test 11).
+out=$(printf 'playbooks/individual/infrastructure/github_docker_runners.yaml\n' | bash "$SCRIPT")
+assert_eq "runner playbook never auto-applies" "[]" "$out"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

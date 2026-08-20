@@ -190,6 +190,31 @@
     group: root
   when: github_runner_mount_cloudflared
 
+# Pre-cache the actions the workflows pull so runners never hit codeload.github.com
+# (whose 429s were failing deploys). ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE (set in the
+# compose env) points the runner at {owner}_{repo}/{sha}.tar.gz; it resolves the ref
+# to that sha and unpacks the local copy instead of downloading.
+- name: Ensure action-archive-cache directories exist
+  ansible.builtin.file:
+    path: "{{ github_runners_base_dir }}/action-archive-cache/{{ item.owner }}_{{ item.repo }}"
+    state: directory
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: '0755'
+  loop: "{{ github_runner_cached_actions }}"
+
+- name: Pre-download cached action tarballs (skip if already present)
+  ansible.builtin.get_url:
+    url: "https://codeload.github.com/{{ item.owner }}/{{ item.repo }}/tar.gz/{{ item.sha }}"
+    dest: "{{ github_runners_base_dir }}/action-archive-cache/{{ item.owner }}_{{ item.repo }}/{{ item.sha }}.tar.gz"
+    owner: "{{ github_runner_user }}"
+    group: "{{ github_runner_group }}"
+    mode: '0644'
+    force: false
+  loop: "{{ github_runner_cached_actions }}"
+  loop_control:
+    label: "{{ item.owner }}/{{ item.repo }}@{{ item.sha[:8] }}"
+
 # Deploy Docker Compose configuration
 - name: Template docker-compose.yml for ephemeral runners
   ansible.builtin.template:
