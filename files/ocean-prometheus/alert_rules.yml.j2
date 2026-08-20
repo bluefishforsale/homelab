@@ -312,3 +312,52 @@ groups:
     annotations:
       summary: "SAS phy {{ "{{ $labels.phy }}" }} link is resetting/losing sync ({{ "{{ $labels.instance }}" }})"
       description: "{{ "{{ $value | humanize }}" }} loss-of-sync/reset events in the last hour on SAS phy {{ "{{ $labels.phy }}" }} of {{ "{{ $labels.instance }}" }}. The physical link is unstable; check the cable/backplane connection to that drive."
+
+- name: ipmi_alerts
+  rules:
+  # In-band ipmi_exporter reads the Dell iDRAC BMC on node005/node006 (the only
+  # [baremetal] hosts). The BMC applies each sensor's OWN thresholds and reports
+  # a rolled-up state, so we alert on that state rather than hardcoding a temp/
+  # RPM/voltage number the BMC already knows better than we do. All ipmi rules
+  # are remediation: manual -> ntfy the human; no PR reseats a PSU or a DIMM.
+  #
+  # NOTE: "Entity Presence" sensors read state=2 on healthy R620/R720 chassis
+  # (a freeipmi mapping quirk for backplane/riser presence bits), so every
+  # sensor rule excludes that type or it would page on nominal hardware. The
+  # chassis_*_fault_state metrics are likewise unreliable here (cooling/drive
+  # fault bits read 1 on both healthy nodes), so we do NOT alert on them - the
+  # per-sensor Fan/Drive-Slot states below are the trustworthy signal.
+  - alert: IpmiExporterDown
+    expr: ipmi_up == 0
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "IPMI/BMC unreachable on {{ "{{ $labels.instance }}" }}"
+      description: "The in-band ipmi_exporter has been unable to read the BMC on {{ "{{ $labels.instance }}" }} for 10m (collector {{ "{{ $labels.collector }}" }}). Hardware health for this Dell host is now blind - check the exporter container and /dev/ipmi0."
+
+  # A sensor the BMC reports as Critical (state=2): temp over the upper-critical
+  # threshold, a fan stopped, a PSU lost AC/redundancy, a CPU/DIMM fault. This
+  # is real hardware in trouble - page and get hands on it.
+  - alert: IpmiSensorCritical
+    expr: ipmi_sensor_state{type!="Entity Presence"} == 2
+    for: 5m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "IPMI sensor CRITICAL: {{ "{{ $labels.name }}" }} ({{ "{{ $labels.type }}" }}) on {{ "{{ $labels.instance }}" }}"
+      description: "BMC reports sensor '{{ "{{ $labels.name }}" }}' (type {{ "{{ $labels.type }}" }}) in CRITICAL state on {{ "{{ $labels.instance }}" }}. Current reading in the Dell Hardware (IPMI) dashboard. Check the iDRAC and the physical part (fan/PSU/DIMM/CPU)."
+
+  # Non-critical / warning state (state=1): approaching a threshold. Longer for:
+  # to ride out a brief thermal excursion under load.
+  - alert: IpmiSensorWarning
+    expr: ipmi_sensor_state{type!="Entity Presence"} == 1
+    for: 15m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "IPMI sensor warning: {{ "{{ $labels.name }}" }} ({{ "{{ $labels.type }}" }}) on {{ "{{ $labels.instance }}" }}"
+      description: "BMC reports sensor '{{ "{{ $labels.name }}" }}' (type {{ "{{ $labels.type }}" }}) in a non-critical warning state on {{ "{{ $labels.instance }}" }} for 15m. Approaching a threshold; check the Dell Hardware (IPMI) dashboard before it escalates."
