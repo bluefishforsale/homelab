@@ -45,7 +45,7 @@ Deploy individual ocean services (non-critical):
 | Network | nginx, cloudflared, cloudflare_ddns |
 | Media | sonarr, radarr, prowlarr, bazarr, nzbget, tautulli, overseerr, tdarr |
 | AI/ML | llamacpp, open-webui, comfyui |
-| Services | nextcloud, tinacms, frigate, homeassistant |
+| Services | tinacms, frigate, homeassistant |
 | Monitoring | prometheus, grafana |
 
 **Note**: Plex requires `deploy-critical-service.yml`
