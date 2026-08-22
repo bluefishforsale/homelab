@@ -43,6 +43,7 @@ Status and future plans for the homelab infrastructure.
 - **AFP**: Apple Filing Protocol file sharing
 - **Agentbox**: Autonomous agent fleet VM (OpenTelemetry collector telemetry)
 - **Kea DHCP**: DHCP server with Prometheus exporter
+- **PowerDNS**: Authoritative internal DNS with Prometheus exporter
 
 ### Media Stack
 
@@ -85,6 +86,8 @@ Status and future plans for the homelab infrastructure.
 - **Process Exporter**: Per-process resource metrics
 - **SMART Exporter**: Disk SMART health and drive-wear metrics
 - **MTR Exporter**: Network path latency metrics
+- **IPMI Exporter**: Dell BMC hardware health metrics (node005, node006)
+- **PVE Exporter**: Proxmox VE cluster and guest metrics
 
 ### Cloud/CMS Services
 
