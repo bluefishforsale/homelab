@@ -8,7 +8,14 @@ Wants=sonarr.service
 Type=simple
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
+# Deliberately no RuntimeMaxSec here, unlike sonarr.service. The playbook starts
+# both units together, so a shared 7d cap expires them within seconds of each
+# other. The exporter then returns on RestartSec=10s into a sonarr that has not
+# begun starting yet (its own RestartSec=120s, plus an image pull and app boot),
+# so :{{ exporter_port }} serves nothing for several minutes and Prometheus
+# records up==0 long enough to trip ServiceDown (#137, #236, #330).
+# radarr-exporter omits RuntimeMaxSec and has never shown this alert. The image
+# still refreshes via the ExecStartPre pull on every playbook-driven restart.
 Restart=always
 RestartSec=10s
 TimeoutStartSec=300s
