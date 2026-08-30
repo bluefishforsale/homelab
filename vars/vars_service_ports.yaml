@@ -123,6 +123,11 @@ service_ports:
   opencode:
     port: 4096
 
+  # Shared agent memory. Both ports are bound to ocean's LAN address only.
+  mem0:
+    api: 8888   # mem0 REST API (hooks, laptop over an ssh forward)
+    mcp: 8766   # mem0-mcp-bridge, the MCP face agent harnesses connect to
+
   # =============================================================================
   # Media Services
   # =============================================================================

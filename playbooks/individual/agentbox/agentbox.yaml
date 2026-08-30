@@ -65,7 +65,16 @@
     #     env: {}
     #   - name: somehttp
     #     url: https://example.com/mcp
-    agentbox_mcp_servers: []
+    #     headers: {Authorization: "Bearer ..."}
+    agentbox_mcp_servers:
+      # Fleet memory (playbooks/individual/ocean/ai/mem0.yaml). One store for
+      # every lane and the laptop, so a decision recorded in one place is
+      # visible from the others. Port hardcoded rather than read from
+      # vars_service_ports so a port bump there doesn't redeploy agentbox.
+      - name: mem0
+        url: "http://ocean.home:8766/mcp"
+        headers:
+          Authorization: "Bearer {{ ai_services.mem0.bridge_token }}"
 
   tasks:
 
@@ -216,7 +225,8 @@
       dest: "{{ home }}/.config/opencode/opencode.json"
       owner: "{{ user }}"
       group: "{{ user }}"
-      mode: '0644'
+      # 0600: MCP server headers put a bearer token in this file.
+      mode: '0600'
 
   - name: Render agentbox environment file
     ansible.builtin.template:
@@ -448,6 +458,8 @@
 
   # MCP into Claude is added (not templated): ~/.claude.json also holds Claude's
   # own runtime state, so we merge via the CLI instead of overwriting the file.
+  # Add-only: a server already registered is skipped, so rotating a header token
+  # needs `claude mcp remove <name>` on the box before the next deploy re-adds it.
   # Whole section is gated on having servers so a fresh/unauthenticated `claude`
   # is never invoked at deploy time (it can block on first-run). `timeout` is a
   # belt-and-suspenders guard against any CLI hang.
@@ -464,7 +476,7 @@
   - name: Register shared MCP servers in Claude Code (user scope)
     ansible.builtin.command: >
       timeout 30 claude mcp add-json {{ item.name | quote }}
-      {{ ({'type': 'http', 'url': item.url} if item.url is defined
+      {{ ({'type': 'http', 'url': item.url, 'headers': item.headers | default({})} if item.url is defined
           else {'type': 'stdio', 'command': item.command, 'args': item.args | default([]), 'env': item.env | default({})}) | to_json | quote }}
       --scope user
     become_user: "{{ user }}"
@@ -474,6 +486,7 @@
     when:
       - agentbox_mcp_servers | length > 0
       - item.name not in (claude_mcp_list.stdout | default(''))
+    no_log: true
     notify: Restart RC sessions
 
   handlers:
