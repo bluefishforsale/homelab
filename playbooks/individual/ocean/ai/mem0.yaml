@@ -87,6 +87,15 @@
       mode: '0644'
     register: bridge_dockerfile
 
+  # Alongside upstream's, not over it: theirs stays for reference and ours is
+  # what compose builds. Untracked in the clone, so `force: true` leaves it be.
+  - name: Supply mem0 with a Dockerfile that has libpq
+    ansible.builtin.copy:
+      src: "{{ files }}/Dockerfile.mem0"
+      dest: "{{ home }}/src/server/Dockerfile.homelab"
+      mode: '0644'
+    register: mem0_dockerfile
+
   # Pre-seeded from the vault rather than left to the bridge's
   # get_or_create_token(), so the token survives a rebuild and matches the
   # Authorization header every agent config already carries.
@@ -134,7 +143,9 @@
       chdir: "{{ home }}"
     environment:
       COMPOSE_PROJECT_NAME: "{{ service }}"
-    when: mem0_clone.changed or bridge_clone.changed or bridge_dockerfile.changed
+    when: >
+      mem0_clone.changed or bridge_clone.changed
+      or bridge_dockerfile.changed or mem0_dockerfile.changed
     notify: Restart mem0 service
 
   # Image acquisition must not happen inside the unit's start: `compose up -d`
