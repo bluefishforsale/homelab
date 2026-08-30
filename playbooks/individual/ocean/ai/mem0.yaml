@@ -30,8 +30,14 @@
     # silent upgrade of the thing holding all the memory.
     mem0_repo: https://github.com/bluefishforsale/mem0.git
     mem0_version: 8cd087f9626d4a64cac530c81192bdb442e2ac54
-    mem0_bridge_repo: https://github.com/bluefishforsale/mem0-mcp-bridge.git
+    # SSH, unlike the mem0 fork above: the bridge repo is private, and an https
+    # clone of a private repo fails with "could not read Username for
+    # 'https://github.com'" rather than anything that names the real problem.
+    mem0_bridge_repo: git@github.com:bluefishforsale/mem0-mcp-bridge.git
     mem0_bridge_version: main
+    # terrac's key is what ocean already clones private repos with
+    # (playbooks/individual/ocean/services/blog_terrac_com_static.yaml).
+    git_ssh_key: /home/terrac/.ssh/id_ed25519
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
     embedder_model: nomic-embed-text
@@ -60,12 +66,18 @@
       force: true
     register: mem0_clone
 
+  # Stays root (the rest of {{ home }} is root-owned) and borrows terrac's key
+  # rather than running as terrac, which would need the clone dir chowned and
+  # then chowned back for the docker build.
   - name: Clone mem0-mcp-bridge source
     ansible.builtin.git:
       repo: "{{ mem0_bridge_repo }}"
       dest: "{{ home }}/src-bridge"
       version: "{{ mem0_bridge_version }}"
       force: true
+      accept_hostkey: true
+    environment:
+      GIT_SSH_COMMAND: "ssh -i {{ git_ssh_key }} -o StrictHostKeyChecking=no"
     register: bridge_clone
 
   - name: Supply the bridge with a Dockerfile
