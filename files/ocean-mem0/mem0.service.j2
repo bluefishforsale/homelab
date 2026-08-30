@@ -6,6 +6,13 @@ Wants=network-online.target
 Requires=docker.service zfs-mount.service zfs-import.target
 RequiresMountsFor=/data01
 
+# Give up after three failures in an hour instead of restarting forever. A
+# start that times out mid-image-pull would otherwise re-download from scratch
+# every cycle and never converge, quietly eating the WAN; failing visibly trips
+# the SystemdUnitFailed alert instead.
+StartLimitIntervalSec=3600
+StartLimitBurst=3
+
 [Service]
 Type=oneshot
 RemainAfterExit=yes
