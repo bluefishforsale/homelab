@@ -25,6 +25,7 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
 - **ZFS Storage** → [`docs/operations/zfs.md`](docs/operations/zfs.md)
 - **GPU Management** → [`docs/operations/gpu-management.md`](docs/operations/gpu-management.md)
 - **Dell Hardware** → [`docs/operations/dell-hardware.md`](docs/operations/dell-hardware.md)
+- **Restoring a service database** → [`docs/operations/db-restore.md`](docs/operations/db-restore.md) — per-service runbook, dry-run by default, point-in-time from GCS generations
 
 ### Troubleshooting
 
