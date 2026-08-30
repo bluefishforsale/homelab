@@ -1,0 +1,169 @@
+# Shared agent memory for the fleet. One writer, one store: every agent that
+# remembers anything (laptop Claude Code, agentbox lanes) talks to this stack
+# instead of keeping a private memory that would diverge. mem0's add() is an LLM
+# rewrite of the existing facts, not an append, so two instances fed the same
+# input produce different rows with different ids and can never be reconciled.
+#
+# Published on the LAN address only. Off-network access is an ssh port-forward
+# to {{ ansible_default_ipv4.address }}:{{ port_api }}, deliberately not a
+# cloudflared ingress: memory contents are the most personal data in the fleet
+# and CF terminates TLS at its edge.
+services:
+  mem0:
+    build:
+      context: {{ home }}/src/server
+      dockerfile: Dockerfile
+    image: mem0-api-server:{{ mem0_version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/Los_Angeles
+      - PYTHONUNBUFFERED=1
+
+    # Schema first, then serve. No --reload (the upstream Dockerfile CMD ships
+    # it); a reloader in prod restarts the app on every stat blip.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ port_api }}:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+    # Upstream has no /metrics and no health route: main.py lists /api/health
+    # only in its log-skip set, and that route belongs to the dashboard, which
+    # we don't run. /docs is unauthenticated and served by the same app, so it
+    # is the honest liveness signal. curl is absent from python:slim.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+    cpus: '2.0'
+    mem_limit: 2048m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
+
+  postgres:
+    image: ankane/pgvector:v0.5.1
+    container_name: {{ service }}-postgres
+    hostname: postgres
+    restart: unless-stopped
+    shm_size: "128mb"
+
+    environment:
+      - TZ=America/Los_Angeles
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD={{ ai_services.mem0.postgres_password }}
+
+    volumes:
+      - {{ home }}/postgres-data:/var/lib/postgresql/data
+      # Creates mem0_app (users, api keys). Mounted from the clone so it cannot
+      # drift from the schema code that expects it.
+      - {{ home }}/src/server/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "postgres", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-postgres"
+
+  # Embeddings only, CPU. nomic-embed-text is ~270MB and the 3090 is spoken for
+  # (llama.cpp weights plus Plex NVENC), so this never asks for the GPU.
+  # NOTE: the collection is 768-dim. Changing this model or MEM0_EMBEDDING_DIMS
+  # orphans every vector already stored.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: {{ service }}-ollama
+    hostname: ollama
+    restart: unless-stopped
+
+    environment:
+      - TZ=America/Los_Angeles
+      - OLLAMA_NUM_PARALLEL=2
+
+    volumes:
+      - {{ home }}/ollama:/root/.ollama
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    cpus: '2.0'
+    mem_limit: 2048m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-ollama"
+
+  # MCP face of the same store, so agent harnesses (Claude Code, opencode) get
+  # memory tools without each reimplementing mem0's REST calls. Stateless: it
+  # holds a bearer token and forwards to mem0 over the compose network.
+  bridge:
+    build:
+      context: {{ home }}/src-bridge
+      dockerfile: Dockerfile
+    image: mem0-mcp-bridge:{{ mem0_bridge_version }}
+    container_name: {{ service }}-bridge
+    hostname: bridge
+    restart: unless-stopped
+
+    environment:
+      - TZ=America/Los_Angeles
+      - MEM0_API_URL=http://{{ service }}:8000
+      # The bridge sends this as X-API-Key, which mem0 compares against
+      # ADMIN_API_KEY before any per-user key lookup (server/auth.py).
+      - MEM0_API_KEY={{ ai_services.mem0.admin_api_key }}
+      - XDG_DATA_HOME=/data
+
+    volumes:
+      - {{ home }}/bridge-data:/data
+
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ port_mcp }}:8766"
+
+    depends_on:
+      mem0:
+        condition: service_healthy
+
+    # Every HTTP path needs the bearer token, so a 2xx probe would mean baking
+    # the secret into the healthcheck. A TCP connect proves the listener is
+    # alive, which is the only thing the bridge can fail at on its own.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8766), 3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    cpus: '0.5'
+    mem_limit: 512m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-bridge"

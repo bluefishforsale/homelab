@@ -310,6 +310,14 @@ scrape_configs:
         labels:
           probe_type: "http"
           category: "personal"
+      - targets:
+        # Homelab services that expose no metrics of their own, so a probe is
+        # the only signal they are actually serving. /docs is mem0's one
+        # unauthenticated route; it is served by the same app as /memories.
+        - http://ocean.home:8888/docs
+        labels:
+          probe_type: "http"
+          category: "homelab_services"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

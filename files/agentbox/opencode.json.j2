@@ -4,7 +4,7 @@
   "instructions": ["{{ home }}/.config/opencode/AGENTS.md"],
   "mcp": {
 {% for s in agentbox_mcp_servers %}
-    "{{ s.name }}": {% if s.url is defined %}{ "type": "remote", "url": "{{ s.url }}", "enabled": true }{% else %}{ "type": "stdio", "command": {{ ([s.command] + (s.args | default([]))) | to_json }}, "enabled": true }{% endif %}{{ "," if not loop.last else "" }}
+    "{{ s.name }}": {% if s.url is defined %}{ "type": "remote", "url": "{{ s.url }}", "enabled": true{% if s.headers is defined %}, "headers": {{ s.headers | to_json }}{% endif %} }{% else %}{ "type": "stdio", "command": {{ ([s.command] + (s.args | default([]))) | to_json }}, "enabled": true }{% endif %}{{ "," if not loop.last else "" }}
 {% endfor %}
   },
   "provider": {

@@ -1,0 +1,17 @@
+# mem0-mcp-bridge ships no Dockerfile (it is normally a uv/pipx install on a
+# laptop), so homelab supplies one and the playbook drops it into the clone.
+# Installing at build time rather than at container start keeps restarts
+# instant and offline-safe.
+FROM python:3.13-slim
+
+WORKDIR /app
+COPY . .
+RUN pip install --no-cache-dir .
+
+# The bearer token lives at $XDG_DATA_HOME/mem0-mcp-bridge/token; the playbook
+# renders it there from the vault so it survives a rebuild and matches what the
+# agent configs send.
+ENV XDG_DATA_HOME=/data
+EXPOSE 8766
+
+CMD ["python", "-m", "mem0_mcp", "serve", "--transport", "http", "--host", "0.0.0.0", "--port", "8766"]

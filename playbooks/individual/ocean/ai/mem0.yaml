@@ -1,0 +1,170 @@
+---
+# mem0: the fleet's shared agent memory (REST API + MCP bridge).
+#
+# Why it lives here rather than on the laptop: memory that only one machine can
+# reach is memory the agentbox lanes never see, and a second instance is not an
+# option. mem0's add() rewrites the existing facts with an LLM instead of
+# appending, so two stores fed the same input diverge immediately and cannot be
+# merged back. One writer on ocean, everything else is a client.
+#
+# Reached over the LAN, or from off-site through an ssh port-forward to
+# {{ ansible_default_ipv4.address }}:8888. Deliberately NOT on cloudflared:
+# conversation memory is the most personal data in the fleet and the CF edge
+# terminates TLS.
+#
+# Both containers build from source clones. The published mem0/mem0-api-server
+# image on Docker Hub was last pushed 2025-09-10, well before the API-key auth
+# this deploy depends on, and mem0-mcp-bridge publishes no image at all.
+- name: Deploy mem0 shared agent memory using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: mem0
+    # Pinned SHAs, not branches: an unpinned clone turns every deploy into a
+    # silent upgrade of the thing holding all the memory.
+    mem0_repo: https://github.com/bluefishforsale/mem0.git
+    mem0_version: 8cd087f9626d4a64cac530c81192bdb442e2ac54
+    mem0_bridge_repo: https://github.com/bluefishforsale/mem0-mcp-bridge.git
+    mem0_bridge_version: main
+    port_api: "{{ service_ports.mem0.api }}"
+    port_mcp: "{{ service_ports.mem0.mcp }}"
+    embedder_model: nomic-embed-text
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/ocean-mem0"
+    home: "{{ data }}/services/{{ service }}"
+
+  tasks:
+
+  - name: Ensure service directories exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      mode: '0755'
+    loop:
+      - "{{ home }}"
+      - "{{ home }}/postgres-data"
+      - "{{ home }}/ollama"
+      - "{{ home }}/bridge-data/mem0-mcp-bridge"
+
+  - name: Clone mem0 server source
+    ansible.builtin.git:
+      repo: "{{ mem0_repo }}"
+      dest: "{{ home }}/src"
+      version: "{{ mem0_version }}"
+      force: true
+    register: mem0_clone
+
+  - name: Clone mem0-mcp-bridge source
+    ansible.builtin.git:
+      repo: "{{ mem0_bridge_repo }}"
+      dest: "{{ home }}/src-bridge"
+      version: "{{ mem0_bridge_version }}"
+      force: true
+    register: bridge_clone
+
+  - name: Supply the bridge with a Dockerfile
+    ansible.builtin.copy:
+      src: "{{ files }}/Dockerfile.bridge"
+      dest: "{{ home }}/src-bridge/Dockerfile"
+      mode: '0644'
+    register: bridge_dockerfile
+
+  # Pre-seeded from the vault rather than left to the bridge's
+  # get_or_create_token(), so the token survives a rebuild and matches the
+  # Authorization header every agent config already carries.
+  - name: Install bridge bearer token
+    ansible.builtin.copy:
+      content: "{{ ai_services.mem0.bridge_token }}\n"
+      dest: "{{ home }}/bridge-data/mem0-mcp-bridge/token"
+      mode: '0600'
+    no_log: true
+    notify: Restart mem0 service
+
+  - name: Create mem0 environment file
+    ansible.builtin.template:
+      src: "{{ files }}/mem0.env.j2"
+      dest: "{{ home }}/.env"
+      mode: '0600'
+    notify:
+    - Reload systemd daemon
+    - Restart mem0 service
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart mem0 service
+
+  - name: Create mem0 systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/mem0.service.j2"
+      dest: "/etc/systemd/system/mem0.service"
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart mem0 service
+
+  # Only on a source change. `compose up -d` builds a missing image on its own,
+  # but a version bump reuses the existing tag, so the rebuild has to be
+  # explicit or the pin would be decorative.
+  - name: Rebuild images after a source change
+    ansible.builtin.command:
+      cmd: docker compose build
+      chdir: "{{ home }}"
+    environment:
+      COMPOSE_PROJECT_NAME: "{{ service }}"
+    when: mem0_clone.changed or bridge_clone.changed or bridge_dockerfile.changed
+    notify: Restart mem0 service
+
+  - name: Enable mem0 service
+    ansible.builtin.systemd:
+      name: mem0.service
+      enabled: true
+      state: started
+      daemon_reload: true
+
+  - name: Flush handlers before probing the running stack
+    ansible.builtin.meta: flush_handlers
+
+  - name: Check whether the embedding model is present
+    ansible.builtin.command:
+      cmd: docker exec mem0-ollama ollama list
+    register: ollama_models
+    changed_when: false
+    failed_when: false
+
+  # ~270MB, CPU-only. Without it every add and search 500s on the embed call.
+  - name: Pull the embedding model
+    ansible.builtin.command:
+      cmd: "docker exec mem0-ollama ollama pull {{ embedder_model }}"
+    when: embedder_model not in (ollama_models.stdout | default(''))
+
+  # The LAN address, not loopback: the compose port is bound to it explicitly so
+  # the service is unreachable from anywhere the host itself doesn't route.
+  - name: Verify the API is serving
+    ansible.builtin.uri:
+      url: "http://{{ ansible_default_ipv4.address }}:{{ port_api }}/docs"
+      status_code: 200
+    retries: 12
+    delay: 10
+    register: mem0_probe
+    until: mem0_probe is succeeded
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  - name: Restart mem0 service
+    ansible.builtin.systemd:
+      name: mem0.service
+      state: restarted
