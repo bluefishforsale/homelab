@@ -273,6 +273,36 @@
                 target_label: 'application'
               - source_labels: ['__syslog_message_facility']
                 target_label: 'facility'
+
+          # Plex Media Server application log. The container's stdout carries
+          # only ~30 lines/day; everything useful (transcode failures, DB
+          # transaction stalls, remote-access negotiation) is written to this
+          # file inside the config bind-mount, so journald alone leaves Plex
+          # effectively unobservable in Loki.
+          # NOTE: labelled container="plex" on purpose so `loki.sh plex ocean`
+          # finds it alongside the container's journald stream; the job label is
+          # what separates the two sources.
+          - job_name: plex-server
+            static_configs:
+              - targets:
+                  - localhost
+                labels:
+                  job: plex-server
+                  host: {{ inventory_hostname }}
+                  container: plex
+                  __path__: "/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log"
+            pipeline_stages:
+              # Unparseable lines (Plex logs raw bytes from internet port
+              # scans) fall through with the ingest timestamp and no level,
+              # rather than being dropped.
+              - regex:
+                  expression: '^(?P<ts>\w{3} \d{2}, \d{4} \d{2}:\d{2}:\d{2}\.\d{3}) \[\d+\] (?P<level>[A-Z]+) - '
+              - timestamp:
+                  source: ts
+                  format: 'Jan 02, 2006 15:04:05.000'
+                  action_on_failure: fudge
+              - labels:
+                  level:
       mode: '0644'
     notify:
       - Restart promtail
