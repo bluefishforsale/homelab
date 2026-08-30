@@ -43,7 +43,20 @@
     git_ssh_key: /home/terrac/.ssh/id_ed25519
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
-    embedder_model: nomic-embed-text
+    # What gets pulled, and what mem0 actually calls. They differ because
+    # ollama's thread count can only be set as a model parameter: it counts the
+    # host's physical cores out of /proc/cpuinfo (not namespaced, not affinity
+    # aware), so a container confined to 6 CPUs still ran a 30-thread pool and
+    # spent all its time in scheduler contention. OLLAMA_NUM_THREADS is not
+    # honoured; a derived model carrying `PARAMETER num_thread` is the lever
+    # that exists. Measured on ocean, same prompt:
+    #   nomic-embed-text     (30 threads): 34.53s
+    #   nomic-embed-homelab  (6 threads):   0.95s cold, 0.05s warm
+    embedder_base_model: nomic-embed-text
+    embedder_model: nomic-embed-homelab
+    # Match the cpuset in the compose file. More threads than usable cores is
+    # exactly the bug above.
+    embedder_threads: 6
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-mem0"
     home: "{{ data }}/services/{{ service }}"
@@ -185,10 +198,30 @@
     failed_when: false
 
   # ~270MB, CPU-only. Without it every add and search 500s on the embed call.
-  - name: Pull the embedding model
+  - name: Pull the base embedding model
     ansible.builtin.command:
-      cmd: "docker exec mem0-ollama ollama pull {{ embedder_model }}"
-    when: embedder_model not in (ollama_models.stdout | default(''))
+      cmd: "docker exec mem0-ollama ollama pull {{ embedder_base_model }}"
+    when: embedder_base_model not in (ollama_models.stdout | default(''))
+
+  # Lands inside the ollama volume, so the container reads it at
+  # /root/.ollama without another mount.
+  - name: Write the embedder Modelfile
+    ansible.builtin.copy:
+      content: |
+        FROM {{ embedder_base_model }}
+        PARAMETER num_thread {{ embedder_threads }}
+      dest: "{{ home }}/ollama/Modelfile.homelab"
+      mode: '0644'
+    register: embedder_modelfile
+
+  - name: Derive the thread-pinned embedding model
+    ansible.builtin.command:
+      cmd: >
+        docker exec mem0-ollama ollama create {{ embedder_model }}
+        -f /root/.ollama/Modelfile.homelab
+    when: >
+      embedder_modelfile.changed
+      or embedder_model not in (ollama_models.stdout | default(''))
 
   # The LAN address, not loopback: the compose port is bound to it explicitly so
   # the service is unreachable from anywhere the host itself doesn't route.
