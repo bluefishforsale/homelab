@@ -76,4 +76,9 @@ fixed-cost constraints are in the plan; the autonomy policy is
 - Service ports are centralized in `vars/vars_service_ports.yaml`.
 - A host joins fleet-wide monitoring by being in `[vms]` (or `groups['all']`);
   the Prometheus loops pick it up by hostname.
+- Service databases are dumped nightly to `gs://homelab-db-backups`, one
+  versioned object per service. A new service with a database has to be added to
+  **both** `files/db-backup/db-backup.sh` and `files/db-backup/db-restore.sh` or
+  it is only half covered. Restoring is dispatch-only and dry-run by default:
+  [`docs/operations/db-restore.md`](docs/operations/db-restore.md).
 - No em dashes, terse commits, no generated-by tag lines.
