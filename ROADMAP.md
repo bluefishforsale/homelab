@@ -85,6 +85,9 @@ Status and future plans for the homelab infrastructure.
 - **Process Exporter**: Per-process resource metrics
 - **SMART Exporter**: Disk SMART health and drive-wear metrics
 - **MTR Exporter**: Network path latency metrics
+- **IPMI Exporter**: Dell out-of-band hardware metrics (node005, node006)
+- **PVE Exporter**: Proxmox hypervisor metrics
+- **PowerDNS Exporter**: Internal DNS server metrics
 
 ### Cloud/CMS Services
 
