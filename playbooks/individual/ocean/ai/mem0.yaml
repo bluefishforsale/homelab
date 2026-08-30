@@ -34,7 +34,10 @@
     # clone of a private repo fails with "could not read Username for
     # 'https://github.com'" rather than anything that names the real problem.
     mem0_bridge_repo: git@github.com:bluefishforsale/mem0-mcp-bridge.git
-    mem0_bridge_version: main
+    # Pinned like the fork above, now that the repo has a commit worth pinning:
+    # this is the one that constrains mcp<2. On `main` the bridge crash-looped,
+    # because mcp>=1.0 resolved to 2.x where FastMCP was renamed and moved.
+    mem0_bridge_version: c426082347501967ecd2a096901930a19f626120
     # terrac's key is what ocean already clones private repos with
     # (playbooks/individual/ocean/services/blog_terrac_com_static.yaml).
     git_ssh_key: /home/terrac/.ssh/id_ed25519

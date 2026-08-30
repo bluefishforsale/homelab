@@ -110,6 +110,10 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - OLLAMA_NUM_PARALLEL=2
+      # Never unload. The default 5-minute idle timeout meant a session's one
+      # recall almost always paid full model-load cost, and the recall hook
+      # gives the entire search 6 seconds.
+      - OLLAMA_KEEP_ALIVE=-1
 
     volumes:
       - {{ home }}/ollama:/root/.ollama
@@ -121,7 +125,13 @@ services:
       retries: 3
       start_period: 30s
 
-    cpus: '2.0'
+    # cpuset, NOT cpus. A `cpus` quota leaves /proc reporting all 30 host cores,
+    # so llama.cpp sizes its threadpool to 30 and then 30 threads contend for
+    # two cores' worth of CFS quota; every barrier waits on the scheduler and a
+    # two-token embedding took 64s. cpuset changes what the container sees
+    # (`docker run --cpuset-cpus=0-3 alpine nproc` -> 4), so the threadpool
+    # matches the allowance.
+    cpuset: "0-5"
     mem_limit: 2048m
 
     logging:
