@@ -48,7 +48,7 @@ dump_mysql grafana-mysql grafana-mysql "$MYSQL_ROOT_PASSWORD"
 [ -n "$WORDPRESS_DB_CONTAINER" ] && dump_mysql "$WORDPRESS_DB_CONTAINER" wordpress "$WORDPRESS_ROOT_PASSWORD"
 
 # --- Live RDBMS: Postgres -> <service>.sql (container's own superuser, trust auth) ---
-for pgc in globalview-timescaledb jellystat-db; do
+for pgc in globalview-timescaledb jellystat-db mem0-postgres; do
   running "$pgc" || { log "skip pg (not running): $pgc"; continue; }
   if docker exec "$pgc" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}"' > "$WORK/$pgc.sql" 2>/dev/null && [ -s "$WORK/$pgc.sql" ]; then
     log "dumped $pgc ($(wc -c <"$WORK/$pgc.sql")B)"; else fail "$pgc"; rm -f "$WORK/$pgc.sql"; fi
