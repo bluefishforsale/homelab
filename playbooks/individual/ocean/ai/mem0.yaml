@@ -137,6 +137,21 @@
     when: mem0_clone.changed or bridge_clone.changed or bridge_dockerfile.changed
     notify: Restart mem0 service
 
+  # Image acquisition must not happen inside the unit's start: `compose up -d`
+  # pulls ollama (2.1GB) on a cold host, that overran TimeoutStartSec=600, and
+  # Restart=on-failure then restarted the pull from the top every cycle, a loop
+  # that can never converge. Pulling here leaves `up -d` with nothing to fetch.
+  # --ignore-buildable skips mem0 and the bridge, which are built from source
+  # and have no registry to pull from.
+  - name: Pull third-party images before the unit starts
+    ansible.builtin.command:
+      cmd: docker compose pull --ignore-buildable
+      chdir: "{{ home }}"
+    environment:
+      COMPOSE_PROJECT_NAME: "{{ service }}"
+    register: mem0_pull
+    changed_when: "'Pulled' in mem0_pull.stderr or 'Downloaded' in mem0_pull.stderr"
+
   - name: Enable mem0 service
     ansible.builtin.systemd:
       name: mem0.service
