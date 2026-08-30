@@ -12,7 +12,9 @@ services:
   mem0:
     build:
       context: {{ home }}/src/server
-      dockerfile: Dockerfile
+      # Ours, not upstream's: theirs is python:3.12-slim with no libpq, which
+      # psycopg needs at runtime. See files/ocean-mem0/Dockerfile.mem0.
+      dockerfile: Dockerfile.homelab
     image: mem0-api-server:{{ mem0_version }}
     container_name: {{ service }}
     hostname: {{ service }}
