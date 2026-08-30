@@ -66,6 +66,7 @@ SQLITE_DBS=(
   paia/data/paia.db photonic_inventory/data/photonic.db
   ntfy/data/auth.db frigate/config/frigate.db
   my_ta_jose/data/my_ta_jose.db
+  mem0/history/history.db
 )
 for rel in "${SQLITE_DBS[@]}"; do
   svc="${rel%%/*}"

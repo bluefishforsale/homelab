@@ -68,10 +68,11 @@ meta(){
     ntfy)       echo "sqlite|ntfy.db.gz|ntfy|$SERVICES_DIR/ntfy/data/auth.db" ;;
     frigate)    echo "sqlite|frigate.db.gz|frigate|$SERVICES_DIR/frigate/config/frigate.db" ;;
     my_ta_jose) echo "sqlite|my_ta_jose.db.gz|my_ta_jose|$SERVICES_DIR/my_ta_jose/data/my_ta_jose.db" ;;
+    mem0)       echo "sqlite|mem0.db.gz|mem0|$SERVICES_DIR/mem0/history/history.db" ;;
     *) echo "" ;;
   esac
 }
-ALL="grafana-mysql wordpress globalview-timescaledb jellystat-db mem0-postgres mysql-atrest sonarr radarr lidarr prowlarr bazarr jellyfin navidrome tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy frigate my_ta_jose"
+ALL="grafana-mysql wordpress globalview-timescaledb jellystat-db mem0-postgres mysql-atrest sonarr radarr lidarr prowlarr bazarr jellyfin navidrome tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy frigate my_ta_jose mem0"
 
 restore_one(){
   local svc="$1" m engine obj container target uri gen payload base

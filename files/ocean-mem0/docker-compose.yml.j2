@@ -36,6 +36,13 @@ services:
     ports:
       - "{{ ansible_default_ipv4.address }}:{{ port_api }}:8000"
 
+    volumes:
+      # mem0 opens a SQLite audit trail at /app/history/history.db on startup
+      # and dies if the directory is absent. Upstream gitignores server/history,
+      # so a fresh clone never has it and the image never gets one. Bind-mounted
+      # rather than left in the container so the trail survives a recreate.
+      - {{ home }}/history:/app/history
+
     depends_on:
       postgres:
         condition: service_healthy
