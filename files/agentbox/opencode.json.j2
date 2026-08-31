@@ -24,14 +24,15 @@
         "apiKey": "{env:GOOGLE_GENERATIVE_AI_API_KEY}"
       },
       "models": {
-        "gemini-2.5-flash": { "name": "Gemini 2.5 Flash (AI Studio free)" }
+        "gemini-flash-latest": { "name": "Gemini Flash latest (AI Studio free)" },
+        "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro preview (AI Studio free, escalation only)" }
       }
     }
   },
-  "model": "google/gemini-2.5-flash",
+  "model": "local-llama/local",
   "small_model": "local-llama/local",
   "agent": {
-    "plan": { "model": "google/gemini-2.5-flash" },
-    "build": { "model": "google/gemini-2.5-flash" }
+    "plan": { "model": "local-llama/local" },
+    "build": { "model": "local-llama/local" }
   }
 }

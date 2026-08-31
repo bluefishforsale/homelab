@@ -7,12 +7,11 @@
 # Moves Todo items that are actually DEPLOYED (a matching playbook exists) AND
 # HEALTHY (scrape target up==1, not named by a DOWN target or firing alert) into
 # Completed, and appends live work that is not listed. Never adds speculative
-# future items. Claude Code does the fuzzy matching on the Pro/Max subscription
-# (ANTHROPIC_API_KEY stays unset); the evidence is gathered here and passed in.
+# future items. The fuzzy matching runs on the strongest free model via
+# opencode; the evidence is gathered here and passed in.
 # Result lands as ONE rolling PR a human merges -- homelab is infra, never
 # auto-merged (ADR 0001).
 set -euo pipefail
-unset ANTHROPIC_API_KEY
 
 OWNER="bluefishforsale"
 REPO="homelab"
@@ -27,9 +26,10 @@ ALERT="${HOMELAB_ALERTMANAGER:-http://192.168.1.143:9093}"
 
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
-unset ANTHROPIC_API_KEY  # enforce: subscription auth, not metered API
 mkdir -p "$WORKROOT" "$LOGDIR"
-export OTEL_RESOURCE_ATTRIBUTES="repo=$REPO,lane=claude,service=agentbox"
+# Strongest free model. This runs once a day, so the quota cost is trivial.
+RECONCILE_MODEL="google/gemini-3.1-pro-preview"
+export OTEL_RESOURCE_ATTRIBUTES="repo=$REPO,lane=reconcile,service=agentbox"
 
 # Rolling agent branch, always rebased on latest master (like renovate). No human
 # commits land here, so the daily force-push is safe and keeps a single clean PR.
@@ -57,7 +57,7 @@ git -C "$WT" checkout -q -B "$BRANCH" origin/HEAD
   ( cd "$WT" && git ls-files 'playbooks/individual/*' | grep -E '\.ya?ml$' | sed -E 's#playbooks/individual/##; s#\.ya?ml$##' | sort -u ) || true
 } > "$EV"
 
-# --- Reconcile with Claude Code (premium lane, headless) ---
+# --- Reconcile with the free escalation model (headless) ---
 prompt="Reconcile ./ROADMAP.md for the $SLUG homelab repo against the fleet evidence below. Read ./ROADMAP.md first.
 
 Make ONLY these surgical edits with the Edit tool:
@@ -72,14 +72,11 @@ Hard rules:
 Evidence:
 $(cat "$EV")"
 
-/usr/local/bin/agentbox-trust-dir.sh "$WT" || true
-# An expired OAuth session lands here and used to be swallowed whole: the log
-# got the error, nothing else did, and the reconciler looked like it had simply
-# found nothing to change.
-( cd "$WT" && claude -p "$prompt" --permission-mode acceptEdits ) \
+# Failures are logged, never swallowed: this used to exit 0 on a dead model and
+# look exactly like "the roadmap was already in sync".
+( cd "$WT" && timeout 900 opencode run -m "$RECONCILE_MODEL" "$prompt" ) \
   >"$LOGDIR/roadmap-reconcile.log" 2>&1 \
-  || /usr/local/bin/agentbox-notify-auth-expired.sh \
-       "roadmap reconcile" "$(cat "$LOGDIR/roadmap-reconcile.log")" || true
+  || echo "roadmap reconcile failed on $RECONCILE_MODEL (see $LOGDIR/roadmap-reconcile.log)" >&2
 
 # --- Open/refresh the single rolling PR only if the roadmap actually changed ---
 if [ -z "$(git -C "$WT" status --porcelain ROADMAP.md)" ]; then

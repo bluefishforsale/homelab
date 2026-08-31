@@ -2,11 +2,11 @@
 # agentbox issue watcher (free lane).
 # Rendered from files/agentbox/issue-watcher.sh by playbooks/individual/agentbox/agentbox.yaml.
 #
-# Polls open issues on the deployable repos, drafts a fix on the FREE lanes via
-# opencode (local GPU / Gemini per opencode.json), opens a PR with auto-merge,
-# and escalates anything it can't resolve to the Claude Code premium lane by
-# relabelling. Self-hosted on purpose: opencode's GitHub Action path bills
-# metered API, this loop stays on the free tiers.
+# Polls open issues on the deployable repos and drafts a fix by walking a model
+# ladder, cheapest first: the local GPU, then Gemini Flash. Opens a PR, and
+# relabels anything neither could resolve for the escalation tier (Gemini Pro,
+# agentbox-escalate.sh). Self-hosted on purpose: opencode's GitHub Action path
+# bills metered API, and every tier here is free.
 set -euo pipefail
 
 OWNER="bluefishforsale"
@@ -22,8 +22,22 @@ WORKROOT="{{ home }}/work"
 # Draft logs live OUTSIDE the worktree so `git add -A` never commits them.
 LOGDIR="{{ home }}/agent-logs"
 LABEL_WORKING="agent-working"
-LABEL_CLAUDE="needs-claude"
+LABEL_ESCALATE="needs-escalation"
 LABEL_REVIEW="needs-human-merge"
+
+# The lane ladder, cheapest first. Local is free and unlimited, so it takes
+# every issue; Google's free quota is only spent on what the GPU could not do.
+# Measured: the local model resolved a real issue end to end in 81s, including
+# running git commands, which is why it drafts rather than merely triages.
+# NOTE: `gemini-flash-latest` is an alias on purpose. Pinning bit us — 2.5-pro
+# is still advertised by the models endpoint but errors on every call. A draft
+# quality shift from an alias moving is self-correcting here (bad draft -> red
+# CI -> escalate), whereas a model that vanishes takes the tier out entirely.
+LANES="local-llama/local google/gemini-flash-latest"
+# Escalation (tier 3) is a separate service; see agentbox-escalate.sh.
+# No working `-latest` alias exists for pro: gemini-pro-latest returns a server
+# error, so this one is pinned and must be re-verified when it stops answering.
+REVIEW_MODEL="google/gemini-3.1-pro-preview"
 
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
@@ -34,7 +48,7 @@ mkdir -p "$WORKROOT" "$LOGDIR"
 ensure_labels() {
   local slug="$1"
   gh label create "$LABEL_WORKING" --repo "$slug" --color FBCA04 --description "Agent fleet is drafting a fix" --force >/dev/null 2>&1 || true
-  gh label create "$LABEL_CLAUDE"  --repo "$slug" --color 5319E7 --description "Escalated to the Claude Code premium lane" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_ESCALATE" --repo "$slug" --color 5319E7 --description "Both free lanes failed; escalated to the harder model" --force >/dev/null 2>&1 || true
   gh label create "$LABEL_REVIEW"  --repo "$slug" --color D93F0B --description "Agent PR open; a human merges" --force >/dev/null 2>&1 || true
 }
 
@@ -53,6 +67,24 @@ has_draft() {  # $1 = worktree
   [ -n "$(git -C "$1" log --oneline origin/HEAD..HEAD)" ]
 }
 
+# One attempt per tier. A capability failure means escalate, not retry: the same
+# model on the same prompt fails the same way, and eight tries buys eight
+# identical failures. Only INFRASTRUCTURE failure is worth a second go, so that
+# retries once in place — timeout (exit 124) or a rate limit in the output.
+draft() {  # $1 = worktree, $2 = model, $3 = prompt, $4 = logfile
+  local wt="$1" model="$2" prompt="$3" log="$4" rc
+  printf '\n===== %s =====\n' "$model" >>"$log"
+  ( cd "$wt" && timeout 900 opencode run -m "$model" "$prompt" ) >>"$log" 2>&1
+  rc=$?
+  if [ "$rc" -eq 124 ] || tail -40 "$log" | grep -qiE '429|rate limit|quota exceeded|RESOURCE_EXHAUSTED'; then
+    echo "  $model: infrastructure failure (rc=$rc), retrying once" >&2
+    printf '\n===== %s (retry) =====\n' "$model" >>"$log"
+    ( cd "$wt" && timeout 900 opencode run -m "$model" "$prompt" ) >>"$log" 2>&1
+    rc=$?
+  fi
+  return "$rc"
+}
+
 no_prod_effect() {  # $1 = newline-separated changed files
   [ -n "$1" ] || return 1
   while IFS= read -r f; do
@@ -68,7 +100,7 @@ for repo in ${AGENTBOX_REPOS:-}; do
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=free,service=agentbox"
   ensure_labels "$slug"
 
-  # Open issues not already claimed (agent-working) or escalated (needs-claude),
+  # Open issues not already claimed (agent-working) or escalated (needs-escalation),
   # AND authored by someone on the allowlist.
   #
   # The author check is the security boundary. An issue title and body are fed
@@ -90,7 +122,7 @@ for repo in ${AGENTBOX_REPOS:-}; do
   issues=$(gh issue list --repo "$slug" --state open --json number,labels,author \
     | jq -r --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
       .[]
-      | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_CLAUDE"'"])) | not)
+      | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_ESCALATE"'"])) | not)
       | select(.author.login as $a | ($allow | split(" ")) | index($a))
       | .number') || { echo "issue list failed for $slug, skipping" >&2; continue; }
 
@@ -111,8 +143,24 @@ $body
 
 Make the minimal, correct change. Do not touch unrelated code. Keep the build and tests green."
 
-    if (cd "$wt" && opencode run "$prompt") >"$LOGDIR/$repo-issue-$num.log" 2>&1 \
-       && has_draft "$wt"; then
+    # Walk the ladder. Each tier starts from a clean origin/HEAD so a failed
+    # attempt's debris is never attributed to the model that follows it.
+    log="$LOGDIR/$repo-issue-$num.log"
+    : >"$log"
+    drafted=""
+    for model in $LANES; do
+      git -C "$wt" checkout -q -B "agent/issue-$num" origin/HEAD
+      git -C "$wt" clean -qfd
+      echo "$slug#$num: drafting on $model" >&2
+      if draft "$wt" "$model" "$prompt" "$log" && has_draft "$wt"; then
+        drafted="$model"
+        echo "$slug#$num: $model produced a diff" >&2
+        break
+      fi
+      echo "$slug#$num: $model produced no usable diff" >&2
+    done
+
+    if [ -n "$drafted" ]; then
       # Only commit what the drafter left loose; committing nothing exits 1 and
       # would abort the run under set -e.
       if [ -n "$(git -C "$wt" status --porcelain)" ]; then
@@ -122,21 +170,23 @@ Make the minimal, correct change. Do not touch unrelated code. Keep the build an
       git -C "$wt" push -q -u origin "agent/issue-$num"
       pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
         --title "fix: $title (#$num)" \
-        --body "Resolves #$num. Drafted by agentbox on the free lane.") || pr_url=""
+        --body "Resolves #$num. Drafted by agentbox on \`$drafted\`.") || pr_url=""
 
-      # Independent premium-lane review: a stronger model (Claude, on the
-      # fixed-cost subscription) reviews the free lane's draft and comments. The
-      # human still merges — this only informs that decision. Diff is passed in
-      # the prompt (no tools), so no extra permissions are needed.
+      # Independent review by the strongest free model. A human still merges;
+      # this only informs that decision.
+      #
+      # Runs from LOGDIR, not the worktree, with the diff inline: a reviewer
+      # that can edit the branch it is reviewing is not a reviewer. --agent plan
+      # is read-only, and the cwd holds no repo, so both belt and braces.
       if [ -n "$pr_url" ]; then
-        /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
         diff=$(git -C "$wt" diff origin/HEAD...HEAD); diff=${diff:0:60000}
-        review=$( cd "$wt" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox" \
-          claude -p "Review this agent-drafted diff resolving issue #$num ($title) in $slug. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
+        review=$( cd "$LOGDIR" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=review,service=agentbox" \
+          timeout 600 opencode run --agent plan -m "$REVIEW_MODEL" \
+          "Review this agent-drafted diff resolving issue #$num ($title) in $slug. It was written by $drafted. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
 
 $diff" 2>/dev/null ) || review=""
         [ -n "$review" ] && gh pr comment "$pr_url" --repo "$slug" \
-          --body "Premium-lane review (Claude):
+          --body "Independent review ($REVIEW_MODEL):
 
 $review" >/dev/null 2>&1 || true
       fi
@@ -152,14 +202,14 @@ $review" >/dev/null 2>&1 || true
         gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
       fi
     else
-      # No usable diff on the free lane -> hand to the Claude Code premium lane.
+      # Every free lane on the ladder failed -> hand to the escalation tier.
       gh issue edit "$num" --repo "$slug" \
-        --remove-label "$LABEL_WORKING" --add-label "$LABEL_CLAUDE" >/dev/null
+        --remove-label "$LABEL_WORKING" --add-label "$LABEL_ESCALATE" >/dev/null
     fi
   done
 
   # Failure-driven escalation: any open agent PR whose CI has gone red is closed
-  # and its issue handed to the Claude Code premium lane. Close + delete branch
+  # and its issue handed to the escalation tier. Close + delete branch
   # so the escalate lane recreates agent/issue-N from a clean base.
   #
   # Author-filtered for the same reason the issue list above is. This loop reads
@@ -202,6 +252,6 @@ $review" >/dev/null 2>&1 || true
     gh pr close "$prnum" --repo "$slug" --delete-branch >/dev/null 2>&1 || true
     gh issue edit "$inum" --repo "$slug" \
       --remove-label "$LABEL_WORKING" --remove-label "$LABEL_REVIEW" \
-      --add-label "$LABEL_CLAUDE" >/dev/null 2>&1 || true
+      --add-label "$LABEL_ESCALATE" >/dev/null 2>&1 || true
   done <<<"$red"
 done
