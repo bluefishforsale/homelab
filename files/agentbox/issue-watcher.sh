@@ -169,12 +169,32 @@ $review" >/dev/null 2>&1 || true
   # issue N is queued for an agent no matter who wrote it. The lane's own author
   # check is the backstop; this keeps the label from being forged in the first
   # place. Agent PRs are opened with the owner's PAT, so they pass.
-  red=$(gh pr list --repo "$slug" --state open \
-    --json number,headRefName,statusCheckRollup,author \
+  # NOTE: asks GraphQL for the rollup's aggregate `state`, not gh's canned
+  # --json statusCheckRollup. They are not interchangeable: gh expands that field
+  # into the per-check `contexts` list, which a fine-grained PAT cannot read
+  # without the Checks permission — and that permission is not offered for
+  # user-owned tokens at all, so this drain silently returned nothing forever:
+  #   Resource not accessible by personal access token
+  #     (repository.pullRequests.nodes.0.statusCheckRollup...contexts.nodes.0)
+  # The aggregate state needs no extra permission, and red-or-not is all we want.
+  red=$(gh api graphql -f owner="$OWNER" -f name="$repo" -f query='
+      query($owner:String!, $name:String!) {
+        repository(owner:$owner, name:$name) {
+          pullRequests(first:50, states:OPEN) {
+            nodes {
+              number headRefName
+              author { login }
+              commits(last:1) { nodes { commit { statusCheckRollup { state } } } }
+            }
+          }
+        }
+      }' \
     | jq -r --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
-      .[] | select(.headRefName|startswith("agent/issue-"))
+      .data.repository.pullRequests.nodes[]
+          | select(.headRefName|startswith("agent/issue-"))
           | select(.author.login as $a | ($allow | split(" ")) | index($a))
-          | select(any(.statusCheckRollup[]?; .conclusion=="FAILURE" or .state=="FAILURE"))
+          | select((.commits.nodes[0].commit.statusCheckRollup // {state:"NONE"}).state
+                   | . == "FAILURE" or . == "ERROR")
           | "\(.number) \(.headRefName)"') || { echo "pr list failed for $slug" >&2; red=""; }
   while read -r prnum ref; do
     [ -z "${ref:-}" ] && continue

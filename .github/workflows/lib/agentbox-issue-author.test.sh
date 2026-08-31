@@ -63,18 +63,27 @@ if [[ "${#PROGS[@]}" -eq 2 ]]; then
 
   # Red agent PRs: the branch name decides WHICH issue gets escalated, so an
   # outsider who can open a PR named agent/issue-N must not reach this loop.
-  prs='[
+  #
+  # Shaped like the GraphQL response, not gh's --json output. The drain asks for
+  # the rollup's aggregate `state` because the per-check `contexts` need the
+  # Checks permission, which the Checks API restricts to GitHub Apps — no PAT
+  # can ever have it. A null rollup (no CI at all) must not read as red.
+  prs='{"data":{"repository":{"pullRequests":{"nodes":[
     {"number":10,"headRefName":"agent/issue-7","author":{"login":"bluefishforsale"},
-     "statusCheckRollup":[{"conclusion":"FAILURE"}]},
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
     {"number":11,"headRefName":"agent/issue-8","author":{"login":"mallory"},
-     "statusCheckRollup":[{"conclusion":"FAILURE"}]},
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
     {"number":12,"headRefName":"agent/issue-9","author":{"login":"bluefishforsale"},
-     "statusCheckRollup":[{"conclusion":"SUCCESS"}]},
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"SUCCESS"}}}]}},
     {"number":13,"headRefName":"feature/whatever","author":{"login":"bluefishforsale"},
-     "statusCheckRollup":[{"conclusion":"FAILURE"}]}
-  ]'
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
+    {"number":14,"headRefName":"agent/issue-5","author":{"login":"bluefishforsale"},
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}},
+    {"number":15,"headRefName":"agent/issue-6","author":{"login":"bluefishforsale"},
+     "commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"ERROR"}}}]}}
+  ]}}}}'
   check "escalation drain ignores an outsider's forged agent/issue-N branch" \
-    "10 agent/issue-7" "$(run_prog "${PROGS[1]}" "$prs")"
+    "10 agent/issue-7 15 agent/issue-6" "$(run_prog "${PROGS[1]}" "$prs")"
 fi
 
 # The premium lane is the backstop: it must not trust the needs-claude label
@@ -112,6 +121,18 @@ if grep -n -- '--jq[[:space:]]*--arg' "$WATCHER" "$ESCALATE"; then
   bad "gh --jq does not accept --arg; pipe to real jq instead"
 else
   ok "no gh invocation passes --arg to gh's own --jq"
+fi
+
+# gh's `--json statusCheckRollup` expands to the per-check contexts list, which
+# needs the Checks permission. GitHub restricts the Checks API to GitHub Apps,
+# so no PAT can ever hold it and that field is permanently a 403 here. Ask
+# GraphQL for the aggregate state instead.
+# Must not match the comment above the fix, which names the broken form on
+# purpose: require no `#` ahead of the flag on the line.
+if grep -nE '^[^#]*--json[^#]*statusCheckRollup' "$WATCHER"; then
+  bad "gh --json statusCheckRollup needs Checks, which is GitHub-App-only; query the rollup state via GraphQL"
+else
+  ok "CI state comes from the rollup aggregate, not the App-only Checks field"
 fi
 
 # The same silent-failure shape that hid it: a bare `|| continue` on the fetch
