@@ -42,6 +42,10 @@
       - my-ta-jose
       - photonic_inventory
       - terrac_com_2026
+    # Whose issues either lane will act on. An issue body is a prompt for an
+    # agent with write access, so this is the trust boundary, not a preference.
+    agentbox_issue_authors:
+      - bluefishforsale
     # Repos driven live via a per-repo Claude Code remote-control session
     # (systemd template agentbox-rc@<repo>.service, cwd repos/<repo>).
     agentbox_rc_repos:

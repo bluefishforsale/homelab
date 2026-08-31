@@ -16,6 +16,8 @@ WORKROOT="{{ home }}/work"
 LABEL_WORKING="agent-working"
 LABEL_CLAUDE="needs-claude"
 LABEL_REVIEW="needs-human-merge"
+# Fail closed if the env file predates this setting: the owner alone, never all.
+ISSUE_AUTHOR_ALLOWLIST="${ISSUE_AUTHOR_ALLOWLIST:-$OWNER}"
 
 # shellcheck disable=SC1091
 source "{{ home }}/.config/agentbox/agentbox.env"
@@ -47,6 +49,20 @@ resolve_issue() {  # $1 = repo (short name); $2 = issue number
   # Per-repo/per-lane telemetry labels for everything claude emits this pass.
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=claude,service=agentbox"
   ensure_labels "$slug"
+
+  # The label is not the authority; the issue's author is. Anything that can put
+  # needs-claude on an issue would otherwise be feeding a prompt straight to a
+  # premium-lane agent running --permission-mode acceptEdits, which commits and
+  # pushes. Both entry points (the periodic drain below and the alert receiver's
+  # triggered mode) funnel through here, so this one check covers both.
+  local author
+  author=$(gh issue view "$num" --repo "$slug" --json author --jq .author.login) || return 0
+  if ! printf ' %s ' "$ISSUE_AUTHOR_ALLOWLIST" | grep -qF " $author "; then
+    # Left labelled on purpose. Stripping it would quietly erase the evidence,
+    # and only a human with write access can label, so this line IS the alert.
+    echo "refusing $slug#$num: author '$author' is not on ISSUE_AUTHOR_ALLOWLIST" >&2
+    return 0
+  fi
 
   local title body
   title=$(gh issue view "$num" --repo "$slug" --json title --jq .title)

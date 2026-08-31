@@ -142,11 +142,21 @@ $review" >/dev/null 2>&1 || true
   # Failure-driven escalation: any open agent PR whose CI has gone red is closed
   # and its issue handed to the Claude Code premium lane. Close + delete branch
   # so the escalate lane recreates agent/issue-N from a clean base.
+  #
+  # Author-filtered for the same reason the issue list above is. This loop reads
+  # an issue NUMBER out of a branch name and hands that issue to the premium
+  # lane, so an unfiltered version lets anyone who can open a PR pick the issue
+  # that gets escalated: fork the repo, push agent/issue-<N>, let CI go red, and
+  # issue N is queued for an agent no matter who wrote it. The lane's own author
+  # check is the backstop; this keeps the label from being forged in the first
+  # place. Agent PRs are opened with the owner's PAT, so they pass.
   red=$(gh pr list --repo "$slug" --state open \
-    --json number,headRefName,statusCheckRollup \
-    --jq '.[] | select(.headRefName|startswith("agent/issue-"))
-            | select(any(.statusCheckRollup[]?; .conclusion=="FAILURE" or .state=="FAILURE"))
-            | "\(.number) \(.headRefName)"') || red=""
+    --json number,headRefName,statusCheckRollup,author \
+    --jq --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
+      .[] | select(.headRefName|startswith("agent/issue-"))
+          | select(.author.login as $a | ($allow | split(" ")) | index($a))
+          | select(any(.statusCheckRollup[]?; .conclusion=="FAILURE" or .state=="FAILURE"))
+          | "\(.number) \(.headRefName)"') || red=""
   while read -r prnum ref; do
     [ -z "${ref:-}" ] && continue
     inum=${ref#agent/issue-}

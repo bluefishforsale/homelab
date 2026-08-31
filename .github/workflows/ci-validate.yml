@@ -271,6 +271,11 @@ jobs:
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
 
+      # An issue body is a prompt for an agent that pushes code, so every point
+      # where the fleet picks work up has to check who wrote it.
+      - name: Agent issue-author trust boundary
+        run: bash .github/workflows/lib/agentbox-issue-author.test.sh
+
       # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
       # changes are coordinated, hand-run tasks — never a commit/CI side effect.
       - name: No ZFS mutations in playbooks
