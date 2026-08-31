@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish mem0 statistics to the node_exporter textfile collector
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=TEXTFILE_DIR=/data01/services/node-exporter/text_files
+ExecStart={{ home }}/mem0-metrics.sh
+# Runs as root: needs docker, and the audit trail is owned by a container UID.
+# Bounded well under the timer interval so a wedged collection cannot pile up.
+TimeoutStartSec=120
