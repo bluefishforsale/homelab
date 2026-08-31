@@ -37,7 +37,17 @@
     # Pinned like the fork above, now that the repo has a commit worth pinning:
     # this is the one that constrains mcp<2. On `main` the bridge crash-looped,
     # because mcp>=1.0 resolved to 2.x where FastMCP was renamed and moved.
-    mem0_bridge_version: c426082347501967ecd2a096901930a19f626120
+    mem0_bridge_version: 031680a22d216086c914646020b5275fbbbe963c
+    # The MCP SDK's DNS-rebinding protection trusts only localhost, so a bridge
+    # published on the LAN answered 421 "Invalid Host header" to every remote
+    # client: agentbox's config pointed at a working service that could not
+    # answer it. Naming the hosts opts into exactly these and no others.
+    # Setting this REPLACES the SDK defaults, hence localhost is listed too.
+    mem0_bridge_allowed_hosts:
+      - "ocean.home:{{ service_ports.mem0.mcp }}"
+      - "192.168.1.143:{{ service_ports.mem0.mcp }}"
+      - "localhost:{{ service_ports.mem0.mcp }}"
+      - "127.0.0.1:{{ service_ports.mem0.mcp }}"
     # terrac's key is what ocean already clones private repos with
     # (playbooks/individual/ocean/services/blog_terrac_com_static.yaml).
     git_ssh_key: /home/terrac/.ssh/id_ed25519

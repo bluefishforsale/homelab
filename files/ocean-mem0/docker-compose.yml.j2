@@ -163,6 +163,9 @@ services:
       # ADMIN_API_KEY before any per-user key lookup (server/auth.py).
       - MEM0_API_KEY={{ ai_services.mem0.admin_api_key }}
       - XDG_DATA_HOME=/data
+      # Without this the SDK accepts only Host: localhost and every request
+      # from agentbox gets 421. See mem0_bridge_allowed_hosts in the playbook.
+      - MEM0_MCP_ALLOWED_HOSTS={{ mem0_bridge_allowed_hosts | join(',') }}
 
     volumes:
       - {{ home }}/bridge-data:/data
