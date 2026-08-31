@@ -16,6 +16,12 @@ env:
   ANSIBLE_HOST_KEY_CHECKING: "false"
   PIP_BREAK_SYSTEM_PACKAGES: "1"
 
+# Least privilege: these workflows only ever check out the repository.
+# The repo default is read, and declaring it here keeps that true even if
+# the default is ever widened again.
+permissions:
+  contents: read
+
 jobs:
   detect-changes:
     name: Detect Changed Playbooks

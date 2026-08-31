@@ -17,6 +17,12 @@ env:
   ANSIBLE_FORCE_COLOR: "true"
   ANSIBLE_HOST_KEY_CHECKING: "false"
 
+# Least privilege: these workflows only ever check out the repository.
+# The repo default is read, and declaring it here keeps that true even if
+# the default is ever widened again.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy blog.terrac.com Hugo Blog
