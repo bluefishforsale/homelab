@@ -276,6 +276,11 @@ jobs:
       - name: Agent issue-author trust boundary
         run: bash .github/workflows/lib/agentbox-issue-author.test.sh
 
+      # A drafting agent may commit its own work. Deciding "did it produce
+      # anything?" from a dirty tree alone threw a correct fix away.
+      - name: Agent draft detection
+        run: bash .github/workflows/lib/agentbox-draft-detection.test.sh
+
       # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
       # changes are coordinated, hand-run tasks — never a commit/CI side effect.
       - name: No ZFS mutations in playbooks

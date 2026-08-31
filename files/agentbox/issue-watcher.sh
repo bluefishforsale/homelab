@@ -43,6 +43,16 @@ ensure_labels() {
 # file is inside this set is a change "no-prod-effect" and eligible for auto-merge.
 NOPROD_RE='^(docs/|README|CONTEXT|.*\.md$|.*_test\.|test/|tests/|spec/)'
 
+# Did the drafter produce anything? The agent may or may not commit its own
+# work — opencode's build agent usually does — so a clean tree does NOT mean it
+# failed. Testing only `status --porcelain` discarded a correct, already
+# committed fix and escalated it to the premium lane, which is why the free lane
+# looked like it never succeeded.
+has_draft() {  # $1 = worktree
+  [ -n "$(git -C "$1" status --porcelain)" ] && return 0
+  [ -n "$(git -C "$1" log --oneline origin/HEAD..HEAD)" ]
+}
+
 no_prod_effect() {  # $1 = newline-separated changed files
   [ -n "$1" ] || return 1
   while IFS= read -r f; do
@@ -102,9 +112,13 @@ $body
 Make the minimal, correct change. Do not touch unrelated code. Keep the build and tests green."
 
     if (cd "$wt" && opencode run "$prompt") >"$LOGDIR/$repo-issue-$num.log" 2>&1 \
-       && [ -n "$(git -C "$wt" status --porcelain)" ]; then
-      git -C "$wt" add -A
-      git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+       && has_draft "$wt"; then
+      # Only commit what the drafter left loose; committing nothing exits 1 and
+      # would abort the run under set -e.
+      if [ -n "$(git -C "$wt" status --porcelain)" ]; then
+        git -C "$wt" add -A
+        git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+      fi
       git -C "$wt" push -q -u origin "agent/issue-$num"
       pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
         --title "fix: $title (#$num)" \

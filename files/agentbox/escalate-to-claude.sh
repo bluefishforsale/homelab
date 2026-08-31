@@ -84,11 +84,32 @@ Make the minimal, correct change; keep the build and tests green."
   # Worktrees are cloned on the fly; trust each before claude reads it
   # (no flag for the workspace-trust gate).
   /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
-  (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) || true
+  # Log rather than swallow. This is where an expired OAuth session shows up,
+  # and a silent `|| true` made a dead premium lane look like a lane that simply
+  # had nothing to say.
+  (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) \
+    || echo "premium lane failed for $slug#$num" >&2
 
-  [ -n "$(git -C "$wt" status --porcelain)" ] || return 0
-  git -C "$wt" add -A
-  git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+  # Claude may commit its own work rather than leaving the tree dirty, so a
+  # clean tree is not the same as "produced nothing". Ask whether the branch
+  # moved off origin/HEAD at all; the watcher had this wrong and threw away a
+  # correct fix because of it.
+  if [ -z "$(git -C "$wt" status --porcelain)" ] \
+     && [ -z "$(git -C "$wt" log --oneline origin/HEAD..HEAD)" ]; then
+    # Put it back in the queue instead of stranding it. This function claims the
+    # issue as agent-working up front, and the watcher skips that label while
+    # this drain only selects needs-claude — so returning here without handing
+    # the label back orphans the issue permanently. That is exactly what an
+    # expired OAuth session did to photonic_inventory#17.
+    echo "no diff for $slug#$num, returning it to the queue" >&2
+    gh issue edit "$num" --repo "$slug" \
+      --remove-label "$LABEL_WORKING" --add-label "$LABEL_CLAUDE" >/dev/null 2>&1 || true
+    return 0
+  fi
+  if [ -n "$(git -C "$wt" status --porcelain)" ]; then
+    git -C "$wt" add -A
+    git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+  fi
   git -C "$wt" push -q -u origin "agent/issue-$num"
   gh pr create --repo "$slug" --head "agent/issue-$num" \
     --title "fix: $title (#$num)" \
