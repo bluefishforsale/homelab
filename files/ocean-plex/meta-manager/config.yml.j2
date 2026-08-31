@@ -86,7 +86,16 @@ webhooks:                                       # Can be individually specified 
   delete:
 plex:                                           # Can be individually specified per library as well; REQUIRED for the script to run
   url: http://192.168.1.143:{{ service_ports.plex.port }}
-  token: {{ media_services.plex.plex_token }}
+  # api_key, not plex_token. media_services.plex.plex_token is 19 chars and
+  # plex.tv rejects it with a 401; api_key is 20 and authenticates as
+  # terracnosaur. Every other consumer (plex-exporter, tautulli, gethomepage)
+  # already uses api_key, so Kometa was the only thing holding the dead one.
+  #
+  # This hid for months because Plex allows LAN clients with NO token at all
+  # (verified: a deliberately bogus token still gets 200 from the LAN), so the
+  # credential only gets tested from a container, and the only thing calling
+  # from a container was the job nobody was watching.
+  token: {{ media_services.plex.api_key }}
   timeout: 60
   clean_bundles: true
   empty_trash: true
