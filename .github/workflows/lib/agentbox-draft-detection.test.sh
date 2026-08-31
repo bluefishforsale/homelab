@@ -72,6 +72,17 @@ if declare -F has_draft >/dev/null; then
   fi
 fi
 
+# A premium-lane run that produces nothing must hand the label back. It claims
+# the issue as agent-working before invoking claude; the watcher skips that
+# label and the drain only selects needs-claude, so a quiet return orphans the
+# issue forever. An expired OAuth session did exactly that to
+# photonic_inventory#17.
+if sed -n '/no diff for/,/return 0/p' "$ESCALATE" | grep -q 'add-label "$LABEL_CLAUDE"'; then
+  ok "a fruitless premium-lane run returns the issue to the queue"
+else
+  bad "escalate-to-claude.sh strands the issue in agent-working when it produces nothing"
+fi
+
 # Neither lane may gate solely on a dirty tree before pushing.
 for f in "$WATCHER" "$ESCALATE"; do
   n=$(basename "$f")
