@@ -49,7 +49,15 @@
     exporter_port: "{{ service_ports.plex_exporter.port }}"
     meta_manager_service: plex-meta-manager
     meta_manager_image: kometateam/kometa
-    meta_manager_version: latest
+    # Pinned, not latest. A floating tag is how this service froze at PMM
+    # v1.21.0 while the project renamed itself to Kometa and its defaults repo
+    # started 404ing: nothing changed here, the world moved, and the nightly
+    # run failed for eight months without a single alert.
+    # NOTE: the tag is v-prefixed. Kometa reports "Version: 2.4.8" in its own
+    # logs and on Docker Hub that tag does not exist, so pinning to what the
+    # log says gets you an image pull failure on the next recreate.
+    # Bump deliberately; KometaNotRunning covers a bad upgrade.
+    meta_manager_version: v2.4.8
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-plex"
     complete: "{{ data }}/complete"
