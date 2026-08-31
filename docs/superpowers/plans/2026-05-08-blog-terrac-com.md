@@ -1,10 +1,10 @@
-# blog.terrac.com Implementation Plan
+# blog.example.com Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up a Hugo + PaperMod static blog at blog.terrac.com, served as static files via nginx, deployed via GitHub Actions → Ansible, using the same pattern as terrac.com.
+**Goal:** Stand up a Hugo + PaperMod static blog at blog.example.com, served as static files via nginx, deployed via GitHub Actions → Ansible, using the same pattern as example.com.
 
-**Architecture:** A new GitHub repo `blog_terrac_com` holds markdown posts and a Hugo config with PaperMod. GitHub Actions builds `public/` on push and dispatches to homelab, which Ansible-rsyncs to `/data01/services/blog_terrac_com` on ocean. Nginx serves that directory as static files; cloudflared tunnels `blog.terrac.com` to nginx (tunnel entry already added).
+**Architecture:** A new GitHub repo `blog_terrac_com` holds markdown posts and a Hugo config with PaperMod. GitHub Actions builds `public/` on push and dispatches to homelab, which Ansible-rsyncs to `/data01/services/blog_terrac_com` on ocean. Nginx serves that directory as static files; cloudflared tunnels `blog.example.com` to nginx (tunnel entry already added).
 
 **Tech Stack:** Hugo, PaperMod theme (git submodule), GitHub Actions, Ansible, nginx static file serving, cloudflared tunnel.
 
@@ -14,7 +14,7 @@
 
 | File | Action |
 |------|--------|
-| `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf` | Replace WordPress proxy block for `blog.terrac.com` with static file server |
+| `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf` | Replace WordPress proxy block for `blog.example.com` with static file server |
 | `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml` | Create — Ansible deploy playbook (mirrors `terrac_com_static.yaml`) |
 | `homelab/.github/workflows/deploy-blog-terrac-com.yml` | Create — homelab workflow to run Ansible on dispatch |
 | `homelab/.github/workflows/deploy-ocean-service.yml` | Modify — add `blog_terrac_com_static` to service list |
@@ -25,23 +25,23 @@
 
 ---
 
-### Task 1: Fix nginx blog.terrac.com block
+### Task 1: Fix nginx blog.example.com block
 
 **Files:**
 - Modify: `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf` (lines 652–691)
 
-The current block is an incorrect WordPress proxy. Replace it with a static file server matching the `terrac.com` pattern.
+The current block is an incorrect WordPress proxy. Replace it with a static file server matching the `example.com` pattern.
 
 - [ ] **Step 1: Replace the WordPress proxy block**
 
-In `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf`, replace the entire `blog.terrac.com` server block (lines 652–691):
+In `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf`, replace the entire `blog.example.com` server block (lines 652–691):
 
 ```nginx
-# WordPress Blog (terrac.com)
+# WordPress Blog (example.com)
 # External access via Cloudflare - ensures HTTPS detection
 server {
     listen 80;
-    server_name blog.terrac.com;
+    server_name blog.example.com;
 
     # Increase client max body size for WordPress uploads (large videos)
     client_max_body_size 2G;
@@ -58,10 +58,10 @@ server {
 With this static file server block:
 
 ```nginx
-# blog.terrac.com - Hugo static blog
+# blog.example.com - Hugo static blog
 server {
     listen 80;
-    server_name blog.terrac.com;
+    server_name blog.example.com;
 
     root /data01/services/blog_terrac_com;
     index index.html index.htm;
@@ -97,7 +97,7 @@ server {
 ```bash
 cd /Users/terrac/Projects/bluefishorsale/homelab
 git add files/nginx-compose/proxy_hostname_web_proxy.conf
-git commit -m "fix: replace blog.terrac.com nginx block with Hugo static file server"
+git commit -m "fix: replace blog.example.com nginx block with Hugo static file server"
 ```
 
 ---
@@ -113,7 +113,7 @@ Create `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml`
 
 ```yaml
 ---
-# Deploy blog.terrac.com Hugo static blog from GitHub
+# Deploy blog.example.com Hugo static blog from GitHub
 #
 # Deploys pre-built static files (public/) committed by GitHub Actions CI.
 # Always does a clean deployment to avoid git ownership/permissions issues.
@@ -121,7 +121,7 @@ Create `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml`
 # Usage:
 #   ansible-playbook playbooks/individual/ocean/services/blog_terrac_com_static.yaml
 #
-- name: Deploy blog.terrac.com Hugo Static Blog from GitHub
+- name: Deploy blog.example.com Hugo Static Blog from GitHub
   hosts: ocean
   become: true
   gather_facts: true
@@ -147,7 +147,7 @@ Create `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml`
   - name: Display deployment information
     ansible.builtin.debug:
       msg:
-        - "Deploying blog.terrac.com Hugo static blog (clean deployment)"
+        - "Deploying blog.example.com Hugo static blog (clean deployment)"
         - "Repository: {{ git_repo }}"
         - "Branch: {{ git_branch }}"
         - "Destination: {{ web_root }}"
@@ -308,7 +308,7 @@ Create `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml`
         - "Files deployed from branch: {{ git_branch }}"
         - "Git commit: {{ git_clone.after | default('N/A') }}"
         - ""
-        - "Access URL: https://blog.terrac.com"
+        - "Access URL: https://blog.example.com"
     when: git_clone is defined
     tags: [always]
 ```
@@ -318,7 +318,7 @@ Create `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml`
 ```bash
 cd /Users/terrac/Projects/bluefishorsale/homelab
 git add playbooks/individual/ocean/services/blog_terrac_com_static.yaml
-git commit -m "feat: add Ansible deploy playbook for blog.terrac.com Hugo static blog"
+git commit -m "feat: add Ansible deploy playbook for blog.example.com Hugo static blog"
 ```
 
 ---
@@ -334,7 +334,7 @@ Create `homelab/.github/workflows/deploy-blog-terrac-com.yml`:
 
 ```yaml
 ---
-name: Deploy blog.terrac.com
+name: Deploy blog.example.com
 
 on:
   workflow_dispatch:
@@ -354,7 +354,7 @@ env:
 
 jobs:
   deploy:
-    name: Deploy blog.terrac.com Hugo Blog
+    name: Deploy blog.example.com Hugo Blog
     runs-on: [self-hosted, homelab, ansible]
     environment: Github Actions CI
     steps:
@@ -408,7 +408,7 @@ jobs:
         if: success()
         run: |
           sleep 3
-          if ssh terrac@192.168.1.143 "test -f /data01/services/blog_terrac_com/index.html"; then
+          if ssh terrac@192.0.2.143 "test -f /data01/services/blog_terrac_com/index.html"; then
             echo "✅ index.html exists on server"
           else
             echo "❌ index.html NOT FOUND"
@@ -421,7 +421,7 @@ jobs:
 ```bash
 cd /Users/terrac/Projects/bluefishorsale/homelab
 git add .github/workflows/deploy-blog-terrac-com.yml
-git commit -m "feat: add GitHub Actions workflow to deploy blog.terrac.com"
+git commit -m "feat: add GitHub Actions workflow to deploy blog.example.com"
 ```
 
 ---
@@ -474,7 +474,7 @@ Go to: `https://github.com/bluefishforsale/homelab/actions/workflows/deploy-ocea
 
 Click "Run workflow", select service: `nginx`, click Run.
 
-Expected: workflow completes successfully, nginx reloaded on ocean with new `blog.terrac.com` static file server block.
+Expected: workflow completes successfully, nginx reloaded on ocean with new `blog.example.com` static file server block.
 
 - [ ] **Step 3: Deploy cloudflared via GitHub Actions**
 
@@ -482,7 +482,7 @@ Go to: `https://github.com/bluefishforsale/homelab/actions/workflows/deploy-ocea
 
 Click "Run workflow", select service: `cloudflared`, click Run.
 
-Expected: cloudflared restarted with new `blog.terrac.com` tunnel ingress entry.
+Expected: cloudflared restarted with new `blog.example.com` tunnel ingress entry.
 
 ---
 
@@ -520,7 +520,7 @@ Expected: `themes/PaperMod/` populated, `.gitmodules` created.
 Create `/Users/terrac/Projects/bluefishorsale/blog_terrac_com/hugo.toml`:
 
 ```toml
-baseURL = "https://blog.terrac.com"
+baseURL = "https://blog.example.com"
 languageCode = "en-us"
 title = "terrac"
 theme = "PaperMod"
@@ -729,13 +729,13 @@ Expected: build completes, `public/` committed back, homelab `deploy-blog-terrac
 - [ ] **Step 4: Verify the site**
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" https://blog.terrac.com
+curl -s -o /dev/null -w "%{http_code}" https://blog.example.com
 ```
 
 Expected: `200`
 
 ```bash
-curl -s https://blog.terrac.com | grep -i "terrac\|papermod\|hello"
+curl -s https://blog.example.com | grep -i "terrac\|papermod\|hello"
 ```
 
 Expected: HTML containing "terrac" in the title and "Hello World" post.

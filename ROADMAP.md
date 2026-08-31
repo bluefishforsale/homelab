@@ -93,8 +93,8 @@ Status and future plans for the homelab infrastructure.
 
 - **NextCloud**: File sharing with MariaDB + Redis backend
 - **TinaCMS**: Git-backed CMS (Docker Hub private image)
-- **WordPress**: Blog platform (saetnere.com) with dedicated database
-- **terrac.com**: Static blog site
+- **WordPress**: Blog platform (example.com) with dedicated database
+- **example.com**: Static blog site
 - **Frigate**: NVR with object detection
 - **Home Assistant**: Smart home automation
 - **Homepage**: Service status dashboard
@@ -164,21 +164,21 @@ Status and future plans for the homelab infrastructure.
 
 | Service | Internal URL | External URL |
 |---------|--------------|--------------|
-| Plex | http://192.168.1.143:32400 | https://plex.terrac.com |
-| Grafana | http://grafana.home | https://grafana.terrac.com |
-| Prometheus | http://192.168.1.143:9090 | - |
-| AlertManager | http://192.168.1.143:9093 | - |
-| Karma | http://192.168.1.143:8080 | - |
-| Homepage | http://192.168.1.143:3001 | - |
-| llama.cpp API | http://192.168.1.143:8080 | - |
-| Open WebUI | http://192.168.1.143:3000 | https://chat.terrac.com |
-| ComfyUI | http://comfyui.home | https://comfyui.terrac.com |
-| NextCloud | http://192.168.1.143:8081 | https://nextcloud.terrac.com |
-| TinaCMS | http://tina.home | https://tina.terrac.com |
-| Overseerr | http://192.168.1.143:5055 | https://requests.terrac.com |
-| Tautulli | http://192.168.1.143:8181 | - |
-| Home Assistant | http://192.168.1.143:8123 | https://ha.terrac.com |
-| Frigate | http://192.168.1.143:5000 | - |
+| Plex | http://192.0.2.143:32400 | https://plex.example.com |
+| Grafana | http://grafana.home | https://grafana.example.com |
+| Prometheus | http://192.0.2.143:9090 | - |
+| AlertManager | http://192.0.2.143:9093 | - |
+| Karma | http://192.0.2.143:8080 | - |
+| Homepage | http://192.0.2.143:3001 | - |
+| llama.cpp API | http://192.0.2.143:8080 | - |
+| Open WebUI | http://192.0.2.143:3000 | https://chat.example.com |
+| ComfyUI | http://comfyui.home | https://comfyui.example.com |
+| NextCloud | http://192.0.2.143:8081 | https://nextcloud.example.com |
+| TinaCMS | http://tina.home | https://tina.example.com |
+| Overseerr | http://192.0.2.143:5055 | https://requests.example.com |
+| Tautulli | http://192.0.2.143:8181 | - |
+| Home Assistant | http://192.0.2.143:8123 | https://ha.example.com |
+| Frigate | http://192.0.2.143:5000 | - |
 
 ---
 
@@ -186,7 +186,7 @@ Status and future plans for the homelab infrastructure.
 
 ### Runners (gh-runner-01)
 
-- 4 ephemeral Docker runners at 192.168.1.250
+- 4 ephemeral Docker runners at 192.0.2.250
 - Labels: `self-hosted`, `homelab`, `ansible`
 - Auto-registers with GitHub on container start
 

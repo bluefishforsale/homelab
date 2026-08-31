@@ -1,6 +1,6 @@
 # Ocean Services Architecture
 
-Services running on ocean VM (192.168.1.143).
+Services running on ocean VM (192.0.2.143).
 
 ---
 
@@ -8,7 +8,7 @@ Services running on ocean VM (192.168.1.143).
 
 ```mermaid
 graph TB
-    subgraph ocean["Ocean VM (192.168.1.143)"]
+    subgraph ocean["Ocean VM (192.0.2.143)"]
         subgraph network["Network"]
             Nginx[nginx<br/>:80, :443]
             DDNS[cloudflare_ddns]

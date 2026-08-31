@@ -58,7 +58,7 @@ Three legs:
 
 | Target | Diagnostic role |
 |---|---|
-| `192.168.1.1` | Unifi gateway. LAN-side baseline. Loss here = local issue (NIC, cable, switch). |
+| `192.0.2.1` | Unifi gateway. LAN-side baseline. Loss here = local issue (NIC, cable, switch). |
 | `1.1.1.1` | Cloudflare anchor — primary "is the internet OK" baseline. |
 | `8.8.8.8` | Google anchor — alternate path; lets us tell ISP route-flap from total internet outage. |
 | `plex.tv` | Plex API/control plane. Bad here + good 1.1.1.1 = path-to-Plex problem. |
@@ -78,7 +78,7 @@ Three legs:
 | Target | Diagnostic role |
 |---|---|
 | `https://plex.tv/` | Full TLS handshake + cert validity. |
-| `https://home.terrac.com/` | Own public endpoint via Cloudflare tunnel — sanity check. |
+| `https://home.example.com/` | Own public endpoint via Cloudflare tunnel — sanity check. |
 
 ### Per-hop MTR — `mtr-exporter`, 60s per target
 

@@ -97,19 +97,19 @@ git push origin feature/service-name-update
 
 These services require **extra caution**:
 
-🔴 **DNS** (192.168.1.2)
+🔴 **DNS** (192.0.2.2)
 - Network foundation
 - Use `deploy-critical-service.yml` workflow
 - Requires manual approval
 - Automatic health checks
 
-🔴 **DHCP** (192.168.1.2)
+🔴 **DHCP** (192.0.2.2)
 - Address management
 - Use `deploy-critical-service.yml` workflow
 - Requires manual approval
 - Automatic health checks
 
-🔴 **Plex** (192.168.1.143:32400)
+🔴 **Plex** (192.0.2.143:32400)
 - Primary media service
 - Use `deploy-critical-service.yml` workflow
 - Requires manual approval
@@ -118,9 +118,9 @@ These services require **extra caution**:
 ### Protected Hosts
 
 Never bypass safety gates for these hosts:
-- **ocean** (192.168.1.143) - Primary Docker host
+- **ocean** (192.0.2.143) - Primary Docker host
 - **node005** - Secondary infrastructure
-- **dns01** (192.168.1.2) - DNS/DHCP server
+- **dns01** (192.0.2.2) - DNS/DHCP server
 
 ## ✅ Code Quality Standards
 

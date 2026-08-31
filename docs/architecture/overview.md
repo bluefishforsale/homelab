@@ -8,13 +8,13 @@ Homelab infrastructure architecture and design.
 
 | Host | IP | Hardware | Purpose |
 |------|----|----------|---------|
-| node005 | 192.168.1.105 | Dell R620 (56 cores, 128GB) | Proxmox - Control VMs |
-| node006 | 192.168.1.106 | Dell R720 (40 cores, 680GB, RTX 3090) | Proxmox - Ocean VM |
-| ocean | 192.168.1.143 | VM on node006 (30 cores, 256GB) | Docker services |
-| dns01 | 192.168.1.2 | VM on node005 | BIND DNS |
-| pihole | 192.168.1.9 | VM on node005 | DNS filtering |
-| gitlab | 192.168.1.5 | VM on node005 | CI/CD |
-| gh-runner-01 | 192.168.1.250 | VM on node005 | GitHub Actions runners |
+| node005 | 192.0.2.105 | Dell R620 (56 cores, 128GB) | Proxmox - Control VMs |
+| node006 | 192.0.2.106 | Dell R720 (40 cores, 680GB, RTX 3090) | Proxmox - Ocean VM |
+| ocean | 192.0.2.143 | VM on node006 (30 cores, 256GB) | Docker services |
+| dns01 | 192.0.2.2 | VM on node005 | BIND DNS |
+| pihole | 192.0.2.9 | VM on node005 | DNS filtering |
+| gitlab | 192.0.2.5 | VM on node005 | CI/CD |
+| gh-runner-01 | 192.0.2.250 | VM on node005 | GitHub Actions runners |
 
 ---
 
@@ -23,20 +23,20 @@ Homelab infrastructure architecture and design.
 ```mermaid
 graph TB
     subgraph "Physical Layer"
-        PM1[node005<br/>192.168.1.105]
-        PM2[node006<br/>192.168.1.106]
+        PM1[node005<br/>192.0.2.105]
+        PM2[node006<br/>192.0.2.106]
         NW[UniFi 10GbE Switch]
     end
     
     subgraph "node005 VMs"
-        PM1 --> DNS[dns01<br/>192.168.1.2]
-        PM1 --> PH[pihole<br/>192.168.1.9]
-        PM1 --> GL[gitlab<br/>192.168.1.5]
-        PM1 --> GH[gh-runner-01<br/>192.168.1.250]
+        PM1 --> DNS[dns01<br/>192.0.2.2]
+        PM1 --> PH[pihole<br/>192.0.2.9]
+        PM1 --> GL[gitlab<br/>192.0.2.5]
+        PM1 --> GH[gh-runner-01<br/>192.0.2.250]
     end
     
     subgraph "node006 VMs"
-        PM2 --> OCEAN[ocean<br/>192.168.1.143]
+        PM2 --> OCEAN[ocean<br/>192.0.2.143]
     end
     
     subgraph "Ocean Services"
@@ -64,12 +64,12 @@ Ocean services mount `/data01/services/` for persistent storage.
 
 | Component | IP | Purpose |
 |-----------|-----|---------|
-| Gateway | 192.168.1.1 | Router |
-| dns01 | 192.168.1.2 | BIND DNS |
-| pihole | 192.168.1.9 | DNS filtering |
-| node005 | 192.168.1.105 | Proxmox |
-| node006 | 192.168.1.106 | Proxmox |
-| ocean | 192.168.1.143 | Docker services |
+| Gateway | 192.0.2.1 | Router |
+| dns01 | 192.0.2.2 | BIND DNS |
+| pihole | 192.0.2.9 | DNS filtering |
+| node005 | 192.0.2.105 | Proxmox |
+| node006 | 192.0.2.106 | Proxmox |
+| ocean | 192.0.2.143 | Docker services |
 
 ### Traffic Flow
 

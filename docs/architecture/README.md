@@ -8,9 +8,9 @@ Architecture diagrams and documentation for the homelab infrastructure.
 
 | Host | IP | Purpose |
 |------|----|---------|
-| node005 | 192.168.1.105 | Proxmox - Control VMs |
-| node006 | 192.168.1.106 | Proxmox - Ocean VM |
-| ocean | 192.168.1.143 | Docker services (VM on node006) |
+| node005 | 192.0.2.105 | Proxmox - Control VMs |
+| node006 | 192.0.2.106 | Proxmox - Ocean VM |
+| ocean | 192.0.2.143 | Docker services (VM on node006) |
 
 ---
 
@@ -35,15 +35,19 @@ Architecture diagrams and documentation for the homelab infrastructure.
 
 ### Network Topology
 
-![Network Topology](./network-topology.png)
+See [`network-topology.md`](./network-topology.md). The diagrams live as mermaid
+in those documents rather than as exported images, because GitHub renders
+mermaid natively and an exported PNG silently keeps whatever was true the day it
+was rendered. The previous exports still showed real addresses long after the
+source had been genericised, which is exactly the failure mode.
 
 ### Ocean Services
 
-![Ocean Services](./ocean-services.png)
+See [`ocean-services.md`](./ocean-services.md).
 
 ### Deployment Flow
 
-![Deployment Flow](./deployment-flow.png)
+See [`deployment-flow.md`](./deployment-flow.md).
 
 ---
 

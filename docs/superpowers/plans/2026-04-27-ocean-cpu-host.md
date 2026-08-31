@@ -10,8 +10,8 @@
 
 **Context:**
 - `kvm64` CPU type omits x86-v2 features (SSE4.2, POPCNT). NumPy 2.x (shipped in the April 24 2026 `open-webui:main` pull) requires them. `--cpu host` passes through the real Xeon flags.
-- node006 SSH: `root@192.168.1.106` ✓ (key auth works)
-- ocean SSH: `terrac@192.168.1.143` ✓
+- node006 SSH: `root@192.0.2.106` ✓ (key auth works)
+- ocean SSH: `terrac@192.0.2.143` ✓
 - All other 37 containers are healthy; only `open-webui` is crash-looping.
 - `homepage` shows `(unhealthy)` — pre-existing, not our problem.
 
@@ -40,7 +40,7 @@
 
   vars:
     vmid: 5000
-    ocean_ip: "192.168.1.143"
+    ocean_ip: "192.0.2.143"
 
   tasks:
     - name: Show current CPU type

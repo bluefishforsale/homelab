@@ -9,7 +9,7 @@ NVIDIA GPU management, monitoring, and optimization for AI/ML workloads.
 | Component | Value |
 |-----------|-------|
 | GPU | NVIDIA RTX 3090 (24GB VRAM) |
-| Host | ocean (192.168.1.143) on node006 |
+| Host | ocean (192.0.2.143) on node006 |
 | Passthrough | PCI 42:00.0 via VFIO |
 | Exporter Port | 9835 |
 | CUDA Version | 12.x |
@@ -20,7 +20,7 @@ NVIDIA GPU management, monitoring, and optimization for AI/ML workloads.
 
 ```bash
 # SSH to ocean and check GPU
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 
 # Basic status
 nvidia-smi
@@ -77,7 +77,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi
 
 # Test with gpu-test container
-ssh terrac@192.168.1.143 "docker exec gpu-test nvidia-smi"
+ssh terrac@192.0.2.143 "docker exec gpu-test nvidia-smi"
 ```
 
 ### Docker Compose GPU Configuration
@@ -144,9 +144,9 @@ ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/ai/llamacpp.yaml --ask-vault-pass
 
 # Check GPU layers
-ssh terrac@192.168.1.143 "docker logs llamacpp 2>&1 | grep -i 'offload\|layer'"
+ssh terrac@192.0.2.143 "docker logs llamacpp 2>&1 | grep -i 'offload\|layer'"
 
-# Access: http://192.168.1.143:8080
+# Access: http://192.0.2.143:8080
 ```
 
 ### ComfyUI (Image Generation)
@@ -156,7 +156,7 @@ ssh terrac@192.168.1.143 "docker logs llamacpp 2>&1 | grep -i 'offload\|layer'"
 ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/ai/comfyui.yaml --ask-vault-pass
 
-# Access: http://192.168.1.143:8188
+# Access: http://192.0.2.143:8188
 ```
 
 ### Plex (Hardware Transcoding)
@@ -167,7 +167,7 @@ ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
 
 # Check NVENC usage during transcoding
-ssh terrac@192.168.1.143 "nvidia-smi pmon -s u -d 1"
+ssh terrac@192.0.2.143 "nvidia-smi pmon -s u -d 1"
 ```
 
 ---
@@ -231,10 +231,10 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check service
-ssh terrac@192.168.1.143 "systemctl status nvidia-gpu-exporter"
+ssh terrac@192.0.2.143 "systemctl status nvidia-gpu-exporter"
 
 # Check metrics
-curl -s http://192.168.1.143:9835/metrics | grep nvidia_gpu | head -10
+curl -s http://192.0.2.143:9835/metrics | grep nvidia_gpu | head -10
 ```
 
 ### Key Metrics
@@ -257,7 +257,7 @@ The RTX 3090 is passed through to ocean VM on node006.
 
 ```bash
 # SSH to node006
-ssh root@192.168.1.106
+ssh root@192.0.2.106
 
 # Check VFIO binding
 lspci -nnk -s 42:00 | grep -A 2 "Kernel driver"
@@ -268,7 +268,7 @@ lspci -nnk -s 42:00 | grep -A 2 "Kernel driver"
 
 ```bash
 # SSH to ocean
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 
 # Check GPU is visible
 lspci | grep -i nvidia
@@ -285,26 +285,26 @@ See [ocean-migration-plan.md](ocean-migration-plan.md) for full passthrough setu
 
 ```bash
 # Stop GPU containers
-ssh terrac@192.168.1.143 "sudo systemctl stop llamacpp comfyui plex"
+ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp comfyui plex"
 
 # Reset GPU
-ssh terrac@192.168.1.143 "sudo nvidia-smi --gpu-reset"
+ssh terrac@192.0.2.143 "sudo nvidia-smi --gpu-reset"
 
 # Restart services
-ssh terrac@192.168.1.143 "sudo systemctl start llamacpp comfyui plex"
+ssh terrac@192.0.2.143 "sudo systemctl start llamacpp comfyui plex"
 ```
 
 ### Thermal Emergency (>85°C)
 
 ```bash
 # Check temperature
-ssh terrac@192.168.1.143 "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
+ssh terrac@192.0.2.143 "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
 
 # Stop high-load services
-ssh terrac@192.168.1.143 "sudo systemctl stop llamacpp comfyui"
+ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp comfyui"
 
 # Monitor until temperature drops
-ssh terrac@192.168.1.143 "watch -n 1 nvidia-smi --query-gpu=temperature.gpu --format=csv"
+ssh terrac@192.0.2.143 "watch -n 1 nvidia-smi --query-gpu=temperature.gpu --format=csv"
 ```
 
 ---

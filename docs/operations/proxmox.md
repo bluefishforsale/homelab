@@ -4,16 +4,16 @@ Comprehensive guide for Proxmox VE operations, maintenance, and homelab-specific
 
 **Hardware Reference:**
 
-- **node006** (192.168.1.106): 40 cores, 680GB RAM, 64TB ZFS (8x 12TB HDD), RTX 3090 24GB, bonded 10G
-- **node005** (192.168.1.105): 56 cores, 128GB RAM, 1TB SSD
+- **node006** (192.0.2.106): 40 cores, 680GB RAM, 64TB ZFS (8x 12TB HDD), RTX 3090 24GB, bonded 10G
+- **node005** (192.0.2.105): 56 cores, 128GB RAM, 1TB SSD
 
 **VMs from inventory:**
 
-- ocean (192.168.1.143) - Media/AI server on node006
-- dns01 (192.168.1.2) - BIND9 DNS on node005
-- pihole (192.168.1.9) - DNS filtering on node005
-- gitlab (192.168.1.5) - GitLab on node005
-- gh-runner-01 (192.168.1.250) - GitHub runner on node005
+- ocean (192.0.2.143) - Media/AI server on node006
+- dns01 (192.0.2.2) - BIND9 DNS on node005
+- pihole (192.0.2.9) - DNS filtering on node005
+- gitlab (192.0.2.5) - GitLab on node005
+- gh-runner-01 (192.0.2.250) - GitHub runner on node005
 
 ---
 
@@ -125,15 +125,15 @@ iface bond0 inet manual
 
 auto vmbr0
 iface vmbr0 inet static
-        address  192.168.1.106/24
-        gateway  192.168.1.1
+        address  192.0.2.106/24
+        gateway  192.0.2.1
         bridge-ports bond0
         bridge-stp off
         bridge-fd 0
 EOF
 
 ifreload -a
-ping -c 2 192.168.1.1 && ping -c 2 1.1.1.1
+ping -c 2 192.0.2.1 && ping -c 2 1.1.1.1
 ```
 
 ---
@@ -213,7 +213,7 @@ EOF
 
 # Install and initialize
 pveceph install --version reef --repository no-subscription
-pveceph init --network 192.168.1.0/24
+pveceph init --network 192.0.2.0/24
 pveceph mon create
 pveceph mgr create
 ceph -s
@@ -337,7 +337,7 @@ qm template 9999
 
 ```bash
 qm clone 9999 2000
-qm set 2000 --name dns01 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1 --nameserver=1.1.1.1 --onboot 1
+qm set 2000 --name dns01 --ipconfig0 ip=192.0.2.2/24,gw=192.0.2.1 --nameserver=1.1.1.1 --onboot 1
 qm set 2000 --cores 1 --memory 1024
 qm resize 2000 scsi0 +8G
 qm start 2000
@@ -347,7 +347,7 @@ qm start 2000
 
 ```bash
 qm clone 9999 2001
-qm set 2001 --name dns02 --ipconfig0 ip=192.168.1.3/24,gw=192.168.1.1 --nameserver=1.1.1.1 --onboot 1
+qm set 2001 --name dns02 --ipconfig0 ip=192.0.2.3/24,gw=192.0.2.1 --nameserver=1.1.1.1 --onboot 1
 qm set 2001 --cores 2 --memory 2048
 qm resize 2001 scsi0 +8G
 qm start 2001
@@ -363,7 +363,7 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/s
 
 ```bash
 qm clone 9999 3000
-qm set 3000 --name pihole --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 3000 --name pihole --ipconfig0 ip=192.0.2.9/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
 qm set 3000 --cores 1 --memory 1024
 qm resize 3000 scsi0 +8G
 qm start 3000
@@ -373,7 +373,7 @@ qm start 3000
 
 ```bash
 qm clone 9999 4000
-qm set 4000 --name gitlab --ipconfig0 ip=192.168.1.5/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 4000 --name gitlab --ipconfig0 ip=192.0.2.5/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
 qm set 4000 --cores 16 --memory 32768
 qm resize 4000 scsi0 +28G
 qm start 4000
@@ -383,7 +383,7 @@ qm start 4000
 
 ```bash
 qm clone 9999 5000
-qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 5000 --name ocean --ipconfig0 ip=192.0.2.143/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
 qm set 5000 --cores 30 --memory 262144
 qm set 5000 --cpu host          # expose x86-v2 features for NumPy 2.x+
 qm resize 5000 scsi0 +126G
@@ -414,7 +414,7 @@ qm start 6000
 
 ```bash
 qm clone 9999 7000
-qm set 7000 --name openclaw --ipconfig0 ip=192.168.1.31/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 7000 --name openclaw --ipconfig0 ip=192.0.2.31/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
 qm set 7000 --cores 4 --memory 4096
 qm resize 7000 scsi0 +16G
 qm start 7000
@@ -428,7 +428,7 @@ for y in 0 1; do
   for z in 1 2 3; do
     n="${x}${y}${z}"
     qm clone 9999 ${n}
-    qm set ${n} --name kube${n} --ipconfig0 ip=$(host kube${n}.home | awk '{print $NF}')/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+    qm set ${n} --name kube${n} --ipconfig0 ip=$(host kube${n}.home | awk '{print $NF}')/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
     qm resize ${n} scsi0 +8G
     qm set ${n} --cores 8 --memory 8192
     [[ "$y" == "3" ]] && qm set ${n} --hostpci0=42:00,pcie=1  # GPU on kube*13

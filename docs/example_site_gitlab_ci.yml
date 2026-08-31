@@ -18,7 +18,7 @@ build_and_commit:
   before_script:
     - apt-get update -qq && apt-get install -y -qq git
     - git config --global user.name "GitLab CI"
-    - git config --global user.email "gitlab-ci@terrac.com"
+    - git config --global user.email "gitlab-ci@example.com"
   script:
     # Install dependencies
     - npm ci

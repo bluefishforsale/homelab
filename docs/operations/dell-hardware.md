@@ -17,10 +17,10 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 | **Storage** | 64 TB ZFS RAIDZ2 |
 | **GPU** | NVIDIA RTX 3090 24GB |
 | **Hypervisor** | Proxmox VE |
-| **Network** | 192.168.1.106 (iDRAC), 192.168.1.x (management) |
+| **Network** | 192.0.2.106 (iDRAC), 192.168.1.x (management) |
 
 **Primary Workloads:**
-- **ocean VM** (192.168.1.143): Main service host for media stack, AI/ML services, monitoring
+- **ocean VM** (192.0.2.143): Main service host for media stack, AI/ML services, monitoring
 - GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, ComfyUIm log-ml)
 - 64TB storage pool for media, backups, and service data
 
@@ -48,14 +48,14 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    192.168.1.0/24 Network                   │
+│                    192.0.2.0/24 Network                   │
 ├─────────────────────────────────────────────────────────────┤
 │  Node006 (R720)              │  Node005 (R620)              │
-│  ├─ iDRAC: 192.168.1.16      │  ├─ iDRAC: 192.168.1.15      |
-│  ├─ host: 192.168.1.106      │  ├─ host: 192.168.1.105      |
-│      ├─ ocean 192.168.1.143  │     ├─ dns01: 192.168.1.2    │
-│                              │     ├─ pihole: 192.168.1.9   │
-│                              │     └─ runners: 192.168.1.20 │
+│  ├─ iDRAC: 192.0.2.16      │  ├─ iDRAC: 192.0.2.15      |
+│  ├─ host: 192.0.2.106      │  ├─ host: 192.0.2.105      |
+│      ├─ ocean 192.0.2.143  │     ├─ dns01: 192.0.2.2    │
+│                              │     ├─ pihole: 192.0.2.9   │
+│                              │     └─ runners: 192.0.2.20 │
 │                              │                              |
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -71,9 +71,9 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 # Default credentials: root/calvin (change immediately!)
 
 # Configure iDRAC network settings
-racadm config -g cfgLanNetworking -o cfgNicIpAddress 192.168.1.106
+racadm config -g cfgLanNetworking -o cfgNicIpAddress 192.0.2.106
 racadm config -g cfgLanNetworking -o cfgNicNetmask 255.255.255.0
-racadm config -g cfgLanNetworking -o cfgNicGateway 192.168.1.1
+racadm config -g cfgLanNetworking -o cfgNicGateway 192.0.2.1
 racadm config -g cfgLanNetworking -o cfgNicUseDHCP 0
 
 # Set strong password
@@ -439,7 +439,7 @@ snmpwalk -v2c -c public idrac-ip 1.3.6.1.4.1.674.10892.5.1.3.50.1.8
 ```bash
 # Configure email alerts
 racadm set iDRAC.EmailAlert.Enable "Enabled"
-racadm set iDRAC.EmailAlert.SMTPServerIPAddress "192.168.1.2"
+racadm set iDRAC.EmailAlert.SMTPServerIPAddress "192.0.2.2"
 racadm set iDRAC.EmailAlert.SMTPPort "25"
 racadm set iDRAC.EmailAlert.SMTPAuthentication "Disabled"
 
@@ -449,7 +449,7 @@ racadm set iDRAC.EmailAlert.CustomMsg "Dell Server Alert"
 
 # Configure SNMP traps
 racadm set iDRAC.SNMPTrap.TrapFormat "SNMPv1"
-racadm set iDRAC.SNMPTrap.SNMPv1TrapDestination "192.168.1.143:162"
+racadm set iDRAC.SNMPTrap.SNMPv1TrapDestination "192.0.2.143:162"
 ```
 
 ### System Health Scripts
