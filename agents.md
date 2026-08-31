@@ -220,7 +220,7 @@ Distilled from prior decisions. Defaults, not laws, but don't override without a
 
 ## Quick Reference
 
-**Primary Host:** ocean (192.168.1.143)
+**Primary Host:** ocean (192.0.2.143)
 **Environment Setup:** `source .envrc`
 **Deploy All:** `ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml`
 **Validate:** `make validate`

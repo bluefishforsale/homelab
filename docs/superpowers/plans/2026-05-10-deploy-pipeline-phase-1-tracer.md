@@ -720,7 +720,7 @@ gh run view "$RUN" --log | grep -E '^Applying:|^✅ SUCCESS|^❌ FAILED'
 
 **Smoke-test the live site:**
 ```bash
-curl -sI https://homepage.terrac.com   # expect HTTP/2 200
+curl -sI https://homepage.example.com   # expect HTTP/2 200
 curl -sI http://homepage.home          # expect 200 OK (run from inside the home network)
 ```
 
@@ -775,7 +775,7 @@ gh run view "$RUN" --log | grep -E '^Applying:|^✅ SUCCESS'
 
 **Then confirm the live site is still up:**
 ```bash
-curl -sI https://homepage.terrac.com
+curl -sI https://homepage.example.com
 ```
 
 ## Failure interpretation
@@ -827,7 +827,7 @@ Follow `docs/operations/deploy-tracer.md` "Tracer 1" exactly. Do not skip the sm
 
 - `gh run watch` exited 0.
 - `gh run view "$RUN" --log | grep "Applying:"` shows exactly one line: the homepage playbook.
-- `curl -sI https://homepage.terrac.com` returns 200.
+- `curl -sI https://homepage.example.com` returns 200.
 - `curl -sI http://homepage.home` returns 200 (from inside the home network).
 
 If any of the above fails, **stop**. Do not run Tracers 2 or 3. Diagnose with `gh run view "$RUN" --log-failed` and either fix the detection script (Task 2) or fix the workflow wiring (Task 5), commit the fix, and re-run Tracer 1.
@@ -864,7 +864,7 @@ Then check `resolve-concurrency-group.sh` against the actual `hosts:` value in `
 
 - Exactly one playbook applied: `playbooks/individual/ocean/network/nginx_compose.yaml`.
 - **No orchestrator playbook runs** (`01_base_system.yaml`, `02_core_infrastructure.yaml`, `03_ocean_services.yaml` must not appear in the Applying lines).
-- `curl -sI https://homepage.terrac.com` still returns 200.
+- `curl -sI https://homepage.example.com` still returns 200.
 
 This is the criterion that proves the sledgehammer was removed. If an orchestrator runs, the fallback logic in `detect-impacted-playbooks.sh` is too broad (probably matching `files/nginx-compose/*` as a generic `files/*` fallback). Inspect:
 ```bash

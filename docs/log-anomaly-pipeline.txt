@@ -310,7 +310,7 @@ The pipeline operates in two tiers: **Tier 1 (log-anomaly-detector)** performs r
 log_anomaly:
   service_name: log-anomaly-detector
   port: 8085
-  loki_url: "http://192.168.1.143:3100"
+  loki_url: "http://192.0.2.143:3100"
   check_interval: 30
   batch_size: 1000
   thresholds:
@@ -328,16 +328,16 @@ log_anomaly_ml:
   
   # PostgreSQL (dedicated container)
   postgresql:
-    host: "192.168.1.143"
+    host: "192.0.2.143"
     port: 5433  # Non-standard port to avoid conflict
     database: "log_anomaly_ml"
     user: "log_anomaly_ml"
     # password from vault: vault_log_anomaly_ml_db_password
   
-  milvus_host: "192.168.1.143"
+  milvus_host: "192.0.2.143"
   milvus_port: 19530
-  redis_addr: "192.168.1.143:6379"
-  alertmanager_url: "http://192.168.1.143:9093"
+  redis_addr: "192.0.2.143:6379"
+  alertmanager_url: "http://192.0.2.143:9093"
   digest_hour: 6
   digest_recipient: "<your-email>"
 ```
@@ -433,17 +433,17 @@ func (m *MilvusClient) PurgeOldEmbeddings(olderThan time.Duration) error {
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Loki | http://192.168.1.143:3100 | Log queries |
-| Loki push | http://192.168.1.143:3100/loki/api/v1/push | Promtail target |
-| log-anomaly-detector | http://192.168.1.143:8085 | Tier 1 API |
-| log-anomaly-ml-processor | http://192.168.1.143:8087 | Tier 2 API (planned) |
-| llamacpp | http://192.168.1.143:8080 | LLM inference |
-| llamacpp chat | http://192.168.1.143:8080/v1/chat/completions | OpenAI-compatible |
-| Milvus | http://192.168.1.143:19530 | Vector DB (planned) |
-| PostgreSQL | 192.168.1.143:5433 | Problem DB (planned) |
-| Redis | 192.168.1.143:6379 | Cache/stats |
-| AlertManager | http://192.168.1.143:9093 | Alert routing (planned) |
-| Grafana | http://192.168.1.143:8910 | Dashboards |
+| Loki | http://192.0.2.143:3100 | Log queries |
+| Loki push | http://192.0.2.143:3100/loki/api/v1/push | Promtail target |
+| log-anomaly-detector | http://192.0.2.143:8085 | Tier 1 API |
+| log-anomaly-ml-processor | http://192.0.2.143:8087 | Tier 2 API (planned) |
+| llamacpp | http://192.0.2.143:8080 | LLM inference |
+| llamacpp chat | http://192.0.2.143:8080/v1/chat/completions | OpenAI-compatible |
+| Milvus | http://192.0.2.143:19530 | Vector DB (planned) |
+| PostgreSQL | 192.0.2.143:5433 | Problem DB (planned) |
+| Redis | 192.0.2.143:6379 | Cache/stats |
+| AlertManager | http://192.0.2.143:9093 | Alert routing (planned) |
+| Grafana | http://192.0.2.143:8910 | Dashboards |
 
 ---
 
@@ -587,7 +587,7 @@ Find similar past anomalies.
 
 ### AlertManager API (outbound)
 
-**POST http://192.168.1.143:9093/api/v2/alerts**
+**POST http://192.0.2.143:9093/api/v2/alerts**
 ```json
 [
   {
@@ -601,7 +601,7 @@ Find similar past anomalies.
     "annotations": {
       "summary": "Nginx upstream timeouts to Plex",
       "description": "23 occurrences over 3h 47m. Plex transcoder not responding.",
-      "dashboard": "http://192.168.1.143:8910/d/log-anomalies?var-problem=abc123"
+      "dashboard": "http://192.0.2.143:8910/d/log-anomalies?var-problem=abc123"
     },
     "startsAt": "2024-11-28T11:45:00Z"
   }
@@ -622,7 +622,7 @@ systemctl status promtail
 curl -s http://localhost:9080/targets | jq .
 
 # Query recent logs from Loki
-curl -s 'http://192.168.1.143:3100/loki/api/v1/query_range' \
+curl -s 'http://192.0.2.143:3100/loki/api/v1/query_range' \
   --data-urlencode 'query={job="systemd-journal"}' \
   --data-urlencode 'limit=5' | jq '.data.result[0].values[:3]'
 ```
@@ -631,16 +631,16 @@ curl -s 'http://192.168.1.143:3100/loki/api/v1/query_range' \
 
 ```bash
 # Health check
-curl -s http://192.168.1.143:8085/health | jq .
+curl -s http://192.0.2.143:8085/health | jq .
 
 # Status
-curl -s http://192.168.1.143:8085/status | jq .
+curl -s http://192.0.2.143:8085/status | jq .
 
 # Loaded patterns
-curl -s http://192.168.1.143:8085/patterns | jq .
+curl -s http://192.0.2.143:8085/patterns | jq .
 
 # Prometheus metrics
-curl -s http://192.168.1.143:8085/metrics | grep log_anomaly
+curl -s http://192.0.2.143:8085/metrics | grep log_anomaly
 
 # Check Redis baselines
 docker exec redis redis-cli KEYS "baseline:*" | head -5
@@ -653,22 +653,22 @@ docker exec redis redis-cli ZRANGE anomalies:recent 0 5 WITHSCORES
 
 ```bash
 # Health check
-curl -s http://192.168.1.143:8087/health | jq .
+curl -s http://192.0.2.143:8087/health | jq .
 
 # List active problems
-curl -s 'http://192.168.1.143:8087/problems?status=active' | jq .
+curl -s 'http://192.0.2.143:8087/problems?status=active' | jq .
 
 # Get specific problem
-curl -s http://192.168.1.143:8087/problems/abc123 | jq .
+curl -s http://192.0.2.143:8087/problems/abc123 | jq .
 
 # Manually resolve a problem
-curl -X POST http://192.168.1.143:8087/problems/abc123/resolve | jq .
+curl -X POST http://192.0.2.143:8087/problems/abc123/resolve | jq .
 
 # Trigger digest email
-curl -X POST http://192.168.1.143:8087/digest/trigger | jq .
+curl -X POST http://192.0.2.143:8087/digest/trigger | jq .
 
 # Simulate anomaly webhook (for testing)
-curl -X POST http://192.168.1.143:8087/webhook/anomaly \
+curl -X POST http://192.0.2.143:8087/webhook/anomaly \
   -H 'Content-Type: application/json' \
   -d '{
     "timestamp": "2024-11-28T15:32:05Z",
@@ -682,17 +682,17 @@ curl -X POST http://192.168.1.143:8087/webhook/anomaly \
   }' | jq .
 
 # Check LLM queue depth
-curl -s http://192.168.1.143:8087/metrics | grep llm_queue_depth
+curl -s http://192.0.2.143:8087/metrics | grep llm_queue_depth
 ```
 
 ### Test llamacpp (LLM Backend)
 
 ```bash
 # Health check
-curl -s http://192.168.1.143:8080/health | jq .
+curl -s http://192.0.2.143:8080/health | jq .
 
 # Test chat completion
-curl -s http://192.168.1.143:8080/v1/chat/completions \
+curl -s http://192.0.2.143:8080/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
     "messages": [{"role": "user", "content": "Explain this log error: upstream timed out"}],
@@ -708,7 +708,7 @@ nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv
 
 ```bash
 # Check Milvus health
-curl -s http://192.168.1.143:9091/healthz
+curl -s http://192.0.2.143:9091/healthz
 
 # List collections (requires pymilvus)
 docker exec -it milvus python3 -c "
@@ -736,20 +736,20 @@ docker exec -it log-anomaly-ml-postgres psql -U log_anomaly_ml -d log_anomaly_ml
   -c "SELECT severity, status, COUNT(*) FROM problems GROUP BY severity, status;"
 
 # External connection test (from ocean host)
-psql -h 192.168.1.143 -p 5433 -U log_anomaly_ml -d log_anomaly_ml -c "SELECT 1;"
+psql -h 192.0.2.143 -p 5433 -U log_anomaly_ml -d log_anomaly_ml -c "SELECT 1;"
 ```
 
 ### Test AlertManager
 
 ```bash
 # Check AlertManager health
-curl -s http://192.168.1.143:9093/-/healthy
+curl -s http://192.0.2.143:9093/-/healthy
 
 # List active alerts
-curl -s http://192.168.1.143:9093/api/v2/alerts | jq .
+curl -s http://192.0.2.143:9093/api/v2/alerts | jq .
 
 # Send test alert
-curl -X POST http://192.168.1.143:9093/api/v2/alerts \
+curl -X POST http://192.0.2.143:9093/api/v2/alerts \
   -H 'Content-Type: application/json' \
   -d '[{
     "labels": {"alertname": "TestAlert", "severity": "info"},
@@ -782,14 +782,14 @@ logger -t test-anomaly "CRITICAL ERROR: Database connection failed repeatedly"
 sleep 15
 
 # 3. Check if it appeared in Loki
-curl -s 'http://192.168.1.143:3100/loki/api/v1/query' \
+curl -s 'http://192.0.2.143:3100/loki/api/v1/query' \
   --data-urlencode 'query={job="systemd-journal"} |= "test-anomaly"' | jq .
 
 # 4. Check if detector picked it up (look at recent metrics)
-curl -s http://192.168.1.143:8085/metrics | grep anomalies_detected
+curl -s http://192.0.2.143:8085/metrics | grep anomalies_detected
 
 # 5. Check if ML processor received it (once implemented)
-curl -s 'http://192.168.1.143:8087/problems?status=active' | jq '.problems[] | select(.title | contains("Database"))'
+curl -s 'http://192.0.2.143:8087/problems?status=active' | jq '.problems[] | select(.title | contains("Database"))'
 ```
 
 ---
@@ -992,7 +992,7 @@ func (p *Processor) Health() HealthStatus {
    systemctl restart log-anomaly-ml-processor
 
 3. Verify:
-   curl http://192.168.1.143:8087/health | jq .
+   curl http://192.0.2.143:8087/health | jq .
    # Should show status: "healthy", mode: "full"
 
 4. Check buffer was flushed:
@@ -1012,7 +1012,7 @@ func (p *Processor) Health() HealthStatus {
 2. Monitor for 24h: baselines will rebuild
 3. Expect higher false positive rate during rebuild
 4. Optional: Temporarily raise thresholds
-   curl -X POST http://192.168.1.143:8085/config \
+   curl -X POST http://192.0.2.143:8085/config \
      -d '{"frequency_sigma": 5.0}'  # Raise from 3.0
 ```
 
@@ -1030,7 +1030,7 @@ func (p *Processor) Health() HealthStatus {
    # Should decrease as replayed
 
 4. Check for data loss:
-   curl http://192.168.1.143:8087/metrics | grep dead_letter
+   curl http://192.0.2.143:8087/metrics | grep dead_letter
    # log_ml_dead_letter_replayed_total should match original count
 ```
 

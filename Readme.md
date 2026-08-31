@@ -8,13 +8,13 @@ Ansible-driven homelab with Docker services, GPU passthrough, and CI/CD automati
 
 | Host | IP | Purpose |
 |------|----|---------|  
-| node005 | 192.168.1.105 | Proxmox - Control VMs |
-| node006 | 192.168.1.106 | Proxmox - Ocean VM |
-| ocean | 192.168.1.143 | Docker services (30 cores, 256GB, RTX 3090) |
-| dns01 | 192.168.1.2 | BIND DNS |
-| pihole | 192.168.1.9 | DNS filtering |
-| gitlab | 192.168.1.5 | CI/CD |
-| gh-runner-01 | 192.168.1.250 | GitHub Actions runners |
+| node005 | 192.0.2.105 | Proxmox - Control VMs |
+| node006 | 192.0.2.106 | Proxmox - Ocean VM |
+| ocean | 192.0.2.143 | Docker services (30 cores, 256GB, RTX 3090) |
+| dns01 | 192.0.2.2 | BIND DNS |
+| pihole | 192.0.2.9 | DNS filtering |
+| gitlab | 192.0.2.5 | CI/CD |
+| gh-runner-01 | 192.0.2.250 | GitHub Actions runners |
 
 ---
 
@@ -134,10 +134,10 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Service logs
-ssh terrac@192.168.1.143 "docker logs plex --tail 50"
+ssh terrac@192.0.2.143 "docker logs plex --tail 50"
 
 # GPU status
-ssh terrac@192.168.1.143 "nvidia-smi"
+ssh terrac@192.0.2.143 "nvidia-smi"
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for full guide.

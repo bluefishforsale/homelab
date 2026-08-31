@@ -17,7 +17,7 @@ Make changes to homelab-managed code — and code in external service repos — 
 
 ## Current state (verified)
 
-- Self-hosted runners on `gh-runner-01` (192.168.1.250) — 4 ephemeral Docker containers, mount host `/root/.ssh` at `/root/.ssh:ro` and a `.github_token` file (`roles/github_docker_runners/templates/docker-compose.yml.j2`).
+- Self-hosted runners on `gh-runner-01` (192.0.2.250) — 4 ephemeral Docker containers, mount host `/root/.ssh` at `/root/.ssh:ro` and a `.github_token` file (`roles/github_docker_runners/templates/docker-compose.yml.j2`).
 - `.github/workflows/main-apply.yml` triggers on push to `master`/`main` with path filters on `playbooks/**`, `files/**`, `roles/**`, `vars/**/*.yaml`, `group_vars/**`. Detects changed playbooks via `git diff HEAD~1 HEAD` (`fetch-depth: 2`).
 - Sledgehammer rule: any change under `roles/`, `group_vars/`, `files/`, `vars/` adds `playbooks/01_base_system.yaml`, `playbooks/02_core_infrastructure.yaml`, `playbooks/03_ocean_services.yaml` to the apply list.
 - `ANSIBLE_VAULT_PASSWORD` is read from a GitHub Actions secret in every deploy workflow (`main-apply.yml`, `deploy-terrac-com.yml`, etc.).
@@ -27,7 +27,7 @@ Make changes to homelab-managed code — and code in external service repos — 
   - external ingress: `vars/vars_cloudflared.yaml` (flat list under `cloudflared.tunnels.main.ingress`)
 - Two existing external-repo deploy patterns:
   - **Image-based** (paia) — external repo builds image → GHCR; homelab playbook (`playbooks/individual/ocean/ai/paia.yaml`) pulls `image: ghcr.io/.../paia:latest`. No auto-redeploy on upstream image push.
-  - **Source-pull** (terrac.com) — external repo dispatches `repository_dispatch: deploy-terrac-com` → `deploy-terrac-com.yml` → `terrac_com_static.yaml` plays git-clones and rsyncs the built `dist/`.
+  - **Source-pull** (example.com) — external repo dispatches `repository_dispatch: deploy-terrac-com` → `deploy-terrac-com.yml` → `terrac_com_static.yaml` plays git-clones and rsyncs the built `dist/`.
 - Homepage end-to-end works today (user-confirmed).
 
 ## Phases
@@ -64,7 +64,7 @@ Validate the chain end-to-end *before* changing structure. Adds concurrency + na
    ```
    RUN=$(gh run list --workflow=main-apply.yml --limit 1 --json databaseId -q '.[0].databaseId')
    gh run watch $RUN --exit-status
-   curl -sI https://homepage.terrac.com
+   curl -sI https://homepage.example.com
    curl -sI http://homepage.home
    gh run view $RUN --log-failed   # only if it failed
    ```
@@ -85,7 +85,7 @@ Consolidate web-service routing into one source of truth.
        host: ocean                       # ansible inventory host
        upstream_port: 8089
        host_internal: homepage.home
-       host_external: homepage.terrac.com
+       host_external: homepage.example.com
        healthcheck_path: /
        nginx_overrides: {}               # optional: timeouts, websocket headers, custom locations
        cloudflared_overrides: {}         # optional: origin_request.no_tls_verify, origin_server_name
@@ -97,7 +97,7 @@ Consolidate web-service routing into one source of truth.
 
 4. **Migration guardrail — `tests/render_diff.sh`.** Renders both the legacy hand-maintained nginx vhost file and the new registry-driven nginx config, and diffs them. Same for cloudflared. A new PR workflow `pr-render-check.yml` runs `render_diff.sh` on every PR; non-whitespace diffs fail CI. Each migration commit must show "diff: whitespace-only" or "diff: captured in `<service>.nginx_overrides`."
 
-5. **Migration order.** Homepage → grafana → blog.terrac.com (simple cases) → ComfyUI (websocket override case) → Loki (timeout override case) → remaining services. One commit per service. Each commit is independently revertable.
+5. **Migration order.** Homepage → grafana → blog.example.com (simple cases) → ComfyUI (websocket override case) → Loki (timeout override case) → remaining services. One commit per service. Each commit is independently revertable.
 
 **Phase 2 done when:** every entry in the old `proxy_hostname_web_proxy.conf` and every `ocean`-host entry in `vars_cloudflared.yaml` has been migrated; `render_diff.sh` produces zero non-whitespace deltas; the flat files are deleted; `pr-render-check.yml` is green on master.
 

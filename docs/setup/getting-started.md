@@ -8,12 +8,12 @@ Complete setup guide for the homelab infrastructure.
 
 | Host | IP | Purpose |
 |------|----|---------|
-| node005 | 192.168.1.105 | Proxmox (56 cores, 128GB RAM) |
-| node006 | 192.168.1.106 | Proxmox (40 cores, 680GB RAM, RTX 3090) |
-| ocean | 192.168.1.143 | Main services VM (media, AI, monitoring) |
-| dns01 | 192.168.1.2 | BIND9 DNS |
-| pihole | 192.168.1.9 | DNS filtering |
-| gitlab | 192.168.1.5 | GitLab CI/CD |
+| node005 | 192.0.2.105 | Proxmox (56 cores, 128GB RAM) |
+| node006 | 192.0.2.106 | Proxmox (40 cores, 680GB RAM, RTX 3090) |
+| ocean | 192.0.2.143 | Main services VM (media, AI, monitoring) |
+| dns01 | 192.0.2.2 | BIND9 DNS |
+| pihole | 192.0.2.9 | DNS filtering |
+| gitlab | 192.0.2.5 | GitLab CI/CD |
 
 ---
 
@@ -59,10 +59,10 @@ sudo dd if=proxmox-ve_8.1-2.iso of=/dev/sdX bs=1M status=progress
 #### 2. Install Proxmox on Both Hosts
 1. Boot from USB and follow installation wizard
 2. Configure basic network settings:
-   - **Host 1**: 192.168.1.106/24
-   - **Host 2**: 192.168.1.107/24  
-   - **Gateway**: 192.168.1.1
-   - **DNS**: 192.168.1.1 (temporarily)
+   - **Host 1**: 192.0.2.106/24
+   - **Host 2**: 192.0.2.107/24  
+   - **Gateway**: 192.0.2.1
+   - **DNS**: 192.0.2.1 (temporarily)
 
 #### 3. Post-Installation Configuration (Ansible)
 
@@ -97,8 +97,8 @@ iface bond0 inet manual
 
 auto vmbr0
 iface vmbr0 inet static
-    address 192.168.1.106/24
-    gateway 192.168.1.1
+    address 192.0.2.106/24
+    gateway 192.0.2.1
     bridge-ports bond0
     bridge-stp off
     bridge-fd 0
@@ -110,7 +110,7 @@ ifreload -a
 #### 2. Test Connectivity
 ```bash
 # Verify network connectivity  
-ping 192.168.1.1
+ping 192.0.2.1
 ping 8.8.8.8
 ping google.com
 
@@ -143,7 +143,7 @@ apt install ceph ceph-mgr-modules-core -y
 #### 3. Create Ceph Monitor
 ```bash
 # Initialize first monitor (replace with your network)
-ceph-deploy mon create-initial --cluster ceph --mon-hosts proxmox01:192.168.1.106
+ceph-deploy mon create-initial --cluster ceph --mon-hosts proxmox01:192.0.2.106
 ```
 
 #### 4. Add OSDs (Object Storage Daemons)
@@ -178,23 +178,23 @@ qm template 9000
 ```bash
 # DNS/DHCP VM
 qm clone 9000 102 --name dns01 --storage local-lvm
-qm set 102 --ipconfig0 ip=192.168.1.2/24,gw=192.168.1.1
+qm set 102 --ipconfig0 ip=192.0.2.2/24,gw=192.0.2.1
 qm set 102 --memory 2048 --cores 2
 
 # Pi-hole VM  
 qm clone 9000 109 --name pihole01 --storage local-lvm
-qm set 109 --ipconfig0 ip=192.168.1.9/24,gw=192.168.1.1
+qm set 109 --ipconfig0 ip=192.0.2.9/24,gw=192.0.2.1
 qm set 109 --memory 2048 --cores 2
 
 # Ocean (Docker host) VM
 qm clone 9000 143 --name ocean --storage local-lvm  
-qm set 143 --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1
+qm set 143 --ipconfig0 ip=192.0.2.143/24,gw=192.0.2.1
 qm set 143 --memory 16384 --cores 8
 qm set 143 --scsi1 local-lvm:200  # Additional storage for Docker
 
 # GitLab VM
 qm clone 9000 150 --name gitlab --storage local-lvm
-qm set 150 --ipconfig0 ip=192.168.1.150/24,gw=192.168.1.1  
+qm set 150 --ipconfig0 ip=192.0.2.150/24,gw=192.0.2.1  
 qm set 150 --memory 8192 --cores 4
 ```
 
@@ -225,11 +225,11 @@ ansible-playbook -i inventories/production/hosts.ini \
 #### 3. Update Network to Use New DNS
 ```bash
 # Update Proxmox hosts to use new DNS
-echo "nameserver 192.168.1.2" > /etc/resolv.conf
+echo "nameserver 192.0.2.2" > /etc/resolv.conf
 
 # Test DNS resolution
-nslookup google.com 192.168.1.2
-dig @192.168.1.2 google.com
+nslookup google.com 192.0.2.2
+dig @192.0.2.2 google.com
 ```
 
 ### Pi-hole Setup
@@ -239,7 +239,7 @@ dig @192.168.1.2 google.com
 ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/core/services/pi_hole.yaml --ask-vault-pass
 
-# Access: http://192.168.1.9/admin
+# Access: http://192.0.2.9/admin
 ```
 
 ### GitLab Setup
@@ -249,7 +249,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/core/services/gitlab.yaml --ask-vault-pass
 
-# Access: http://192.168.1.5 or http://gitlab.home
+# Access: http://192.0.2.5 or http://gitlab.home
 ```
 
 ### Monitoring Setup
@@ -263,7 +263,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/monitoring/grafana_compose.yaml --ask-vault-pass
 
-# Access Grafana: http://192.168.1.143:8910
+# Access Grafana: http://192.0.2.143:8910
 # Login: admin / grafana (from vault)
 ```
 
@@ -309,8 +309,8 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 **Access:**
 
-- Plex: `http://192.168.1.143:32400`
-- Tautulli: `http://192.168.1.143:8905`
+- Plex: `http://192.0.2.143:32400`
+- Tautulli: `http://192.0.2.143:8905`
 
 ### AI/ML Services
 
@@ -326,8 +326,8 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 **Access:**
 
-- llama.cpp: `http://192.168.1.143:8080`
-- Open WebUI: `http://192.168.1.143:3000`
+- llama.cpp: `http://192.0.2.143:8080`
+- Open WebUI: `http://192.0.2.143:3000`
 
 ### Other Services
 
@@ -376,16 +376,16 @@ ansible-playbook -i inventories/github_runners/hosts.ini \
 
 ```bash
 # Plex
-curl -sf http://192.168.1.143:32400/web/index.html > /dev/null && echo "Plex OK"
+curl -sf http://192.0.2.143:32400/web/index.html > /dev/null && echo "Plex OK"
 
 # Grafana
-curl -sf http://192.168.1.143:8910 > /dev/null && echo "Grafana OK"
+curl -sf http://192.0.2.143:8910 > /dev/null && echo "Grafana OK"
 
 # Prometheus
-curl -sf http://192.168.1.143:9090/-/healthy && echo "Prometheus OK"
+curl -sf http://192.0.2.143:9090/-/healthy && echo "Prometheus OK"
 
 # DNS
-nslookup ocean.home 192.168.1.2
+nslookup ocean.home 192.0.2.2
 ```
 
 ---

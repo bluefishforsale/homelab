@@ -1,14 +1,14 @@
-# Setting Up terrac.com for Automated Deployment
+# Setting Up example.com for Automated Deployment
 
 ## Quick Start
 
-The homelab deployment expects the `dist/` folder to be committed to the terrac_com_2026 repository.
+The homelab deployment expects the `dist/` folder to be committed to the example_site repository.
 
 ### Option 1: Manual Build and Commit (Quick)
 
 ```bash
-# In terrac_com_2026 repository
-cd /path/to/terrac_com_2026
+# In example_site repository
+cd /path/to/example_site
 
 # Remove dist from .gitignore
 sed -i '' '/^dist$/d' .gitignore
@@ -34,7 +34,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ### Option 2: Automated Build with GitHub Actions (Recommended)
 
-1. **Copy the workflow file** from `docs/terrac_com_build_workflow.yml` to terrac_com_2026 repo at:
+1. **Copy the workflow file** from `docs/example_site_build_workflow.yml` to example_site repo at:
    ```
    .github/workflows/build-and-commit.yml
    ```
@@ -42,7 +42,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 2. **Create GitHub Personal Access Token** (for automatic deployment trigger):
    - Go to GitHub Settings → Developer settings → Personal access tokens
    - Create a new token with `repo` scope
-   - Add it as a secret in terrac_com_2026 repository:
+   - Add it as a secret in example_site repository:
      - Repository Settings → Secrets → Actions
      - Name: `HOMELAB_DEPLOY_TOKEN`
      - Value: your token
@@ -65,7 +65,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Developer pushes to terrac_com_2026/main                    │
+│ Developer pushes to example_site/main                    │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
@@ -80,7 +80,7 @@ ansible-playbook -i inventories/production/hosts.ini \
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Homelab: Deploy terrac.com Website Workflow                 │
+│ Homelab: Deploy example.com Website Workflow                 │
 │  1. git pull (gets new dist/ folder)                        │
 │  2. rsync dist/ → /data01/services/terrac_com/              │
 │  3. Set permissions                                          │
@@ -89,7 +89,7 @@ ansible-playbook -i inventories/production/hosts.ini \
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ nginx serves files from /data01/services/terrac_com/        │
-│ Available at https://terrac.com                              │
+│ Available at https://example.com                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -103,11 +103,11 @@ ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/services/terrac_com.yaml
 
 # Verify deployment
-curl -I http://192.168.1.143/
-ssh terrac@192.168.1.143 "ls -la /data01/services/terrac_com/"
+curl -I http://192.0.2.143/
+ssh terrac@192.0.2.143 "ls -la /data01/services/terrac_com/"
 
 # Check the site
-open https://terrac.com
+open https://example.com
 ```
 
 ## Troubleshooting
@@ -116,10 +116,10 @@ open https://terrac.com
 
 ```bash
 # Check if dist exists in repo
-ssh terrac@192.168.1.143 "ls -la /data01/services/terrac_com/repo/dist/"
+ssh terrac@192.0.2.143 "ls -la /data01/services/terrac_com/repo/dist/"
 
-# If missing, build and commit dist in terrac_com_2026 repo
-cd /path/to/terrac_com_2026
+# If missing, build and commit dist in example_site repo
+cd /path/to/example_site
 npm run build
 git add -f dist/
 git commit -m "build: add dist folder"
@@ -135,11 +135,11 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check if dist was committed
-cd /path/to/terrac_com_2026
+cd /path/to/example_site
 git log --oneline --name-only -5 | grep dist
 
 # Force pull on server
-ssh terrac@192.168.1.143 "cd /data01/services/terrac_com/repo && git pull"
+ssh terrac@192.0.2.143 "cd /data01/services/terrac_com/repo && git pull"
 
 # Redeploy
 ansible-playbook -i inventories/production/hosts.ini \
@@ -151,7 +151,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 You can also manually trigger deployment via GitHub Actions:
 
 1. Go to: https://github.com/bluefishforsale/homelab/actions
-2. Select "Deploy terrac.com Website"
+2. Select "Deploy example.com Website"
 3. Click "Run workflow"
 4. Choose branch and options
 5. Click "Run workflow"

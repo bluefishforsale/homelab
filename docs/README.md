@@ -2,18 +2,33 @@
 
 Documentation for the homelab infrastructure.
 
+## Addresses in these docs are placeholders
+
+Every address below is in `192.0.2.0/24`, the range RFC 5737 reserves for
+documentation, and every hostname is under `example.com`, reserved by RFC 2606.
+Neither routes anywhere. They are here so the shape of the network is legible:
+which host does what, what talks to what, which service sits behind which name.
+
+If you are cloning this repo to run it yourself, the addresses are yours to
+supply. Start with `inventories/production/hosts.ini` and the `group_vars`
+beside it. Nothing will deploy until those describe real machines, which is
+deliberate: the interesting part of this repo is the patterns, not the numbers.
+
+The last-octet mapping is kept stable across every document, so `192.0.2.143`
+is the same host wherever it appears.
+
 ---
 
 ## Quick Reference
 
 | Host | IP | Purpose |
 |------|----|---------|  
-| node005 | 192.168.1.105 | Proxmox (56 cores, 128GB) |
-| node006 | 192.168.1.106 | Proxmox (40 cores, 680GB, RTX 3090) |
-| ocean | 192.168.1.143 | Docker services VM |
-| dns01 | 192.168.1.2 | BIND9 DNS |
-| pihole | 192.168.1.9 | DNS filtering |
-| gitlab | 192.168.1.5 | GitLab CI/CD |
+| node005 | 192.0.2.105 | Proxmox (56 cores, 128GB) |
+| node006 | 192.0.2.106 | Proxmox (40 cores, 680GB, RTX 3090) |
+| ocean | 192.0.2.143 | Docker services VM |
+| dns01 | 192.0.2.2 | BIND9 DNS |
+| pihole | 192.0.2.9 | DNS filtering |
+| gitlab | 192.0.2.5 | GitLab CI/CD |
 
 ---
 
@@ -76,29 +91,29 @@ Documentation for the homelab infrastructure.
 
 | Service | URL |
 |---------|-----|
-| Grafana | `http://192.168.1.143:8910` |
-| Prometheus | `http://192.168.1.143:9090` |
-| Plex | `http://192.168.1.143:32400` |
-| Open WebUI | `http://192.168.1.143:3000` |
-| llama.cpp | `http://192.168.1.143:8080` |
-| Pi-hole | `http://192.168.1.9/admin` |
-| Proxmox node006 | `https://192.168.1.106:8006` |
-| Proxmox node005 | `https://192.168.1.105:8006` |
+| Grafana | `http://192.0.2.143:8910` |
+| Prometheus | `http://192.0.2.143:9090` |
+| Plex | `http://192.0.2.143:32400` |
+| Open WebUI | `http://192.0.2.143:3000` |
+| llama.cpp | `http://192.0.2.143:8080` |
+| Pi-hole | `http://192.0.2.9/admin` |
+| Proxmox node006 | `https://192.0.2.106:8006` |
+| Proxmox node005 | `https://192.0.2.105:8006` |
 
 ### SSH Access
 
 ```bash
 # Ocean (Docker services)
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 
 # Proxmox hosts
-ssh root@192.168.1.106  # node006
-ssh root@192.168.1.105  # node005
+ssh root@192.0.2.106  # node006
+ssh root@192.0.2.105  # node005
 
 # VMs
-ssh debian@192.168.1.2   # dns01
-ssh debian@192.168.1.5   # gitlab
-ssh debian@192.168.1.9   # pihole
+ssh debian@192.0.2.2   # dns01
+ssh debian@192.0.2.5   # gitlab
+ssh debian@192.0.2.9   # pihole
 ```
 
 ---
@@ -121,26 +136,26 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check Docker services on ocean
-ssh terrac@192.168.1.143 "docker ps --format 'table {{.Names}}\t{{.Status}}'"
+ssh terrac@192.0.2.143 "docker ps --format 'table {{.Names}}\t{{.Status}}'"
 
 # Check ZFS pool
-ssh terrac@192.168.1.143 "zpool status data01"
+ssh terrac@192.0.2.143 "zpool status data01"
 
 # Check GPU status
-ssh terrac@192.168.1.143 "nvidia-smi"
+ssh terrac@192.0.2.143 "nvidia-smi"
 ```
 
 ### Logs and Diagnostics
 
 ```bash
 # View service logs
-ssh terrac@192.168.1.143 "docker logs plex --tail 50"
+ssh terrac@192.0.2.143 "docker logs plex --tail 50"
 
 # Test DNS
-nslookup ocean.home 192.168.1.2
+nslookup ocean.home 192.0.2.2
 
 # Check Prometheus targets
-curl -s http://192.168.1.143:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+curl -s http://192.0.2.143:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
 ```
 
 ---

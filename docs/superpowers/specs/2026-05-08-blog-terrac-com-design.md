@@ -1,11 +1,11 @@
-# blog.terrac.com — Design Spec
+# blog.example.com — Design Spec
 
 **Date:** 2026-05-08
 **Status:** Approved
 
 ## Goal
 
-A minimal, static blog at `blog.terrac.com` powered by Hugo and PaperMod. No runtime process, no database, no CMS. Write markdown, push to git, site updates automatically.
+A minimal, static blog at `blog.example.com` powered by Hugo and PaperMod. No runtime process, no database, no CMS. Write markdown, push to git, site updates automatically.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ GitHub repo: blog_terrac_com
   └── content/posts/     ← markdown posts
   └── static/            ← images and other static assets
   └── themes/PaperMod/   ← git submodule
-  └── hugo.toml          ← site config (baseURL: https://blog.terrac.com)
+  └── hugo.toml          ← site config (baseURL: https://blog.example.com)
   └── public/            ← built output, committed by CI
 
 GitHub Actions (on push to main)
@@ -26,12 +26,12 @@ Ansible (homelab repo)
   └── rsyncs public/ → /data01/services/blog_terrac_com on ocean
 
 Nginx (ocean, port 80)
-  └── server_name blog.terrac.com
+  └── server_name blog.example.com
   └── root /data01/services/blog_terrac_com
-  └── static file serving (same pattern as terrac.com)
+  └── static file serving (same pattern as example.com)
 
 Cloudflared tunnel (already added)
-  └── blog.terrac.com → http://192.168.1.143:80
+  └── blog.example.com → http://192.0.2.143:80
 ```
 
 ## Components
@@ -39,7 +39,7 @@ Cloudflared tunnel (already added)
 ### 1. Hugo repo (`blog_terrac_com`)
 - New GitHub repo under `bluefishforsale`
 - PaperMod as a git submodule at `themes/PaperMod`
-- `hugo.toml` with `baseURL = "https://blog.terrac.com"`, `theme = "PaperMod"`
+- `hugo.toml` with `baseURL = "https://blog.example.com"`, `theme = "PaperMod"`
 - `public/` committed by CI, not edited manually
 
 ### 2. GitHub Actions workflow
@@ -54,12 +54,12 @@ Cloudflared tunnel (already added)
 - Same structure as `terrac_com_static.yaml`
 
 ### 4. Nginx server block
-- Replace the WordPress proxy block added for `blog.terrac.com` in `proxy_hostname_web_proxy.conf`
+- Replace the WordPress proxy block added for `blog.example.com` in `proxy_hostname_web_proxy.conf`
 - Static file serving from `/data01/services/blog_terrac_com`
-- Same config as the `terrac.com` block: gzip, cache headers for assets, no hidden files
+- Same config as the `example.com` block: gzip, cache headers for assets, no hidden files
 
 ### 5. Cloudflared tunnel
-- Entry already added to `vars/vars_cloudflared.yaml`: `blog.terrac.com → http://192.168.1.143:80`
+- Entry already added to `vars/vars_cloudflared.yaml`: `blog.example.com → http://192.0.2.143:80`
 - No further changes needed
 
 ## Data Flow
@@ -67,7 +67,7 @@ Cloudflared tunnel (already added)
 1. Author writes `content/posts/my-post.md` and pushes to `main`
 2. GitHub Actions builds site → commits `public/` to repo
 3. Ansible pulls repo, rsyncs `public/` to ocean
-4. Nginx serves static files; cloudflared proxies `blog.terrac.com` through to nginx
+4. Nginx serves static files; cloudflared proxies `blog.example.com` through to nginx
 
 ## What's NOT included
 
@@ -85,5 +85,5 @@ These can be added later without changing the core architecture.
 |------|--------|
 | `bluefishforsale/blog_terrac_com` (GitHub) | Create new repo |
 | `homelab/playbooks/individual/ocean/services/blog_terrac_com_static.yaml` | Create |
-| `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf` | Replace `blog.terrac.com` block with static file server |
+| `homelab/files/nginx-compose/proxy_hostname_web_proxy.conf` | Replace `blog.example.com` block with static file server |
 | `homelab/vars/vars_cloudflared.yaml` | Already done |

@@ -6,7 +6,7 @@ deploys onto ocean (or another homelab host) automatically on push.
 ## Data flow
 
 ```
-bluefishforsale/<service>             bluefishforsale/homelab          ocean (192.168.1.143)
+bluefishforsale/<service>             bluefishforsale/homelab          ocean (192.0.2.143)
 ─────────────────────────             ───────────────────────          ─────────────────────
 push main                             repository_dispatch              docker pull + systemd restart
    │                                  ↓                                   │
@@ -20,12 +20,12 @@ push main                             repository_dispatch              docker pu
                                     self-hosted runner               cloudflared tunnel
                                     (/root/.ssh + cloudflared           │
                                      binary mounted)                    ▼
-                                                                     https://<service>.terrac.com
+                                                                     https://<service>.example.com
 ```
 
 ## Two deploy archetypes
 
-| | Image-based (paia, my-ta-jose) | Source-pull (terrac.com, blog.terrac.com) |
+| | Image-based (paia, my-ta-jose) | Source-pull (example.com, blog.example.com) |
 |---|---|---|
 | External repo builds | Docker image → GHCR | static `dist/` or `public/` → committed back to main |
 | Homelab playbook | `docker login ghcr.io`, compose pull, systemd restart | git clone, rsync `public/` → web_root |
@@ -66,9 +66,9 @@ Five files per new service:
 4. Routing — three coordinated entries:
    - `vars/vars_service_ports.yaml`: `<service>.port: 8xxx`
    - `files/nginx-compose/proxy_hostname_web_proxy.conf`: vhost
-     `<service>.terrac.com` + `<service>.home` → `proxy_pass http://172.17.0.1:8xxx`
+     `<service>.example.com` + `<service>.home` → `proxy_pass http://172.17.0.1:8xxx`
    - `vars/vars_cloudflared.yaml`: ingress
-     `<service>.terrac.com` → `http://192.168.1.143:80`
+     `<service>.example.com` → `http://192.0.2.143:80`
 5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
    of the hostname to `fully_public_services` (Access bypass) for public
    services. `public_services` = admin + plex-users gate. Else admin-only.
@@ -90,7 +90,7 @@ Five files per new service:
 
 | | Convention |
 |---|---|
-| External hostname | `<service>.terrac.com` (Cloudflare zone, routed via tunnel) |
+| External hostname | `<service>.example.com` (Cloudflare zone, routed via tunnel) |
 | Internal hostname | `<service>.home` (BIND on dns01, no tunnel) |
 | Container | `container_name: <service>` |
 | On-disk state | `/data01/services/<service>/` |
@@ -161,7 +161,7 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
 ## Bootstrap checklist for a new service
 
 ```text
-[ ] Decide hostname (<name>.terrac.com) and host port (next free 80xx)
+[ ] Decide hostname (<name>.example.com) and host port (next free 80xx)
 
 homelab:
 [ ] playbooks/individual/ocean/services/<name>.yaml      (clone paia.yaml or terrac_com.yaml)
@@ -179,5 +179,5 @@ external repo:
 [ ] gh secret set HOMELAB_DISPATCH_TOKEN (value from vault deploy_dispatch_token)
 [ ] Push initial code → CI builds → dispatches → ocean deploys.
 
-[ ] Visit https://<name>.terrac.com
+[ ] Visit https://<name>.example.com
 ```

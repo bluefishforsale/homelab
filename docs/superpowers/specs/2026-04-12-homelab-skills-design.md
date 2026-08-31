@@ -61,9 +61,9 @@ Retrieves docker logs from a container on a remote host via SSH.
 
 Zero-argument shortcut to tail the Plex Media Server application log.
 
-- **Host:** ocean (`terrac@192.168.1.143` from inventory)
+- **Host:** ocean (`terrac@192.0.2.143` from inventory)
 - **Log path:** `/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log`
-- **Command:** `ssh terrac@192.168.1.143 tail -n1000 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'`
+- **Command:** `ssh terrac@192.0.2.143 tail -n1000 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'`
 
 ### 5. debug-service
 
@@ -103,11 +103,11 @@ If a container doesn't exist, a service unit isn't found, or SSH fails for a spe
 
 Hosts and their SSH details are in `inventories/production/hosts.ini`. Key entries:
 
-- `ocean` — `terrac@192.168.1.143` (GPU VM, runs media/AI services)
-- `dns01` — `debian@192.168.1.2`
-- `dns02` — `debian@192.168.1.3`
-- `node005` — `root@192.168.1.105` (Proxmox bare metal)
-- `node006` — `root@192.168.1.106` (Proxmox bare metal)
+- `ocean` — `terrac@192.0.2.143` (GPU VM, runs media/AI services)
+- `dns01` — `debian@192.0.2.2`
+- `dns02` — `debian@192.0.2.3`
+- `node005` — `root@192.0.2.105` (Proxmox bare metal)
+- `node006` — `root@192.0.2.106` (Proxmox bare metal)
 
 ## Playbook Convention
 

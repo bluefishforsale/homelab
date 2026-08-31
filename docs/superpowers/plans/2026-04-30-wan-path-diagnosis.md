@@ -202,7 +202,7 @@ Open `files/ocean-prometheus/prometheus.yml.j2`. Inside the `blackbox-tls` job (
 ```yaml
       - targets:
         - https://plex.tv:443
-        - https://home.terrac.com:443
+        - https://home.example.com:443
         labels:
           probe_type: "tls"
           category: "plex_path"
@@ -237,7 +237,7 @@ Expected: `probe_success 1` and an `earliest_cert_expiry` epoch value. Prometheu
 git add files/ocean-prometheus/prometheus.yml.j2
 git commit -m "feat(prometheus): add Plex TLS cert checks to blackbox-tls
 
-Tracks plex.tv cert validity and home.terrac.com (own public
+Tracks plex.tv cert validity and home.example.com (own public
 endpoint) cert validity at 1h intervals. Fast handshake timing is
 covered by blackbox-tcp's plex_path targets at 1m intervals.
 
@@ -692,9 +692,9 @@ Create `files/ocean-prometheus/wan-path-diagnosis-dashboard.json` with this cont
     {
       "id": 9,
       "type": "stat",
-      "title": "home.terrac.com cert expiry",
+      "title": "home.example.com cert expiry",
       "gridPos": {"h": 4, "w": 12, "x": 12, "y": 36},
-      "targets": [{"expr": "(probe_ssl_earliest_cert_expiry{instance=\"https://home.terrac.com:443\"} - time()) / 86400", "legendFormat": "days", "refId": "A"}]
+      "targets": [{"expr": "(probe_ssl_earliest_cert_expiry{instance=\"https://home.example.com:443\"} - time()) / 86400", "legendFormat": "days", "refId": "A"}]
     }
   ]
 }
@@ -728,7 +728,7 @@ After deploy/import, open the dashboard URL. Confirm:
 - ICMP loss panel near zero across the board
 - Per-hop heatmap shows ~10 hops to each destination, mostly low loss (one or two hops may show occasional spikes — that's normal)
 - TCP handshake panel populated
-- Cert expiry stats show positive days (~30+ for Let's Encrypt-managed `home.terrac.com`)
+- Cert expiry stats show positive days (~30+ for Let's Encrypt-managed `home.example.com`)
 
 - [ ] **Step 6: Commit**
 

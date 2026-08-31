@@ -147,15 +147,15 @@ From `inventories/production/hosts.ini`:
 
 | Host/Group | User | IP | Description |
 |------------|------|----|-------------|
-| `ocean` | terrac | 192.168.1.143 | GPU VM, media/AI services |
-| `dns01` | debian | 192.168.1.2 | DNS server |
-| `dns02` | debian | 192.168.1.3 | DNS server |
-| `node005` | root | 192.168.1.105 | Proxmox bare metal |
-| `node006` | root | 192.168.1.106 | Proxmox bare metal |
-| `gitlab` | debian | 192.168.1.5 | GitLab server |
-| `pihole` | debian | 192.168.1.9 | Pi-hole |
-| `gh-runner-01` | debian | 192.168.1.20 | GitHub runner |
-| `openclaw` | debian | 192.168.1.31 | OpenClaw |
+| `ocean` | terrac | 192.0.2.143 | GPU VM, media/AI services |
+| `dns01` | debian | 192.0.2.2 | DNS server |
+| `dns02` | debian | 192.0.2.3 | DNS server |
+| `node005` | root | 192.0.2.105 | Proxmox bare metal |
+| `node006` | root | 192.0.2.106 | Proxmox bare metal |
+| `gitlab` | debian | 192.0.2.5 | GitLab server |
+| `pihole` | debian | 192.0.2.9 | Pi-hole |
+| `gh-runner-01` | debian | 192.0.2.20 | GitHub runner |
+| `openclaw` | debian | 192.0.2.31 | OpenClaw |
 
 **Groups:** `proxmox`, `baremetal`, `vms`, `github_runners`, `dns`, `dns_servers`, `k8s`
 
@@ -227,15 +227,15 @@ Parse the inventory to extract `ansible_user` and `ansible_ssh_host` for the giv
 
 | Host | SSH Target |
 |------|-----------|
-| `ocean` | `terrac@192.168.1.143` |
-| `dns01` | `debian@192.168.1.2` |
-| `dns02` | `debian@192.168.1.3` |
-| `node005` | `root@192.168.1.105` |
-| `node006` | `root@192.168.1.106` |
-| `gitlab` | `debian@192.168.1.5` |
-| `pihole` | `debian@192.168.1.9` |
-| `gh-runner-01` | `debian@192.168.1.20` |
-| `openclaw` | `debian@192.168.1.31` |
+| `ocean` | `terrac@192.0.2.143` |
+| `dns01` | `debian@192.0.2.2` |
+| `dns02` | `debian@192.0.2.3` |
+| `node005` | `root@192.0.2.105` |
+| `node006` | `root@192.0.2.106` |
+| `gitlab` | `debian@192.0.2.5` |
+| `pihole` | `debian@192.0.2.9` |
+| `gh-runner-01` | `debian@192.0.2.20` |
+| `openclaw` | `debian@192.0.2.31` |
 
 ## How to Use
 
@@ -257,17 +257,17 @@ ssh <user>@<ip> docker logs [flags] <container>
 
 Last 100 lines of plex on ocean:
 ` ` `bash
-ssh terrac@192.168.1.143 docker logs --tail 100 plex
+ssh terrac@192.0.2.143 docker logs --tail 100 plex
 ` ` `
 
 Sonarr logs from the last hour:
 ` ` `bash
-ssh terrac@192.168.1.143 docker logs --since 1h sonarr
+ssh terrac@192.0.2.143 docker logs --since 1h sonarr
 ` ` `
 
 Last 50 lines of frigate with timestamps:
 ` ` `bash
-ssh terrac@192.168.1.143 docker logs --tail 50 --timestamps frigate
+ssh terrac@192.0.2.143 docker logs --tail 50 --timestamps frigate
 ` ` `
 
 ## Listing Containers
@@ -318,12 +318,12 @@ Tail the last 1000 lines of the Plex Media Server application log on ocean.
 This skill takes no arguments. Just run:
 
 ` ` `bash
-ssh terrac@192.168.1.143 tail -n1000 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'
+ssh terrac@192.0.2.143 tail -n1000 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'
 ` ` `
 
 ## Details
 
-- **Host:** ocean (`terrac@192.168.1.143`)
+- **Host:** ocean (`terrac@192.0.2.143`)
 - **Log path:** `/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log`
 - **Lines:** 1000
 
@@ -411,11 +411,11 @@ Extract `ansible_user` and `ansible_ssh_host` from the line. Quick reference:
 
 | Host | SSH Target |
 |------|-----------|
-| `ocean` | `terrac@192.168.1.143` |
-| `dns01` | `debian@192.168.1.2` |
-| `dns02` | `debian@192.168.1.3` |
-| `node005` | `root@192.168.1.105` |
-| `node006` | `root@192.168.1.106` |
+| `ocean` | `terrac@192.0.2.143` |
+| `dns01` | `debian@192.0.2.2` |
+| `dns02` | `debian@192.0.2.3` |
+| `node005` | `root@192.0.2.105` |
+| `node006` | `root@192.0.2.106` |
 
 ## Step 2: Collect Diagnostics
 
@@ -487,13 +487,13 @@ If any diagnostic command fails (container not found, SSH timeout, unit not foun
 
 User says "debug plex":
 1. Discovery finds: `plex|ocean|/data01`
-2. Resolve ocean: `terrac@192.168.1.143`
+2. Resolve ocean: `terrac@192.0.2.143`
 3. Run all four diagnostic commands (including plex filesystem log)
 4. Analyze combined output
 
 User says "debug sonarr":
 1. Discovery finds: `sonarr|ocean|/data01`
-2. Resolve ocean: `terrac@192.168.1.143`
+2. Resolve ocean: `terrac@192.0.2.143`
 3. Run three diagnostic commands (no filesystem log for sonarr)
 4. Analyze combined output
 
@@ -550,7 +550,7 @@ Expected: list of services including plex, sonarr, radarr, frigate, etc. with th
 - [ ] **Step 4: Test SSH connectivity to ocean**
 
 ```bash
-ssh -o ConnectTimeout=5 terrac@192.168.1.143 echo "connected"
+ssh -o ConnectTimeout=5 terrac@192.0.2.143 echo "connected"
 ```
 
 Expected: `connected`
@@ -558,7 +558,7 @@ Expected: `connected`
 - [ ] **Step 5: Test plex-logs command**
 
 ```bash
-ssh terrac@192.168.1.143 tail -n5 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'
+ssh terrac@192.0.2.143 tail -n5 '/data01/services/plex/config/Library/Application Support/Plex Media Server/Logs/Plex Media Server.log'
 ```
 
 Expected: 5 lines of Plex log output (just verifying the path is valid).
@@ -566,7 +566,7 @@ Expected: 5 lines of Plex log output (just verifying the path is valid).
 - [ ] **Step 6: Test docker inspect on plex**
 
 ```bash
-ssh terrac@192.168.1.143 docker inspect plex --format '{{json .State}}' | head -1
+ssh terrac@192.0.2.143 docker inspect plex --format '{{json .State}}' | head -1
 ```
 
 Expected: JSON with Status, ExitCode, Health fields.

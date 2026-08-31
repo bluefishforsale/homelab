@@ -8,14 +8,14 @@ Homelab network configuration and topology.
 
 | Host | IP | Purpose |
 |------|----|---------|
-| Gateway | 192.168.1.1 | Router |
-| dns01 | 192.168.1.2 | BIND DNS |
-| gitlab | 192.168.1.5 | CI/CD |
-| pihole | 192.168.1.9 | DNS filtering |
-| node005 | 192.168.1.105 | Proxmox host |
-| node006 | 192.168.1.106 | Proxmox host |
-| ocean | 192.168.1.143 | Docker services |
-| gh-runner-01 | 192.168.1.250 | GitHub runners |
+| Gateway | 192.0.2.1 | Router |
+| dns01 | 192.0.2.2 | BIND DNS |
+| gitlab | 192.0.2.5 | CI/CD |
+| pihole | 192.0.2.9 | DNS filtering |
+| node005 | 192.0.2.105 | Proxmox host |
+| node006 | 192.0.2.106 | Proxmox host |
+| ocean | 192.0.2.143 | Docker services |
+| gh-runner-01 | 192.0.2.250 | GitHub runners |
 
 ---
 
@@ -25,7 +25,7 @@ Homelab network configuration and topology.
 Internet
     │
     ▼
-Router (192.168.1.1)
+Router (192.0.2.1)
     │
     ▼
 UniFi US-16-XG (10GbE)
@@ -37,7 +37,7 @@ UniFi US-16-XG (10GbE)
 
 ---
 
-## Subnet: 192.168.1.0/24
+## Subnet: 192.0.2.0/24
 
 Single flat network for all hosts and services.
 
@@ -69,8 +69,8 @@ iface bond0 inet manual
 ```bash
 auto vmbr0
 iface vmbr0 inet static
-    address 192.168.1.106/24
-    gateway 192.168.1.1
+    address 192.0.2.106/24
+    gateway 192.0.2.1
     bridge-ports bond0
     bridge-stp off
     bridge-fd 0
@@ -84,16 +84,16 @@ See [unifi.md](/docs/operations/unifi.md) for switch LACP configuration.
 
 ### Internal DNS (BIND)
 
-dns01 (192.168.1.2) serves `.home` domain for internal services.
+dns01 (192.0.2.2) serves `.home` domain for internal services.
 
 ```bash
 # Test resolution
-nslookup ocean.home 192.168.1.2
+nslookup ocean.home 192.0.2.2
 ```
 
 ### External DNS (Cloudflare)
 
-External access via `*.terrac.com` through Cloudflare tunnels.
+External access via `*.example.com` through Cloudflare tunnels.
 
 Deploy DDNS updater:
 
@@ -116,7 +116,7 @@ ansible-playbook -i inventories/production/hosts.ini \
   playbooks/individual/ocean/network/cloudflared.yaml --ask-vault-pass
 
 # Check tunnel status
-ssh terrac@192.168.1.143 "docker logs cloudflared --tail 20"
+ssh terrac@192.0.2.143 "docker logs cloudflared --tail 20"
 ```
 
 ### Traffic Flow
@@ -140,11 +140,11 @@ ip addr show
 cat /proc/net/bonding/bond0
 
 # Test connectivity
-ping -c 4 192.168.1.1
+ping -c 4 192.0.2.1
 traceroute google.com
 
 # DNS resolution
-nslookup ocean.home 192.168.1.2
+nslookup ocean.home 192.0.2.2
 ```
 
 ### Performance Testing
@@ -152,7 +152,7 @@ nslookup ocean.home 192.168.1.2
 ```bash
 # iperf3 between hosts
 iperf3 -s                      # Server
-iperf3 -c 192.168.1.143        # Client
+iperf3 -c 192.0.2.143        # Client
 ```
 
 ---

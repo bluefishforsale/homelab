@@ -205,18 +205,18 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check container status
-ssh terrac@192.168.1.143 "docker ps | grep unpoller"
+ssh terrac@192.0.2.143 "docker ps | grep unpoller"
 
 # Check metrics endpoint
-curl -s http://192.168.1.143:9130/metrics | head -20
+curl -s http://192.0.2.143:9130/metrics | head -20
 
 # Check logs
-ssh terrac@192.168.1.143 "docker logs unpoller --tail 50"
+ssh terrac@192.0.2.143 "docker logs unpoller --tail 50"
 ```
 
 ### Prometheus Target
 
-UnPoller exposes metrics at `http://192.168.1.143:9130/metrics` for Prometheus scraping.
+UnPoller exposes metrics at `http://192.0.2.143:9130/metrics` for Prometheus scraping.
 
 ---
 

@@ -41,7 +41,7 @@ gh run view "$RUN" --log | grep -E '^Applying:|^✅ SUCCESS|^❌ FAILED'
 
 **Smoke-test the live site:**
 ```bash
-curl -sI https://homepage.terrac.com   # expect HTTP/2 200
+curl -sI https://homepage.example.com   # expect HTTP/2 200
 curl -sI http://homepage.home          # expect 200 OK (run from inside the home network)
 ```
 
@@ -96,7 +96,7 @@ gh run view "$RUN" --log | grep -E '^Applying:|^✅ SUCCESS'
 
 **Then confirm the live site is still up:**
 ```bash
-curl -sI https://homepage.terrac.com
+curl -sI https://homepage.example.com
 ```
 
 ## Failure interpretation

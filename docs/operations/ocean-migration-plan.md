@@ -8,8 +8,8 @@ Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Pr
 
 | Component | Value |
 |-----------|-------|
-| Proxmox Host | node006 (192.168.1.106) |
-| Ocean VM | 192.168.1.143 (VM on node006) |
+| Proxmox Host | node006 (192.0.2.106) |
+| Ocean VM | 192.0.2.143 (VM on node006) |
 | VM ID | 5000 |
 | Template ID | 9999 |
 | GPU | NVIDIA RTX 3090 (PCI 42:00) - passed through |
@@ -23,7 +23,7 @@ Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Pr
 
 **Completed:**
 
-1. Proxmox VE installed on node006 (192.168.1.106)
+1. Proxmox VE installed on node006 (192.0.2.106)
 2. IOMMU and VFIO configured for hardware passthrough
 3. Debian 12 cloud-init template created (VM ID 9999)
 4. Ocean VM created with GPU and SAS passthrough
@@ -46,8 +46,8 @@ Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Pr
 
 ### Network
 
-- Proxmox host (node006): 192.168.1.106
-- Ocean VM: 192.168.1.143
+- Proxmox host (node006): 192.0.2.106
+- Ocean VM: 192.0.2.143
 
 ### Hardware Passthrough
 
@@ -60,7 +60,7 @@ Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Pr
 ## Step-by-Step Migration Guide
 
 ### ✅ COMPLETED: Proxmox Installation and VFIO Configuration
-- Proxmox VE installed on node006 (192.168.1.106)
+- Proxmox VE installed on node006 (192.0.2.106)
 - SSH access configured (terrac user with keys, passwordless )
 - Network bond0 configured (eth0+eth1)
 - Old Ubuntu boot disk available via USB adapter if needed
@@ -76,7 +76,7 @@ Completed migration of ocean from Ubuntu 20.04 baremetal to a Debian 12 VM on Pr
 #### Step 1.1: Download Debian 12 Cloud Image
 ```bash
 # SSH to node006 as terrac
-ssh terrac@192.168.1.106
+ssh terrac@192.0.2.106
 
 # Download Debian 12 cloud image
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
@@ -120,7 +120,7 @@ qm template 9999
 #### Step 2.1: Verify IOMMU and VFIO Devices
 ```bash
 # SSH to node006
-ssh terrac@192.168.1.106
+ssh terrac@192.0.2.106
 
 # Verify IOMMU is enabled
 dmesg | grep -e DMAR -e IOMMU | head -20
@@ -164,15 +164,15 @@ lsblk
 
 ```bash
 # SSH to node006
-ssh terrac@192.168.1.106
+ssh terrac@192.0.2.106
 
 # Clone from template 9999 to VM ID 5000
 qm clone 9999 5000
 
 # Configure ocean VM with DIRECT production IP (no temporary IP needed)
 qm set 5000 --name ocean \
-  --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 \
-  --nameserver=192.168.1.2 \
+  --ipconfig0 ip=192.0.2.143/24,gw=192.0.2.1 \
+  --nameserver=192.0.2.2 \
   --onboot 1
 
 # Ensure multiqueue is configured for optimal network performance
@@ -282,7 +282,7 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/01_base_system.ya
 **Option B: Manual Docker Installation**
 ```bash
 # If Ansible not available, install Docker manually in VM
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -294,7 +294,7 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 
 # Logout and back in for group changes
 exit
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 ```
 
 #### Step 4.3: Test GPU Access
@@ -323,7 +323,7 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml --li
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/*/ocean*.yaml
 
 # Verify services are running
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 docker ps -a
 systemctl list-units --type=service | grep -E 'docker|service' | grep Active
 ```
@@ -349,7 +349,7 @@ for svc in "${services[@]}"; do
   name="${svc%:*}"
   port="${svc#*:}"
   echo "Testing $name..."
-  curl -f -s -o /dev/null "http://192.168.1.143:$port" && echo "✓ $name OK" || echo "✗ $name FAILED"
+  curl -f -s -o /dev/null "http://192.0.2.143:$port" && echo "✓ $name OK" || echo "✗ $name FAILED"
 done
 
 # Test GPU services
@@ -359,7 +359,7 @@ docker exec comfyui nvidia-smi
 ls -la /data01/media/
 
 # Test external access via cloudflare
-curl https://grafana.terrac.com
+curl https://grafana.example.com
 
 # Verify ZFS pool health
 zpool status data01
@@ -379,7 +379,7 @@ zpool status -v data01 | grep scan
 
 # After (new):
 # [vms]
-# ocean ansible_user=terrac nvidia_gpu=true ansible_ssh_host=192.168.1.143 bare_metal_host="node006"
+# ocean ansible_user=terrac nvidia_gpu=true ansible_ssh_host=192.0.2.143 bare_metal_host="node006"
 
 # Commit changes
 git add inventories/production/hosts.ini
@@ -397,7 +397,7 @@ git commit -m "ocean: migrated to Proxmox VM on node006"
 4. Services resume automatically from /data01
 
 # Option B: Fix issues in VM without rollback
-1. SSH to Proxmox: ssh terrac@192.168.1.106
+1. SSH to Proxmox: ssh terrac@192.0.2.106
 2. Access VM console: qm terminal 100
 3. Debug and fix issues
 4. Keep old Ubuntu disk available for 1-2 weeks
@@ -424,7 +424,7 @@ git commit -m "ocean: migrated to Proxmox VM on node006"
 
 **Create Cloud-Init Template:**
 ```bash
-ssh terrac@192.168.1.106
+ssh terrac@192.0.2.106
 cd /tmp
 wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 curl https://github.com/bluefishforsale.keys > rsa.keys
@@ -442,7 +442,7 @@ qm template 9999
 **Create VM with Hardware Passthrough:**
 ```bash
 qm clone 9999 5000
-qm set 5000 --name ocean --ipconfig0 ip=192.168.1.143/24,gw=192.168.1.1 --nameserver=192.168.1.2 --onboot 1
+qm set 5000 --name ocean --ipconfig0 ip=192.0.2.143/24,gw=192.0.2.1 --nameserver=192.0.2.2 --onboot 1
 qm set 5000 --net0 virtio,bridge=vmbr0,queues=128  # Ensure multiqueue is configured
 qm resize 5000 scsi0 +126G
 qm set 5000 --cores 30 --memory 262144  # 30 cores, 256GB RAM
@@ -455,7 +455,7 @@ qm start 5000
 
 **Import ZFS Pool in VM:**
 ```bash
-ssh terrac@192.168.1.143
+ssh terrac@192.0.2.143
 sudo apt update && sudo apt install -y zfsutils-linux
 sudo modprobe zfs
 lsmod | grep zfs
@@ -502,7 +502,7 @@ zpool status data01
    - NVMe remains on Proxmox host (not passed through)
 6. ⚠️ **ZFS IMPORT:** ZFS pool will be imported in VM after hardware passthrough
 7. ⚠️ **RESILVER:** ZFS resilver continues automatically after import in VM
-8. ⚠️ **DIRECT IP:** Using production IP 192.168.1.143 directly (no temporary IP)
+8. ⚠️ **DIRECT IP:** Using production IP 192.0.2.143 directly (no temporary IP)
 9. ⚠️ **VALIDATION:** Test all services thoroughly before declaring success
 
 ---
@@ -514,7 +514,7 @@ If you decide to skip Proxmox and install Debian directly:
 ```bash
 # Same process as Phase 2.3, but:
 # 1. Install Debian 12 instead of Proxmox
-# 2. Configure IP as 192.168.1.143 directly
+# 2. Configure IP as 192.0.2.143 directly
 # 3. No VM needed - all services run on host
 # 4. Simpler, but less flexible
 # 5. GPU directly available (easier setup)

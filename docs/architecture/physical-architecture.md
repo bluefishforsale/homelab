@@ -19,13 +19,13 @@ Physical server layout and rack diagram.
 │         │                                                   │
 │  U7-8   │ node005 - Dell R620                               │
 │         │ 56 cores, 128GB RAM                               │
-│         │ 192.168.1.105                                     │
+│         │ 192.0.2.105                                     │
 │         │ VMs: dns01, pihole, gitlab, gh-runner-01          │
 ├─────────────────────────────────────────────────────────────┤
 │         │                                                   │
 │  U9-10  │ node006 - Dell R720                               │
 │         │ 40 cores, 680GB RAM, RTX 3090                     │
-│         │ 192.168.1.106                                     │
+│         │ 192.0.2.106                                     │
 │         │ VMs: ocean (Docker services)                      │
 ├─────────────────────────────────────────────────────────────┤
 │  U11-14 │ UPS / Power Distribution                          │
@@ -46,14 +46,14 @@ Physical server layout and rack diagram.
 | RAM | 128GB DDR3 ECC |
 | Storage | Local LVM for VM boot disks |
 | Network | 2x 10GbE (bond0 LACP) |
-| IP | 192.168.1.105 |
+| IP | 192.0.2.105 |
 
 **VMs hosted:**
 
-- dns01 (192.168.1.2) - BIND DNS
-- pihole (192.168.1.9) - DNS filtering
-- gitlab (192.168.1.5) - CI/CD
-- gh-runner-01 (192.168.1.250) - GitHub Actions
+- dns01 (192.0.2.2) - BIND DNS
+- pihole (192.0.2.9) - DNS filtering
+- gitlab (192.0.2.5) - CI/CD
+- gh-runner-01 (192.0.2.250) - GitHub Actions
 
 ### node006 (Dell R720)
 
@@ -64,11 +64,11 @@ Physical server layout and rack diagram.
 | GPU | NVIDIA RTX 3090 (24GB VRAM) - passthrough |
 | Storage | Local LVM + SAS controller passthrough |
 | Network | 2x 10GbE (bond0 LACP) |
-| IP | 192.168.1.106 |
+| IP | 192.0.2.106 |
 
 **VMs hosted:**
 
-- ocean (192.168.1.143) - Docker services, ZFS storage
+- ocean (192.0.2.143) - Docker services, ZFS storage
 
 ---
 
@@ -79,15 +79,15 @@ graph TB
     subgraph rack["Physical Rack"]
         Switch[UniFi US-16-XG<br/>10GbE]
         
-        subgraph node005["node005 (192.168.1.105)"]
-            DNS[dns01<br/>192.168.1.2]
-            PiHole[pihole<br/>192.168.1.9]
-            GitLab[gitlab<br/>192.168.1.5]
-            Runner[gh-runner-01<br/>192.168.1.250]
+        subgraph node005["node005 (192.0.2.105)"]
+            DNS[dns01<br/>192.0.2.2]
+            PiHole[pihole<br/>192.0.2.9]
+            GitLab[gitlab<br/>192.0.2.5]
+            Runner[gh-runner-01<br/>192.0.2.250]
         end
         
-        subgraph node006["node006 (192.168.1.106)"]
-            Ocean[ocean<br/>192.168.1.143]
+        subgraph node006["node006 (192.0.2.106)"]
+            Ocean[ocean<br/>192.0.2.143]
             GPU[RTX 3090]
             ZFS[ZFS data01]
         end

@@ -6,11 +6,11 @@ This guide covers frequently encountered issues in the homelab environment.
 
 | Host | IP | Purpose |
 |------|----|---------|
-| ocean | 192.168.1.143 | Media/AI services, Prometheus, Grafana |
-| dns01 | 192.168.1.2 | BIND9 DNS |
-| pihole | 192.168.1.9 | DNS filtering |
-| node005 | 192.168.1.105 | Proxmox hypervisor |
-| node006 | 192.168.1.106 | Proxmox hypervisor (GPU) |
+| ocean | 192.0.2.143 | Media/AI services, Prometheus, Grafana |
+| dns01 | 192.0.2.2 | BIND9 DNS |
+| pihole | 192.0.2.9 | DNS filtering |
+| node005 | 192.0.2.105 | Proxmox hypervisor |
+| node006 | 192.0.2.106 | Proxmox hypervisor (GPU) |
 
 ---
 
@@ -20,18 +20,18 @@ This guide covers frequently encountered issues in the homelab environment.
 
 ```bash
 # Test DNS resolution
-nslookup gitlab.home 192.168.1.2
-dig @192.168.1.2 ocean.home
+nslookup gitlab.home 192.0.2.2
+dig @192.0.2.2 ocean.home
 
 # Check DNS server status (dns01)
-ssh debian@192.168.1.2 "systemctl status bind9"
+ssh debian@192.0.2.2 "systemctl status bind9"
 
 # Check pihole status
-ssh debian@192.168.1.9 "systemctl status pihole-FTL"
+ssh debian@192.0.2.9 "systemctl status pihole-FTL"
 
 # Restart DNS services
-ssh debian@192.168.1.2 "sudo systemctl restart bind9"
-ssh debian@192.168.1.9 "sudo systemctl restart pihole-FTL"
+ssh debian@192.0.2.2 "sudo systemctl restart bind9"
+ssh debian@192.0.2.9 "sudo systemctl restart pihole-FTL"
 
 # Ansible: Redeploy DNS
 ansible-playbook -i inventories/production/hosts.ini \
@@ -43,7 +43,7 @@ ansible-playbook -i inventories/production/hosts.ini \
 #### No Internet Access
 ```bash
 # Check gateway connectivity
-ping 192.168.1.1
+ping 192.0.2.1
 
 # Check external DNS
 ping 8.8.8.8
@@ -54,7 +54,7 @@ ip route show
 ip route get 8.8.8.8
 
 # Fix routing if needed
-sudo ip route add default via 192.168.1.1
+sudo ip route add default via 192.0.2.1
 ```
 
 #### Interface Problems
@@ -94,19 +94,19 @@ sudo systemctl restart isc-dhcp-server
 
 ```bash
 # Check VM configuration (on Proxmox node)
-ssh root@192.168.1.106 "qm config VMID"
+ssh root@192.0.2.106 "qm config VMID"
 
 # Look for locks
-ssh root@192.168.1.106 "qm unlock VMID"
+ssh root@192.0.2.106 "qm unlock VMID"
 
 # Check storage availability
-ssh root@192.168.1.106 "pvesm status"
+ssh root@192.0.2.106 "pvesm status"
 
 # Check resource availability
-ssh root@192.168.1.106 "pvesh get /nodes/node006/status"
+ssh root@192.0.2.106 "pvesh get /nodes/node006/status"
 
 # Start with debug output
-ssh root@192.168.1.106 "qm start VMID --debug"
+ssh root@192.0.2.106 "qm start VMID --debug"
 ```
 
 #### VM Storage Issues
@@ -276,19 +276,19 @@ sudo nvidia-smi -pl 65  # Reduce from 75W to 65W
 
 ```bash
 # Check pool status
-ssh terrac@192.168.1.143 "zpool status data01"
+ssh terrac@192.0.2.143 "zpool status data01"
 
 # Force import if needed
-ssh terrac@192.168.1.143 "sudo zpool import -f data01"
+ssh terrac@192.0.2.143 "sudo zpool import -f data01"
 
 # Check for errors
-ssh terrac@192.168.1.143 "zpool status -x"
+ssh terrac@192.0.2.143 "zpool status -x"
 
 # Clear errors after fixing
-ssh terrac@192.168.1.143 "sudo zpool clear data01"
+ssh terrac@192.0.2.143 "sudo zpool clear data01"
 
 # Monitor resilver progress
-ssh terrac@192.168.1.143 "watch 'zpool status data01'"
+ssh terrac@192.0.2.143 "watch 'zpool status data01'"
 ```
 
 See `docs/operations/zfs-disk-replacement.md` for disk replacement procedures.
@@ -448,17 +448,17 @@ gitlab-rails console -e production
 
 ```bash
 # Check Plex service
-ssh terrac@192.168.1.143 "docker ps | grep plex"
-ssh terrac@192.168.1.143 "systemctl status plex"
+ssh terrac@192.0.2.143 "docker ps | grep plex"
+ssh terrac@192.0.2.143 "systemctl status plex"
 
 # View logs
-ssh terrac@192.168.1.143 "docker logs plex --tail 50"
+ssh terrac@192.0.2.143 "docker logs plex --tail 50"
 
 # Restart Plex
-ssh terrac@192.168.1.143 "sudo systemctl restart plex"
+ssh terrac@192.0.2.143 "sudo systemctl restart plex"
 
 # Check GPU access
-ssh terrac@192.168.1.143 "docker exec plex nvidia-smi"
+ssh terrac@192.0.2.143 "docker exec plex nvidia-smi"
 
 # Redeploy via Ansible
 ansible-playbook -i inventories/production/hosts.ini \
@@ -471,16 +471,16 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check Grafana service
-ssh terrac@192.168.1.143 "docker ps | grep grafana"
-ssh terrac@192.168.1.143 "systemctl status grafana"
+ssh terrac@192.0.2.143 "docker ps | grep grafana"
+ssh terrac@192.0.2.143 "systemctl status grafana"
 
 # Check logs
-ssh terrac@192.168.1.143 "docker logs grafana --tail 50"
+ssh terrac@192.0.2.143 "docker logs grafana --tail 50"
 
 # Restart Grafana
-ssh terrac@192.168.1.143 "sudo systemctl restart grafana"
+ssh terrac@192.0.2.143 "sudo systemctl restart grafana"
 
-# Access: http://192.168.1.143:8910
+# Access: http://192.0.2.143:8910
 
 # Redeploy
 ansible-playbook -i inventories/production/hosts.ini \
@@ -491,15 +491,15 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 ```bash
 # Check Prometheus
-ssh terrac@192.168.1.143 "docker ps | grep prometheus"
-ssh terrac@192.168.1.143 "systemctl status prometheus"
+ssh terrac@192.0.2.143 "docker ps | grep prometheus"
+ssh terrac@192.0.2.143 "systemctl status prometheus"
 
 # Check targets
-curl http://192.168.1.143:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+curl http://192.0.2.143:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
 
 # Check specific exporter
-curl http://192.168.1.143:9100/metrics | head -20  # node-exporter
-curl http://192.168.1.143:8912/metrics | head -20  # cadvisor
+curl http://192.0.2.143:9100/metrics | head -20  # node-exporter
+curl http://192.0.2.143:8912/metrics | head -20  # cadvisor
 
 # Redeploy
 ansible-playbook -i inventories/production/hosts.ini \
@@ -559,7 +559,7 @@ pg_resetwal /var/lib/postgresql/data
 ping -c 4 google.com
 traceroute google.com
 mtr --report google.com
-nmap -sn 192.168.1.0/24
+nmap -sn 192.0.2.0/24
 ```
 
 ### Performance Analysis
@@ -594,10 +594,10 @@ stress-ng --cpu 4 --timeout 60s
 sometimes and not others.
 
 **Architecture that makes it happen:** the dns-stack is **dual-primary with no
-replication**. dns01 (192.168.1.2) and dns02 (192.168.1.3) each run their own
+replication**. dns01 (192.0.2.2) and dns02 (192.0.2.3) each run their own
 PowerDNS + Kea DHCP + kea-dhcp-ddns, and Kea DDNS-updates only its *local*
-PowerDNS (`127.0.0.1:53`). pihole (192.168.1.9) forwards `.home` to **both**
-(`server=/home/192.168.1.2` and `/home/192.168.1.3` in
+PowerDNS (`127.0.0.1:53`). pihole (192.0.2.9) forwards `.home` to **both**
+(`server=/home/192.0.2.2` and `/home/192.0.2.3` in
 `files/pihole/etc/dnsmasq.d/02-local-dns.conf`), answering from whichever
 replies first. So any per-server divergence surfaces to clients as flapping.
 
