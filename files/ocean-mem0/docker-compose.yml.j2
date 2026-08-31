@@ -10,12 +10,18 @@
 # and CF terminates TLS at its edge.
 services:
   mem0:
-    build:
-      context: {{ home }}/src/server
-      # Ours, not upstream's: theirs is python:3.12-slim with no libpq, which
-      # psycopg needs at runtime. See files/ocean-mem0/Dockerfile.mem0.
-      dockerfile: Dockerfile.homelab
-    image: mem0-api-server:{{ mem0_version }}
+    # Built and smoke-tested by the mem0 repo's build-and-push workflow, which
+    # dispatches deploy-mem0 here on merge. Not built on this host any more.
+    #
+    # The host build could only ever see {{ home }}/src/server, and that context
+    # does not contain the repository's own mem0/ package, so requirements.txt
+    # installed mem0ai from PyPI and every change in the fork was inert once
+    # deployed. Building the right Dockerfile did not fix that; only moving the
+    # build to a context that includes mem0/ does, which is what CI now does.
+    #
+    # libpq comes from psycopg[binary] in the image, so Dockerfile.mem0 and its
+    # libpq5 apt install are both gone.
+    image: {{ mem0_image }}:{{ mem0_version }}
     container_name: {{ service }}
     hostname: {{ service }}
     restart: unless-stopped
