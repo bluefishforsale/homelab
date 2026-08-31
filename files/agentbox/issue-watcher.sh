@@ -10,6 +10,12 @@
 set -euo pipefail
 
 OWNER="bluefishforsale"
+# Whose issues the fleet is willing to take instructions from, space separated.
+# GitHub cannot restrict who opens an issue on a public repo, so this is where
+# that boundary has to live. Overridable from agentbox.env for the day a second
+# trusted human exists; defaulting to the owner alone is the safe direction to
+# be wrong in.
+ISSUE_AUTHOR_ALLOWLIST="${ISSUE_AUTHOR_ALLOWLIST:-$OWNER}"
 # Separate from repos/ (the RC sessions' cwd) so the watcher's clone + commits
 # can't collide with a live remote-control session on the same repo.
 WORKROOT="{{ home }}/work"
@@ -52,9 +58,26 @@ for repo in ${AGENTBOX_REPOS:-}; do
   export OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=free,service=agentbox"
   ensure_labels "$slug"
 
-  # Open issues not already claimed (agent-working) or escalated (needs-claude).
-  issues=$(gh issue list --repo "$slug" --state open --json number,labels \
-    --jq '.[] | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_CLAUDE"'"])) | not) | .number') || continue
+  # Open issues not already claimed (agent-working) or escalated (needs-claude),
+  # AND authored by someone on the allowlist.
+  #
+  # The author check is the security boundary. An issue title and body are fed
+  # verbatim into the prompt below, and the agent that reads them clones the
+  # repo, writes code and opens a PR, which for an allowlisted repo can then
+  # auto-merge. That makes an issue an instruction channel into a process with
+  # write access, so it must only accept instructions from people entitled to
+  # give them.
+  #
+  # Every watched repo is private today, which is the only reason this was not
+  # already exploitable. That is an accident of configuration, not a control:
+  # the day one goes public, or an outside collaborator is added, anyone could
+  # queue work for the fleet. Trust belongs in the code, stated out loud.
+  issues=$(gh issue list --repo "$slug" --state open --json number,labels,author \
+    --jq --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
+      .[]
+      | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_CLAUDE"'"])) | not)
+      | select(.author.login as $a | ($allow | split(" ")) | index($a))
+      | .number') || continue
 
   for num in $issues; do
     title=$(gh issue view "$num" --repo "$slug" --json title --jq .title)
