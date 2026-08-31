@@ -1,0 +1,164 @@
+---
+name: Deploy mem0
+
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      mem0_version:
+        description: "Image tag to deploy (40-char SHA). Empty uses the playbook's pin."
+        required: false
+        default: ""
+        type: string
+
+  # Webhook trigger from the mem0 repository's build-and-push workflow, which
+  # fires only after that workflow has started the image against a real
+  # postgres and read a memory back out of it.
+  repository_dispatch:
+    types: [deploy-mem0]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+jobs:
+  deploy:
+    name: Deploy mem0
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Determine deployment parameters
+        id: params
+        # Payload through env vars, never inline ${{ }} expansion: client_payload
+        # is attacker-controlled if the dispatch token ever leaks, and a commit
+        # message is free text.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_COMMIT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_COMMIT_MESSAGE: ${{ github.event.client_payload.commit_message }}
+          INPUT_VERSION: ${{ inputs.mem0_version }}
+        run: |
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            VERSION="$CLIENT_COMMIT_SHA"
+            COMMIT_MESSAGE="${CLIENT_COMMIT_MESSAGE:-Webhook deployment}"
+          else
+            VERSION="$INPUT_VERSION"
+            COMMIT_MESSAGE="Manual deployment"
+          fi
+
+          # This value becomes both an --extra-vars argument and an image tag.
+          # Anything that is not a plain commit SHA is refused and the
+          # playbook's own pin is used instead.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9a-f]{40}$'; then
+            if [ -n "$VERSION" ]; then
+              echo "::warning::ignoring malformed mem0_version, falling back to the playbook pin"
+            fi
+            VERSION=""
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_message=$(printf '%s' "$COMMIT_MESSAGE" | head -1)" >> $GITHUB_OUTPUT
+
+          echo "Deployment parameters:"
+          echo "  Image tag: ${VERSION:-<playbook pin>}"
+
+      - name: Run deployment playbook
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          INVENTORY="inventories/production/hosts.ini"
+          PLAYBOOK="playbooks/individual/ocean/ai/mem0.yaml"
+          VERSION="${{ steps.params.outputs.version }}"
+
+          EXTRA=()
+          if [ -n "$VERSION" ]; then
+            EXTRA=(--extra-vars "mem0_version=$VERSION")
+          fi
+
+          # NOTE: steps run under `bash -e`, so the failure branch has to be an
+          # if/else. Testing $? on the following line would never execute.
+          START_TIME=$(date +%s)
+          if ansible-playbook -i "$INVENTORY" \
+               --vault-password-file=/tmp/.vault_pass \
+               "${EXTRA[@]}" "$PLAYBOOK"; then
+            ANSIBLE_EXIT=0
+          else
+            ANSIBLE_EXIT=1
+          fi
+          DURATION=$(( $(date +%s) - START_TIME ))
+
+          echo "deployment_duration=$DURATION" >> $GITHUB_ENV
+          if [ "$ANSIBLE_EXIT" -eq 0 ]; then
+            echo "deployment_status=success" >> $GITHUB_ENV
+          else
+            echo "deployment_status=failed" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      # The playbook already probes /docs and fails the deploy if it never comes
+      # up, so this is a second opinion from outside the play, not the gate.
+      # Halt-and-alert: nothing here rolls back.
+      - name: Post-deployment health check
+        if: success()
+        run: |
+          if timeout 10 curl -fsS -o /dev/null http://192.168.1.143:8888/docs; then
+            echo "mem0 API serving /docs on 8888"
+          else
+            echo "::error::mem0 API is not serving /docs on 8888"
+            exit 1
+          fi
+
+      - name: Generate deployment summary
+        if: always()
+        env:
+          DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
+        run: |
+          STATUS="${{ env.deployment_status || 'unknown' }}"
+          DURATION="${{ env.deployment_duration || 'N/A' }}"
+          VERSION="${{ steps.params.outputs.version }}"
+
+          if [ "$STATUS" = "success" ]; then
+            STATUS_EMOJI="✅"; STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
+          else
+            STATUS_EMOJI="❌"; STATUS_TEXT="DEPLOYMENT FAILED"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # 🧠 mem0 Deployment
+
+          ## $STATUS_EMOJI $STATUS_TEXT
+
+          **Image tag:** \`${VERSION:-playbook pin}\`
+          **Message:** $DEPLOY_COMMIT_MESSAGE
+          **Duration:** ${DURATION}s
+
+          | Parameter | Value |
+          |-----------|-------|
+          | Repository | bluefishforsale/mem0 |
+          | Image | ghcr.io/bluefishforsale/mem0-api-server |
+          | API | 192.168.1.143:8888 (LAN only, ssh forward off-site) |
+          | MCP bridge | 192.168.1.143:8766 |
+
+          EOF
