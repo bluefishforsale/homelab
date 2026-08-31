@@ -434,7 +434,7 @@
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
       },
-      "description": "The recall hook gives a whole search 6s and fails silent, so anything above that line means sessions start with no memory and no error.",
+      "description": "Quantiles over a rolling 60m window; the grey bars are how many requests they rest on. A homelab is quiet, so a p95 built from one request is common and means nothing. The recall hook gives a whole search 6s and fails silent, so sustained time above that line means sessions start with no memory and no error.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -468,7 +468,47 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "samples (60m)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "requests in window"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -514,6 +554,17 @@
           "refId": "C",
           "range": true,
           "legendFormat": "max"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_request_samples{path=\"/search\"}",
+          "refId": "D",
+          "range": true,
+          "legendFormat": "samples (60m)"
         }
       ]
     },
@@ -594,7 +645,7 @@
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
       },
-      "description": "Writes are slow by design: each one runs fact extraction through a frontier model before storing.",
+      "description": "Ten seconds here is normal, not a fault. A mem0 write is an LLM pipeline: fact extraction through a frontier model, then a second pass deciding add/update/delete against existing memories, plus an embed and a vector search per fact (measured: 6 embed call sites and an LLM call in _add_to_vector_store alone). Nothing waits on it either, the capture hook fires it backgrounded. Watch the grey sample bars before reading anything into the quantiles.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -612,7 +663,47 @@
             "spanNulls": true
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "samples (60m)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 25
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "requests in window"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -647,6 +738,17 @@
           "refId": "B",
           "range": true,
           "legendFormat": "p95"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_request_samples{path=\"/memories\"}",
+          "refId": "C",
+          "range": true,
+          "legendFormat": "samples (60m)"
         }
       ]
     },

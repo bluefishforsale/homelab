@@ -65,15 +65,23 @@ reqs=$(docker exec "$PG_CONTAINER" psql -U postgres -d mem0_app -tAF, -c "
    where created_at > now() - interval '$WINDOW_MIN minutes'
    group by 1, 2" 2>/dev/null)
 
+# Paths come from a 24h window but the figures from LAT_WINDOW, so a path that
+# has gone quiet reports 0 samples instead of vanishing. A panel that empties
+# out looks broken; a zero bar reads as "nothing happened", which is the truth.
+# Quantiles are emitted only when the window actually holds requests.
 lat=$(docker exec "$PG_CONTAINER" psql -U postgres -d mem0_app -tAF, -c "
-  select $norm as p,
-         round(percentile_cont(0.5)  within group (order by latency_ms)::numeric, 1),
-         round(percentile_cont(0.95) within group (order by latency_ms)::numeric, 1),
-         round(max(latency_ms)::numeric, 1),
-         count(*)
-    from request_logs
-   where created_at > now() - interval '$LAT_WINDOW_MIN minutes'
-   group by 1" 2>/dev/null)
+  with w as (select created_at > now() - interval '$LAT_WINDOW_MIN minutes' as recent,
+                    $norm as p, latency_ms
+               from request_logs
+              where created_at > now() - interval '24 hours')
+  select p,
+         coalesce(round(percentile_cont(0.5)  within group (order by latency_ms)
+                        filter (where recent)::numeric, 1), -1),
+         coalesce(round(percentile_cont(0.95) within group (order by latency_ms)
+                        filter (where recent)::numeric, 1), -1),
+         coalesce(round(max(latency_ms) filter (where recent)::numeric, 1), -1),
+         count(*) filter (where recent)
+    from w group by 1" 2>/dev/null)
 
 # --- live embedder probe ---------------------------------------------------
 # The embedder is the component that has actually misbehaved (thread
@@ -139,10 +147,13 @@ END=$(date +%s)
   if [ -n "$lat" ]; then
     printf '%s\n' "$lat" | while IFS=, read -r p p50 p95 mx n; do
       [ -n "$p" ] || continue
+      # Sample count always; quantiles only when there is something behind
+      # them. -1 is the SQL sentinel for "no requests in the window".
+      echo "mem0_request_samples{path=\"$p\"} $(num "$n")"
+      [ "$(num "$p50")" = "-1" ] && continue
       echo "mem0_request_latency_ms{path=\"$p\",quantile=\"0.5\"} $(num "$p50")"
       echo "mem0_request_latency_ms{path=\"$p\",quantile=\"0.95\"} $(num "$p95")"
       echo "mem0_request_latency_ms{path=\"$p\",quantile=\"max\"} $(num "$mx")"
-      echo "mem0_request_samples{path=\"$p\"} $(num "$n")"
     done
   fi
 
