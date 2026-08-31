@@ -38,7 +38,7 @@ src = open(sys.argv[1]).read()
 # interpolation quote instead of at the end of the jq program.
 for var, val in (("LABEL_WORKING", "agent-working"), ("LABEL_CLAUDE", "needs-claude")):
     src = src.replace("'" + '"$' + var + '"' + "'", val)
-pat = r"""--jq --arg allow "\$ISSUE_AUTHOR_ALLOWLIST" '(.*?)'"""
+pat = r"""jq -r --arg allow "\$ISSUE_AUTHOR_ALLOWLIST" '(.*?)'"""
 for prog in re.findall(pat, src, re.S):
     print(prog.replace("\n", " "))
 PY
@@ -99,6 +99,28 @@ for f in "$WATCHER" "$ESCALATE"; do
     bad "$(basename "$f") lacks the :-\$OWNER fallback"
   fi
 done
+
+# gh's --jq is not jq. It takes one expression and has no --arg, so
+# `gh ... --jq --arg allow ...` makes gh reject the whole command. That shipped
+# once and killed the watcher for every repo, silently, because the failure was
+# swallowed by `|| continue`. Running the extracted program under real jq (as
+# the tests above do) cannot catch it — the bug is in how gh parses its flags,
+# not in the jq — so assert the shape directly.
+# Matched as a bare string, not anchored to the gh line: the flag lands on a
+# backslash continuation, which is how it slipped through the first time.
+if grep -n -- '--jq[[:space:]]*--arg' "$WATCHER" "$ESCALATE"; then
+  bad "gh --jq does not accept --arg; pipe to real jq instead"
+else
+  ok "no gh invocation passes --arg to gh's own --jq"
+fi
+
+# The same silent-failure shape that hid it: a bare `|| continue` on the fetch
+# turns a total outage into a clean exit 0.
+if grep -qE "\|\| continue$" "$WATCHER"; then
+  bad "watcher swallows a failed fetch with a bare || continue (log it instead)"
+else
+  ok "a failed fetch is logged, not silently skipped"
+fi
 
 # The allowlist is single-sourced in the env template both lanes read.
 if grep -q 'ISSUE_AUTHOR_ALLOWLIST=' "$ROOT/files/agentbox/agentbox.env.j2"; then

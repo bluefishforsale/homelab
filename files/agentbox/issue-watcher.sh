@@ -72,12 +72,17 @@ for repo in ${AGENTBOX_REPOS:-}; do
   # already exploitable. That is an accident of configuration, not a control:
   # the day one goes public, or an outside collaborator is added, anyone could
   # queue work for the fleet. Trust belongs in the code, stated out loud.
+  #
+  # NOTE: gh's own --jq takes a single expression and does NOT accept --arg;
+  # passing one makes gh reject the entire command, so the allowlist has to
+  # reach jq through a real pipe. Get this wrong and the loop below silently
+  # processes nothing.
   issues=$(gh issue list --repo "$slug" --state open --json number,labels,author \
-    --jq --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
+    | jq -r --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
       .[]
       | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_CLAUDE"'"])) | not)
       | select(.author.login as $a | ($allow | split(" ")) | index($a))
-      | .number') || continue
+      | .number') || { echo "issue list failed for $slug, skipping" >&2; continue; }
 
   for num in $issues; do
     title=$(gh issue view "$num" --repo "$slug" --json title --jq .title)
@@ -152,11 +157,11 @@ $review" >/dev/null 2>&1 || true
   # place. Agent PRs are opened with the owner's PAT, so they pass.
   red=$(gh pr list --repo "$slug" --state open \
     --json number,headRefName,statusCheckRollup,author \
-    --jq --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
+    | jq -r --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
       .[] | select(.headRefName|startswith("agent/issue-"))
           | select(.author.login as $a | ($allow | split(" ")) | index($a))
           | select(any(.statusCheckRollup[]?; .conclusion=="FAILURE" or .state=="FAILURE"))
-          | "\(.number) \(.headRefName)"') || red=""
+          | "\(.number) \(.headRefName)"') || { echo "pr list failed for $slug" >&2; red=""; }
   while read -r prnum ref; do
     [ -z "${ref:-}" ] && continue
     inum=${ref#agent/issue-}
