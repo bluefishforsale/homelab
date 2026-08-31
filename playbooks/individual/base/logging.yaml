@@ -309,6 +309,33 @@
                   action_on_failure: fudge
               - labels:
                   level:
+
+          # Kometa, same shape as Plex: the container's stdout says nothing and
+          # the entire run outcome lives in a file. Without this, a nightly job
+          # that has not succeeded since 2025-11-12 looks identical to one that
+          # ran fine, because `docker ps` says healthy either way.
+          - job_name: kometa
+            static_configs:
+              - targets:
+                  - localhost
+                labels:
+                  job: kometa
+                  host: {{ inventory_hostname }}
+                  container: plex-meta-manager
+                  __path__: "/data01/services/plex-meta-manager/config/logs/meta.log"
+            pipeline_stages:
+              - regex:
+                  expression: '^\[(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d{3}\] \[[^\]]+\]\s+\[(?P<level>[A-Z]+)\]'
+              - timestamp:
+                  source: ts
+                  format: '2006-01-02 15:04:05'
+                  # Same local-time-no-zone trap as Plex above. Stated up front
+                  # here rather than discovered later by wondering why a job
+                  # that demonstrably ran has no recent lines.
+                  location: America/Los_Angeles
+                  action_on_failure: fudge
+              - labels:
+                  level:
       mode: '0644'
     notify:
       - Restart promtail

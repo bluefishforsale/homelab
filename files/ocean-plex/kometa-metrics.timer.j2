@@ -1,0 +1,13 @@
+[Unit]
+Description=Collect Kometa run outcomes every 15 minutes
+
+[Timer]
+OnBootSec=5min
+# Kometa runs once a day, so the metrics only change once a day. 15m is about
+# keeping the series fresh enough that Mem0-style staleness alerting works,
+# not about resolution.
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
