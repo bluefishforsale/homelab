@@ -225,6 +225,31 @@
       embedder_modelfile.changed
       or embedder_model not in (ollama_models.stdout | default(''))
 
+  # mem0 has no /metrics of its own, so statistics reach Prometheus through the
+  # node_exporter textfile collector, the same route db-backup uses.
+  - name: Deploy the metrics collector
+    ansible.builtin.copy:
+      src: "{{ files }}/mem0-metrics.sh"
+      dest: "{{ home }}/mem0-metrics.sh"
+      mode: '0755'
+
+  - name: Install the metrics timer
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    loop:
+      - mem0-metrics.service
+      - mem0-metrics.timer
+    notify: Reload systemd daemon
+
+  - name: Enable the metrics timer
+    ansible.builtin.systemd:
+      name: mem0-metrics.timer
+      enabled: true
+      state: started
+      daemon_reload: true
+
   # The LAN address, not loopback: the compose port is bound to it explicitly so
   # the service is unreachable from anywhere the host itself doesn't route.
   - name: Verify the API is serving
