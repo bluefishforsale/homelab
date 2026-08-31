@@ -1,7 +1,13 @@
 ## This file is a template remove the .template to use the file
 libraries:                                      # This is called out once within the config.yml file                                       
   Movies:                                       # Each library must match the Plex library name
-    metadata_path:
+    # Kometa v2 split metadata_path into collection_files and metadata_files.
+    # Everything below is collections, checked rather than assumed: Movies.yml
+    # has top-level `templates:`/`collections:`, config/movies/*.yaml are all
+    # `collections:`, and every `default:` here is a Kometa default collection
+    # file. Nothing edits item metadata, so this is a clean rename with no
+    # entries needing metadata_files.
+    collection_files:
     - file: config/Movies.yml                   # This is a local file on the system
     - folder: config/movies/                    # This is a local directory on the system
     - default: seasonal
@@ -21,7 +27,8 @@ libraries:                                      # This is called out once within
     - default: director
     operations:
       delete_unmanaged_collections: true
-    overlay_path:
+    # Straight rename in v2, unlike collection_files above.
+    overlay_files:
     - remove_overlays: false                    # Set this to true to remove all overlays
     - file: config/Overlays.yml                 # This is a local file on the system
     - default: ribbon                               # This is a file within the defaults folder in the Repository
