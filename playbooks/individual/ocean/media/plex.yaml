@@ -204,6 +204,36 @@
       state: started
     tags: [service, meta-manager]
 
+  # Kometa has no metrics endpoint and its stdout is silent, so the only
+  # evidence a nightly run happened is meta.log. Publishing its outcome through
+  # the textfile collector is what makes a run that stops happening visible.
+  - name: Deploy the Kometa metrics collector
+    ansible.builtin.copy:
+      src: "{{ files }}/kometa-metrics.sh"
+      dest: "{{ meta_manager_home }}/kometa-metrics.sh"
+      mode: '0755'
+    tags: [config, meta-manager]
+
+  - name: Install the Kometa metrics timer
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    vars:
+      home: "{{ meta_manager_home }}"
+    loop:
+      - kometa-metrics.service
+      - kometa-metrics.timer
+    tags: [service, meta-manager]
+
+  - name: Enable the Kometa metrics timer
+    ansible.builtin.systemd:
+      name: kometa-metrics.timer
+      enabled: true
+      state: started
+      daemon_reload: true
+    tags: [service, meta-manager]
+
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
       daemon_reload: yes

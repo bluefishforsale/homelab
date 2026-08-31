@@ -91,6 +91,35 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} failed on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been in the failed state for 5m on {{ "{{ $labels.instance }}" }}"
 
+  # Kometa has not completed a clean run in two days. It runs nightly, its
+  # container reports healthy while doing nothing, and its stdout is silent, so
+  # before this alert existed the service went 8+ months without a successful
+  # run and nothing anywhere said so. kometa_last_success_timestamp_seconds is 0
+  # when no log on disk shows a clean run, which the 30d guard below treats as
+  # firing rather than as "brand new".
+  - alert: KometaNotRunning
+    expr: >
+      (kometa_last_success_timestamp_seconds == 0)
+      or (time() - kometa_last_success_timestamp_seconds > 172800)
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "Kometa has not had a clean run in over 48h"
+      description: "No Kometa run without a CRITICAL in 48h. Check `scripts/loki.sh` for job=kometa, or /data01/services/plex-meta-manager/config/logs/meta.log. Collections and overlays are not being updated."
+
+  # A run that finishes instantly did nothing. The original 8-month outage
+  # looked exactly like this every night: Run Time 0:00:00, no crash visible
+  # from outside, nothing updated.
+  - alert: KometaRunDidNothing
+    expr: kometa_last_run_failed == 1 and kometa_last_run_duration_seconds < 60
+    for: 2h
+    labels:
+      severity: warning
+    annotations:
+      summary: "Kometa's last run failed after {{ "{{ $value }}" }}s"
+      description: "Kometa aborted early rather than doing work. A config or Plex-connection error aborts in seconds and still prints a run summary."
+
   # Nothing has been written to the shared memory in two days. The store stays
   # up, the probe stays green, and the hooks fail silent by design, so without
   # this the only symptom is agents quietly getting dumber. This is the alert

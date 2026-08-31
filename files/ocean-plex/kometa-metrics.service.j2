@@ -1,0 +1,9 @@
+[Unit]
+Description=Publish Kometa run outcomes to the node_exporter textfile collector
+
+[Service]
+Type=oneshot
+Environment=TEXTFILE_DIR=/data01/services/node-exporter/text_files
+ExecStart={{ home }}/kometa-metrics.sh
+# Runs as root: the Kometa logs are owned by the media UID inside the bind mount.
+TimeoutStartSec=60
