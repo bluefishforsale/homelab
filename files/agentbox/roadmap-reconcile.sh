@@ -73,8 +73,13 @@ Evidence:
 $(cat "$EV")"
 
 /usr/local/bin/agentbox-trust-dir.sh "$WT" || true
+# An expired OAuth session lands here and used to be swallowed whole: the log
+# got the error, nothing else did, and the reconciler looked like it had simply
+# found nothing to change.
 ( cd "$WT" && claude -p "$prompt" --permission-mode acceptEdits ) \
-  >"$LOGDIR/roadmap-reconcile.log" 2>&1 || true
+  >"$LOGDIR/roadmap-reconcile.log" 2>&1 \
+  || /usr/local/bin/agentbox-notify-auth-expired.sh \
+       "roadmap reconcile" "$(cat "$LOGDIR/roadmap-reconcile.log")" || true
 
 # --- Open/refresh the single rolling PR only if the roadmap actually changed ---
 if [ -z "$(git -C "$WT" status --porcelain ROADMAP.md)" ]; then

@@ -273,6 +273,7 @@
       - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
       - { src: roadmap-reconcile.sh, dest: agentbox-roadmap-reconcile.sh }
       - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
+      - { src: notify-auth-expired.sh, dest: agentbox-notify-auth-expired.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
 
