@@ -9,7 +9,14 @@ services:
       TZ: America/Los_Angeles
       VERSION: {{ version }}
       PLEX_CLAIM: "{{ plex_claim }}"
-      ADVERTISE_IP: "https://{{ ansible_default_ipv4.address }}:32400/"
+      # NOTE: the image writes ADVERTISE_IP straight into Preferences.xml
+      # customConnections on every start, so this is the only durable place to
+      # set it. Editing it in the Plex UI is reverted by the next recreate.
+      # The public name must stay first and must match the mounted cert CN, or
+      # remote clients get no direct TLS endpoint. The LAN address stays because
+      # Plex only auto-detects its own container IP (172.19.x), which no LAN
+      # client can reach.
+      ADVERTISE_IP: "https://home.terrac.com:32400/,https://{{ ansible_default_ipv4.address }}:32400/"
       PLEX_UID: "{{ uid }}"
       PLEX_GID: "{{ uid }}"
       NVIDIA_VISIBLE_DEVICES: all
@@ -56,12 +63,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        compress: "true"
 
   plex-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
@@ -106,12 +107,6 @@ services:
       retries: 3
     security_opt:
       - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        compress: "true"
 
 networks:
   default:
