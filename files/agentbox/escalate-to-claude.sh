@@ -86,9 +86,14 @@ Make the minimal, correct change; keep the build and tests green."
   /usr/local/bin/agentbox-trust-dir.sh "$wt" || true
   # Log rather than swallow. This is where an expired OAuth session shows up,
   # and a silent `|| true` made a dead premium lane look like a lane that simply
-  # had nothing to say.
-  (cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits) \
-    || echo "premium lane failed for $slug#$num" >&2
+  # had nothing to say. Output is captured so the notifier can read it, then
+  # echoed so the journal keeps what it always had.
+  local out
+  if ! out=$(cd "$wt" && claude -p "$prompt" --permission-mode acceptEdits 2>&1); then
+    echo "premium lane failed for $slug#$num" >&2
+    /usr/local/bin/agentbox-notify-auth-expired.sh "escalate $slug#$num" "$out" || true
+  fi
+  printf '%s\n' "$out"
 
   # Claude may commit its own work rather than leaving the tree dirty, so a
   # clean tree is not the same as "produced nothing". Ask whether the branch
