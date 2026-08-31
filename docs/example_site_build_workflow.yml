@@ -64,17 +64,28 @@ jobs:
           
       - name: Trigger homelab deployment
         if: success()
+        # Untrusted commit fields go through env, never inline ${{ }} in run:.
+        # A commit message is attacker-controlled: `${{ }}` is substituted into
+        # the script text before the shell sees it, so a message containing
+        # $(...) or backticks executes as commands with HOMELAB_DEPLOY_TOKEN in
+        # scope. jq then builds the JSON, which also survives quotes and
+        # newlines that would otherwise produce a malformed payload.
+        # The homelab workflows themselves were fixed this way in PR #43.
+        env:
+          DEPLOY_TOKEN: ${{ secrets.HOMELAB_DEPLOY_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          payload=$(jq -n \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHA" \
+            --arg msg "$COMMIT_MESSAGE" \
+            '{event_type: "deploy-terrac-com",
+              client_payload: {branch: $branch, sha: $sha,
+                               commit_message: $msg, force_clean: false}}')
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.HOMELAB_DEPLOY_TOKEN }}" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
             https://api.github.com/repos/bluefishforsale/homelab/dispatches \
-            -d '{
-              "event_type": "deploy-terrac-com",
-              "client_payload": {
-                "branch": "${{ github.ref_name }}",
-                "sha": "${{ github.sha }}",
-                "commit_message": "${{ github.event.head_commit.message }}",
-                "force_clean": false
-              }
-            }' || echo "⚠️ Could not trigger homelab deployment (HOMELAB_DEPLOY_TOKEN may not be set)"
+            -d "$payload" || echo "⚠️ Could not trigger homelab deployment (HOMELAB_DEPLOY_TOKEN may not be set)"

@@ -75,26 +75,37 @@ build_and_commit:
 
 trigger_homelab_deployment:
   stage: deploy
-  image: curlimages/curl:latest
+  # alpine rather than curlimages/curl so jq is available. Hand-escaping JSON
+  # in shell is how the bug below happens.
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
   script:
     - |
       echo "🚀 Triggering homelab deployment..."
-      
-      # Trigger repository_dispatch in homelab GitHub repo
+
+      # jq builds the payload. This is NOT shell injection: unlike GitHub's
+      # ${{ }}, which is substituted into the script text before the shell runs,
+      # ${CI_COMMIT_MESSAGE} is expanded at runtime and its value is never
+      # re-evaluated, so $(...) in a commit message does not execute.
+      #
+      # It is JSON injection. Pasting the message straight into a hand-built
+      # document means a message containing a quote produces malformed JSON, and
+      # a crafted one closes the string and appends its own fields. Since
+      # force_clean is a real deploy parameter, a commit message could set it.
+      payload=$(jq -n \
+        --arg branch "$CI_COMMIT_REF_NAME" \
+        --arg sha "$CI_COMMIT_SHA" \
+        --arg msg "$CI_COMMIT_MESSAGE" \
+        '{event_type: "deploy-terrac-com",
+          client_payload: {branch: $branch, sha: $sha, commit_message: $msg,
+                           force_clean: false, source: "gitlab"}}')
+
       curl -X POST \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${HOMELAB_DEPLOY_TOKEN}" \
         https://api.github.com/repos/bluefishforsale/homelab/dispatches \
-        -d "{
-          \"event_type\": \"deploy-terrac-com\",
-          \"client_payload\": {
-            \"branch\": \"${CI_COMMIT_REF_NAME}\",
-            \"sha\": \"${CI_COMMIT_SHA}\",
-            \"commit_message\": \"${CI_COMMIT_MESSAGE}\",
-            \"force_clean\": false,
-            \"source\": \"gitlab\"
-          }
-        }"
+        --data "$payload"
       
       if [ $? -eq 0 ]; then
         echo "✅ Homelab deployment triggered successfully"
