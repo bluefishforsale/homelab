@@ -15,9 +15,10 @@ Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
-# No `compose pull`: mem0 and the bridge are built from source clones, so a pull
-# would only 404 against Docker Hub. `up -d` builds any image that is missing;
-# rebuilds after a version bump are the playbook's job.
+# Still no `compose pull`, though the API image now comes from GHCR: the bridge
+# is built from a source clone and publishes to no registry, so a whole-project
+# pull would fail on it. Pulling the pinned API tag is the playbook's job, as is
+# rebuilding the bridge after a version bump. `up -d` builds anything missing.
 ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
 
 ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'

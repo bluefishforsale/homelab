@@ -10,10 +10,18 @@
 # and CF terminates TLS at its edge.
 services:
   mem0:
-    build:
-      context: {{ home }}/src/server
-      dockerfile: Dockerfile
-    image: mem0-api-server:{{ mem0_version }}
+    # Built, smoke-tested and published by the mem0 repo's build-and-push
+    # workflow, never built here. Two reasons, both learned the hard way.
+    #
+    # The old build context was {{ home }}/src/server, which cannot see the
+    # repository's own mem0/ package, so the image installed mem0ai from PyPI
+    # and every change in the fork was inert once deployed.
+    #
+    # And `docker compose build` takes no service argument in the rebuild task
+    # below, so a change to the bridge rebuilt this service too. That rebuild
+    # exits 0 and produces an image that dies on `import psycopg` with "no pq
+    # wrapper available". With no build section here, it cannot happen.
+    image: {{ mem0_image }}:{{ mem0_version }}
     container_name: {{ service }}
     hostname: {{ service }}
     restart: unless-stopped

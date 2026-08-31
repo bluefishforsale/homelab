@@ -12,9 +12,12 @@
 # conversation memory is the most personal data in the fleet and the CF edge
 # terminates TLS.
 #
-# Both containers build from source clones. The published mem0/mem0-api-server
-# image on Docker Hub was last pushed 2025-09-10, well before the API-key auth
-# this deploy depends on, and mem0-mcp-bridge publishes no image at all.
+# The API image comes from GHCR, built and smoke-tested by the mem0 repo's
+# build-and-push workflow, which dispatches here on merge. The bridge still
+# builds from a source clone: mem0-mcp-bridge publishes no image at all.
+#
+# The published mem0/mem0-api-server image on Docker Hub is not an option: last
+# pushed 2025-09-10, well before the API-key auth this deploy depends on.
 - name: Deploy mem0 shared agent memory using Docker Compose
   hosts: ocean
   become: true
@@ -26,12 +29,16 @@
 
   vars:
     service: mem0
-    # Pinned SHAs, not branches: an unpinned clone turns every deploy into a
-    # silent upgrade of the thing holding all the memory.
-    mem0_repo: https://github.com/bluefishforsale/mem0.git
-    mem0_version: 8cd087f9626d4a64cac530c81192bdb442e2ac54
+    # Pinned SHAs, not branches: an unpinned version turns every deploy into a
+    # silent upgrade of the thing holding all the memory. mem0_version is now an
+    # image tag rather than a git ref; the deploy-mem0 dispatch overrides it with
+    # the SHA whose image CI just built and smoke-tested.
+    mem0_image: ghcr.io/bluefishforsale/mem0-api-server
+    mem0_version: 595f19890918cc0b4d7dc559b23e26b4c6c4e325
     mem0_bridge_repo: https://github.com/bluefishforsale/mem0-mcp-bridge.git
-    mem0_bridge_version: main
+    # Was `main`, which made the bridge a silent upgrade on every apply. Pinned
+    # to what ocean already runs, so this change deploys the API and nothing else.
+    mem0_bridge_version: 031680a22d216086c914646020b5275fbbbe963c
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
     embedder_model: nomic-embed-text
@@ -52,13 +59,21 @@
       - "{{ home }}/ollama"
       - "{{ home }}/bridge-data/mem0-mcp-bridge"
 
-  - name: Clone mem0 server source
-    ansible.builtin.git:
-      repo: "{{ mem0_repo }}"
-      dest: "{{ home }}/src"
-      version: "{{ mem0_version }}"
-      force: true
-    register: mem0_clone
+  - name: Log ocean into GHCR to pull the private mem0 image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+    changed_when: false
+
+  # Explicit, so a version bump actually fetches. `compose up -d` pulls only
+  # when the tag is absent locally, which would make the pin decorative the
+  # same way the old build task did.
+  - name: Pull the pinned mem0 API image
+    ansible.builtin.command:
+      cmd: "docker pull {{ mem0_image }}:{{ mem0_version }}"
+    register: mem0_image_pull
+    changed_when: "'Image is up to date' not in mem0_image_pull.stdout"
+    notify: Restart mem0 service
 
   - name: Clone mem0-mcp-bridge source
     ansible.builtin.git:
@@ -116,13 +131,18 @@
   # Only on a source change. `compose up -d` builds a missing image on its own,
   # but a version bump reuses the existing tag, so the rebuild has to be
   # explicit or the pin would be decorative.
-  - name: Rebuild images after a source change
+  #
+  # NOTE: named service, not a bare `docker compose build`. The bare form builds
+  # every service carrying a build section, so a bridge change used to rebuild
+  # the API too. The API has no build section any more, but naming the service
+  # keeps that true if one is ever added back.
+  - name: Rebuild the bridge image after a source change
     ansible.builtin.command:
-      cmd: docker compose build
+      cmd: docker compose build bridge
       chdir: "{{ home }}"
     environment:
       COMPOSE_PROJECT_NAME: "{{ service }}"
-    when: mem0_clone.changed or bridge_clone.changed or bridge_dockerfile.changed
+    when: bridge_clone.changed or bridge_dockerfile.changed
     notify: Restart mem0 service
 
   - name: Enable mem0 service
