@@ -48,8 +48,12 @@ last_run_criticals=0
 last_success_ts=0
 version="unknown"
 
-# Newest first: meta.log, then meta.log.1, .2, ... as they age.
-mapfile -t logs < <(ls -1 "$LOG_DIR"/meta.log "$LOG_DIR"/meta.log.[0-9]* 2>/dev/null)
+# Newest first. Both rotation schemes on purpose: Kometa 2.4.7 rotated to
+# meta.log.1 and 2.4.8 rotates to meta-1.log, so a version bump would otherwise
+# hide every historical run behind a glob that quietly matches nothing. Both
+# names are present on disk right now, mid-upgrade.
+mapfile -t logs < <(ls -1t "$LOG_DIR"/meta.log "$LOG_DIR"/meta.log.[0-9]* \
+                            "$LOG_DIR"/meta-[0-9]*.log 2>/dev/null)
 
 for f in "${logs[@]}"; do
   [ -f "$f" ] || continue
@@ -71,7 +75,31 @@ for f in "${logs[@]}"; do
   fi
 done
 
+# Is a run happening right now? Kometa writes meta.log from its first line and
+# only gains the "Run Time:" summary at the very end, so a recently-touched log
+# without that line means work in flight. This is deliberately not a process
+# check: the scheduled 05:00 run happens inside the long-lived container
+# process, so there is nothing distinguishable to pgrep for.
+#
+# Without this, every alert here describes the last COMPLETED run, and a long
+# catch-up run gets alerted about for its entire duration on the strength of the
+# failure it is busy fixing.
+#
+# The marker is the summary's "Finished: HH:MM:SS YYYY-MM-DD", not "Run Time:".
+# Kometa prints a Run Time for every collection it processes (146 of them in a
+# single observed run), so that string says nothing about the run as a whole.
+in_progress=0
+newest="$LOG_DIR/meta.log"
+if [ -f "$newest" ] && [ -n "$(find "$newest" -mmin -10 2>/dev/null)" ] \
+   && ! grep -q 'Finished: [0-9:]\+ [0-9-]\+' "$newest"; then
+  in_progress=1
+fi
+
 {
+  echo "# HELP kometa_run_in_progress 1 while a run is underway, so alerts can hold off"
+  echo "# TYPE kometa_run_in_progress gauge"
+  echo "kometa_run_in_progress $in_progress"
+
   echo "# HELP kometa_last_run_timestamp_seconds Unix time the most recent run finished, 0 if never"
   echo "# TYPE kometa_last_run_timestamp_seconds gauge"
   echo "kometa_last_run_timestamp_seconds $last_run_ts"

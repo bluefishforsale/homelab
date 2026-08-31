@@ -97,10 +97,14 @@ groups:
   # run and nothing anywhere said so. kometa_last_success_timestamp_seconds is 0
   # when no log on disk shows a clean run, which the 30d guard below treats as
   # firing rather than as "brand new".
+  # `unless in_progress` because these metrics describe the last COMPLETED run.
+  # A long catch-up run would otherwise be alerted about for its entire
+  # duration, on the strength of the very failure it is in the middle of fixing.
   - alert: KometaNotRunning
     expr: >
-      (kometa_last_success_timestamp_seconds == 0)
-      or (time() - kometa_last_success_timestamp_seconds > 172800)
+      ((kometa_last_success_timestamp_seconds == 0)
+       or (time() - kometa_last_success_timestamp_seconds > 172800))
+      unless (kometa_run_in_progress == 1)
     for: 1h
     labels:
       severity: warning
@@ -112,7 +116,9 @@ groups:
   # looked exactly like this every night: Run Time 0:00:00, no crash visible
   # from outside, nothing updated.
   - alert: KometaRunDidNothing
-    expr: kometa_last_run_failed == 1 and kometa_last_run_duration_seconds < 60
+    expr: >
+      (kometa_last_run_failed == 1 and kometa_last_run_duration_seconds < 60)
+      unless (kometa_run_in_progress == 1)
     for: 2h
     labels:
       severity: warning
