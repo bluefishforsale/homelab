@@ -51,11 +51,13 @@
     # honoured; a derived model carrying `PARAMETER num_thread` is the lever
     # that exists. Measured on ocean, same prompt:
     #   nomic-embed-text     (30 threads): 34.53s
-    #   nomic-embed-homelab  (6 threads):   0.95s cold, 0.05s warm
+    #   nomic-embed-homelab  (6 threads):   ~0.9s on an idle host
+    #
+    # Those 6 threads are the reason the compose file gives this container a
+    # 6-CPU quota. Do not also pin it with cpuset: one saturated core in a
+    # fixed set drags the whole pool to ~7s while its neighbours idle.
     embedder_base_model: nomic-embed-text
     embedder_model: nomic-embed-homelab
-    # Match the cpuset in the compose file. More threads than usable cores is
-    # exactly the bug above.
     embedder_threads: 6
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-mem0"

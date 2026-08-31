@@ -125,13 +125,18 @@ services:
       retries: 3
       start_period: 30s
 
-    # cpuset, NOT cpus. A `cpus` quota leaves /proc reporting all 30 host cores,
-    # so llama.cpp sizes its threadpool to 30 and then 30 threads contend for
-    # two cores' worth of CFS quota; every barrier waits on the scheduler and a
-    # two-token embedding took 64s. cpuset changes what the container sees
-    # (`docker run --cpuset-cpus=0-3 alpine nproc` -> 4), so the threadpool
-    # matches the allowance.
-    cpuset: "0-5"
+    # A quota, deliberately NOT cpuset. The threadpool size is already fixed by
+    # `PARAMETER num_thread` on the derived model, which is the only thing
+    # cpuset was ever compensating for (ollama counts cores from /proc/cpuinfo,
+    # so a quota alone left it spawning 30 threads).
+    #
+    # Pinning actively hurts once the thread count is right: the pool runs at
+    # the speed of its slowest thread, and a pinned thread cannot migrate off a
+    # busy core. With a niced ffmpeg transcode saturating one core of a "0-5"
+    # set, embeddings went from sub-second to 6.9s while the other five cores
+    # sat 83-99% idle. A quota lets the scheduler place all six threads on
+    # whatever is free.
+    cpus: '6.0'
     mem_limit: 2048m
 
     logging:
