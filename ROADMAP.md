@@ -43,6 +43,7 @@ Status and future plans for the homelab infrastructure.
 - **AFP**: Apple Filing Protocol file sharing
 - **Agentbox**: Autonomous agent fleet VM (OpenTelemetry collector telemetry)
 - **Kea DHCP**: DHCP server with Prometheus exporter
+- **Mail Relay**: Deployed service
 
 ### Media Stack
 
@@ -65,6 +66,7 @@ Status and future plans for the homelab infrastructure.
 - **ComfyUI**: AI image generation with YanWenKun image (cu126-slim)
 - **paia**: Personal AI assistant
 - **terminalbench**: LLM benchmarking and testing
+- **mem0**: AI memory service
 
 ### Monitoring Stack
 
@@ -88,6 +90,13 @@ Status and future plans for the homelab infrastructure.
 - **IPMI Exporter**: Dell out-of-band hardware metrics (node005, node006)
 - **PVE Exporter**: Proxmox hypervisor metrics
 - **PowerDNS Exporter**: Internal DNS server metrics
+- **Jellyfin Exporter**: Metrics exporter
+- **NZBGet Exporter**: Metrics exporter
+- **Plex Exporter**: Metrics exporter
+- **Prowlarr Exporter**: Metrics exporter
+- **Radarr Exporter**: Metrics exporter
+- **Sonarr Exporter**: Metrics exporter
+- **Tautulli Exporter**: Metrics exporter
 
 ### Cloud/CMS Services
 
@@ -100,6 +109,9 @@ Status and future plans for the homelab infrastructure.
 - **Homepage**: Service status dashboard
 - **GlobalView**: Custom service monitoring stack
 - **my-ta-jose**: Application service (healthy metrics target)
+- **Photonic Inventory**: Deployed service
+- **RA Mirror**: Deployed service
+- **terrac.com**: Deployed service
 
 ### Automation & Security
 
