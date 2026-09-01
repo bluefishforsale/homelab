@@ -30,18 +30,47 @@ mkdir -p "$TEXTFILE_DIR" || { echo "cannot write $TEXTFILE_DIR"; exit 2; }
 psql_q() { docker exec "$PG_CONTAINER" psql -U postgres -d "$1" -tAc "$2" 2>/dev/null | tr -d ' '; }
 num() { case "$1" in ''|*[!0-9.-]*) echo 0 ;; *) echo "$1" ;; esac; }
 
+# A failed query must NOT become a number. The previous version ran every result
+# through num(), which turns "" into 0, so an unreachable Postgres published
+# mem0_memories_total 0 as a PRESENT series -- indistinguishable from a real
+# empty store, and invisible to absent(). Worse,
+# mem0_newest_memory_age_seconds (the metric that exists to catch a silently
+# failing capture hook) read 0, meaning "newest memory arrived a moment ago":
+# the freshness detector reported perfect health exactly when the store was
+# gone. Now an unmeasurable value returns non-zero and the series is OMITTED,
+# so absent() fires and the dashboard shows a gap rather than a comfortable
+# zero. The -1 sentinels stay: those mean "measured, and genuinely empty".
+qnum() {  # $1 = database, $2 = sql -> value on stdout, non-zero if unmeasurable
+  local v
+  v=$(psql_q "$1" "$2") || return 1
+  case "$v" in ''|*[!0-9.-]*) return 1 ;; esac
+  printf '%s' "$v"
+}
+
+# Emit a gauge only when the value was actually measured. An empty value means
+# the probe failed, and publishing nothing is the honest answer.
+gauge() {  # $1 = metric, $2 = help, $3 = value ('' to skip)
+  [ -n "$3" ] || return 0
+  printf '# HELP %s %s\n# TYPE %s gauge\n%s %s\n' "$1" "$2" "$1" "$1" "$3"
+}
+
+# DEGRADED must be assigned in THIS shell, not inside a command substitution,
+# or the subshell swallows it -- the same class of bug being fixed here.
+DEGRADED=0
+
 # --- store shape -----------------------------------------------------------
-memories=$(num "$(psql_q postgres "select count(*) from mem0_local")")
-users=$(num "$(psql_q postgres "select count(distinct payload->>'user_id') from mem0_local")")
-vec_bytes=$(num "$(psql_q postgres "select pg_total_relation_size('mem0_local')")")
-db_vectors=$(num "$(psql_q postgres "select pg_database_size('postgres')")")
-db_app=$(num "$(psql_q postgres "select pg_database_size('mem0_app')")")
+memories=$(qnum postgres "select count(*) from mem0_local") || { memories=""; DEGRADED=1; }
+users=$(qnum postgres "select count(distinct payload->>'user_id') from mem0_local") || { users=""; DEGRADED=1; }
+vec_bytes=$(qnum postgres "select pg_total_relation_size('mem0_local')") || { vec_bytes=""; DEGRADED=1; }
+db_vectors=$(qnum postgres "select pg_database_size('postgres')") || { db_vectors=""; DEGRADED=1; }
+db_app=$(qnum postgres "select pg_database_size('mem0_app')") || { db_app=""; DEGRADED=1; }
 
 # Age of the most recent memory. This is the one that would have caught the
 # capture hook silently writing nowhere for six weeks: the store stays up, the
 # probe stays green, and only the freshness of its newest row says otherwise.
-newest_age=$(num "$(psql_q postgres \
-  "select coalesce(round(extract(epoch from now() - max((payload->>'created_at')::timestamptz))), -1) from mem0_local")")
+newest_age=$(qnum postgres \
+  "select coalesce(round(extract(epoch from now() - max((payload->>'created_at')::timestamptz))), -1) from mem0_local") \
+  || { newest_age=""; DEGRADED=1; }
 
 # --- audit trail (SQLite inside the API container) -------------------------
 history_rows=$(docker exec "$API_CONTAINER" python -c "
@@ -52,7 +81,9 @@ try:
 except Exception:
     print(0)
 " 2>/dev/null | tr -d ' ')
-history_rows=$(num "$history_rows")
+case "$history_rows" in
+  ''|*[!0-9.-]*) history_rows=""; DEGRADED=1 ;;
+esac
 
 # --- traffic + latency from request_logs -----------------------------------
 # /memories/<uuid> collapses to /memories/:id so one deleted memory cannot mint
@@ -101,35 +132,40 @@ try:
 except Exception:
     print('-1')
 " 2>/dev/null | tr -d ' ')
-embed_secs=$(num "$embed_secs")
+# The probe prints -1 when it ran and failed, which is a measurement worth
+# publishing. An empty value means it could not run at all (container gone) --
+# num() used to turn that into 0, i.e. "embedded instantly", the most reassuring
+# possible number for a dead service.
+case "$embed_secs" in
+  ''|*[!0-9.-]*) embed_secs=""; DEGRADED=1 ;;
+esac
 
 END=$(date +%s)
 
 {
-  echo "# HELP mem0_memories_total Rows in the mem0 vector store"
-  echo "# TYPE mem0_memories_total gauge"
-  echo "mem0_memories_total $memories"
+  # One number to alert on: 0 means at least one probe could not measure, so
+  # the gaps below are failure rather than genuine absence.
+  echo "# HELP mem0_collector_up 1 when every probe in this run returned a real value"
+  echo "# TYPE mem0_collector_up gauge"
+  echo "mem0_collector_up $((1 - DEGRADED))"
 
-  echo "# HELP mem0_users_total Distinct user_ids in the vector store"
-  echo "# TYPE mem0_users_total gauge"
-  echo "mem0_users_total $users"
+  gauge mem0_memories_total "Rows in the mem0 vector store" "$memories"
+  gauge mem0_users_total "Distinct user_ids in the vector store" "$users"
+  gauge mem0_history_rows_total "Rows in the SQLite memory-change audit trail" "$history_rows"
+  gauge mem0_vector_table_bytes "On-disk size of the vector table including indexes" "$vec_bytes"
 
-  echo "# HELP mem0_history_rows_total Rows in the SQLite memory-change audit trail"
-  echo "# TYPE mem0_history_rows_total gauge"
-  echo "mem0_history_rows_total $history_rows"
+  if [ -n "$db_vectors" ] || [ -n "$db_app" ]; then
+    echo "# HELP mem0_database_bytes On-disk size of each mem0 database"
+    echo "# TYPE mem0_database_bytes gauge"
+    [ -n "$db_vectors" ] && echo "mem0_database_bytes{database=\"vectors\"} $db_vectors"
+    [ -n "$db_app" ] && echo "mem0_database_bytes{database=\"app\"} $db_app"
+  fi
 
-  echo "# HELP mem0_vector_table_bytes On-disk size of the vector table including indexes"
-  echo "# TYPE mem0_vector_table_bytes gauge"
-  echo "mem0_vector_table_bytes $vec_bytes"
-
-  echo "# HELP mem0_database_bytes On-disk size of each mem0 database"
-  echo "# TYPE mem0_database_bytes gauge"
-  echo "mem0_database_bytes{database=\"vectors\"} $db_vectors"
-  echo "mem0_database_bytes{database=\"app\"} $db_app"
-
-  echo "# HELP mem0_newest_memory_age_seconds Age of the most recent memory, -1 if empty"
-  echo "# TYPE mem0_newest_memory_age_seconds gauge"
-  echo "mem0_newest_memory_age_seconds $newest_age"
+  # Absent when unmeasurable, -1 when the store is genuinely empty. Never 0,
+  # which used to read as "a memory arrived a moment ago" while Postgres was
+  # unreachable.
+  gauge mem0_newest_memory_age_seconds \
+    "Age of the most recent memory, -1 if empty, absent if unmeasurable" "$newest_age"
 
   echo "# HELP mem0_requests_recent Requests in the last ${WINDOW_MIN}m by path and status"
   echo "# TYPE mem0_requests_recent gauge"
@@ -157,17 +193,22 @@ END=$(date +%s)
     done
   fi
 
-  echo "# HELP mem0_embed_probe_seconds Time to embed a unique short prompt, -1 on failure"
-  echo "# TYPE mem0_embed_probe_seconds gauge"
-  echo "mem0_embed_probe_seconds $embed_secs"
+  gauge mem0_embed_probe_seconds \
+    "Time to embed a unique short prompt, -1 if the probe ran and failed, absent if it could not run" \
+    "$embed_secs"
 
   echo "# HELP mem0_metrics_duration_seconds Wall-clock duration of this collection"
   echo "# TYPE mem0_metrics_duration_seconds gauge"
   echo "mem0_metrics_duration_seconds $((END-START))"
 
-  echo "# HELP mem0_metrics_last_success_timestamp_seconds Unix time of this collection"
-  echo "# TYPE mem0_metrics_last_success_timestamp_seconds gauge"
-  echo "mem0_metrics_last_success_timestamp_seconds $END"
+  # Only on a run where everything was measurable. It is named last_SUCCESS,
+  # and stamping it after a failed collection is how a freshness alert gets
+  # told the data is current when nothing was collected at all.
+  if [ "$DEGRADED" -eq 0 ]; then
+    echo "# HELP mem0_metrics_last_success_timestamp_seconds Unix time of the last fully successful collection"
+    echo "# TYPE mem0_metrics_last_success_timestamp_seconds gauge"
+    echo "mem0_metrics_last_success_timestamp_seconds $END"
+  fi
 } > "$tmp" && mv -f "$tmp" "$prom"
 
 echo "[mem0-metrics] memories=$memories history=$history_rows embed=${embed_secs}s in $((END-START))s"

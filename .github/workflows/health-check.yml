@@ -196,6 +196,28 @@ jobs:
           TOTAL_HEALTHY=0
           TOTAL_UNHEALTHY=0
           ALL_RESULTS=""
+          # Targets that were supposed to report but did not. This is the whole
+          # point of the block below: every check step is continue-on-error and
+          # writes its results file LAST, so a step that dies early -- SSH
+          # refused, host unreachable, DNS broken -- left no file, contributed
+          # zero unhealthy, and this workflow exited 0 "healthy" having checked
+          # nothing. The outage is exactly the condition that produces it.
+          UNCHECKED=""
+
+          want() {  # was this target selected for this run?
+            [ "${{ inputs.target }}" = "all" ] || [ "${{ inputs.target }}" = "$1" ]
+          }
+          # A selected target must have BOTH completed its step and left results.
+          expect() {  # $1 = target, $2 = step outcome, $3 = results file
+            want "$1" || return 0
+            if [ "$2" = "failure" ] || [ ! -f "$3" ]; then
+              UNCHECKED="${UNCHECKED}${1} "
+              echo "❌ $1: check did not complete (outcome=$2, results=$( [ -f "$3" ] && echo present || echo missing ))"
+            fi
+          }
+          expect ocean   "${{ steps.ocean.outcome }}"   /tmp/ocean-results.txt
+          expect dns     "${{ steps.dns.outcome }}"     /tmp/dns-results.txt
+          expect runners "${{ steps.runners.outcome }}" /tmp/runners-results.txt
 
           # Ocean
           if [ -f /tmp/ocean-results.txt ]; then
@@ -218,8 +240,12 @@ jobs:
             ALL_RESULTS="${ALL_RESULTS}### GitHub Runners\n$(cat /tmp/runners-results.txt)\n"
           fi
 
-          # Determine overall status
-          if [ $TOTAL_UNHEALTHY -eq 0 ]; then
+          # Determine overall status. An unchecked target can never be called
+          # healthy: "I could not look" is not "nothing is wrong".
+          if [ -n "$UNCHECKED" ]; then
+            STATUS="unknown"
+            EMOJI="❌"
+          elif [ $TOTAL_UNHEALTHY -eq 0 ]; then
             STATUS="healthy"
             EMOJI="✅"
           elif [ $TOTAL_HEALTHY -gt $TOTAL_UNHEALTHY ]; then
@@ -254,5 +280,12 @@ jobs:
           echo "   Unhealthy: $TOTAL_UNHEALTHY"
           echo "════════════════════════════════════════"
 
-          # Exit with error if unhealthy
+          # Exit non-zero if anything is unhealthy OR if any selected target
+          # could not be checked at all.
+          if [ -n "$UNCHECKED" ]; then
+            echo "❌ did not manage to check: $UNCHECKED"
+            echo "   Treating that as a failure -- a health check that reports"
+            echo "   healthy without looking is worse than no health check."
+            exit 1
+          fi
           [ $TOTAL_UNHEALTHY -gt 0 ] && exit 1 || exit 0

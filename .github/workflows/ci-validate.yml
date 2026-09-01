@@ -313,6 +313,11 @@ jobs:
       - name: Replace-issue reconciler guard rails
         run: bash .github/workflows/lib/agentbox-replace-reconcile.test.sh
 
+      # "I could not look" must never render as "nothing is wrong". Three
+      # places in this repo got that backwards at once.
+      - name: Absence is not health
+        run: bash .github/workflows/lib/absence-is-not-health.test.sh
+
       # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
       # changes are coordinated, hand-run tasks — never a commit/CI side effect.
       - name: No ZFS mutations in playbooks

@@ -369,18 +369,24 @@ jobs:
           for svc in "${SERVICES[@]}"; do
             NAME="${svc%%:*}"
             PORT="${svc##*:}"
-            
-            # Try up to 3 times with 5s delay
+
+            # Track success explicitly. Testing `attempt -eq 3` after the loop
+            # counted a service that recovered on its THIRD try as both healthy
+            # and failed, because `break` leaves attempt at 3 either way -- and
+            # a slow start right after a deploy is exactly when that happens.
+            OK=0
             for attempt in 1 2 3; do
               if timeout 5 bash -c "echo >/dev/tcp/192.168.1.143/$PORT" 2>/dev/null; then
                 echo "✅ $NAME (port $PORT) responding"
-                HEALTHY=$((HEALTHY + 1))
+                OK=1
                 break
               fi
               [ $attempt -lt 3 ] && sleep 5
             done
 
-            if [ $attempt -eq 3 ]; then
+            if [ $OK -eq 1 ]; then
+              HEALTHY=$((HEALTHY + 1))
+            else
               echo "❌ $NAME (port $PORT) NOT responding after 3 attempts"
               FAILED=$((FAILED + 1))
             fi
