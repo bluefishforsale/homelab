@@ -6,6 +6,11 @@
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+    # config.ini.j2 reads media_services.* for the arr API keys and the
+    # opensubtitles credential. Without this the play renders nothing and dies
+    # with "'media_services' is undefined" — which is exactly how it failed when
+    # those values moved out of the template and into the vault.
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
     image: linuxserver/bazarr
