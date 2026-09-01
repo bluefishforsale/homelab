@@ -56,7 +56,7 @@ flask_secret_key = 2fc5d871a6e0a16d9682ae6b0f8a058d
 type = None
 username = 
 password = 
-apikey = 0712acafded0f58cefe4fb7df221597f
+apikey = {{ media_services.bazarr.api_key }}
 
 [backup]
 folder = /config/backup
@@ -70,7 +70,7 @@ ip = ocean.home
 port = 8902
 base_url = /
 ssl = False
-apikey = f04a996effa8494aa68712bdb0b33a6f
+apikey = {{ media_services.sonarr.api_key }}
 full_update = Daily
 full_update_day = 6
 full_update_hour = 4
@@ -87,7 +87,7 @@ ip = ocean.home
 port = 8903
 base_url = /
 ssl = False
-apikey = eb727e9d30f540d59677e7cc08161da4
+apikey = {{ media_services.radarr.api_key }}
 full_update = Daily
 full_update_day = 6
 full_update_hour = 5
@@ -105,8 +105,8 @@ password =
 exclude = ["localhost","127.0.0.1"]
 
 [opensubtitles]
-username = FishyFishyTiger
-password = dvW0z8Mech&co^&L
+username = {{ media_services.opensubtitles.username }}
+password = {{ media_services.opensubtitles.password }}
 use_tag_search = False
 vip = False
 ssl = False
@@ -114,8 +114,8 @@ timeout = 15
 skip_wrong_fps = False
 
 [opensubtitlescom]
-username = FishyFishyTiger
-password = dvW0z8Mech&co^&L
+username = {{ media_services.opensubtitles.username }}
+password = {{ media_services.opensubtitles.password }}
 use_hash = True
 
 [addic7ed]
@@ -161,8 +161,14 @@ username =
 password = 
 
 [subscene]
-username = FishyFishyTiger
-password = dvW0z8Mech&co^&L
+; Blanked deliberately. This shared a password with opensubtitles purely by
+; reuse, and that password was published in this repo, so it had to change.
+; The new credential belongs to opensubtitles.org only. If subscene is still
+; used, add media_services.subscene.{username,password} to the vault and
+; reference them here; pointing this at the opensubtitles key would just be a
+; guess that fails at runtime.
+username =
+password =
 
 [betaseries]
 token = 
