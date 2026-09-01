@@ -56,7 +56,7 @@ Terminal-bench is the [Harbor framework's](https://github.com/harbor-framework/t
 - **Run command**:
   ```bash
   OPENAI_API_BASE=http://localhost:8080/v1 \
-  OPENAI_API_KEY=llamacpp-homelab-key \
+  OPENAI_API_KEY=$LLAMA_API_KEY \
   harbor run --dataset terminal-bench@2.0 --agent terminus-2 \
              --model openai/<model-name> -n 1
   ```
@@ -74,7 +74,7 @@ terminalbench_agent: "terminus-2"
 terminalbench_benchmark_ctx_size: 8192        # standardized context for all models
 terminalbench_output_dir: /data01/services/llamacpp/benchmarks
 terminalbench_api_base: http://localhost:8080/v1
-terminalbench_api_key: llamacpp-homelab-key
+terminalbench_api_key: <vaulted: ai_services.llamacpp.api_key>
 terminalbench_health_url: http://localhost:8080/health
 terminalbench_health_timeout: 180             # seconds
 terminalbench_health_interval: 10             # seconds between polls
