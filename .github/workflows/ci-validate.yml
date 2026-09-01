@@ -286,6 +286,11 @@ jobs:
       - name: Agent lane ladder stays local-first and free
         run: bash .github/workflows/lib/agentbox-lane-ladder.test.sh
 
+      # The only automation that closes hardware issues, on the pool where data
+      # loss is the worst outcome. Asserts what it must REFUSE to close.
+      - name: Replace-issue reconciler guard rails
+        run: bash .github/workflows/lib/agentbox-replace-reconcile.test.sh
+
       # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
       # changes are coordinated, hand-run tasks — never a commit/CI side effect.
       - name: No ZFS mutations in playbooks
