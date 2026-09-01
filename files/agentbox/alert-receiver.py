@@ -17,7 +17,10 @@ Idempotent on issues: an open issue carrying the alert fingerprint is reused.
 import base64
 import json
 import os
+import re
 import subprocess
+import threading
+import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -36,6 +39,17 @@ NTFY_PASS = os.environ.get("ALERT_NTFY_PASS", "")
 FP_MARKER = "alert-fp:"  # embedded in the issue body to dedupe by fingerprint
 COMP_MARKER = "replace-component:"  # dedupe hardware issues by physical drive
 HW_LABEL = "hardware"
+# Only stable by-id device names earn a [replace] ticket. A kernel name (sdb,
+# nvme0n1) is not stable across reboots, and the zfs exporter emits BOTH forms
+# for the same drive, so accepting kernel names means one disk gets two issues
+# under two identities. Deliberately anchored and conservative: an unrecognised
+# id is skipped and logged, never guessed at.
+STABLE_DEV_RE = re.compile(r"^(wwn-|ata-|nvme-|scsi-|dm-uuid-|usb-)")
+# Guards issue creation. See the comment in open_replace_issue: GitHub's list
+# endpoint cannot be relied on to show an issue created seconds ago.
+_CREATE_LOCK = threading.Lock()
+_RECENT_MARKERS = {}   # marker -> unix ts of the issue we just created
+RECENT_TTL = 900       # 15m; longer than any plausible list-endpoint lag
 RUNBOOK_URL = ("https://github.com/bluefishforsale/homelab/blob/master/"
                "docs/operations/zfs-data01-disk-replacement-runbook.md")
 
@@ -157,10 +171,37 @@ def open_replace_issue(alert):
     inst = labels.get("instance", labels.get("job", ""))
     if not dev:
         return None
+    # Only stable by-id names get a ticket. The exporter emits kernel names
+    # (sdb, sdc) ALONGSIDE the wwn- name for the same physical drive, so
+    # accepting both mints two issues for one disk under two identities, and a
+    # kernel name is not even stable across reboots. The ntfy push happens
+    # independently of this function, so skipping here loses no notification —
+    # only the useless ticket.
+    if not STABLE_DEV_RE.match(dev):
+        print(f"[replace] skipping unstable device id {dev!r} on {inst} "
+              f"(ntfy still sent; only wwn-/ata-/nvme-/scsi- ids get tickets)",
+              flush=True)
+        return None
     marker = f"{COMP_MARKER}{inst}/{dev}"
-    found = find_open_issue(marker)
-    if found is not None:  # existing issue OR gh error -> never mint a duplicate
-        return found if isinstance(found, int) else None
+
+    # The lock and the recent-marker cache exist because the GitHub list
+    # endpoint is NOT read-after-write consistent: on 2026-08-18 an alert burst
+    # produced 3 duplicate pairs, each 1-2s apart, because find_open_issue could
+    # not yet see the issue created seconds earlier. ThreadingHTTPServer lets one
+    # Alertmanager batch race itself on top of that. The API cannot answer "did I
+    # just create this", so the process has to remember.
+    with _CREATE_LOCK:
+        now = time.time()
+        for m, ts in list(_RECENT_MARKERS.items()):
+            if now - ts > RECENT_TTL:
+                del _RECENT_MARKERS[m]
+        if marker in _RECENT_MARKERS:
+            print(f"[replace] {dev}: created moments ago, not duplicating", flush=True)
+            return None
+        found = find_open_issue(marker)
+        if found is not None:  # existing issue OR gh error -> never mint a duplicate
+            return found if isinstance(found, int) else None
+        _RECENT_MARKERS[marker] = now
     ann = alert.get("annotations", {})
     pool = labels.get("pool", "")
     title = f"[replace] failing drive {dev}{(' on ' + inst) if inst else ''}"
@@ -182,6 +223,11 @@ def open_replace_issue(alert):
     out = (r.stdout or r.stderr).strip()
     print(out, flush=True)
     if r.returncode != 0:
+        # The marker was reserved before the create so a racing thread would
+        # back off. The create failed, so release it: otherwise one transient gh
+        # error silences this drive's ticket for the whole TTL.
+        with _CREATE_LOCK:
+            _RECENT_MARKERS.pop(marker, None)
         return None
     try:
         return int(out.rsplit("/", 1)[-1])

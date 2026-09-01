@@ -277,6 +277,15 @@
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
 
+  # Installed with copy, NOT template: the PromQL inside contains `{{device=...}}`
+  # (an f-string brace escape) which jinja would try to evaluate. It reads its
+  # config from the environment instead.
+  - name: Install the [replace] issue reconciler
+    ansible.builtin.copy:
+      src: "{{ files }}/replace-issue-reconcile.py"
+      dest: /usr/local/bin/agentbox-replace-issue-reconcile.py
+      mode: '0755'
+
   # Renaming a script installs the new name but leaves the old one on PATH, so
   # the box keeps a copy of code that master no longer has. Harmless until
   # someone runs it and gets the previous behaviour back. Deployed state has to
@@ -301,6 +310,8 @@
       - agentbox-escalate.timer
       - agentbox-roadmap-reconcile.service
       - agentbox-roadmap-reconcile.timer
+      - agentbox-replace-reconcile.service
+      - agentbox-replace-reconcile.timer
       - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
     notify: Reload systemd daemon
@@ -318,6 +329,7 @@
       - agentbox-issue-watcher.timer
       - agentbox-escalate.timer
       - agentbox-roadmap-reconcile.timer
+      - agentbox-replace-reconcile.timer
 
   - name: Enable and start the alert receiver
     ansible.builtin.systemd:

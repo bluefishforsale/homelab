@@ -1,0 +1,23 @@
+[Unit]
+Description=Retire [replace] hardware issues whose drive is demonstrably gone
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME=/home/{{ user }}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=HOMELAB_PROM=http://{{ hostvars['ocean']['ansible_ssh_host'] | default('192.168.1.143') }}:9090
+Environment=ALERT_ISSUE_REPO={{ alert_issue_repo }}
+# GH_TOKEN for the issue comments/closes.
+EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
+WorkingDirectory={{ home }}
+# --yes because a dry run in a timer would only ever print. The refusal to close
+# anything questionable lives in the script, not in this flag: it never closes a
+# device still in the pool, never closes on zero counters, and does nothing at
+# all while a pool is unhealthy or Prometheus is unreachable.
+ExecStart=/usr/local/bin/agentbox-replace-issue-reconcile.py --yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-replace-reconcile

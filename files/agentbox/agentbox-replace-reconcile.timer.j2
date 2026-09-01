@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily reconcile of [replace] hardware issues against live pool state
+
+[Timer]
+# Daily is generous for something that only changes when a human swaps a disk,
+# and the randomised delay keeps it off the same second as every other timer.
+OnCalendar=daily
+RandomizedDelaySec=1800
+Persistent=true
+Unit=agentbox-replace-reconcile.service
+
+[Install]
+WantedBy=timers.target
