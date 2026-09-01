@@ -15,7 +15,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 WATCHER="$ROOT/files/agentbox/issue-watcher.sh"
-ESCALATE="$ROOT/files/agentbox/escalate-to-claude.sh"
+ESCALATE="$ROOT/files/agentbox/escalate.sh"
 ALLOW="bluefishforsale"
 PASS=0
 FAIL=0
@@ -36,7 +36,7 @@ src = open(sys.argv[1]).read()
 # The watcher closes its single quote to interpolate the label names. Do that
 # substitution first, exactly as the shell does, or the extraction stops at the
 # interpolation quote instead of at the end of the jq program.
-for var, val in (("LABEL_WORKING", "agent-working"), ("LABEL_CLAUDE", "needs-claude")):
+for var, val in (("LABEL_WORKING", "agent-working"), ("LABEL_ESCALATE", "needs-escalation")):
     src = src.replace("'" + '"$' + var + '"' + "'", val)
 pat = r"""jq -r --arg allow "\$ISSUE_AUTHOR_ALLOWLIST" '(.*?)'"""
 for prog in re.findall(pat, src, re.S):
@@ -57,7 +57,7 @@ if [[ "${#PROGS[@]}" -eq 2 ]]; then
     {"number":2,"labels":[],"author":{"login":"mallory"}},
     {"number":3,"labels":[{"name":"agent-working"}],"author":{"login":"bluefishforsale"}},
     {"number":4,"labels":[],"author":{"login":"Bluefishforsale"}},
-    {"number":5,"labels":[{"name":"needs-claude"}],"author":{"login":"mallory"}}
+    {"number":5,"labels":[{"name":"needs-escalation"}],"author":{"login":"mallory"}}
   ]'
   check "free lane drafts only the owner's unclaimed issue" "1" "$(run_prog "${PROGS[0]}" "$issues")"
 
@@ -86,7 +86,7 @@ if [[ "${#PROGS[@]}" -eq 2 ]]; then
     "10 agent/issue-7 15 agent/issue-6" "$(run_prog "${PROGS[1]}" "$prs")"
 fi
 
-# The premium lane is the backstop: it must not trust the needs-claude label
+# The premium lane is the backstop: it must not trust the needs-escalation label
 # alone, and it must decide BEFORE the issue body reaches the prompt.
 # Anchored on the comparison itself, not on any mention of the variable: the
 # fallback assignment near the top of the file also mentions it, and matching

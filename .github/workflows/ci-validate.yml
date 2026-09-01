@@ -281,6 +281,11 @@ jobs:
       - name: Agent draft detection
         run: bash .github/workflows/lib/agentbox-draft-detection.test.sh
 
+      # A collapsed ladder or a paid model creeping in breaks nothing visibly;
+      # it just changes the bill. Assert the shape instead.
+      - name: Agent lane ladder stays local-first and free
+        run: bash .github/workflows/lib/agentbox-lane-ladder.test.sh
+
       # Data-safety guardrail: no committed playbook may mutate ZFS. Storage
       # changes are coordinated, hand-run tasks — never a commit/CI side effect.
       - name: No ZFS mutations in playbooks

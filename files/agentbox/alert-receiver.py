@@ -6,7 +6,7 @@ Rendered from files/agentbox/alert-receiver.py by the agentbox playbook.
 Alertmanager POSTs its webhook JSON here. For each FIRING alert we:
   - push a notification to ntfy so a human is aware (all severities);
   - open a GitHub issue on the infra repo so it becomes trackable/fixable —
-    critical alerts get `needs-claude` (premium lane / drive via RC), others get
+    critical alerts get `needs-escalation` (premium lane / drive via RC), others get
     a plain issue. Resolved alerts close the matching tracking issue (by
     fingerprint) and push a "resolved" ntfy — completing the fire->fix->close loop.
 
@@ -28,7 +28,7 @@ LISTEN_PORT = int(os.environ.get("ALERT_LISTEN_PORT", "9098"))
 # unattended infra edits (issue + ntfy still fire).
 REMEDIATE = os.environ.get("ALERT_REMEDIATE", "1") == "1"
 RC_URL = os.environ.get("ALERT_RC_URL", "https://claude.ai/code")  # live RC console
-ESCALATE = "/usr/local/bin/agentbox-escalate-to-claude.sh"
+ESCALATE = "/usr/local/bin/agentbox-escalate.sh"
 REPO_NAME = ISSUE_REPO.split("/")[-1]
 # ntfy is deny-all (public via ntfy.terrac.com); publish with basic auth.
 NTFY_USER = os.environ.get("ALERT_NTFY_USER", "")
@@ -111,9 +111,9 @@ def open_issue(alert):
             f"<!-- {FP_MARKER}{fp} -->")
     args = ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--body", body]
     if sev == "critical":
-        gh("label", "create", "needs-claude", "--repo", ISSUE_REPO,
+        gh("label", "create", "needs-escalation", "--repo", ISSUE_REPO,
            "--color", "5319E7", "--force")  # idempotent; ignore result
-        args += ["--label", "needs-claude"]
+        args += ["--label", "needs-escalation"]
     r = gh(*args)
     out = (r.stdout or r.stderr).strip()
     print(out, flush=True)
@@ -149,7 +149,7 @@ def open_replace_issue(alert):
     """Collapse every disk/ZFS alert for one physical drive into a single
     [replace] issue keyed on the device (across alertname AND error-type). A
     failing drive needs hands, never a PR — this issue never carries
-    needs-claude and is never auto-closed; a human closes it after the swap.
+    needs-escalation and is never auto-closed; a human closes it after the swap.
     Returns the issue number (existing or new), or None for a device-less
     hardware alert (e.g. pool-level ZpoolDegraded) -> ntfy-only."""
     labels = alert["labels"]
@@ -194,7 +194,7 @@ def remediate(num):
     multi-minute claude run never blocks the HTTP handler; it only ever opens a
     PR (never auto-merges infra), so a human still gates the change.
     ponytail: child dies if the receiver service restarts mid-run (cgroup kill);
-    acceptable — the needs-claude issue survives and the periodic drain retries.
+    acceptable — the needs-escalation issue survives and the periodic drain retries.
     """
     if not os.path.exists(ESCALATE):
         print(f"escalate script missing: {ESCALATE}", flush=True)
@@ -275,7 +275,7 @@ def _selftest():
     args = created[0]
     body = args[args.index("--body") + 1]
     assert f"{COMP_MARKER}ocean.home/sde" in body, "marker must key on instance/device"
-    assert "needs-claude" not in " ".join(args), "hardware issue must never get needs-claude"
+    assert "needs-escalation" not in " ".join(args), "hardware issue must never get needs-escalation"
     # a second alert for the same drive reuses the issue (consistent-list dedup)
     calls.clear()
 

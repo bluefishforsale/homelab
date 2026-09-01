@@ -14,7 +14,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 WATCHER="$ROOT/files/agentbox/issue-watcher.sh"
-ESCALATE="$ROOT/files/agentbox/escalate-to-claude.sh"
+ESCALATE="$ROOT/files/agentbox/escalate.sh"
 PASS=0
 FAIL=0
 TMP="$(mktemp -d)"
@@ -74,13 +74,13 @@ fi
 
 # A premium-lane run that produces nothing must hand the label back. It claims
 # the issue as agent-working before invoking claude; the watcher skips that
-# label and the drain only selects needs-claude, so a quiet return orphans the
+# label and the drain only selects needs-escalation, so a quiet return orphans the
 # issue forever. An expired OAuth session did exactly that to
 # photonic_inventory#17.
-if sed -n '/no diff for/,/return 0/p' "$ESCALATE" | grep -q 'add-label "$LABEL_CLAUDE"'; then
-  ok "a fruitless premium-lane run returns the issue to the queue"
+if sed -n '/no diff for/,/return 0/p' "$ESCALATE" | grep -q 'add-label "$LABEL_HUMAN"'; then
+  ok "a fruitless escalation run hands the issue to a human"
 else
-  bad "escalate-to-claude.sh strands the issue in agent-working when it produces nothing"
+  bad "escalate.sh strands the issue in agent-working when it produces nothing"
 fi
 
 # Neither lane may gate solely on a dirty tree before pushing.

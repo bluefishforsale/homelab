@@ -8,7 +8,11 @@
 # `|| true`, the systemd oneshot still exited 0, and the lane looked idle rather
 # than dead for weeks at a time.
 #
-# Usage: agentbox-notify-auth-expired.sh <context> <claude output>
+# Called by the RC watchdog, the only place Claude Code still runs unattended
+# enough to strand silently. The issue/escalation lanes moved to opencode and
+# free models, which have no OAuth to expire.
+#
+# Usage: agentbox-notify-auth-expired.sh <context> <log text>
 # Exits 0 and pushes nothing unless the output actually names an auth failure,
 # so callers can pipe every failure through it without filtering first.
 set -uo pipefail

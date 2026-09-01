@@ -270,7 +270,7 @@
       mode: '0755'
     loop:
       - { src: issue-watcher.sh, dest: agentbox-issue-watcher.sh }
-      - { src: escalate-to-claude.sh, dest: agentbox-escalate-to-claude.sh }
+      - { src: escalate.sh, dest: agentbox-escalate.sh }
       - { src: roadmap-reconcile.sh, dest: agentbox-roadmap-reconcile.sh }
       - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
       - { src: notify-auth-expired.sh, dest: agentbox-notify-auth-expired.sh }
@@ -363,6 +363,12 @@
             fi
             if [ -n "$reason" ]; then
               logger -t agentbox-rc-watchdog "restarting $lane: $reason"
+              # An expired subscription session is NOT fixed by restarting: the
+              # unit flaps every 2 minutes forever and nobody is told. RC is the
+              # only place Claude Code still runs, so this is where that alarm
+              # has to live now that the unattended lanes are on opencode.
+              recent=$(journalctl -u "$unit" -n 40 --no-pager 2>/dev/null || true)
+              /usr/local/bin/agentbox-notify-auth-expired.sh "RC session $lane" "$recent" || true
               systemctl restart "$unit"
             fi
           done
@@ -379,6 +385,8 @@
           Description=Restart hung agentbox RC lanes (dead websocket)
           [Service]
           Type=oneshot
+          # ntfy credentials for the auth-expired alarm above.
+          EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
           ExecStart=/usr/local/sbin/agentbox-rc-watchdog
       - name: agentbox-rc-watchdog.timer
         content: |
