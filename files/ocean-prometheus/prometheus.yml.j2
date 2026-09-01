@@ -215,7 +215,11 @@ scrape_configs:
     scrape_timeout: 10s
     authorization:
       type: Bearer
-      credentials: "{{ ai_services.llamacpp.api_key | default('llamacpp-homelab-key') }}"
+      # NOTE: deliberately no `| default(...)`. A fallback credential committed
+      # to a public repo is worse than a render failure, because it would
+      # authenticate silently with a string anyone can read. If the vault key
+      # goes missing, this must fail loudly rather than fall back.
+      credentials: "{{ ai_services.llamacpp.api_key }}"
     static_configs:
     - targets: ['ocean.home:8080']
 

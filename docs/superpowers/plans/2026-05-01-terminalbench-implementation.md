@@ -140,7 +140,7 @@ terminalbench_agent: "terminus-2"
 terminalbench_benchmark_ctx_size: 8192
 terminalbench_output_dir: /data01/services/llamacpp/benchmarks
 terminalbench_api_base: "http://localhost:8080/v1"
-terminalbench_api_key: "llamacpp-homelab-key"
+terminalbench_api_key: "{{ ai_services.llamacpp.api_key }}"
 terminalbench_health_url: "http://localhost:8080/health"
 terminalbench_health_timeout: 180
 terminalbench_health_interval: 10
@@ -227,7 +227,7 @@ services:
       - "512"
       - "--flash-attn"
       - "--api-key"
-      - "llamacpp-homelab-key"
+      - "{{ terminalbench_api_key }}"
       - "--metrics"
 
     healthcheck:

@@ -12,7 +12,7 @@ GPU-accelerated LLM inference server with OpenAI-compatible API.
 | Port | 8080 |
 | GPU | RTX 3090 (CUDA) |
 | Default Model | Qwen3-14B-Q4_K_M.gguf |
-| API Key | `llamacpp-homelab-key` |
+| API Key | vaulted: `ai_services.llamacpp.api_key` |
 
 ---
 
@@ -79,7 +79,9 @@ flash-attn: enabled
 | `/completion` | POST | Text completion |
 | `/embedding` | POST | Generate embeddings |
 
-**Authentication**: Include `Authorization: Bearer llamacpp-homelab-key` header.
+**Authentication**: Include an `Authorization: Bearer $LLAMA_API_KEY` header.
+Read the key from the vault, never from this page:
+`python3 scripts/vault.py get ai_services.llamacpp.api_key`
 
 ---
 
@@ -106,13 +108,13 @@ docker logs -f llamacpp
 curl http://localhost:8080/health
 
 # List models
-curl -H "Authorization: Bearer llamacpp-homelab-key" \
+curl -H "Authorization: Bearer $LLAMA_API_KEY" \
   http://localhost:8080/v1/models
 
 # Chat completion
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer llamacpp-homelab-key" \
+  -H "Authorization: Bearer $LLAMA_API_KEY" \
   -d '{
     "messages": [{"role": "user", "content": "Hello!"}],
     "max_tokens": 100

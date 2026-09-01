@@ -16,7 +16,10 @@ terminalbench_llamacpp_port: 8082
 
 terminalbench_output_dir: /data01/services/terminalbench-llamacpp/benchmarks
 terminalbench_api_base: "http://localhost:8082/v1"
-terminalbench_api_key: "llamacpp-homelab-key"
+# Reuse the vaulted llamacpp key rather than carrying a literal. A default
+# credential committed to a public repo is a credential, even a weak one that
+# nothing currently uses.
+terminalbench_api_key: "{{ ai_services.llamacpp.api_key }}"
 terminalbench_health_url: "http://localhost:8082/health"
 terminalbench_health_timeout: 180
 terminalbench_health_interval: 10
