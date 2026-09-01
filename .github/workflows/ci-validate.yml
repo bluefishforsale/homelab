@@ -212,6 +212,26 @@ jobs:
           done
           echo "✓ All vault files are properly encrypted"
 
+      # A template can reference a vault variable its playbook never loads, or a
+      # vault path that does not exist. The first kills the apply with
+      # "'media_services' is undefined"; the second renders an empty string, so
+      # the deploy succeeds and the service breaks silently. Neither is visible
+      # to a syntax check, because --syntax-check never resolves variables.
+      # bazarr hit the first on 2026-09-01 and CI was fully green.
+      - name: Vault references resolve
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+          trap 'rm -f /tmp/.vault_pass' EXIT
+          python3 .github/workflows/lib/check-vault-refs.py /tmp/.vault_pass
+
+      - name: Vault reference check catches a planted bug
+        run: bash .github/workflows/lib/check-vault-refs.test.sh
+
       - name: Check no vault keys were dropped
         if: github.event_name == 'pull_request'
         env:
