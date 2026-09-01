@@ -170,17 +170,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # This job used to end in `|| echo "✓ no obvious credentials"`, so it
+      # exited 0 whether it found a secret or not. It ran that way for months
+      # while three live API keys and a third-party account password sat in
+      # files/ocean-bazarr/config.ini.j2 — a directory and file extension it
+      # did not even scan. A gate that cannot go red is decoration.
       - name: Scan for hardcoded secrets
-        run: |
-          echo "Scanning for potential hardcoded credentials..."
-          echo "⚠️  Review the following matches (if any):"
-          grep -r -i "password\|secret\|token" playbooks/ files/ --include="*.yaml" --include="*.yml" | \
-            grep -v "vault" | \
-            grep -v "ask-vault-pass" | \
-            grep -v "{{ " || echo "✓ No obvious hardcoded credentials found"
+        run: bash .github/workflows/lib/scan-hardcoded-secrets.sh
 
-          echo ""
-          echo "Note: All secrets should be in encrypted vault files"
+      # And the scanner needs its own test, or it rots back into decoration
+      # without anyone noticing: this plants a secret and requires a non-zero
+      # exit.
+      - name: Secret scanner catches a planted secret
+        run: bash .github/workflows/lib/scan-hardcoded-secrets.test.sh
 
   check-vault:
     name: Verify Vault Files

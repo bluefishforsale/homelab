@@ -29,7 +29,11 @@
     hook_dest: /etc/letsencrypt/renewal-hooks/deploy/deploy-plex-cert.sh
     live_dir: "/etc/letsencrypt/live/{{ domain }}"
     pfx_path: "{{ live_dir }}/{{ domain }}.pfx"
-    plex_cert_pfx_password: string_cheese
+    # NOTE: vaulted, but NOT rotated. The .pfx already on disk was encrypted
+    # with this value, so changing it here without regenerating the PFX and
+    # reloading Plex breaks certificate loading. Rotating it is a deliberate
+    # task, not a side effect of moving it out of the repo.
+    plex_cert_pfx_password: "{{ media_services.plex.cert_pfx_password }}"
     uid: 1001
 
   tasks:
