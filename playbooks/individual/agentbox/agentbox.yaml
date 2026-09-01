@@ -277,6 +277,17 @@
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
 
+  # Renaming a script installs the new name but leaves the old one on PATH, so
+  # the box keeps a copy of code that master no longer has. Harmless until
+  # someone runs it and gets the previous behaviour back. Deployed state has to
+  # equal the repo, so removals are declared, not assumed.
+  - name: Remove agent scripts that have been renamed away
+    ansible.builtin.file:
+      path: "/usr/local/bin/{{ item }}"
+      state: absent
+    loop:
+      - agentbox-escalate-to-claude.sh   # -> agentbox-escalate.sh (PR #374)
+
   # --- systemd units ---
   - name: Install systemd units
     ansible.builtin.template:
