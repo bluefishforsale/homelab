@@ -91,7 +91,6 @@ Ocean services mount `/data01/services/` for persistent storage.
 
 - llama.cpp (LLM API server)
 - Open WebUI (chat interface)
-- ComfyUI (image generation)
 
 ### Media
 
@@ -113,8 +112,8 @@ MySQL serves Grafana only, so it is not exposed on the host:
 
 ### Services
 
-- NextCloud, TinaCMS
-- Frigate, Home Assistant
+- NextCloud
+- Home Assistant
 
 ---
 

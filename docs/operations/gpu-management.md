@@ -149,16 +149,6 @@ ssh terrac@192.0.2.143 "docker logs llamacpp 2>&1 | grep -i 'offload\|layer'"
 # Access: http://192.0.2.143:8080
 ```
 
-### ComfyUI (Image Generation)
-
-```bash
-# Deploy
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/ai/comfyui.yaml --ask-vault-pass
-
-# Access: http://192.0.2.143:8188
-```
-
 ### Plex (Hardware Transcoding)
 
 ```bash
@@ -285,13 +275,13 @@ See [ocean-migration-plan.md](ocean-migration-plan.md) for full passthrough setu
 
 ```bash
 # Stop GPU containers
-ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp comfyui plex"
+ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp plex"
 
 # Reset GPU
 ssh terrac@192.0.2.143 "sudo nvidia-smi --gpu-reset"
 
 # Restart services
-ssh terrac@192.0.2.143 "sudo systemctl start llamacpp comfyui plex"
+ssh terrac@192.0.2.143 "sudo systemctl start llamacpp plex"
 ```
 
 ### Thermal Emergency (>85°C)
@@ -301,7 +291,7 @@ ssh terrac@192.0.2.143 "sudo systemctl start llamacpp comfyui plex"
 ssh terrac@192.0.2.143 "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader"
 
 # Stop high-load services
-ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp comfyui"
+ssh terrac@192.0.2.143 "sudo systemctl stop llamacpp"
 
 # Monitor until temperature drops
 ssh terrac@192.0.2.143 "watch -n 1 nvidia-smi --query-gpu=temperature.gpu --format=csv"

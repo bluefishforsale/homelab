@@ -329,14 +329,6 @@ ansible-playbook -i inventories/production/hosts.ini \
 - llama.cpp: `http://192.0.2.143:8080`
 - Open WebUI: `http://192.0.2.143:3000`
 
-### Other Services
-
-```bash
-# Frigate NVR
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/services/frigate.yaml --ask-vault-pass
-```
-
 ### Full Ocean Deployment
 
 Use the master playbook for complete ocean deployment:

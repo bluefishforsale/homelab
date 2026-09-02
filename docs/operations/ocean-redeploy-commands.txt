@@ -92,9 +92,6 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 # Open WebUI (LLM web interface)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml
 
-# ComfyUI (AI image generation)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml
-
 # ==============================================================================
 # PHASE 6: Cloud/Web Services
 # ==============================================================================
@@ -102,17 +99,12 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 # NextCloud (file sharing with MariaDB + Redis)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml
 
-# TinaCMS (headless CMS)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml
-
 # WordPress (if deployed)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/blog_saetnere_com_wp.yaml
 
 # Home Assistant (if deployed)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/homeassistant_compose.yaml
 
-# Frigate NVR (if deployed)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/frigate.yaml
 
 
 # ==============================================================================
@@ -156,9 +148,7 @@ ssh ocean "cd /data01/services && for dir in */; do if [ -f \${dir}docker-compos
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/tdarr.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/llamacpp.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/open_webui.yaml && \
-# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/ai/comfyui.yaml && \
-# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml && \
-# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/tinacms.yaml
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/services/nextcloud.yaml
 
 # ==============================================================================
 # NOTES

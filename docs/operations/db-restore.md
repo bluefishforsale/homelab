@@ -144,7 +144,6 @@ Service names are exactly these. A name that is not listed is rejected with
 | `paia` | sqlite | `paia/paia.db.gz` | `paia` | `/data01/services/paia/data/paia.db` |
 | `photonic_inventory` | sqlite | `photonic_inventory/photonic_inventory.db.gz` | `photonic_inventory` | `/data01/services/photonic_inventory/data/photonic.db` |
 | `ntfy` | sqlite | `ntfy/ntfy.db.gz` | `ntfy` | `/data01/services/ntfy/data/auth.db` |
-| `frigate` | sqlite | `frigate/frigate.db.gz` | `frigate` | `/data01/services/frigate/config/frigate.db` |
 | `my_ta_jose` | sqlite | `my_ta_jose/my_ta_jose.db.gz` | `my_ta_jose` | `/data01/services/my_ta_jose/data/my_ta_jose.db` |
 | `mem0` | sqlite | `mem0/mem0.db.gz` | `mem0` | `/data01/services/mem0/history/history.db` |
 

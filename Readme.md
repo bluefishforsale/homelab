@@ -96,7 +96,7 @@ homelab/
 ### GPU Acceleration
 
 - RTX 3090 (24GB VRAM) passed through to ocean VM
-- llama.cpp, ComfyUI, Plex hardware transcoding
+- llama.cpp, Plex hardware transcoding
 
 ### Storage
 

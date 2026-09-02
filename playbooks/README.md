@@ -57,11 +57,11 @@ ansible-playbook -i inventories/production/hosts.ini \
 
 # With tags
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/ai/comfyui.yaml --tags models --ask-vault-pass
+  playbooks/individual/ocean/media/jellyfin.yaml --tags config --ask-vault-pass
 
 # Skip tags
 ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/ai/comfyui.yaml --skip-tags models --ask-vault-pass
+  playbooks/individual/ocean/media/jellyfin.yaml --skip-tags restart --ask-vault-pass
 ```
 
 ### GitHub Runners
@@ -104,11 +104,11 @@ ansible-playbook -i inventories/github_runners/hosts.ini \
 
 ### Ocean (`individual/ocean/`)
 
-- **ai/** - llama.cpp, ComfyUI, Open WebUI
+- **ai/** - llama.cpp, Open WebUI, paia, mem0
 - **media/** - Plex, Tautulli, Sonarr, Radarr, Prowlarr
 - **monitoring/** - Prometheus, Grafana
 - **network/** - nginx, Cloudflare tunnel
-- **services/** - Frigate, NextCloud
+- **services/** - Home Assistant, GlobalView, WordPress
 
 ---
 

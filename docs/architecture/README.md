@@ -68,10 +68,10 @@ See [`deployment-flow.md`](./deployment-flow.md).
 ### Services
 
 - **Network**: nginx, cloudflared, cloudflare_ddns
-- **AI/ML**: llama.cpp, Open WebUI, ComfyUI
+- **AI/ML**: llama.cpp, Open WebUI, paia, mem0
 - **Media**: Plex, Sonarr, Radarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr
 - **Monitoring**: Prometheus, Grafana, NVIDIA DCGM, UnPoller
-- **Services**: NextCloud, TinaCMS, Frigate, Home Assistant
+- **Services**: Home Assistant, GlobalView, WordPress
 
 ---
 

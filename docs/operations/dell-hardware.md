@@ -21,7 +21,7 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 
 **Primary Workloads:**
 - **ocean VM** (192.0.2.143): Main service host for media stack, AI/ML services, monitoring
-- GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, ComfyUIm log-ml)
+- GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, log-ml)
 - 64TB storage pool for media, backups, and service data
 
 ### Node005 - Dell PowerEdge R620 (Infrastructure Server)

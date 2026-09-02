@@ -63,7 +63,6 @@ Status and future plans for the homelab infrastructure.
 
 - **llama.cpp**: GPU-accelerated LLM API (Qwen3-14B, 40K context, full GPU offload)
 - **Open WebUI**: Chat interface auto-configured for llama.cpp
-- **ComfyUI**: AI image generation with YanWenKun image (cu126-slim)
 - **paia**: Personal AI assistant
 - **terminalbench**: LLM benchmarking and testing
 - **mem0**: AI memory service
@@ -101,10 +100,8 @@ Status and future plans for the homelab infrastructure.
 ### Cloud/CMS Services
 
 - **NextCloud**: File sharing with MariaDB + Redis backend
-- **TinaCMS**: Git-backed CMS (Docker Hub private image)
 - **WordPress**: Blog platform (example.com) with dedicated database
 - **example.com**: Static blog site
-- **Frigate**: NVR with object detection
 - **Home Assistant**: Smart home automation
 - **Homepage**: Service status dashboard
 - **GlobalView**: Custom service monitoring stack
@@ -184,13 +181,10 @@ Status and future plans for the homelab infrastructure.
 | Homepage | http://192.0.2.143:3001 | - |
 | llama.cpp API | http://192.0.2.143:8080 | - |
 | Open WebUI | http://192.0.2.143:3000 | https://chat.example.com |
-| ComfyUI | http://comfyui.home | https://comfyui.example.com |
 | NextCloud | http://192.0.2.143:8081 | https://nextcloud.example.com |
-| TinaCMS | http://tina.home | https://tina.example.com |
 | Overseerr | http://192.0.2.143:5055 | https://requests.example.com |
 | Tautulli | http://192.0.2.143:8181 | - |
 | Home Assistant | http://192.0.2.143:8123 | https://ha.example.com |
-| Frigate | http://192.0.2.143:5000 | - |
 
 ---
 
