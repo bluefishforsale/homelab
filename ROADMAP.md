@@ -96,6 +96,9 @@ Status and future plans for the homelab infrastructure.
 - **Radarr Exporter**: Metrics exporter
 - **Sonarr Exporter**: Metrics exporter
 - **Tautulli Exporter**: Metrics exporter
+- **NVIDIA Exporter**: Metrics exporter
+- **NVIDIA GPU Exporter**: Metrics exporter
+- **NVIDIA Power Limit**: Deployed service
 
 ### Cloud/CMS Services
 
