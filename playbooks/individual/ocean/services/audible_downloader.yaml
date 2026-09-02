@@ -93,6 +93,11 @@
         group: root
         mode: '0750'
 
+    # audible.json is NOT managed here. It is audible-cli's credential cache:
+    # it carries an access token with an `expires` field and a refresh token,
+    # and the tool rewrites the file whenever it renews them. Templating it
+    # from the vault would clobber a live refreshed token with a stale one on
+    # every apply. Seed it once by hand with `audible quickstart`.
     - name: Copy audible-cli config files
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../../../../files/audible-downloader/.audible/{{ item }}"
@@ -101,7 +106,6 @@
         group: root
         mode: '0660'
       loop:
-        - audible.json
         - config.toml
 
     - name: Create systemd service and timer
