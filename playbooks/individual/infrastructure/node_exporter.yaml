@@ -22,10 +22,13 @@
     node_exporter_home: "/data01/services/{{ node_exporter_service }}"
     node_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     # Weekly image refresh, the base time each project's timer randomises 6h
-    # forward from. dns01 and dns02 are the only pair whose simultaneous loss is
-    # unrecoverable (no DNS means no route to anything that could fix it), so
-    # they never refresh on the same day.
-    docker_refresh_schedule: "{{ 'Wed *-*-* 02:00:00' if inventory_hostname == 'dns02' else 'Sun *-*-* 02:00:00' }}"
+    # forward from, so the window is 08:00-14:00 Pacific: awake and watching, not
+    # asleep. The zone is named rather than left to host-local time, which pins
+    # the window against a host rebuilt in UTC and follows DST on its own.
+    # dns01 and dns02 are the only pair whose simultaneous loss is unrecoverable
+    # (no DNS means no route to anything that could fix it), so they never
+    # refresh on the same day.
+    docker_refresh_schedule: "{{ 'Wed *-*-* 08:00:00 America/Los_Angeles' if inventory_hostname == 'dns02' else 'Sun *-*-* 08:00:00 America/Los_Angeles' }}"
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest

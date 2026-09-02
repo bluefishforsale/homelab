@@ -5,8 +5,8 @@ Description=Weekly image refresh for compose project %i
 OnCalendar={{ docker_refresh_schedule }}
 # 31 compose projects on ocean alone. Without a wide spread they pull
 # back-to-back and saturate the WAN, so every instance lands at its own random
-# offset inside a 6h window, redrawn each week. A host that was down at the
-# scheduled time still catches up.
+# offset inside the 08:00-14:00 Pacific window, redrawn each week. A host that
+# was down at the scheduled time still catches up.
 RandomizedDelaySec=6h
 Persistent=true
 
