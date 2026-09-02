@@ -21,10 +21,11 @@
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
     node_exporter_home: "/data01/services/{{ node_exporter_service }}"
     node_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
-    # Weekly image refresh. dns01 and dns02 are the only pair whose simultaneous
-    # loss is unrecoverable (no DNS means no route to anything that could fix
-    # it), so they never refresh on the same day.
-    docker_refresh_schedule: "{{ 'Wed *-*-* 04:00:00' if inventory_hostname == 'dns02' else 'Sun *-*-* 04:00:00' }}"
+    # Weekly image refresh, the base time each project's timer randomises 6h
+    # forward from. dns01 and dns02 are the only pair whose simultaneous loss is
+    # unrecoverable (no DNS means no route to anything that could fix it), so
+    # they never refresh on the same day.
+    docker_refresh_schedule: "{{ 'Wed *-*-* 02:00:00' if inventory_hostname == 'dns02' else 'Sun *-*-* 02:00:00' }}"
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
@@ -139,6 +140,10 @@
   # pulls only when an image is missing. Without this the fleet runs whatever it
   # first pulled, which is how prometheus sat on a June image while restarting
   # weekly. Recreates only services whose image actually changed.
+  #
+  # One timer instance per compose project, discovered from the host rather than
+  # listed here: the project list is what is actually running, and a registry in
+  # this file would rot the first time a service is added elsewhere.
   - name: Install docker-refresh script
     ansible.builtin.copy:
       src: "{{ node_exporter_files }}/docker-refresh.sh"
@@ -147,24 +152,84 @@
       group: root
       mode: '0755'
 
-  - name: Create docker-refresh systemd service
-    ansible.builtin.template:
-      src: "{{ node_exporter_files }}/docker-refresh.service.j2"
-      dest: /etc/systemd/system/docker-refresh.service
-      mode: '0644'
+  # Replaced by the per-project instances below. The old sweep refreshed every
+  # project back-to-back from one unit, so one wedged project stalled the rest.
+  # Removed before the reload below so systemd forgets it in the same pass.
+  - name: Check for the old fleet-wide docker-refresh sweep
+    ansible.builtin.stat:
+      path: /etc/systemd/system/docker-refresh.timer
+    register: old_docker_refresh
 
-  - name: Create docker-refresh systemd timer
-    ansible.builtin.template:
-      src: "{{ node_exporter_files }}/docker-refresh.timer.j2"
-      dest: /etc/systemd/system/docker-refresh.timer
-      mode: '0644'
-
-  - name: Start and enable docker-refresh timer
+  - name: Stop and disable the old docker-refresh sweep
     ansible.builtin.systemd:
       name: docker-refresh.timer
+      state: stopped
+      enabled: false
+    when: old_docker_refresh.stat.exists
+
+  - name: Remove the old docker-refresh sweep units
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/systemd/system/docker-refresh.timer
+      - /etc/systemd/system/docker-refresh.service
+      # The textfile collector republishes a .prom file forever, so leaving it
+      # would keep serving the sweep's metrics long after the sweep is gone.
+      - "{{ node_exporter_textfiles }}/docker_refresh.prom"
+
+  - name: Create docker-refresh template service
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/docker-refresh@.service"
+      dest: /etc/systemd/system/docker-refresh@.service
+      mode: '0644'
+
+  - name: Create docker-refresh template timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/docker-refresh@.timer.j2"
+      dest: /etc/systemd/system/docker-refresh@.timer
+      mode: '0644'
+
+  - name: Reload systemd for the docker-refresh templates
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  # Read-only, and it has to run in check mode too or the dry run would loop
+  # over an undefined list.
+  - name: Enumerate running compose projects
+    ansible.builtin.command: docker compose ls --format json
+    register: compose_projects
+    changed_when: false
+    check_mode: false
+    when: docker_check.rc == 0
+
+  - name: Enable a refresh timer per compose project
+    ansible.builtin.systemd:
+      name: "docker-refresh@{{ item }}.timer"
       state: started
       enabled: true
-      daemon_reload: yes
+    loop: "{{ compose_projects.stdout | from_json | map(attribute='Name') | list }}"
+    when: docker_check.rc == 0
+
+  - name: Find enabled refresh timers
+    ansible.builtin.find:
+      paths: /etc/systemd/system/timers.target.wants
+      patterns: 'docker-refresh@*.timer'
+      file_type: link
+    register: refresh_timer_links
+    when: docker_check.rc == 0
+
+  # A deleted service (comfyui, frigate) would otherwise keep an enabled timer
+  # that fails weekly against a project that no longer exists, and page for it.
+  - name: Disable refresh timers whose compose project is gone
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: stopped
+      enabled: false
+    loop: "{{ refresh_timer_links.files | map(attribute='path') | map('basename') | list | difference(wanted_refresh_timers) }}"
+    vars:
+      wanted_refresh_timers: "{{ compose_projects.stdout | from_json | map(attribute='Name') | map('regex_replace', '^(.*)$', 'docker-refresh@\\1.timer') | list }}"
+    when: docker_check.rc == 0
 
   - name: Create node exporter Docker Compose directory
     ansible.builtin.file:

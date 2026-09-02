@@ -1,0 +1,15 @@
+[Unit]
+Description=Refresh images for compose project %i
+Documentation=file:///usr/local/bin/docker-refresh.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/docker-refresh.sh %i
+# A pull plus a recreate must never wedge the host: a stalled registry is
+# bounded here, and the work stays out of the way of whatever the box is
+# actually doing.
+TimeoutStartSec=1800
+Nice=10
+IOSchedulingClass=idle
