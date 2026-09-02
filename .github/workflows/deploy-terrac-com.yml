@@ -103,6 +103,10 @@ jobs:
 
       - name: Run deployment playbook
         env:
+          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
+          DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
+          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
+          DEPLOY_FORCE_CLEAN: ${{ steps.params.outputs.force_clean }}
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
@@ -114,24 +118,24 @@ jobs:
           echo "Deploying terrac.com static website"
           echo "================================================"
           echo ""
-          echo "Branch: ${{ steps.params.outputs.branch }}"
-          echo "Force Clean: ${{ steps.params.outputs.force_clean }}"
-          echo "Commit: ${{ steps.params.outputs.commit_sha }}"
-          echo "Message: ${{ steps.params.outputs.commit_message }}"
+          echo "Branch: $DEPLOY_BRANCH"
+          echo "Force Clean: $DEPLOY_FORCE_CLEAN"
+          echo "Commit: $DEPLOY_COMMIT_SHA"
+          echo "Message: $DEPLOY_COMMIT_MESSAGE"
           echo ""
 
           START_TIME=$(date +%s)
 
-          # Build ansible-playbook command
-          CMD="ansible-playbook -i $INVENTORY --vault-password-file=/tmp/.vault_pass"
-          CMD="$CMD -e git_branch=${{ steps.params.outputs.branch }}"
-          CMD="$CMD -e force_clean=${{ steps.params.outputs.force_clean }}"
-          CMD="$CMD $PLAYBOOK"
-
-          echo "Running: $CMD"
+          # NOTE: invoked directly, never built into a string and eval'd. eval
+          # re-parses after expansion, so a branch name carrying shell syntax
+          # would execute with the vault password in scope.
+          echo "Running: ansible-playbook $PLAYBOOK (branch=$DEPLOY_BRANCH force_clean=$DEPLOY_FORCE_CLEAN)"
           echo ""
 
-          if eval $CMD; then
+          if ansible-playbook -i "$INVENTORY" --vault-password-file=/tmp/.vault_pass \
+               -e git_branch="$DEPLOY_BRANCH" \
+               -e force_clean="$DEPLOY_FORCE_CLEAN" \
+               "$PLAYBOOK"; then
             END_TIME=$(date +%s)
             DURATION=$((END_TIME - START_TIME))
             
@@ -181,11 +185,14 @@ jobs:
       - name: Generate deployment summary
         if: always()
         env:
+          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
+          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
+          DEPLOY_FORCE_CLEAN: ${{ steps.params.outputs.force_clean }}
           DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
         run: |
-          BRANCH="${{ steps.params.outputs.branch }}"
-          FORCE_CLEAN="${{ steps.params.outputs.force_clean }}"
-          COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
+          BRANCH="$DEPLOY_BRANCH"
+          FORCE_CLEAN="$DEPLOY_FORCE_CLEAN"
+          COMMIT_SHA="$DEPLOY_COMMIT_SHA"
           COMMIT_MESSAGE="$DEPLOY_COMMIT_MESSAGE"
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
