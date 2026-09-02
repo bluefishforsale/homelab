@@ -117,8 +117,11 @@ jobs:
             done <<< "$CHANGED_FILES"
           fi
 
-          # Remove duplicates and create JSON array
-          UNIQUE_PLAYBOOKS=($(printf '%s\n' "${PLAYBOOKS[@]}" | sort -u))
+          # Remove duplicates and create JSON array. A PR that DELETES a
+          # service still lists its files as changed, and the files/ mapping
+          # below happily maps them to a playbook that no longer exists, so
+          # drop anything that isn't on disk before the validate job opens it.
+          UNIQUE_PLAYBOOKS=($(printf '%s\n' "${PLAYBOOKS[@]}" | sort -u | while read -r p; do [ -f "$p" ] && echo "$p"; done || true))
           PLAYBOOK_COUNT=${#UNIQUE_PLAYBOOKS[@]}
 
           # Convert to JSON
