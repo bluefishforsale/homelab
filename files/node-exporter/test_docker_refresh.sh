@@ -23,12 +23,18 @@ exited() { # exited <name> <expected-rc>
 }
 
 # Runs the script with <stub-body> as the docker CLI. Journal lines land in
-# $LOG, so what the script reports is assertable without a syslog.
-run_with_stub() { # run_with_stub <stub-body-file> <project>
+# $LOG, so what the script reports is assertable without a syslog. A third
+# argument stubs `timeout` as expired (rc 124), which is how a pull that runs
+# past its budget looks.
+run_with_stub() { # run_with_stub <stub-body-file> <project> [expire-pull]
   BIN=$(mktemp -d)
   { echo '#!/usr/bin/env bash'; cat "$1"; } > "$BIN/docker"
   printf '#!/usr/bin/env bash\nshift 2\necho "$*" >> %s\n' "$LOG" > "$BIN/logger"
   chmod +x "$BIN/docker" "$BIN/logger"
+  if [ -n "${3:-}" ]; then
+    printf '#!/usr/bin/env bash\nexit 124\n' > "$BIN/timeout"
+    chmod +x "$BIN/timeout"
+  fi
   PATH="$BIN:$PATH" bash "$SCRIPT" "$2" > "$OUT" 2>&1
   RC=$?
   rm -rf "$BIN"
@@ -85,6 +91,24 @@ esac
 STUBEOF
 run_with_stub "$STUB" paia
 exited "a failed pull fails the unit" 1
+
+# A pull that runs past its budget must fail BEFORE the recreate. The outage
+# case this guards is systemd killing the unit between `compose` stopping the
+# old container and starting the new one, which would leave the service down.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"tdarr","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *images\ --quiet) echo sha256:same ;;
+  *up\ -d*) echo RECREATED ;;
+  *) : ;;
+esac
+STUBEOF
+: > "$LOG"
+run_with_stub "$STUB" tdarr expire-pull
+exited "a pull past its budget fails the unit" 1
+refute "a timed-out pull recreates nothing" "RECREATED" "$OUT"
+check "a timed-out pull says so in the journal" "project=tdarr pull failed or exceeded 2700s, nothing recreated" "$LOG"
 
 # A project that is not running is not this script's business: starting it would
 # resurrect something stopped on purpose, and its own unit already alerts.

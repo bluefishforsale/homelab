@@ -7,9 +7,10 @@ Requires=docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/docker-refresh.sh %i
-# A pull plus a recreate must never wedge the host: a stalled registry is
-# bounded here, and the work stays out of the way of whatever the box is
-# actually doing.
-TimeoutStartSec=1800
+# Backstop only. The script bounds its own pull at 45m, so this should never be
+# what fires: systemd killing the unit mid-recreate would leave the service
+# down, which is the one way this can cause an outage. 15m of headroom past the
+# pull budget covers the recreate.
+TimeoutStartSec=3600
 Nice=10
 IOSchedulingClass=idle
