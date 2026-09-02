@@ -48,6 +48,16 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | `media_clients.py` | one client wrapping radarr/sonarr/tdarr/plex/overseerr/tautulli (`ping` / `get` / `delete` / `tdarr-stats`) | library used by the media scripts |
 | `vault.py` | `vault/secrets.yaml`: `list [path]` (redacted) / `get <path>` / `check <path> <value>` / `set <path> <value>` / `rotate <path> <value>` — pass `-` for any value to read it from stdin instead of argv (`printf '%s' "$new" \| vault.py rotate a.b.c -`), which keeps the secret out of shell history and `ps` | writes are line-edits (comments + ordering survive), diffed before re-encrypting so exactly one path can change, then encrypted beside the vault and decrypted back to prove it round-trips before `os.replace` — the vault is never overwritten by an unverified write. Exit codes: `0` ok, `1` `check` mismatch, `2` error, which is how you tell "rotation didn't land" from "typo'd the path". Self-check: `python3 scripts/test_vault.py` |
 
+**Never replace `vault/secrets.yaml` wholesale.** Merging in an older copy silently
+deletes keys and the ciphertext diff hides it. CI's "Check no vault keys were dropped"
+step compares decrypted key paths against the base branch and fails the PR, and clearing
+that takes a human. Use `vault.py` instead of `ansible-vault view | grep` or hand-editing.
+Vault-only changes still need a manual dispatch to deploy.
+
+**Deletes lag on ZFS.** Unlinks are async, so `df` trails a `media-reclaim-delete.py` run
+by a minute or two. Reclaim policy: keep watched, monitored, requested, protected-genre,
+pre-`--since` and the well-rated; cull the mediocre recent.
+
 ## Environment overrides
 
 | Var | Default | Used by |

@@ -4,57 +4,16 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
 
 ---
 
-## Documentation Index
+## Where to look
 
-### Getting Started
-
-- **Quick Start** → [`docs/setup/getting-started.md`](docs/setup/getting-started.md)
-- **macOS Development Setup** → [`docs/setup/macos-setup.md`](docs/setup/macos-setup.md)
-- **Development Guide** → [`DEVELOPMENT.md`](DEVELOPMENT.md)
-
-### Architecture
-
-- **System Overview** → [`docs/architecture/overview.md`](docs/architecture/overview.md)
-- **Network Design** → [`docs/architecture/networking.md`](docs/architecture/networking.md)
-- **Ocean Services** → [`docs/architecture/ocean-services.md`](docs/architecture/ocean-services.md)
-- **Deployment Flow** → [`docs/architecture/deployment-flow.md`](docs/architecture/deployment-flow.md)
-
-### Operations
-
-- **Proxmox Management** → [`docs/operations/proxmox.md`](docs/operations/proxmox.md)
-- **ZFS Storage** → [`docs/operations/zfs.md`](docs/operations/zfs.md)
-- **GPU Management** → [`docs/operations/gpu-management.md`](docs/operations/gpu-management.md)
-- **Dell Hardware** → [`docs/operations/dell-hardware.md`](docs/operations/dell-hardware.md)
-- **Restoring a service database** → [`docs/operations/db-restore.md`](docs/operations/db-restore.md) — per-service runbook, dry-run by default, point-in-time from GCS generations
-
-### Troubleshooting
-
-- **Common Issues** → [`docs/troubleshooting/common-issues.md`](docs/troubleshooting/common-issues.md)
-- **Internal DNS flapping / hostname collisions** → [`docs/troubleshooting/common-issues.md#internal-dns-intermittent--flapping-home-answers`](docs/troubleshooting/common-issues.md#internal-dns-intermittent--flapping-home-answers) · check with [`scripts/dns-drift-check.sh`](scripts/dns-drift-check.sh)
-
-### CI/CD & Automation
-
-- **Adding a new external-repo service (READ FIRST when onboarding a new project)** → [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
-- **Validating the deploy chain end-to-end** → [`docs/operations/deploy-tracer.md`](docs/operations/deploy-tracer.md)
-- **GitHub Actions Workflows** → [`.github/workflows/`](.github/workflows/)
-- **Playbook Documentation** → [`playbooks/README.md`](playbooks/README.md)
-
-### Diagnostics & Admin Scripts
-
-**Reach for [`scripts/`](scripts/README.md) before hand-rolling `ssh host 'docker …'` or
-`curl prometheus | jq`.** Full index: [`scripts/README.md`](scripts/README.md). The ones you
-want most often:
-
-- **Metrics** → [`scripts/prom.sh`](scripts/prom.sh) `q '<promql>'` / `names` / `targets down`
-- **Logs for a service on a host** → [`scripts/loki.sh`](scripts/loki.sh) `<svc> <host> [since] [limit] [match]`
-- **systemd across the fleet** → [`scripts/fleet-systemctl.sh`](scripts/fleet-systemctl.sh) `all` / `<service> [host]` / `host <host>`
-- **Docker across the fleet** → [`scripts/docker.sh`](scripts/docker.sh) `where <c>` / `status <c> [host]` / `logs`
-- **Active alerts** → [`scripts/alerts.sh`](scripts/alerts.sh)
-- **Cloudflare (DNS / cache-status / purge)** → [`scripts/cf.sh`](scripts/cf.sh) — `purge` after editing a cached static site
-- **Media library (ocean Plex stack, NAS reclaim)** → [`scripts/media_clients.py`](scripts/media_clients.py) `ping` (one client for radarr/sonarr/tdarr/plex/overseerr/tautulli, keys self-discovered on ocean), [`scripts/media-reclaim-report.py`](scripts/media-reclaim-report.py) (library taste profile), [`scripts/media-cull-candidates.py`](scripts/media-cull-candidates.py) `movies`/`tv` (taste-aware cull TSV → hand-edit → feed IDs to) [`scripts/media-reclaim-delete.py`](scripts/media-reclaim-delete.py) (Overseerr-guarded delete + *arr untrack, dry-run unless `--yes`). Reclaim policy: keep watched/monitored/requested/protected-genre/pre-`--since` and the well-rated; cull the mediocre recent. ZFS unlinks async — `df` lags a delete by ~1-2 min.
-- **Restart/bounce a service on one host** → [`scripts/fleet-restart.sh`](scripts/fleet-restart.sh) (guarded; the only mutating fleet tool)
-- **Public DNS + mail-auth for a domain** → [`scripts/dns-records.sh`](scripts/dns-records.sh) (SPF/DKIM/DMARC), [`scripts/dns-snapshot.sh`](scripts/dns-snapshot.sh) (diffable), [`scripts/dns-timeline.py`](scripts/dns-timeline.py) — external domains, distinct from the internal PowerDNS `dns-drift-check.sh`
-- **Vault secrets** → [`scripts/vault.py`](scripts/vault.py) `list [path]` (redacted) / `get <path>` / `check <path> <value>` (exit 1 on mismatch — "did that rotation land?") / `set` / `rotate`. Pass `-` as the value to read it from stdin, so the secret never lands in shell history or `ps`. **Never replace `vault/secrets.yaml` wholesale** — a merged older copy silently deletes keys and the ciphertext diff hides it; CI's "Check no vault keys were dropped" step compares decrypted key paths against the base branch and fails the PR, and clearing it takes a human. Use it instead of `ansible-vault view | grep` or hand-editing: writes are line-edits, so comments and ordering survive, and the result is diffed before re-encrypting so exactly one path can change. Vault-only changes still need a manual dispatch to deploy
+- **Docs index** (setup, architecture, operations, troubleshooting, CI/CD) -> [`docs/README.md`](docs/README.md)
+- **Diagnostic + admin tooling** -> [`scripts/README.md`](scripts/README.md). Reach for
+  `scripts/` before hand-rolling `ssh host 'docker ...'` or `curl prometheus | jq`:
+  `prom.sh` (metrics), `loki.sh` (logs), `fleet-systemctl.sh` / `docker.sh` (fleet state),
+  `alerts.sh`, `cf.sh` (Cloudflare), `vault.py` (secrets), `fleet-restart.sh` (the only
+  mutating one).
+- **Onboarding a new external-repo service** -> [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
+- **Validate:** `make validate`
 
 ---
 
@@ -236,29 +195,3 @@ Distilled from prior decisions. Defaults, not laws, but don't override without a
 - **Local-first for sensitive data.** PII / FERPA / HIPAA-adjacent work defaults to
   on-prem inference; cloud LLMs are explicit opt-in phase 2, never suggested unprompted.
 
----
-
-## Quick Reference
-
-**Primary Host:** ocean (192.0.2.143)
-**Environment Setup:** `source .envrc`
-**Deploy All:** `ansible-playbook -i inventories/production/hosts.ini playbooks/00_site.yaml`
-**Validate:** `make validate`
-**Adding a new project that deploys here:** follow [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md) — bootstrap checklist + every gotcha that's bitten this repo before.
-
----
-
-## Hardware
-
-- **node006** (Dell R720): 40 cores, 680GB RAM, 64TB ZFS, RTX 3090 → ocean VM
-- **node005** (Dell R620): 56 cores, 128GB RAM → dns01, pihole, k8s, runners
-
-## Grafana + MySQL Consolidated Stack
-
-MySQL consolidated into Grafana docker-compose (MySQL only serves Grafana):
-
-- **grafana_internal** network: Grafana ↔ MySQL (private, no host exposure)
-- **web_proxy** network: nginx ↔ Grafana
-- MySQL: percona/percona-server:5.7, 1 CPU, 1GB, buffer_pool=512M
-- Storage: `/data01/services/grafana/{mysql-data,mysql-logs,mysql-conf,data,logs}/`
-- Deploy: single playbook manages both containers

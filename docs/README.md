@@ -57,12 +57,23 @@ is the same host wherever it appears.
 - [GPU Management](operations/gpu-management.md) - NVIDIA RTX 3090 configuration
 - [Dell Hardware](operations/dell-hardware.md) - iDRAC, RAID, firmware
 - [UniFi Network](operations/unifi.md) - Switch and AP configuration
+- [Database Restore](operations/db-restore.md) - Per-service runbook, dry-run by default, point-in-time from GCS generations
+
+---
+
+## CI/CD
+
+- [Deploy Pattern](operations/deploy-pattern.md) - READ FIRST when onboarding a new external-repo service
+- [Deploy Tracer](operations/deploy-tracer.md) - Validating the deploy chain end to end
+- [scripts/README.md](/scripts/README.md) - Diagnostic and admin tooling
+- [.github/workflows/](/.github/workflows/) - Workflow definitions
 
 ---
 
 ## Troubleshooting
 
 - [Common Issues](troubleshooting/common-issues.md) - Frequently encountered problems
+- [Internal DNS flapping / hostname collisions](troubleshooting/common-issues.md#internal-dns-intermittent--flapping-home-answers) - check with [`scripts/dns-drift-check.sh`](/scripts/dns-drift-check.sh)
 
 ## Quick Links by Topic
 
