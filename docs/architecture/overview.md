@@ -103,6 +103,14 @@ Ocean services mount `/data01/services/` for persistent storage.
 - Prometheus, Grafana
 - NVIDIA DCGM, UnPoller
 
+Grafana and its MySQL live in one docker-compose, deployed by a single playbook.
+MySQL serves Grafana only, so it is not exposed on the host:
+
+- `grafana_internal` network: Grafana to MySQL, private
+- `web_proxy` network: nginx to Grafana
+- MySQL: percona/percona-server:5.7, 1 CPU, 1GB, `buffer_pool=512M`
+- Storage: `/data01/services/grafana/{mysql-data,mysql-logs,mysql-conf,data,logs}/`
+
 ### Services
 
 - NextCloud, TinaCMS
