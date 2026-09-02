@@ -21,6 +21,10 @@
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
     node_exporter_home: "/data01/services/{{ node_exporter_service }}"
     node_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
+    # Weekly image refresh. dns01 and dns02 are the only pair whose simultaneous
+    # loss is unrecoverable (no DNS means no route to anything that could fix
+    # it), so they never refresh on the same day.
+    docker_refresh_schedule: "{{ 'Wed *-*-* 04:00:00' if inventory_hostname == 'dns02' else 'Sun *-*-* 04:00:00' }}"
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
@@ -127,6 +131,37 @@
   - name: Start and enable sas-phy-metrics timer
     ansible.builtin.systemd:
       name: sas-phy-metrics.timer
+      state: started
+      enabled: true
+      daemon_reload: yes
+
+  # Floating tags (:latest, :main, :stable) never update on their own: compose
+  # pulls only when an image is missing. Without this the fleet runs whatever it
+  # first pulled, which is how prometheus sat on a June image while restarting
+  # weekly. Recreates only services whose image actually changed.
+  - name: Install docker-refresh script
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/docker-refresh.sh"
+      dest: /usr/local/bin/docker-refresh.sh
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create docker-refresh systemd service
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/docker-refresh.service.j2"
+      dest: /etc/systemd/system/docker-refresh.service
+      mode: '0644'
+
+  - name: Create docker-refresh systemd timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/docker-refresh.timer.j2"
+      dest: /etc/systemd/system/docker-refresh.timer
+      mode: '0644'
+
+  - name: Start and enable docker-refresh timer
+    ansible.builtin.systemd:
+      name: docker-refresh.timer
       state: started
       enabled: true
       daemon_reload: yes

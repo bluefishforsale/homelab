@@ -85,6 +85,45 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} failed on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been in the failed state for 5m on {{ "{{ $labels.instance }}" }}"
 
+  # A unit stuck in `activating` is a restart loop, and SystemdUnitFailed above
+  # cannot see it: a unit with Restart=always never settles into `failed`. This
+  # is how comfyui and frigate crash-looped 128109 times on ocean without one
+  # alert. Legitimate oneshot units pass through `activating` in seconds, so 30m
+  # only catches units that are genuinely stuck.
+  - alert: SystemdUnitStuckActivating
+    expr: node_systemd_unit_state{state="activating"} == 1
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "systemd unit {{ "{{ $labels.name }}" }} stuck activating on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} has been activating for 30m on {{ "{{ $labels.instance }}" }}, which means it is failing and restarting rather than starting"
+
+  # A compose project whose weekly image refresh failed. Left alone this is
+  # silent: the containers keep running the old image and nothing says the host
+  # stopped tracking upstream.
+  - alert: DockerRefreshFailed
+    expr: docker_refresh_project_failed == 1
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "docker refresh failed for {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }}"
+      description: "The last weekly image refresh of compose project {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }} did not complete, so it is still on its previous images"
+
+  # The refresh mechanism itself died. Weekly cadence, so 10 days means at least
+  # one run was missed entirely. 0 is the never-succeeded case and must fire.
+  - alert: DockerRefreshStale
+    expr: >
+      (docker_refresh_last_success_timestamp_seconds == 0)
+       or (time() - docker_refresh_last_success_timestamp_seconds > 864000)
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "docker image refresh stale on {{ "{{ $labels.instance }}" }}"
+      description: "No clean weekly image refresh on {{ "{{ $labels.instance }}" }} in over 10 days; the host has stopped tracking upstream images"
+
   # Kometa has not completed a clean run in two days. It runs nightly, its
   # container reports healthy while doing nothing, and its stdout is silent, so
   # before this alert existed the service went 8+ months without a successful
