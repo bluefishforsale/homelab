@@ -88,11 +88,17 @@ groups:
   # A unit stuck in `activating` is a restart loop, and SystemdUnitFailed above
   # cannot see it: a unit with Restart=always never settles into `failed`. This
   # is how comfyui and frigate crash-looped 128109 times on ocean without one
-  # alert. Legitimate oneshot units pass through `activating` in seconds, so 30m
-  # only catches units that are genuinely stuck.
+  # alert.
+  #
+  # NOTE: a oneshot sits in `activating` for its ENTIRE run, so this window has
+  # to clear the longest legitimate run on the fleet or it pages on healthy
+  # work. audible-download took 1h34m on 2026-09-02, and the agentbox lanes are
+  # unbounded by nature, so 30m was wrong and even 2h is tight. 6h costs nothing
+  # in detection: a genuinely wedged unit stays activating for days (comfyui sat
+  # there for months). Raise it again if a legitimate run ever trips this.
   - alert: SystemdUnitStuckActivating
     expr: node_systemd_unit_state{state="activating"} == 1
-    for: 30m
+    for: 6h
     labels:
       severity: warning
     annotations:
