@@ -1,0 +1,14 @@
+[Unit]
+Description=Pull newer images for every compose project and recreate what changed
+Documentation=file://{{ node_exporter_files | default('files/node-exporter') }}/docker-refresh.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Recreates containers, so it is deliberately slow and low priority: a stalled
+# registry must not wedge the host. TimeoutStartSec bounds the whole sweep.
+ExecStart=/usr/local/bin/docker-refresh.sh {{ node_exporter_textfiles }}
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle

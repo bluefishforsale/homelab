@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly docker image refresh
+
+[Timer]
+OnCalendar={{ docker_refresh_schedule }}
+# Hosts must not stampede the registry (or the WAN) at the same second, and a
+# host that was down at the scheduled time still catches up on boot.
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
