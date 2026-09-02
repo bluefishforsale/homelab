@@ -140,6 +140,73 @@ case "$embed_secs" in
   ''|*[!0-9.-]*) embed_secs=""; DEGRADED=1 ;;
 esac
 
+# --- live extraction-LLM probe ---------------------------------------------
+# The embedder probe above was written when both halves ran locally. Extraction
+# now leaves the network, and that dependency has already failed once: the
+# OpenAI account ran out of credit and every add returned 502 for 21 hours.
+# Nothing noticed, because embeddings are local, so search stayed fast, /docs
+# stayed 200 and the container healthcheck stayed green the whole time.
+#
+# Mem0WritesFailing catches that, but only once writes are being attempted and
+# rejected. If nobody is working there are no writes, no 5xx and no alert, so
+# the outage is discovered by sitting down to work. This probe is independent
+# of usage.
+#
+# It must be a real completion. /v1/models returned 200 throughout that outage:
+# the key was valid, the quota was not. Only generating a token surfaces
+# insufficient_quota.
+#
+# Config is read from the mem0 container's own environment, so the probe tests
+# exactly what mem0 uses, with mem0's credentials, from mem0's network
+# position, and no secret has to be handled here.
+#
+# Rate-limited because this one costs money. Measured against the live
+# provider: 8 prompt + 1 completion tokens, 1.4s. At 1/min that is $0.08/month
+# against an extraction bill of ~$0.80/month, a tenth of the thing it watches.
+# Every 5 minutes is $0.016/month and still finds an outage long before the
+# 15-minute alert window closes.
+: "${LLM_PROBE_INTERVAL_SEC:=300}"
+llm_stamp="${TEXTFILE_DIR}/.mem0-llm-probe-stamp"
+llm_cache="${TEXTFILE_DIR}/.mem0-llm-probe-value"
+now=$(date +%s)
+last=$(cat "$llm_stamp" 2>/dev/null || echo 0)
+case "$last" in ''|*[!0-9]*) last=0 ;; esac
+
+if [ $((now - last)) -ge "$LLM_PROBE_INTERVAL_SEC" ]; then
+  llm_secs=$(docker exec "$API_CONTAINER" python -c "
+import json, os, time, urllib.request
+base = (os.environ.get('MEM0_LLM_BASE_URL') or os.environ.get('OPENAI_BASE_URL') or '').rstrip('/')
+key = os.environ.get('MEM0_LLM_API_KEY') or os.environ.get('OPENAI_API_KEY') or ''
+model = os.environ.get('MEM0_DEFAULT_LLM_MODEL') or ''
+if not base or not model:
+    print('-1'); raise SystemExit
+body = json.dumps({'model': model,
+                   'messages': [{'role': 'user', 'content': 'ping'}],
+                   'max_tokens': 1, 'temperature': 0}).encode()
+t = time.time()
+try:
+    r = urllib.request.Request(base + '/chat/completions', data=body,
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key})
+    d = json.load(urllib.request.urlopen(r, timeout=60))
+    print(f'{time.time()-t:.3f}' if d.get('choices') else '-1')
+except Exception:
+    print('-1')
+" 2>/dev/null | tr -d ' ')
+  case "$llm_secs" in
+    ''|*[!0-9.-]*) llm_secs="" ;;
+    *) printf '%s' "$now" > "$llm_stamp"; printf '%s' "$llm_secs" > "$llm_cache" ;;
+  esac
+else
+  # Republish the last real measurement between probes. Omitting the series on
+  # in-between runs would make it flap in and out of existence and break
+  # absent() for anything alerting on it.
+  llm_secs=$(cat "$llm_cache" 2>/dev/null)
+  case "$llm_secs" in ''|*[!0-9.-]*) llm_secs="" ;; esac
+fi
+# Unlike the embedder, an unmeasurable LLM probe does NOT set DEGRADED: the
+# provider being unreachable is a real finding about the provider, not a broken
+# collector, and it must not suppress mem0_metrics_last_success_timestamp.
+
 END=$(date +%s)
 
 {
@@ -197,6 +264,10 @@ END=$(date +%s)
     "Time to embed a unique short prompt, -1 if the probe ran and failed, absent if it could not run" \
     "$embed_secs"
 
+  gauge mem0_llm_probe_seconds \
+    "Time for a 1-token completion from the configured extraction provider, -1 if the probe ran and failed, absent if it could not run" \
+    "$llm_secs"
+
   echo "# HELP mem0_metrics_duration_seconds Wall-clock duration of this collection"
   echo "# TYPE mem0_metrics_duration_seconds gauge"
   echo "mem0_metrics_duration_seconds $((END-START))"
@@ -211,4 +282,4 @@ END=$(date +%s)
   fi
 } > "$tmp" && mv -f "$tmp" "$prom"
 
-echo "[mem0-metrics] memories=$memories history=$history_rows embed=${embed_secs}s in $((END-START))s"
+echo "[mem0-metrics] memories=$memories history=$history_rows embed=${embed_secs}s llm=${llm_secs:-skip}s in $((END-START))s"
