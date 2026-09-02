@@ -153,6 +153,25 @@ groups:
       summary: "mem0 is rejecting writes: {{ "{{ $value }}" }} 5xx on /memories in the last window"
       description: "Adds are failing while reads stay healthy, because the embedder is local and only extraction leaves the network. Check the LLM provider first (credit, quota, outage) via `docker logs mem0 | grep -i 'LLM extraction failed'`. Captures are queued in ~/.claude/.cache/mem0-outbox.jsonl on the laptop and replay at the next session start, so nothing is lost while this is open."
 
+  # The extraction provider is refusing or unreachable. Mem0WritesFailing sees
+  # the same outage, but only once writes are being attempted and rejected: no
+  # sessions means no writes, no 5xx and no alert, so the outage is discovered
+  # by sitting down to work. This probe runs regardless of usage.
+  #
+  # -1 means the probe ran and failed, which is the credit-exhaustion case
+  # (/v1/models kept returning 200 throughout that outage; only generating a
+  # token surfaces insufficient_quota). Absent means it could not run at all,
+  # so absent() is deliberately not alerted on here -- Mem0MetricsStale covers
+  # a dead collector.
+  - alert: Mem0ExtractionProviderDown
+    expr: mem0_llm_probe_seconds == -1
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "mem0's extraction provider is not answering"
+      description: "A 1-token completion against MEM0_LLM_BASE_URL failed. Writes will 502 while reads stay perfectly healthy, because the embedder is local and only extraction leaves the network. Check credit or quota first: `docker logs mem0 | grep -i 'LLM extraction failed'`. Captures queue in ~/.claude/.cache/mem0-outbox.jsonl and replay at the next session start, so nothing is lost while this is open."
+
   # Search slower than the recall hook's own timeout. Past this line the hook
   # gives up and injects nothing, with no error anywhere: sessions just start
   # without memory. Both real regressions here (a 30-thread pool on 2 cores,
