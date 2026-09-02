@@ -26,9 +26,8 @@ flowchart TD
     Nginx --> AI{AI/ML Services}
     AI --> Llama[llamacpp.yaml]
     Llama --> WebUI[open_webui.yaml]
-    WebUI --> ComfyUI[comfyui.yaml]
     
-    ComfyUI --> Media{Media Services}
+    WebUI --> Media{Media Services}
     Media --> Plex[plex.yaml]
     Plex --> Sonarr[sonarr.yaml]
     Sonarr --> Radarr[radarr.yaml]
@@ -47,10 +46,8 @@ flowchart TD
     
     UnPoller --> Services{Application Services}
     Services --> NextCloud[nextcloud.yaml]
-    NextCloud --> TinaCMS[tinacms.yaml]
-    TinaCMS --> Audible[audible_downloader.yaml]
-    Audible --> Frigate[frigate.yaml]
-    Frigate --> HomeAssistant[homeassistant_compose.yaml]
+    NextCloud --> Audible[audible_downloader.yaml]
+    Audible --> HomeAssistant[homeassistant_compose.yaml]
     
     HomeAssistant --> Complete([Complete])
     
@@ -76,7 +73,6 @@ flowchart TD
 | **AI/ML** | |
 | llama.cpp | `individual/ocean/ai/llamacpp.yaml` |
 | Open WebUI | `individual/ocean/ai/open_webui.yaml` |
-| ComfyUI | `individual/ocean/ai/comfyui.yaml` |
 | **Media** | |
 | Plex | `individual/ocean/media/plex.yaml` |
 | Sonarr | `individual/ocean/media/sonarr.yaml` |
@@ -94,9 +90,7 @@ flowchart TD
 | UnPoller | `individual/ocean/monitoring/unpoller.yaml` |
 | **Services** | |
 | NextCloud | `individual/ocean/services/nextcloud.yaml` |
-| TinaCMS | `individual/ocean/services/tinacms.yaml` |
 | Audible Downloader | `individual/ocean/services/audible_downloader.yaml` |
-| Frigate | `individual/ocean/services/frigate.yaml` |
 | Home Assistant | `individual/ocean/services/homeassistant_compose.yaml` |
 
 ---

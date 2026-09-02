@@ -33,9 +33,6 @@
 - name: Deploy Open WebUI for LLM Interface
   ansible.builtin.import_playbook: individual/ocean/ai/open_webui.yaml
 
-- name: Deploy ComfyUI for AI Image Generation
-  ansible.builtin.import_playbook: individual/ocean/ai/comfyui.yaml
-
 - name: Deploy paia Personal AI Assistant
   ansible.builtin.import_playbook: individual/ocean/ai/paia.yaml
 
@@ -91,9 +88,6 @@
 # Application Services
 # ============================================================================
 
-- name: Deploy TinaCMS Blog Platform
-  ansible.builtin.import_playbook: individual/ocean/services/tinacms.yaml
-
 - name: Deploy terrac.com Static Website
   ansible.builtin.import_playbook: individual/ocean/services/terrac_com.yaml
 
@@ -107,9 +101,6 @@
 #
 # - name: Deploy Spotube Music Streaming
 #   ansible.builtin.import_playbook: individual/ocean/services/spotube.yaml
-
-- name: Deploy Frigate NVR
-  ansible.builtin.import_playbook: individual/ocean/services/frigate.yaml
 
 - name: Deploy Home Assistant
   ansible.builtin.import_playbook: individual/ocean/services/homeassistant_compose.yaml

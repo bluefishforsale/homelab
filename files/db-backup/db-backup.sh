@@ -64,7 +64,7 @@ SQLITE_DBS=(
   tautulli/config/tautulli.db overseerr/config/db/db.sqlite3
   homeassistant/home-assistant_v2.db open-webui/data/webui.db
   paia/data/paia.db photonic_inventory/data/photonic.db
-  ntfy/data/auth.db frigate/config/frigate.db
+  ntfy/data/auth.db
   my_ta_jose/data/my_ta_jose.db
   mem0/history/history.db
 )

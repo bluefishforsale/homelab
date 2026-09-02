@@ -18,7 +18,6 @@ graph TB
         subgraph ai["AI/ML (GPU)"]
             LlamaCpp[llama.cpp<br/>:8080]
             OpenWebUI[Open WebUI<br/>:3000]
-            ComfyUI[ComfyUI<br/>:8188]
         end
         
         subgraph media["Media"]
@@ -42,8 +41,6 @@ graph TB
         
         subgraph services["Services"]
             NextCloud[NextCloud]
-            TinaCMS[TinaCMS]
-            Frigate[Frigate]
             HomeAssistant[Home Assistant]
             Audible[Audible Downloader]
         end
@@ -70,7 +67,6 @@ graph TB
     
     LlamaCpp --> OpenWebUI
     GPU --> LlamaCpp
-    GPU --> ComfyUI
     GPU --> Plex
     
     Prometheus --> Grafana
@@ -88,10 +84,10 @@ graph TB
 | Category | Services |
 |----------|----------|
 | Network | nginx, cloudflared, cloudflare_ddns |
-| AI/ML | llama.cpp, Open WebUI, ComfyUI |
+| AI/ML | llama.cpp, Open WebUI, paia, mem0 |
 | Media | Plex, Sonarr, Radarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr |
 | Monitoring | Prometheus, Grafana, NVIDIA DCGM, UnPoller |
-| Services | NextCloud, TinaCMS, Audible Downloader, Frigate, Home Assistant |
+| Services | Audible Downloader, Home Assistant, GlobalView |
 
 ---
 

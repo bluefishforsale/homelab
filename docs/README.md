@@ -91,7 +91,7 @@ is the same host wherever it appears.
 | Service | Location |
 |---------|----------|
 | Media (Plex, Arr) | [Getting Started](setup/getting-started.md#media-services) |
-| AI/ML (llama.cpp, ComfyUI) | [Getting Started](setup/getting-started.md#aiml-services) |
+| AI/ML (llama.cpp) | [Getting Started](setup/getting-started.md#aiml-services) |
 | Monitoring (Grafana, Prometheus) | [Getting Started](setup/getting-started.md#monitoring-setup) |
 
 ---
