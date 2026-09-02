@@ -139,6 +139,26 @@ groups:
       summary: "mem0 has not stored a memory in {{ "{{ $value | humanizeDuration }}" }}"
       description: "The newest memory in the shared store is over 48h old. Either nothing is writing (check the laptop's ssh forward and ~/.claude/hooks/mem0-capture.sh) or writes are failing silently."
 
+  # Writes are being attempted and rejected. CaptureStalled above eventually
+  # catches this too, but it measures staleness, so it cannot tell "writes are
+  # broken" from "nobody worked today" and has to wait 48h to be sure. This
+  # fires in 15m and cannot false-positive on a quiet homelab: no requests
+  # means no series, and no series means no alert.
+  #
+  # Written after extraction ran out of OpenAI credit and every add returned
+  # 502 for 21 hours. Nothing caught it. Embeddings are local, so search stayed
+  # fast, /docs stayed 200 and the container healthcheck stayed green the whole
+  # time; the only real symptom was memories quietly not appearing. The 502s
+  # were already in mem0_requests_recent that entire time. Nothing looked.
+  - alert: Mem0WritesFailing
+    expr: sum(mem0_requests_recent{path="/memories", status=~"5.."}) > 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "mem0 is rejecting writes: {{ "{{ $value }}" }} 5xx on /memories in the last window"
+      description: "Adds are failing while reads stay healthy, because the embedder is local and only extraction leaves the network. Check the LLM provider first (credit, quota, outage) via `docker logs mem0 | grep -i 'LLM extraction failed'`. Captures are queued in ~/.claude/.cache/mem0-outbox.jsonl on the laptop and replay at the next session start, so nothing is lost while this is open."
+
   # Search slower than the recall hook's own timeout. Past this line the hook
   # gives up and injects nothing, with no error anywhere: sessions just start
   # without memory. Both real regressions here (a 30-thread pool on 2 cores,
