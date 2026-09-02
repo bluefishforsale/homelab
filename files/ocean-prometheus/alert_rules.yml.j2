@@ -34,18 +34,12 @@ groups:
       summary: "High memory usage on hypervisor {{ "{{ $labels.instance }}" }}"
       description: "Memory usage is above 95% for more than 5 minutes on hypervisor {{ "{{ $labels.instance }}" }}"
 
-  # Disk space: warn early, critical near-full, and predict rapid fills.
+  # Disk space: critical near-full, plus a rate-based warning for steady fills.
+  # There is deliberately no static warning tier below 90: a fixed percentage on
+  # a 64TB media pool nags without saying anything actionable, and DiskWillFillSoon
+  # already catches the case that matters (actually heading for zero).
   # Uses avail_bytes (what df/apps actually see, excludes root-reserved blocks)
   # and ignores ephemeral filesystems (tmpfs/overlay/etc).
-  - alert: DiskSpaceWarning
-    expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}) * 100 > 80
-    for: 15m
-    labels:
-      severity: warning
-    annotations:
-      summary: "Disk over 80% on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
-      description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is {{ "{{ $value }}" }}% used."
-
   - alert: HighDiskUsage
     expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|fuse.*"}) * 100 > 90
     for: 5m
