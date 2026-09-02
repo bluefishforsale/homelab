@@ -24,11 +24,17 @@ env:
   ANSIBLE_FORCE_COLOR: "true"
   ANSIBLE_HOST_KEY_CHECKING: "false"
 
-# Least privilege: these workflows only ever check out the repository.
-# The repo default is read, and declaring it here keeps that true even if
-# the default is ever widened again.
+# contents: write, unlike its sibling deploy workflows, because this one records
+# the deployed image tag back into the playbook. Without that write-back the
+# pin goes stale and the next unrelated apply rolls mem0 backwards.
+#
+# The marginal risk is small in context: this job already holds
+# ANSIBLE_VAULT_PASSWORD and applies ansible to production. A job that can
+# rewrite the fleet's secrets and services is not meaningfully constrained by
+# being unable to push a commit. Kept at the workflow level, not the repo
+# default, so the other deploy workflows stay read-only.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -118,6 +124,39 @@ jobs:
             echo "deployment_status=failed" >> $GITHUB_ENV
             exit 1
           fi
+
+      # The playbook's mem0_version is the deployed version, not a floor. The
+      # --extra-vars override above lives only for this run, so without writing
+      # it back the next apply of this playbook silently redeploys the older
+      # pinned tag -- and main-apply fires on any change under playbooks/,
+      # files/, roles/ or vars/. That happened: an unrelated mem0.env.j2 edit
+      # rolled ocean back four merged PRs while the container stayed healthy.
+      - name: Record the deployed version in the playbook
+        if: success() && steps.params.outputs.version != ''
+        env:
+          VERSION: ${{ steps.params.outputs.version }}
+        run: |
+          PLAYBOOK="playbooks/individual/ocean/ai/mem0.yaml"
+          # VERSION is already validated as 40 hex chars by the params step.
+          if grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK"; then
+            echo "pin already current, nothing to write back"
+            exit 0
+          fi
+          sed -i -E "s|^(    mem0_version: )[0-9a-f]{40}$|\1${VERSION}|" "$PLAYBOOK"
+          grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK" || {
+            echo "::error::failed to rewrite mem0_version in $PLAYBOOK"; exit 1; }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$PLAYBOOK"
+          # [skip ci] matters: this commit touches playbooks/, which is a
+          # main-apply trigger. Without it every deploy causes a second,
+          # pointless production apply.
+          git commit -m "chore(mem0): record deployed image ${VERSION:0:7} [skip ci]"
+          # Rebase, never force: master moves for unrelated reasons and this
+          # must not clobber someone else's commit.
+          git pull --rebase origin master
+          git push origin HEAD:master
 
       - name: Cleanup vault password
         if: always()

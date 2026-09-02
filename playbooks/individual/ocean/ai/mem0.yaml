@@ -31,10 +31,22 @@
     service: mem0
     # Pinned SHAs, not branches: an unpinned version turns every deploy into a
     # silent upgrade of the thing holding all the memory. mem0_version is an
-    # image tag now rather than a git ref, and the deploy-mem0 dispatch
-    # overrides it with the SHA whose image CI just built and smoke-tested.
+    # image tag rather than a git ref.
+    #
+    # NOTE: this line is the deployed version, not a floor. deploy-mem0 passes
+    # --extra-vars mem0_version=<sha> and then writes that sha back here, so
+    # the file and the running container always agree.
+    #
+    # The write-back is load-bearing. Without it the override lives only for
+    # the dispatch run, while every other apply redeploys whatever this line
+    # says -- and main-apply fires on any change under playbooks/, files/,
+    # roles/ or vars/. Editing an unrelated homelab file then silently rolls
+    # mem0 back. Not hypothetical: a mem0.env.j2 edit rolled ocean from 09cb707
+    # to 595f1989, undoing four merged PRs, with the container healthy
+    # throughout. Found only by a check comparing the running image to
+    # fork/main.
     mem0_image: ghcr.io/bluefishforsale/mem0-api-server
-    mem0_version: 595f19890918cc0b4d7dc559b23e26b4c6c4e325
+    mem0_version: 1271d6dcd01d985959517421b9f1a2a918757bbe
     # SSH, unlike the mem0 fork above: the bridge repo is private, and an https
     # clone of a private repo fails with "could not read Username for
     # 'https://github.com'" rather than anything that names the real problem.
