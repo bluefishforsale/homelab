@@ -3,6 +3,8 @@
   hosts: ocean
   become: true
   gather_facts: true
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
   vars:
     services:
       - audible-download.timer
@@ -69,9 +71,19 @@
         group: media
         mode: '0755'
       loop:
-        - compress.sh
         - download.sh
         - download_and_compress.sh
+
+    # compress.sh carries the Audible account activation bytes, so it is
+    # rendered from the vault rather than copied. The plaintext copy was
+    # scrubbed from git in a8ae67f, which left this play unappliable until now.
+    - name: Render compress.sh with the account activation bytes
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../../../files/audible-downloader/compress.sh.j2"
+        dest: /data01/services/audible-downloader/compress.sh
+        owner: media
+        group: media
+        mode: '0755'
 
     - name: Ensure audible-cli config directory exists
       ansible.builtin.file:

@@ -20,7 +20,7 @@ find ./aax -type f -name '*.aax*' | sed 's|^\./||' |   while read file ; do
     echo "Compressing ${TARGET}/${file}"
     ${BASEDIR}/AAXtoMP3 \
         --no-clobber \
-        -A {{ audible.activation_bytes }}  \
+        -A {{ media_services.audible.activation_bytes }}  \
         -t "${TARGET}/mp3" \
         -D '$artist - $title' \
         -e:mp3 \
