@@ -81,4 +81,10 @@ fixed-cost constraints are in the plan; the autonomy policy is
   **both** `files/db-backup/db-backup.sh` and `files/db-backup/db-restore.sh` or
   it is only half covered. Restoring is dispatch-only and dry-run by default:
   [`docs/operations/db-restore.md`](docs/operations/db-restore.md).
+- Docker services run as **compose projects**, one project per service, because
+  that is the unit of image refresh. A `docker-refresh@<project>` timer per
+  project pulls weekly and recreates only what changed, Sunday between 08:00 and
+  14:00 Pacific. The instances are enabled from `docker compose ls`, so a compose
+  service is covered the moment it runs and a bare `docker run` service is never
+  updated at all. Restarting a service does not pull.
 - No em dashes, terse commits, no generated-by tag lines.

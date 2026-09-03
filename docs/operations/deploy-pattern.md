@@ -59,7 +59,11 @@ Five files per new service:
 
 1. `playbooks/individual/ocean/services/<service>.yaml` — ansible playbook.
    For image-based: templates compose + systemd, ends with an **unconditional**
-   `systemd: state: restarted` (so floating `:latest` tags get pulled on every run).
+   `systemd: state: restarted` so a dispatched deploy always lands. That restart
+   does **not** pull: `docker compose up -d` fetches only when the image is
+   missing locally, and `--quiet-pull` merely silences a pull it was already
+   going to do. Prometheus restarted weekly on a June image for months this way.
+   Floating tags stay current through the weekly refresh below, not the restart.
 2. `files/<service>/{docker-compose.yml.j2, .env.j2, <service>.service.j2}` — templates.
 3. `.github/workflows/deploy-<service>.yml` — listens for
    `repository_dispatch: deploy-<service>`, runs the playbook.
@@ -72,6 +76,27 @@ Five files per new service:
 5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
    of the hostname to `fully_public_services` (Access bypass) for public
    services. `public_services` = admin + plex-users gate. Else admin-only.
+
+**Image refresh requirements (every docker-based service):**
+
+- **Run it as a compose project.** `docker-refresh@<project>` instances are enabled
+  from `docker compose ls` on each host, so a compose service is covered the moment
+  it runs and there is nothing to register. A service started with a bare
+  `docker run` (cloudflare-exporter, ndt-speedtest-exporter) is invisible to the
+  refresh and will never see a new image again.
+- **Keep the compose project name stable.** It is the systemd instance name, so
+  renaming the project silently orphans the old timer and enables a new one.
+- **Floating tags are the default** (`:latest`, `:main`, `:stable`) and are safe
+  only because of the refresh. Pinning a tag or digest is a deliberate opt-out of
+  updates: say why in the compose template, because nothing will alert on it.
+- **Do not add a periodic pull to the service's own unit.** An `ExecStartPre` pull
+  only freshens a start, and editing the unit templates to add one restarts every
+  affected service on merge. The weekly timer is the mechanism; the unit is not.
+- **Verify:** `scripts/fleet-systemctl.sh docker-refresh@<project>.timer <host>`
+  reports `active waiting`. A failed refresh surfaces as a failed unit
+  (`SystemdUnitFailed`); a timer that goes quiet or never fires surfaces as
+  `DockerRefreshStale` / `DockerRefreshNeverRan`. Refreshes run Sunday between
+  08:00 and 14:00 Pacific, one project at a time.
 
 **Workflow conventions for `.github/workflows/deploy-<service>.yml`:**
 
@@ -166,6 +191,7 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
 homelab:
 [ ] playbooks/individual/ocean/services/<name>.yaml      (clone paia.yaml or terrac_com.yaml)
 [ ] files/<name>/{docker-compose.yml.j2, .env.j2, .service.j2}
+[ ] Service runs as a compose project (bare `docker run` never gets a new image)
 [ ] vars/vars_service_ports.yaml — add <name>.port
 [ ] files/nginx-compose/proxy_hostname_web_proxy.conf — add vhost block
 [ ] vars/vars_cloudflared.yaml — add ingress entry
