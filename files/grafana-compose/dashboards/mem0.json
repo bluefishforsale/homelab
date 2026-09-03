@@ -19,8 +19,8 @@
   "panels": [
     {
       "type": "row",
-      "title": "Store",
-      "id": 1,
+      "title": "Health",
+      "id": 20,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -32,320 +32,17 @@
     },
     {
       "type": "stat",
-      "title": "Memories",
-      "id": 2,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "bf02tpxiz6m0wf"
-      },
-      "description": "Rows in the vector store. The API's own list endpoint returns a fraction of this, which is why migrations go through postgres.",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "mem0_memories_total",
-          "refId": "A",
-          "range": true
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Users",
-      "id": 3,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "bf02tpxiz6m0wf"
-      },
-      "description": "",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "mem0_users_total",
-          "refId": "A",
-          "range": true
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Audit trail rows",
-      "id": 4,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "bf02tpxiz6m0wf"
-      },
-      "description": "SQLite history.db, the change log behind memory_history.",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "mem0_history_rows_total",
-          "refId": "A",
-          "range": true
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Store on disk",
-      "id": 5,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "bf02tpxiz6m0wf"
-      },
-      "description": "Both databases: vectors plus users/api-keys/request log.",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "sum(mem0_database_bytes)",
-          "refId": "A",
-          "range": true
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Capture freshness",
-      "id": 6,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "bf02tpxiz6m0wf"
-      },
-      "description": "Age of the newest memory. This is the silent-failure detector: the store can be up, healthy and green while nothing has been written to it for weeks.",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 1
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 86400
-              },
-              {
-                "color": "red",
-                "value": 172800
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "mem0_newest_memory_age_seconds",
-          "refId": "A",
-          "range": true
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "API",
+      "title": "mem0 API",
       "id": 7,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
       },
-      "description": "",
+      "description": "Blackbox probe of /docs, mem0's one unauthenticated route, served by the same app as /memories. Green means the API is answering, not merely running.",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 6,
+        "x": 0,
         "y": 1
       },
       "fieldConfig": {
@@ -414,6 +111,560 @@
       ]
     },
     {
+      "type": "stat",
+      "title": "MCP connector",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "Blackbox probe of the MCP bridge on :8766, the path every off-box agent takes to reach mem0. Probed with the http_4xx module because the bridge answers 401 to an unauthenticated request: a 401 is the pass condition, since it proves the listener, HTTP layer and auth middleware are all up. The API being green says nothing about this.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "noValue": "NO DATA"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "probe_success{instance=\"http://ocean.home:8766/mcp\"}",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Containers",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "Docker health state for all four containers in the stack. Shows the count reporting healthy; anything below 4 means one is down or unhealthy and the panel turns red.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 4
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "4": {
+                  "text": "4/4 UP",
+                  "color": "green",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "noValue": "NO DATA"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum(container_health_state{name=~\"mem0|mem0-bridge|mem0-ollama|mem0-postgres\"})",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Metrics collector",
+      "id": 23,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "The exporter that produces every mem0_* series on this dashboard. When this is red the other panels are stale, not healthy.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "noValue": "NO DATA"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_collector_up",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Store",
+      "id": 1,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Memories",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "Rows in the vector store. The API's own list endpoint returns a fraction of this, which is why migrations go through postgres.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_memories_total",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Users",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_users_total",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Audit trail rows",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "SQLite history.db, the change log behind memory_history.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_history_rows_total",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Store on disk",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "Both databases: vectors plus users/api-keys/request log.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum(mem0_database_bytes)",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Capture freshness",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "Age of the newest memory. This is the silent-failure detector: the store can be up, healthy and green while nothing has been written to it for weeks.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 86400
+              },
+              {
+                "color": "red",
+                "value": 172800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_newest_memory_age_seconds",
+          "refId": "A",
+          "range": true
+        }
+      ]
+    },
+    {
       "type": "row",
       "title": "Latency",
       "id": 8,
@@ -421,7 +672,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 10
       },
       "collapsed": false,
       "panels": []
@@ -439,7 +690,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 11
       },
       "fieldConfig": {
         "defaults": {
@@ -581,7 +832,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 11
       },
       "fieldConfig": {
         "defaults": {
@@ -649,7 +900,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 14
+        "y": 19
       },
       "fieldConfig": {
         "defaults": {
@@ -703,7 +954,8 @@
           "range": true,
           "legendFormat": "extraction llm"
         }
-      ]
+      ],
+      "id": 19
     },
     {
       "type": "timeseries",
@@ -718,7 +970,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 27
       },
       "fieldConfig": {
         "defaults": {
@@ -833,7 +1085,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 27
       },
       "fieldConfig": {
         "defaults": {
@@ -885,7 +1137,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 35
       },
       "collapsed": false,
       "panels": []
@@ -903,7 +1155,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 36
       },
       "fieldConfig": {
         "defaults": {
@@ -956,7 +1208,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 36
       },
       "fieldConfig": {
         "defaults": {
@@ -1031,7 +1283,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 39
+        "y": 44
       },
       "fieldConfig": {
         "defaults": {
@@ -1084,7 +1336,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 39
+        "y": 44
       },
       "fieldConfig": {
         "defaults": {
@@ -1132,12 +1384,12 @@
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
       },
-      "description": "Age of these metrics themselves. If this climbs, every other panel is showing you the past.",
+      "description": "Age of these metrics themselves, and how long a collection takes. If age climbs, every other panel is showing you the past; if duration climbs toward the scrape interval, age is about to.",
       "gridPos": {
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1190,6 +1442,124 @@
           "refId": "A",
           "range": true,
           "legendFormat": "age"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "mem0_metrics_duration_seconds",
+          "refId": "B",
+          "range": true,
+          "legendFormat": "collection duration"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Logs",
+      "id": 24,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Warnings and errors by container (5m)",
+      "id": 25,
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "description": "Rate of log lines matching error/warn/traceback across the stack. Entity linking and the near-duplicate check both fail open and only say so at WARNING, so a bump here is the only sign memories are being silently dropped.",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "sum by (container) (rate({container=~\"mem0|mem0-bridge|mem0-ollama|mem0-postgres\"} |~ \"(?i)(error|warn|traceback|exception)\" [5m]))",
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{container}}"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Stack logs",
+      "id": 26,
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "description": "All four containers, newest first. Each mem0 request carries a short id in brackets, so pasting one into the filter follows a single add or search all the way through embedding, extraction and insert.",
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 65
+      },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "editorMode": "code",
+          "expr": "{container=~\"mem0|mem0-bridge|mem0-ollama|mem0-postgres\"}",
+          "refId": "A",
+          "queryType": "range"
         }
       ]
     }

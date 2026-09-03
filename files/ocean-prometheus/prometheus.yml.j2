@@ -589,6 +589,29 @@ scrape_configs:
         replacement: nvcr
 
   # Internal Service Health Checks
+  # Services whose only unauthenticated answer is a 4xx. A 401 here is a pass:
+  # it proves the listener, the HTTP layer and the auth middleware are all alive.
+  # The MCP bridge is how agentbox and every other off-box agent reaches mem0,
+  # so "is the connector up" is a different question from "is the API up".
+  - job_name: 'blackbox-http-4xx'
+    metrics_path: /probe
+    params:
+      module: [http_4xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+        - http://ocean.home:8766/mcp
+        labels:
+          probe_type: "http"
+          category: "homelab_services"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
   - job_name: 'blackbox-internal'
     metrics_path: /probe
     params:

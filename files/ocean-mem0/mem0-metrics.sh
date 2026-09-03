@@ -90,11 +90,18 @@ esac
 # a new time series forever.
 norm="case when path ~ '^/memories/[0-9a-f-]{36}' then '/memories/:id' else path end"
 
+# Path/status pairs come from a 24h window but the counts from WINDOW_MIN, so a
+# pair that has gone quiet reports 0 instead of vanishing — the same trick the
+# latency block below uses, and for the same reason: a panel that empties out
+# looks broken, while a zero reads as "nothing happened", which is the truth.
+# Without this the traffic panel is blank on any idle stretch over WINDOW_MIN.
 reqs=$(docker exec "$PG_CONTAINER" psql -U postgres -d mem0_app -tAF, -c "
-  select $norm as p, status_code, count(*)
-    from request_logs
-   where created_at > now() - interval '$WINDOW_MIN minutes'
-   group by 1, 2" 2>/dev/null)
+  with w as (select created_at > now() - interval '$WINDOW_MIN minutes' as recent,
+                    $norm as p, status_code
+               from request_logs
+              where created_at > now() - interval '24 hours')
+  select p, status_code, count(*) filter (where recent)
+    from w group by 1, 2" 2>/dev/null)
 
 # Paths come from a 24h window but the figures from LAT_WINDOW, so a path that
 # has gone quiet reports 0 samples instead of vanishing. A panel that empties
