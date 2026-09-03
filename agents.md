@@ -180,7 +180,11 @@ Distilled from prior decisions. Defaults, not laws, but don't override without a
   (1) it has at least a **health check** (compose `healthcheck:` / systemd health / a
   blackbox probe) so failure is visible, and (2) if it exposes a **Prometheus metrics
   endpoint, add a scrape job** (`files/ocean-prometheus/prometheus.yml.j2`) so the metrics
-  land in Prometheus and a Grafana panel. A service that ships unmonitored is unfinished.
+  land in Prometheus and a Grafana panel, and (3) it runs as a **compose project**, which
+  is what enables its `docker-refresh@<project>` timer and keeps a floating tag current
+  (a bare `docker run` service never gets a new image again — see
+  [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)).
+  A service that ships unmonitored is unfinished.
   Verify with [`scripts/exporter-scrape-check.sh`](scripts/exporter-scrape-check.sh) (targets down)
   and [`scripts/prom.sh`](scripts/prom.sh) `targets`.
 - **Fix through code, never manual SSH.** A playbook / workflow / runner-config change

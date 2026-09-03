@@ -1,0 +1,16 @@
+[Unit]
+Description=Refresh images for compose project %i
+Documentation=file:///usr/local/bin/docker-refresh.sh
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/docker-refresh.sh %i
+# Backstop only. The script bounds its own pull at 45m, so this should never be
+# what fires: systemd killing the unit mid-recreate would leave the service
+# down, which is the one way this can cause an outage. 15m of headroom past the
+# pull budget covers the recreate.
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle

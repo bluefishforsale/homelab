@@ -105,30 +105,37 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} stuck activating on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been activating for 30m on {{ "{{ $labels.instance }}" }}, which means it is failing and restarting rather than starting"
 
-  # A compose project whose weekly image refresh failed. Left alone this is
-  # silent: the containers keep running the old image and nothing says the host
-  # stopped tracking upstream.
-  - alert: DockerRefreshFailed
-    expr: docker_refresh_project_failed == 1
-    for: 1h
-    labels:
-      severity: warning
-    annotations:
-      summary: "docker refresh failed for {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }}"
-      description: "The last weekly image refresh of compose project {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }} did not complete, so it is still on its previous images"
-
-  # The refresh mechanism itself died. Weekly cadence, so 10 days means at least
-  # one run was missed entirely. 0 is the never-succeeded case and must fire.
+  # A compose project whose image refresh failed is a failed docker-refresh@
+  # instance, so SystemdUnitFailed above already carries it. The two rules here
+  # cover only what unit state cannot say: that a timer stopped firing.
+  #
+  # Weekly cadence, so 10 days means at least one run was missed entirely. The
+  # `> 0` arm excludes timers that have never fired, which report 0 rather than
+  # a stale timestamp and are caught separately below.
   - alert: DockerRefreshStale
     expr: >
-      (docker_refresh_last_success_timestamp_seconds == 0)
-       or (time() - docker_refresh_last_success_timestamp_seconds > 864000)
+      (node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} > 0)
+       and (time() - node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} > 864000)
     for: 1h
     labels:
       severity: warning
     annotations:
-      summary: "docker image refresh stale on {{ "{{ $labels.instance }}" }}"
-      description: "No clean weekly image refresh on {{ "{{ $labels.instance }}" }} in over 10 days; the host has stopped tracking upstream images"
+      summary: "image refresh stale for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} has not fired in over 10 days on {{ "{{ $labels.instance }}" }}; that project has stopped tracking upstream images"
+
+  # A timer that has never fired reports 0 forever, and the rule above cannot
+  # see it. A freshly enabled instance legitimately reads 0 until its first
+  # Sunday, so this waits out a full cadence plus a day before calling it
+  # broken. A prometheus restart resets the pending window, which delays this
+  # alert but cannot lose it: the condition is still true afterwards.
+  - alert: DockerRefreshNeverRan
+    expr: node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} == 0
+    for: 8d
+    labels:
+      severity: warning
+    annotations:
+      summary: "image refresh never ran for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} has been enabled for over 8 days without firing once, so that project has never been refreshed"
 
   # Kometa has not completed a clean run in two days. It runs nightly, its
   # container reports healthy while doing nothing, and its stdout is silent, so
