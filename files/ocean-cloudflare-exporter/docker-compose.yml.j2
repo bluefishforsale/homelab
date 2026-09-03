@@ -1,0 +1,24 @@
+# Rendered by playbooks/individual/ocean/monitoring/cloudflare_exporter.yaml.
+#
+# The image is built here from repo source, not pulled from a registry. The
+# `build:` key is what makes that safe for the weekly refresh: docker-refresh
+# pulls with --ignore-buildable, so this project is skipped rather than failing
+# every week on a tag that exists in no registry. Its real update path is a
+# change to exporter.py, which rebuilds on the next apply.
+#
+# The env file holds the scoped read-only API token and stays mode 0600 beside
+# this file. The Dockerfile copies only requirements.txt and exporter.py, so
+# nothing in this directory is baked into the image.
+services:
+  cloudflare-exporter:
+    build: .
+    image: "{{ image }}"
+    container_name: "{{ service }}"
+    hostname: "{{ service }}"
+    env_file:
+      - cloudflare-exporter.env
+    ports:
+      - "{{ cf_port }}:{{ cf_internal_port }}"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

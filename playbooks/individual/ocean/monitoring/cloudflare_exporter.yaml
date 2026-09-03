@@ -62,6 +62,13 @@
         mode: '0600'
       register: cf_env
 
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: cf_compose
+
     - name: Install systemd unit
       ansible.builtin.template:
         src: "{{ files }}/cloudflare-exporter.service.j2"
@@ -73,11 +80,39 @@
     - name: Flush handlers so the unit is registered before enabling
       ansible.builtin.meta: flush_handlers
 
+    # One-time migration off the `docker run` unit. Compose cannot create a
+    # container whose name an unmanaged one already holds, and the old container
+    # outlives the unit stop, so the first apply would otherwise fail on a name
+    # conflict. rc 0 = a container with this name exists and carries no compose
+    # label. Ordering is load-bearing: this runs after the reload above, so
+    # systemd is holding the new oneshot definition and the old Restart=always
+    # one cannot respawn the container between the stop and the removal.
+    - name: Detect a pre-compose container holding the service name
+      ansible.builtin.shell: |
+        docker inspect {{ service }} >/dev/null 2>&1 || exit 2
+        docker inspect {{ service }} | grep -q '"com.docker.compose.project"' && exit 1 || exit 0
+      args:
+        executable: /bin/bash
+      register: cf_legacy
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Stop the pre-compose unit before migrating
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        state: stopped
+      when: cf_legacy.rc == 0
+
+    - name: Remove the pre-compose container so compose can claim the name
+      ansible.builtin.command: docker rm -f {{ service }}
+      when: cf_legacy.rc == 0
+
     - name: Enable and start the exporter (restart only on config/unit change)
       ansible.builtin.systemd:
         name: "{{ service }}.service"
         enabled: true
-        state: "{{ 'restarted' if (cf_env is changed or cf_unit is changed or cf_build_context is changed) else 'started' }}"
+        state: "{{ 'restarted' if (cf_env is changed or cf_unit is changed or cf_build_context is changed or cf_compose is changed or cf_legacy.rc == 0) else 'started' }}"
         daemon_reload: true
 
   handlers:

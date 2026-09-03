@@ -82,8 +82,14 @@ Five files per new service:
 - **Run it as a compose project.** `docker-refresh@<project>` instances are enabled
   from `docker compose ls` on each host, so a compose service is covered the moment
   it runs and there is nothing to register. A service started with a bare
-  `docker run` (cloudflare-exporter, ndt-speedtest-exporter) is invisible to the
-  refresh and will never see a new image again.
+  `docker run` is invisible to the refresh and will never see a new image again.
+  The last two that ran that way, cloudflare-exporter and ndt-speedtest-exporter,
+  were converted for exactly this reason.
+- **A locally built image is fine, but declare `build:`.** Both exporters build on
+  the host from repo source, so their tag exists in no registry and pulling it
+  fails. The refresh pulls with `--ignore-buildable`, which skips a project only if
+  the compose file says it is buildable. Without that key the weekly refresh pages
+  instead of no-opping. Their update path is a repo change that rebuilds on apply.
 - **Keep the compose project name stable.** It is the systemd instance name, so
   renaming the project silently orphans the old timer and enables a new one.
 - **Floating tags are the default** (`:latest`, `:main`, `:stable`) and are safe

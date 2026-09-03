@@ -44,30 +44,53 @@
         cmd: "docker build -t {{ ndt_exporter_image }} ."
         chdir: "{{ home }}"
       when: build_context is changed
-      notify: Restart ndt-speedtest-exporter
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ src }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: ndt_compose
 
     - name: Install systemd unit
       ansible.builtin.template:
         src: "{{ src }}/ndt-speedtest-exporter.service.j2"
         dest: "/etc/systemd/system/{{ ndt_exporter_service }}.service"
         mode: '0644'
-      notify:
-        - Reload systemd daemon
-        - Restart ndt-speedtest-exporter
+      register: ndt_unit
+
+    # One-time migration off the `docker run` unit. Compose cannot create a
+    # container whose name an unmanaged one already holds, and the old container
+    # outlives the unit stop, so the first apply would otherwise fail on a name
+    # conflict. rc 0 = a container with this name exists and carries no compose
+    # label. Ordering is load-bearing: the stop below carries daemon_reload so
+    # systemd is holding the new oneshot definition before the container goes,
+    # otherwise the old Restart=always definition just respawns it in 30s.
+    - name: Detect a pre-compose container holding the service name
+      ansible.builtin.shell: |
+        docker inspect {{ ndt_exporter_service }} >/dev/null 2>&1 || exit 2
+        docker inspect {{ ndt_exporter_service }} | grep -q '"com.docker.compose.project"' && exit 1 || exit 0
+      args:
+        executable: /bin/bash
+      register: ndt_legacy
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Stop the pre-compose unit before migrating
+      ansible.builtin.systemd:
+        name: "{{ ndt_exporter_service }}.service"
+        state: stopped
+        daemon_reload: true
+      when: ndt_legacy.rc == 0
+
+    - name: Remove the pre-compose container so compose can claim the name
+      ansible.builtin.command: docker rm -f {{ ndt_exporter_service }}
+      when: ndt_legacy.rc == 0
 
     - name: Enable and start ndt-speedtest-exporter
       ansible.builtin.systemd:
         name: "{{ ndt_exporter_service }}.service"
         enabled: true
-        state: started
+        state: "{{ 'restarted' if (build_context is changed or ndt_compose is changed or ndt_unit is changed or ndt_legacy.rc == 0) else 'started' }}"
         daemon_reload: true
-
-  handlers:
-    - name: Reload systemd daemon
-      ansible.builtin.systemd:
-        daemon_reload: true
-
-    - name: Restart ndt-speedtest-exporter
-      ansible.builtin.systemd:
-        name: "{{ ndt_exporter_service }}.service"
-        state: restarted

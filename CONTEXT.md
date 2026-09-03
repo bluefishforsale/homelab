@@ -86,5 +86,6 @@ fixed-cost constraints are in the plan; the autonomy policy is
   project pulls weekly and recreates only what changed, Sunday between 08:00 and
   14:00 Pacific. The instances are enabled from `docker compose ls`, so a compose
   service is covered the moment it runs and a bare `docker run` service is never
-  updated at all. Restarting a service does not pull.
+  updated at all. Restarting a service does not pull. A service whose image is
+  built on the host declares `build:` so the pull skips it instead of failing.
 - No em dashes, terse commits, no generated-by tag lines.

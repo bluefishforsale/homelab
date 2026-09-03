@@ -51,7 +51,7 @@ case "$*" in
     echo '[{"Name":"plex","Status":"running(1)","ConfigFiles":"/data01/services/plex/docker-compose.yml"}]' ;;
   *images\ --quiet)
     if [ -f /tmp/.dr_pulled ]; then echo sha256:new; else echo sha256:old; fi ;;
-  *pull*) touch /tmp/.dr_pulled ;;
+  *pull*) touch /tmp/.dr_pulled; echo "PULLARGS $*" ;;
   *) : ;;
 esac
 STUBEOF
@@ -60,6 +60,9 @@ rm -f /tmp/.dr_pulled
 run_with_stub "$STUB" plex
 exited "a refreshed project exits clean" 0
 check "a replaced image is logged with both digests" "project=plex updated=1 before=sha256:old, after=sha256:new," "$LOG"
+# Locally built projects (cloudflare-exporter, ndt-speedtest-exporter) have a
+# tag no registry serves. Without this flag their refresh fails every week.
+check "the pull skips images built on the host" "PULLARGS compose -p plex -f /data01/services/plex/docker-compose.yml pull --quiet --ignore-buildable" "$OUT"
 rm -f /tmp/.dr_pulled
 
 # Multiple config files come back comma-separated; only the first is the compose

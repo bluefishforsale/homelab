@@ -58,7 +58,11 @@ if [ -z "$CFG" ]; then
 fi
 
 before=$(images)
-if ! timeout "$PULL_TIMEOUT" docker compose -p "$PROJECT" -f "$CFG" pull --quiet; then
+# --ignore-buildable: a few projects (cloudflare-exporter, ndt-speedtest-exporter)
+# build their image on the host from repo source, so the tag exists in no
+# registry and pulling it fails. Skipping them here is the difference between a
+# weekly no-op and a weekly page. Their update path is a repo change, not a pull.
+if ! timeout "$PULL_TIMEOUT" docker compose -p "$PROJECT" -f "$CFG" pull --quiet --ignore-buildable; then
   logger -t docker-refresh "project=$PROJECT pull failed or exceeded ${PULL_TIMEOUT}s, nothing recreated"
   exit 1
 fi
