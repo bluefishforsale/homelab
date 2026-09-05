@@ -66,6 +66,7 @@ Status and future plans for the homelab infrastructure.
 - **paia**: Personal AI assistant
 - **terminalbench**: LLM benchmarking and testing
 - **mem0**: AI memory service
+- **GPU Test**: Deployed service
 
 ### Monitoring Stack
 
@@ -122,6 +123,7 @@ Status and future plans for the homelab infrastructure.
 - **Docker journald logging**: Centralized container logs
 - **Idempotent playbooks**: Safe multiple runs
 - **Fail2ban**: SSH and service protection with Prometheus exporter
+- **Certbot**: Deployed service
 
 ---
 
