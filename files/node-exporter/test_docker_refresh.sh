@@ -21,7 +21,10 @@ refute() {
 run_with_stub() { # run_with_stub <stub-body-file> <textfile-dir>
   local bin; bin=$(mktemp -d)
   { echo '#!/usr/bin/env bash'; cat "$1"; } > "$bin/docker"
-  chmod +x "$bin/docker"
+  # The script journals a line on every failure. Swallow it here rather than
+  # spraying the test runner's syslog.
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/logger"
+  chmod +x "$bin/docker" "$bin/logger"
   PATH="$bin:$PATH" bash "$SCRIPT" "$2" >/dev/null 2>&1
   rm -rf "$bin"
 }
@@ -82,6 +85,33 @@ if [ -n "$prev_success" ] && [ "$prev_success" != "0" ] && [ "$after" = "$prev_s
 else
   echo "FAIL: a failed run carries the previous success forward (was '$prev_success', now '$after')"; fail=$((fail + 1))
 fi
+
+# The bug this pins: mem0's bridge is built on the host and published nowhere,
+# so a plain `compose pull` fails on it forever. That failed the whole project
+# every run, and since last_success needs every project green, ocean never
+# recorded one success at all.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"mem0","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *images\ --quiet) echo sha256:same ;;
+  *pull*--ignore-buildable*) : ;;
+  *pull*) exit 1 ;;
+  *) : ;;
+esac
+STUBEOF
+TD2=$(mktemp -d)
+run_with_stub "$STUB" "$TD2"
+check "a project with a buildable service still refreshes" 'docker_refresh_project_failed{project="mem0"} 0' "$TD2/docker_refresh.prom"
+# Deliberately a fresh textfile dir: with no earlier success in the file there
+# is nothing to carry forward, so a non-zero stamp can only mean this run
+# actually succeeded. Asserted in $TD it would pass on the carried value alone.
+if [ "$(awk '/^docker_refresh_last_success_timestamp_seconds /{print $2}' "$TD2/docker_refresh.prom")" != "0" ]; then
+  echo "PASS: a buildable service no longer blocks the success stamp"; pass=$((pass + 1))
+else
+  echo "FAIL: a buildable service no longer blocks the success stamp"; fail=$((fail + 1))
+fi
+rm -rf "$TD2"
 
 # The bug this guards: an unparseable `compose ls` used to be swallowed, which
 # enumerated zero projects and then wrote a clean success.

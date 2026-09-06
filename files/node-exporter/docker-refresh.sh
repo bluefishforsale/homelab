@@ -40,11 +40,32 @@ for p in json.load(sys.stdin):
 # Image IDs currently backing a project, one per line, sorted.
 image_ids() { docker compose -p "$1" -f "$2" images --quiet 2>/dev/null | sort -u; }
 
+# A failed step used to go to /dev/null, so the alert said a project stopped
+# refreshing and nothing anywhere said why. One journal line, truncated: the
+# useful part of a compose error is always the first line.
+log_failure() { # log_failure <project> <step> <output>
+  logger -t docker-refresh \
+    "project=$1 step=$2 failed: $(printf '%s' "$3" | tr '\n' ' ' | cut -c1-400)"
+}
+
 refresh() {
-  local name="$1" cfg="$2" before after updated
+  local name="$1" cfg="$2" before after updated err
   before=$(image_ids "$name" "$cfg")
-  docker compose -p "$name" -f "$cfg" pull --quiet >/dev/null 2>&1 || return 1
-  docker compose -p "$name" -f "$cfg" up -d >/dev/null 2>&1 || return 1
+  # --ignore-buildable: a service carrying a `build:` key names an image that
+  # was built on this host and exists in no registry, so pulling it can only
+  # ever fail. mem0's bridge is the fleet's only one, and the playbook pins it
+  # to a commit, so a floating-tag refresh has no business touching it anyway.
+  # Without this the mem0 project failed every single run, and because
+  # last_success needs every project green, that pinned ocean's staleness
+  # clock at 0 from the day this script landed.
+  if ! err=$(docker compose -p "$name" -f "$cfg" pull --quiet --ignore-buildable 2>&1); then
+    log_failure "$name" pull "$err"
+    return 1
+  fi
+  if ! err=$(docker compose -p "$name" -f "$cfg" up -d 2>&1); then
+    log_failure "$name" up "$err"
+    return 1
+  fi
   after=$(image_ids "$name" "$cfg")
   updated=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -c . || true)
   # The old image IDs stay on disk until the weekly prune, so the journal line
