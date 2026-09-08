@@ -298,6 +298,13 @@ jobs:
       - name: Agent issue-author trust boundary
         run: bash .github/workflows/lib/agentbox-issue-author.test.sh
 
+      # The receiver ships its own defect ledger but nothing ran it, so it sat
+      # broken from #378 (which started refusing kernel device names) until
+      # 2026-09-08. Env vars are the two it reads at import; it never opens a
+      # socket in selftest mode.
+      - name: Alert receiver selftest
+        run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
+
       # A drafting agent may commit its own work. Deciding "did it produce
       # anything?" from a dirty tree alone threw a correct fix away.
       - name: Agent draft detection

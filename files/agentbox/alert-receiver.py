@@ -55,6 +55,38 @@ RUNBOOK_URL = ("https://github.com/bluefishforsale/homelab/blob/master/"
 
 PRIO = {"critical": "urgent", "warning": "high", "info": "default"}
 
+# Ordered most-specific first; first hit wins. These are the labels that say
+# WHICH thing broke, as opposed to which rule fired or which host it fired on.
+SUBJECT_LABELS = ("project", "name", "service", "container", "unit", "pool",
+                  "device", "mountpoint", "phy", "controller", "target")
+# Trailing systemd type, which is noise once the unit is already identified.
+_UNIT_SUFFIX = re.compile(r"\.(service|timer|mount|socket|target)$")
+
+
+def subject(labels):
+    """The 'which one' half of a notification title.
+
+    Without this the title was just the rule name, so DockerRefreshStale on a
+    host running 31 compose projects said only "ocean.home" and you had to open
+    the alert to learn it meant mem0. Fixing it here rather than in each rule's
+    summary covers every alert at once, including ones not written yet, and the
+    rules that already name their subject lose nothing by repeating it in the
+    title where it is actually scannable.
+
+    Returns "" when no label identifies a subject: some alerts are genuinely
+    host-wide (HighCpuUsage), and some report an aggregate that has no
+    per-service label at all (homelab_db_backup_* is one metric for every
+    database it backs up). A title is a scanning aid, so no subject beats a
+    misleading one.
+    """
+    for key in SUBJECT_LABELS:
+        value = labels.get(key)
+        if value:
+            # ntfy carries the title in an HTTP header, which is latin-1, so
+            # non-ASCII raises rather than degrades. Strip it here, not later.
+            return _UNIT_SUFFIX.sub("", value).encode("ascii", "ignore").decode()
+    return ""
+
 
 def ntfy(title, message, priority="default", tags="", click=""):
     headers = {"Title": title, "Priority": priority, "Tags": tags}
@@ -117,10 +149,15 @@ def open_issue(alert):
     sev = labels.get("severity", "warning")
     name = labels.get("alertname", "alert")
     inst = labels.get("instance", labels.get("job", ""))
-    title = f"[alert] {name}{(' on ' + inst) if inst else ''}"
+    # Subject in the title for the same reason as the ntfy push: an issue list
+    # full of "[alert] DockerRefreshStale on ocean.home" cannot be triaged
+    # without opening every one of them.
+    who = subject(labels)
+    title = f"[alert] {name}{(': ' + who) if who else ''}{(' on ' + inst) if inst else ''}"
     body = (f"Fired by Alertmanager.\n\n"
             f"- **Alert:** {name}\n- **Severity:** {sev}\n- **Instance:** {inst}\n"
-            f"- **Summary:** {ann.get('summary', '')}\n"
+            + (f"- **Subject:** {who}\n" if who else "")
+            + f"- **Summary:** {ann.get('summary', '')}\n"
             f"- **Description:** {ann.get('description', '')}\n\n"
             f"<!-- {FP_MARKER}{fp} -->")
     args = ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--body", body]
@@ -256,6 +293,10 @@ def handle(payload):
         name = labels.get("alertname", "alert")
         inst = labels.get("instance", labels.get("job", ""))
         summary = alert.get("annotations", {}).get("summary", "")
+        # "DockerRefreshStale: mem0" rather than "DockerRefreshStale", so the
+        # notification list is readable without opening anything.
+        who = subject(labels)
+        ident = f"{name}: {who}" if who else name
         # Hardware alerts (remediation: manual) never enter the code lane — a
         # failing disk needs hands, not a PR. They get ntfy + one per-drive
         # [replace] issue, and are never auto-closed.
@@ -266,7 +307,7 @@ def handle(payload):
             if manual:
                 num = open_replace_issue(alert)
                 issue_url = f"https://github.com/{ISSUE_REPO}/issues/{num}" if num else ""
-                ntfy(f"{name} ({sev})",
+                ntfy(f"{ident} ({sev})",
                      "\n".join(x for x in (inst, summary, issue_url) if x),
                      PRIO.get(sev, "default"), "wrench,homelab", click=issue_url)
                 continue
@@ -275,7 +316,7 @@ def handle(payload):
             body = "\n".join(x for x in (inst, summary, issue_url) if x)
             # Critical: one-tap into the live RC console to supervise; warning:
             # tap opens the tracking issue.
-            ntfy(f"{name} ({sev})", body, PRIO.get(sev, "default"),
+            ntfy(f"{ident} ({sev})", body, PRIO.get(sev, "default"),
                  "rotating_light,homelab",
                  click=RC_URL if sev == "critical" else issue_url)
             if num and sev == "critical" and REMEDIATE:
@@ -284,11 +325,11 @@ def handle(payload):
             if manual:
                 # A replace issue's lifecycle is the physical swap, not the
                 # alert flapping; a human closes it. Still ntfy the all-clear.
-                ntfy(f"cleared: {name}", f"{inst}\n{summary}".strip(),
+                ntfy(f"cleared: {ident}", f"{inst}\n{summary}".strip(),
                      "min", "white_check_mark,homelab")
                 continue
             close_issue(alert)
-            ntfy(f"resolved: {name}", f"{inst}\n{summary}".strip(),
+            ntfy(f"resolved: {ident}", f"{inst}\n{summary}".strip(),
                  "min", "white_check_mark,homelab")
 
 
@@ -307,12 +348,18 @@ def _selftest():
                 returncode=0, stdout="https://github.com/x/y/issues/42", stderr="")
         return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
+    # A stable by-id name. Kernel names (sde) are deliberately refused by
+    # STABLE_DEV_RE, so using one here asserted the opposite of the behaviour
+    # and this selftest had been failing since #378 added the filter. Nothing
+    # ran it, which is why nobody noticed; CI runs it now.
+    DEV = "wwn-0x5000c500a1b2c3d4"
+
     gh = fake_list_empty
     # device-less hardware alert (pool-level) -> ntfy only, never touches gh
     assert open_replace_issue({"labels": {"remediation": "manual", "pool": "data01"}}) is None
     assert calls == [], "device-less alert must not create an issue"
     # device-bearing -> exactly one [replace] issue, keyed on instance/device
-    n = open_replace_issue({"labels": {"remediation": "manual", "device": "sde",
+    n = open_replace_issue({"labels": {"remediation": "manual", "device": DEV,
                                        "instance": "ocean.home", "pool": "data01"},
                             "annotations": {"summary": "s"}})
     assert n == 42, n
@@ -320,23 +367,48 @@ def _selftest():
     assert len(created) == 1, created
     args = created[0]
     body = args[args.index("--body") + 1]
-    assert f"{COMP_MARKER}ocean.home/sde" in body, "marker must key on instance/device"
+    assert f"{COMP_MARKER}ocean.home/{DEV}" in body, "marker must key on instance/device"
     assert "needs-escalation" not in " ".join(args), "hardware issue must never get needs-escalation"
-    # a second alert for the same drive reuses the issue (consistent-list dedup)
+    # An immediate repeat is caught by the in-process marker cache, before the
+    # list endpoint is consulted at all. That is the 2026-08-18 burst case.
+    calls.clear()
+    assert open_replace_issue({"labels": {"remediation": "manual", "device": DEV,
+                                          "instance": "ocean.home"},
+                               "annotations": {}}) is None, "recent marker must suppress"
+    assert not any(c[:2] == ("issue", "create") for c in calls), "and must not create"
+
+    # a second alert for the same drive reuses the issue (consistent-list dedup).
+    # The marker cache has to be cleared first or it short-circuits above and
+    # this never exercises the list path it exists to test.
+    _RECENT_MARKERS.clear()
     calls.clear()
 
     def fake_list_hit(*args):
         calls.append(args)
         if args[:2] == ("issue", "list"):
             return types.SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
-                [{"number": 42, "body": f"x {COMP_MARKER}ocean.home/sde y"}]))
+                [{"number": 42, "body": f"x {COMP_MARKER}ocean.home/{DEV} y"}]))
         return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
     gh = fake_list_hit
-    assert open_replace_issue({"labels": {"remediation": "manual", "device": "sde",
+    assert open_replace_issue({"labels": {"remediation": "manual", "device": DEV,
                                           "instance": "ocean.home"},
                                "annotations": {}}) == 42
     assert not any(c[:2] == ("issue", "create") for c in calls), "must reuse, not recreate"
+
+    # 2026-09-08: DockerRefreshStale pushed "ocean.home / docker image refresh
+    # stale on ocean.home" for a host running 31 compose projects, naming none
+    # of them.
+    assert subject({"project": "mem0"}) == "mem0"
+    assert subject({"name": "docker-refresh@mem0.timer"}) == "docker-refresh@mem0"
+    assert subject({"name": "plex.service"}) == "plex"
+    assert subject({"pool": "data01", "device": "sde"}) == "data01", "most specific label wins"
+    # Host-wide alerts have no subject, and inventing one would be worse than none.
+    assert subject({"instance": "ocean.home", "severity": "warning"}) == ""
+    assert subject({}) == ""
+    # The title rides in an HTTP header, which is latin-1: non-ASCII must be
+    # stripped here or urllib raises and the push is lost entirely.
+    assert subject({"name": "café.service"}) == "caf"
     print("selftest ok")
 
 
