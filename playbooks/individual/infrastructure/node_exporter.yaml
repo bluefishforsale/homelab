@@ -29,6 +29,17 @@
     # (no DNS means no route to anything that could fix it), so they never
     # refresh on the same day.
     docker_refresh_schedule: "{{ 'Wed *-*-* 08:00:00 America/Los_Angeles' if inventory_hostname == 'dns02' else 'Sun *-*-* 08:00:00 America/Los_Angeles' }}"
+    # NOTE: github-runners must never get a refresh timer. Its compose file is
+    # the only one in this repo that interpolates a runtime value
+    # (ACCESS_TOKEN: "${GITHUB_TOKEN}"), and the only thing that supplies it is
+    # the EnvironmentFile on github-docker-runners.service. A refresh unit has
+    # no such file, so `up -d` from here recreates all four runners with an
+    # empty token and they crash-loop until a human restarts the real unit.
+    # That is exactly what happened on 2026-09-06: the old sweep recreated them
+    # at 04:10 and CI was dead for two days. A runner also cannot recreate
+    # itself mid-job without killing the job that is doing the recreating.
+    docker_refresh_exclude:
+      - github-runners
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
@@ -206,12 +217,17 @@
     check_mode: false
     when: docker_check.rc == 0
 
+  - name: Select the compose projects that may be refreshed
+    ansible.builtin.set_fact:
+      refreshable_projects: "{{ compose_projects.stdout | from_json | map(attribute='Name') | difference(docker_refresh_exclude) }}"
+    when: docker_check.rc == 0
+
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
       name: "docker-refresh@{{ item }}.timer"
       state: started
       enabled: true
-    loop: "{{ compose_projects.stdout | from_json | map(attribute='Name') | list }}"
+    loop: "{{ refreshable_projects }}"
     when: docker_check.rc == 0
 
   - name: Find enabled refresh timers
@@ -224,14 +240,17 @@
 
   # A deleted service (comfyui, frigate) would otherwise keep an enabled timer
   # that fails weekly against a project that no longer exists, and page for it.
-  - name: Disable refresh timers whose compose project is gone
+  # Driving this off refreshable_projects rather than the raw list also means a
+  # newly excluded project has its existing timer torn down here, so the
+  # exclusion above is self-healing instead of only applying to fresh hosts.
+  - name: Disable refresh timers whose compose project is gone or excluded
     ansible.builtin.systemd:
       name: "{{ item }}"
       state: stopped
       enabled: false
     loop: "{{ refresh_timer_links.files | map(attribute='path') | map('basename') | list | difference(wanted_refresh_timers) }}"
     vars:
-      wanted_refresh_timers: "{{ compose_projects.stdout | from_json | map(attribute='Name') | map('regex_replace', '^(.*)$', 'docker-refresh@\\1.timer') | list }}"
+      wanted_refresh_timers: "{{ refreshable_projects | map('regex_replace', '^(.*)$', 'docker-refresh@\\1.timer') | list }}"
     when: docker_check.rc == 0
 
   - name: Create node exporter Docker Compose directory
