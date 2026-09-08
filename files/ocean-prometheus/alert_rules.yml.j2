@@ -105,30 +105,84 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} stuck activating on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been activating for 30m on {{ "{{ $labels.instance }}" }}, which means it is failing and restarting rather than starting"
 
-  # A compose project whose weekly image refresh failed. Left alone this is
-  # silent: the containers keep running the old image and nothing says the host
-  # stopped tracking upstream.
-  - alert: DockerRefreshFailed
-    expr: docker_refresh_project_failed == 1
-    for: 1h
-    labels:
-      severity: warning
-    annotations:
-      summary: "docker refresh failed for {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }}"
-      description: "The last weekly image refresh of compose project {{ "{{ $labels.project }}" }} on {{ "{{ $labels.instance }}" }} did not complete, so it is still on its previous images"
-
-  # The refresh mechanism itself died. Weekly cadence, so 10 days means at least
-  # one run was missed entirely. 0 is the never-succeeded case and must fire.
+  # A compose project whose image refresh failed is a failed docker-refresh@
+  # instance, so SystemdUnitFailed above already carries it. The two rules here
+  # cover only what unit state cannot say: that a timer stopped firing.
+  #
+  # Weekly cadence, so 10 days means at least one run was missed entirely. The
+  # `> 0` arm excludes timers that have never fired, which report 0 rather than
+  # a stale timestamp and are caught separately below.
   - alert: DockerRefreshStale
     expr: >
-      (docker_refresh_last_success_timestamp_seconds == 0)
-       or (time() - docker_refresh_last_success_timestamp_seconds > 864000)
+      (node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} > 0)
+       and (time() - node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} > 864000)
     for: 1h
     labels:
       severity: warning
     annotations:
-      summary: "docker image refresh stale on {{ "{{ $labels.instance }}" }}"
-      description: "No clean weekly image refresh on {{ "{{ $labels.instance }}" }} in over 10 days; the host has stopped tracking upstream images"
+      summary: "image refresh stale for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} has not fired in over 10 days on {{ "{{ $labels.instance }}" }}, so that project is not being refreshed. Note a timer that IS firing proves only cadence, not work: a stopped project is skipped with a clean exit, so check the journal before concluding the image is current"
+
+  # A timer that has never fired reports 0 forever, and the rule above cannot
+  # see it. A freshly enabled instance legitimately reads 0 until its first
+  # scheduled day (dns02 is on Wed, everything else on Sun), so this has to wait
+  # out a full cadence plus a day before calling it broken.
+  #
+  # NOTE: that 8 days lives in the query, not in `for:`. `for: 8d` needs 8
+  # continuous days of in-memory pending state, and prometheus here restarted 23
+  # times in the last 30 days (changes(process_start_time_seconds[30d]) = 23,
+  # longest unbroken stretch 13.3d), so a `for:` that long is reset before it
+  # ever fires. This PR makes that worse, not better: prometheus now has its own
+  # docker-refresh@prometheus timer, so an upstream image move recreates the
+  # evaluator. Reading the window from TSDB survives every restart.
+  #
+  # The count ratio is the "has existed long enough" guard, replacing what `for:`
+  # used to do. It is a ratio, so it holds at any scrape interval, and it works
+  # out to hours of series age: a fully covered window scores 8d/1h = 192, and
+  # 191.95 measured on a live series.
+  #
+  # NOTE: this threshold must sit ABOVE the worst-case healthy first run, or it
+  # pages for every new instance instead of catching broken ones. A timer
+  # enabled just after its window closes (Sun 14:00) waits until the next Sun
+  # 08:00 plus up to 6h of RandomizedDelaySec, so 6.75d to 7.00d is normal and
+  # silent. 185 fires at 7.71d, which clears that by 0.71d and still tolerates
+  # ~3.6% scrape gaps. 150 would have fired at 6.25d, i.e. before a healthy
+  # timer's first run, and this deploy creates ~60-80 fresh instances at once.
+  - alert: DockerRefreshNeverRan
+    expr: >
+      (max_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d]) == 0)
+       and
+      (count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d])
+        / count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[1h]) > 185)
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "image refresh never ran for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} has been enabled for over 8 days without firing once, so that project has never been refreshed"
+
+  # Both rules above are plain vector selectors, so a host with zero
+  # docker-refresh@ timers produces zero series and cannot alert on anything.
+  # That is the dangerous state, not a stale one: node_exporter.yaml deletes the
+  # old sweep units before it enables the new instances, so an apply that dies in
+  # between leaves a host with nothing refreshing and nothing to be stale. It
+  # also removes the old docker_refresh.prom heartbeat, so the previous
+  # host-level signal is gone rather than left behind to fire.
+  #
+  # Any host running docker is expected to carry at least one instance. 2h rides
+  # out the rollout window, where a host still on the old single sweep has no
+  # docker-refresh@ series yet.
+  - alert: DockerRefreshTimersMissing
+    expr: >
+      count by (instance) (node_systemd_unit_state{name="docker.service",state="active"} == 1)
+       unless
+      count by (instance) (node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"})
+    for: 2h
+    labels:
+      severity: warning
+    annotations:
+      summary: "no image refresh timers on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.instance }}" }} runs docker but has no docker-refresh@ timer at all, so nothing there is tracking upstream images and the staleness rules have no series to fire on"
 
   # Kometa has not completed a clean run in two days. It runs nightly, its
   # container reports healthy while doing nothing, and its stdout is silent, so

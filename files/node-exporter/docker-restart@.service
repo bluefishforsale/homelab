@@ -1,0 +1,22 @@
+[Unit]
+Description=Weekly restart of container %i
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Nice=10
+# Restarts by container name, not compose project, because that needs no
+# compose-file lookup and both users pin container_name explicitly. A plain
+# restart is the point: this replaces the RuntimeMaxSec=7d that the old
+# `docker run` units carried, for services whose image is built on the host and
+# so is never recreated by docker-refresh.
+#
+# An absent container is a skip, not a failure. `docker restart` on a missing
+# name exits 1 ("No such container", verified on ocean), and both users stop via
+# `compose down`, which REMOVES the container. Without this, stopping a service
+# on purpose becomes a SystemdUnitFailed warning every Saturday until someone
+# notices, and a renamed instance pages forever because nothing tears these
+# timers down. A restart that genuinely fails still exits non-zero and alerts,
+# which is why this is one command and not a SuccessExitStatus fudge.
+ExecStart=/bin/sh -c 'docker inspect %i >/dev/null 2>&1 || { logger -t docker-restart "container %i absent, skipped"; exit 0; }; exec docker restart %i'

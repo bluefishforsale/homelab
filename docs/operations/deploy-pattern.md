@@ -59,7 +59,11 @@ Five files per new service:
 
 1. `playbooks/individual/ocean/services/<service>.yaml` — ansible playbook.
    For image-based: templates compose + systemd, ends with an **unconditional**
-   `systemd: state: restarted` (so floating `:latest` tags get pulled on every run).
+   `systemd: state: restarted` so a dispatched deploy always lands. That restart
+   does **not** pull: `docker compose up -d` fetches only when the image is
+   missing locally, and `--quiet-pull` merely silences a pull it was already
+   going to do. Prometheus restarted weekly on a June image for months this way.
+   Floating tags stay current through the weekly refresh below, not the restart.
 2. `files/<service>/{docker-compose.yml.j2, .env.j2, <service>.service.j2}` — templates.
 3. `.github/workflows/deploy-<service>.yml` — listens for
    `repository_dispatch: deploy-<service>`, runs the playbook.
@@ -72,6 +76,58 @@ Five files per new service:
 5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
    of the hostname to `fully_public_services` (Access bypass) for public
    services. `public_services` = admin + plex-users gate. Else admin-only.
+
+**Image refresh requirements (every docker-based service):**
+
+- **Run it as a compose project.** `docker-refresh@<project>` instances are enabled
+  from `docker compose ls` on each host, so a compose service is covered the moment
+  it runs and there is nothing to register. A service started with a bare
+  `docker run` is invisible to the refresh and will never see a new image again.
+  The last two that ran that way, cloudflare-exporter and ndt-speedtest-exporter,
+  were converted for exactly this reason.
+- **A locally built image is fine, but declare `build:`.** Both exporters build on
+  the host from repo source, so their tag exists in no registry and pulling it
+  fails. The refresh pulls with `--ignore-buildable`, which skips a project only if
+  the compose file says it is buildable. Without that key the weekly refresh pages
+  instead of no-opping. Their update path is a repo change that rebuilds on apply.
+- **Keep the compose project name stable.** It is the systemd instance name, so
+  renaming the project silently orphans the old timer and enables a new one.
+- **Floating tags are the default** (`:latest`, `:main`, `:stable`) and are safe
+  only because of the refresh. Pinning a tag or digest is a deliberate opt-out of
+  updates: say why in the compose template, because nothing will alert on it.
+- **Do not add a periodic pull to the service's own unit.** An `ExecStartPre` pull
+  only freshens a start, and editing the unit templates to add one restarts every
+  affected service on merge. The weekly timer is the mechanism; the unit is not.
+- **Verify:** `scripts/fleet-systemctl.sh docker-refresh@<project>.timer <host>`
+  reports `active waiting`. A failed refresh surfaces as a failed unit
+  (`SystemdUnitFailed`); a timer that goes quiet or never fires surfaces as
+  `DockerRefreshStale` / `DockerRefreshNeverRan`. Refreshes run Sunday between
+  08:00 and 14:00 Pacific, staggered but not serialized: each instance draws its
+  own `RandomizedDelaySec` independently, so overlaps are expected and nothing
+  holds a mutex. The point of the spread is that one wedged project cannot stall
+  the others, not that only one runs at a time.
+- **It converges, it does not just pull.** `up -d` applies the whole compose
+  file on the host, not only the new image, so anything a playbook rendered
+  without restarting lands here instead: unattended, at a random hour, up to a
+  week later. That file is ansible-rendered, so the converge moves toward repo
+  state rather than away from it, and this is how compose drift heals itself.
+  But if you render a change and skip the restart, you have not deferred it to
+  the next apply, you have deferred it to Sunday.
+- **It is discovery-based, and that inverts the repo's usual direction.**
+  Timers are granted from `docker compose ls` on the host, not from anything
+  this repo declares, because a registry here would rot the first time a
+  service is added elsewhere. The consequence is that a project started by hand
+  outside IaC still gets weekly auto-updates and alert coverage, and the only
+  declarative control is the `docker_refresh_exclude` denylist in
+  `node_exporter.yaml`. If you want a running project left alone, that list is
+  the one place to say so.
+- **A new host needs systemd 252 or newer.** The refresh timers use a
+  timezone-qualified `OnCalendar` (`Sun *-*-* 08:00:00 America/Los_Angeles`), and
+  252 is the release that added timezone support. The whole fleet is bookworm on
+  252 today, so there is no margin: build a host on bullseye or PVE 7 (systemd
+  247) and the calendar fails to parse, the timer never loads, and the only sign
+  is `DockerRefreshTimersMissing` eventually firing for that host. Check with
+  `systemd-analyze calendar "Sun *-*-* 08:00:00 America/Los_Angeles"`.
 
 **Workflow conventions for `.github/workflows/deploy-<service>.yml`:**
 
@@ -166,6 +222,7 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
 homelab:
 [ ] playbooks/individual/ocean/services/<name>.yaml      (clone paia.yaml or terrac_com.yaml)
 [ ] files/<name>/{docker-compose.yml.j2, .env.j2, .service.j2}
+[ ] Service runs as a compose project (bare `docker run` never gets a new image)
 [ ] vars/vars_service_ports.yaml — add <name>.port
 [ ] files/nginx-compose/proxy_hostname_web_proxy.conf — add vhost block
 [ ] vars/vars_cloudflared.yaml — add ingress entry
