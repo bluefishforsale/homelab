@@ -106,6 +106,13 @@ Five files per new service:
   own `RandomizedDelaySec` independently, so overlaps are expected and nothing
   holds a mutex. The point of the spread is that one wedged project cannot stall
   the others, not that only one runs at a time.
+- **A new host needs systemd 252 or newer.** The refresh timers use a
+  timezone-qualified `OnCalendar` (`Sun *-*-* 08:00:00 America/Los_Angeles`), and
+  252 is the release that added timezone support. The whole fleet is bookworm on
+  252 today, so there is no margin: build a host on bullseye or PVE 7 (systemd
+  247) and the calendar fails to parse, the timer never loads, and the only sign
+  is `DockerRefreshTimersMissing` eventually firing for that host. Check with
+  `systemd-analyze calendar "Sun *-*-* 08:00:00 America/Los_Angeles"`.
 
 **Workflow conventions for `.github/workflows/deploy-<service>.yml`:**
 
