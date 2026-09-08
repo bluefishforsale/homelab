@@ -106,6 +106,21 @@ Five files per new service:
   own `RandomizedDelaySec` independently, so overlaps are expected and nothing
   holds a mutex. The point of the spread is that one wedged project cannot stall
   the others, not that only one runs at a time.
+- **It converges, it does not just pull.** `up -d` applies the whole compose
+  file on the host, not only the new image, so anything a playbook rendered
+  without restarting lands here instead: unattended, at a random hour, up to a
+  week later. That file is ansible-rendered, so the converge moves toward repo
+  state rather than away from it, and this is how compose drift heals itself.
+  But if you render a change and skip the restart, you have not deferred it to
+  the next apply, you have deferred it to Sunday.
+- **It is discovery-based, and that inverts the repo's usual direction.**
+  Timers are granted from `docker compose ls` on the host, not from anything
+  this repo declares, because a registry here would rot the first time a
+  service is added elsewhere. The consequence is that a project started by hand
+  outside IaC still gets weekly auto-updates and alert coverage, and the only
+  declarative control is the `docker_refresh_exclude` denylist in
+  `node_exporter.yaml`. If you want a running project left alone, that list is
+  the one place to say so.
 - **A new host needs systemd 252 or newer.** The refresh timers use a
   timezone-qualified `OnCalendar` (`Sun *-*-* 08:00:00 America/Los_Angeles`), and
   252 is the release that added timezone support. The whole fleet is bookworm on

@@ -121,7 +121,7 @@ groups:
       severity: warning
     annotations:
       summary: "image refresh stale for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
-      description: "{{ "{{ $labels.name }}" }} has not fired in over 10 days on {{ "{{ $labels.instance }}" }}; that project has stopped tracking upstream images"
+      description: "{{ "{{ $labels.name }}" }} has not fired in over 10 days on {{ "{{ $labels.instance }}" }}, so that project is not being refreshed. Note a timer that IS firing proves only cadence, not work: a stopped project is skipped with a clean exit, so check the journal before concluding the image is current"
 
   # A timer that has never fired reports 0 forever, and the rule above cannot
   # see it. A freshly enabled instance legitimately reads 0 until its first

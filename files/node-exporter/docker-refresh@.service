@@ -6,12 +6,18 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+# NOTE: %i, never %I. %i is the instance name literally as written; %I unescapes
+# it, and systemd unescapes a hyphen into a slash. Six of the fleet's project
+# names contain hyphens, so %I would turn globalview-stack into globalview/stack
+# and plex-meta-manager into plex/meta/manager. The script would then find no
+# such project, log "not running, skipped", exit 0, and the timer would stamp a
+# clean run forever while refreshing nothing. One character, silent, permanent.
 ExecStart=/usr/local/bin/docker-refresh.sh %i
 # Backstop only, and it must stay above the script's own budgets or it becomes
 # the thing it exists to prevent: systemd killing the unit mid-recreate leaves
 # the service down, which is the one way this can cause an outage. The script
-# bounds the pull at 45m and the recreate at 10m, so 4200 sits past both with
-# 10m to spare.
+# bounds the pull at 45m, the recreate at 10m and the post-recreate health wait
+# at 2m, so 4200 sits past all three with 13m to spare.
 TimeoutStartSec=4200
 Nice=10
 IOSchedulingClass=idle

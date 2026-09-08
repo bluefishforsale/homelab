@@ -52,6 +52,9 @@ case "$*" in
   *images\ --quiet)
     if [ -f /tmp/.dr_pulled ]; then echo sha256:new; else echo sha256:old; fi ;;
   *pull*) touch /tmp/.dr_pulled; echo "PULLARGS $*" ;;
+  *image\ inspect\ sha256:old*) echo "prom/plex@sha256:OLDDIGEST" ;;
+  *image\ inspect\ sha256:new*) echo "prom/plex@sha256:NEWDIGEST" ;;
+  *ps\ --format*) echo '[{"Name":"plex","State":"running","Health":""}]' ;;
   *) : ;;
 esac
 STUBEOF
@@ -59,7 +62,8 @@ rm -f /tmp/.dr_pulled
 : > "$LOG"
 run_with_stub "$STUB" plex
 exited "a refreshed project exits clean" 0
-check "a replaced image is logged with both digests" "project=plex updated=1 before=sha256:old, after=sha256:new," "$LOG"
+check "the trail records repo digests, not image IDs" "before=prom/plex@sha256:OLDDIGEST after=prom/plex@sha256:NEWDIGEST" "$LOG"
+refute "the trail never records a bare image ID, which cannot be pulled" "before=sha256:old" "$LOG"
 # Locally built projects (cloudflare-exporter, ndt-speedtest-exporter) have a
 # tag no registry serves. Without this flag their refresh fails every week.
 check "the pull skips images built on the host" "PULLARGS compose -p plex -f /data01/services/plex/docker-compose.yml pull --quiet --ignore-buildable" "$OUT"
@@ -163,6 +167,45 @@ exited "unset compose variables fail the unit" 1
 refute "a gutted project is never pulled" "PULLED" "$OUT"
 refute "a gutted project is never recreated" "RECREATED" "$OUT"
 check "the refusal says so in the journal" "project=github-runners has unset compose variables, refusing to recreate" "$LOG"
+
+# A project assembled from several compose files would be rebuilt from a partial
+# definition if only the first were used. Refusing is loud; corrupting is not.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"stack","ConfigFiles":"/a/base.yml,/a/override.yml"}]' ;;
+  *images\ --quiet) echo sha256:same ;;
+  *pull*) echo "PULLARGS $*" ;;
+  *) : ;;
+esac
+STUBEOF
+: > "$LOG"
+run_with_stub "$STUB" stack
+exited "a multi-file project refreshes cleanly" 0
+# Needle deliberately starts with the project name: check() passes it to grep
+# unquoted, so a leading -f is eaten as grep's pattern-file flag.
+check "every compose file is passed through, not just the first" "stack -f /a/base.yml -f /a/override.yml" "$OUT"
+
+# The point of the whole feature is that a bad :latest gets caught. `up -d`
+# returns as soon as containers are started, so without the settle check an
+# image that starts and dies exits 0 and the timer stamps a clean run.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"prometheus","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*) : ;;
+  *images*) if [ -f /tmp/dr_after ]; then echo sha256:new; else echo sha256:old; fi ;;
+  *pull*) touch /tmp/dr_after; echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *ps*) echo '[{"Name":"prometheus","State":"restarting","Health":""}]' ;;
+  *) : ;;
+esac
+STUBEOF
+rm -f /tmp/dr_after; : > "$LOG"
+run_with_stub "$STUB" prometheus
+rm -f /tmp/dr_after
+exited "a recreate that comes back broken fails the unit" 1
+check "the unhealthy recreate says so in the journal" "did not come back healthy" "$LOG"
 
 rm -f "$LOG" "$OUT" "$STUB"
 echo
