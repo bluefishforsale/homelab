@@ -46,7 +46,7 @@
     # throughout. Found only by a check comparing the running image to
     # fork/main.
     mem0_image: ghcr.io/bluefishforsale/mem0-api-server
-    mem0_version: c7a8eaed8debc52c2fda94946d4a1b49d9bcbd23
+    mem0_version: d56da05c4d67f9537a3369bc77bf7aba9f37b6c7
     # SSH, unlike the mem0 fork above: the bridge repo is private, and an https
     # clone of a private repo fails with "could not read Username for
     # 'https://github.com'" rather than anything that names the real problem.
