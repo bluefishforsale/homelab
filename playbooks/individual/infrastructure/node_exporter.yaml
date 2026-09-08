@@ -226,8 +226,17 @@
 
   # Read-only, and it has to run in check mode too or the dry run would loop
   # over an undefined list.
-  - name: Enumerate running compose projects
-    ansible.builtin.command: docker compose ls --format json
+  #
+  # NOTE: -a is load-bearing. Plain `docker compose ls` is "List running compose
+  # projects", so without it a project that merely happens to be stopped during
+  # an apply is absent here, and the teardown below then disables its timer for
+  # good. Plex wedges often enough to have its own autoheal timer, so that is a
+  # question of when, not if, and it fails silently: the unit is gone, so the
+  # series is gone, and an alert cannot fire on a series that does not exist.
+  # A genuinely deleted project has no containers at all and so is still absent
+  # from -a, which is what keeps the comfyui/frigate cleanup working.
+  - name: Enumerate compose projects
+    ansible.builtin.command: docker compose ls -a --format json
     register: compose_projects
     changed_when: false
     check_mode: false
