@@ -28,6 +28,11 @@ PROJECT="${1:?usage: docker-refresh.sh <compose-project>}"
 # that runs out of budget instead fails before anything is recreated, and the
 # layers it did fetch stay cached for the next run.
 PULL_TIMEOUT=2700
+# The recreate half. Pulls nothing (the pull above already did), so this is
+# container stop/start time; 10m covers a project with many services. The unit's
+# TimeoutStartSec has to stay above PULL_TIMEOUT + UP_TIMEOUT or systemd becomes
+# the thing that kills a recreate midway.
+UP_TIMEOUT=600
 
 # Compose file backing a running project, first entry only (compose returns
 # them comma-separated). Deliberately NOT fault-tolerant: unparseable output
@@ -57,6 +62,23 @@ if [ -z "$CFG" ]; then
   exit 0
 fi
 
+# A compose file whose variables resolve blank would be recreated gutted. The
+# github-runners token reaches its containers as ACCESS_TOKEN: "${GITHUB_TOKEN}",
+# supplied only by the EnvironmentFile on github-docker-runners.service, which
+# this unit does not have. Recreating from here produced four runners with an
+# empty token that crash-looped 3067 times and took CI out for two days on
+# 2026-09-06. Refuse rather than recreate.
+#
+# The playbook also excludes that project so no timer exists at all, but that
+# exclusion is a hardcoded name matched against a project Docker derives from a
+# directory in a different file. This is the backstop for when those drift
+# apart. Guarding on the class (any unset variable) rather than the name means
+# it keeps working for projects this repo does not own.
+if docker compose -p "$PROJECT" -f "$CFG" config 2>&1 >/dev/null | grep -q 'variable is not set'; then
+  logger -t docker-refresh "project=$PROJECT has unset compose variables, refusing to recreate"
+  exit 1
+fi
+
 before=$(images)
 # --ignore-buildable: a few projects (cloudflare-exporter, ndt-speedtest-exporter)
 # build their image on the host from repo source, so the tag exists in no
@@ -66,7 +88,16 @@ if ! timeout "$PULL_TIMEOUT" docker compose -p "$PROJECT" -f "$CFG" pull --quiet
   logger -t docker-refresh "project=$PROJECT pull failed or exceeded ${PULL_TIMEOUT}s, nothing recreated"
   exit 1
 fi
-docker compose -p "$PROJECT" -f "$CFG" up -d || exit 1
+# Bounded for the same reason the pull is, and the comment above about systemd
+# killing the unit mid-recreate applies here literally: leaving this unbounded
+# just moved the hazard from "any slow pull" to "a recreate that outruns
+# whatever is left of TimeoutStartSec", where the kill lands between stopping
+# the old container and starting the new one. 10m is generous for a recreate
+# that pulls nothing, and it fits inside the unit's budget alongside the pull.
+if ! timeout "$UP_TIMEOUT" docker compose -p "$PROJECT" -f "$CFG" up -d; then
+  logger -t docker-refresh "project=$PROJECT up -d failed or exceeded ${UP_TIMEOUT}s"
+  exit 1
+fi
 after=$(images)
 
 # The hourly prune deletes the replaced image within the hour, so this journal

@@ -137,14 +137,23 @@ groups:
   # evaluator. Reading the window from TSDB survives every restart.
   #
   # The count ratio is the "has existed long enough" guard, replacing what `for:`
-  # used to do. A series covering the full window scores 8d/1h = 192; 150 leaves
-  # room for scrape gaps, and it is a ratio so it holds at any scrape interval.
+  # used to do. It is a ratio, so it holds at any scrape interval, and it works
+  # out to hours of series age: a fully covered window scores 8d/1h = 192, and
+  # 191.95 measured on a live series.
+  #
+  # NOTE: this threshold must sit ABOVE the worst-case healthy first run, or it
+  # pages for every new instance instead of catching broken ones. A timer
+  # enabled just after its window closes (Sun 14:00) waits until the next Sun
+  # 08:00 plus up to 6h of RandomizedDelaySec, so 6.75d to 7.00d is normal and
+  # silent. 185 fires at 7.71d, which clears that by 0.71d and still tolerates
+  # ~3.6% scrape gaps. 150 would have fired at 6.25d, i.e. before a healthy
+  # timer's first run, and this deploy creates ~60-80 fresh instances at once.
   - alert: DockerRefreshNeverRan
     expr: >
       (max_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d]) == 0)
        and
       (count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d])
-        / count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[1h]) > 150)
+        / count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[1h]) > 185)
     for: 1h
     labels:
       severity: warning

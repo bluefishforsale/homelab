@@ -143,6 +143,27 @@ run_with_stub "$STUB" plex
 exited "broken enumeration fails, not swallowed" 1
 check "broken enumeration says so in the journal" "project=plex enumeration failed" "$LOG"
 
+# 2026-09-06: recreating github-runners from here resolved ACCESS_TOKEN to the
+# empty string, because ${GITHUB_TOKEN} comes from an EnvironmentFile this unit
+# does not have. Four runners crash-looped and CI was dead for two days.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls -a --format json"|"compose ls --format json")
+    echo '[{"Name":"github-runners","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*)
+    echo 'level=warning msg="The \"GITHUB_TOKEN\" variable is not set. Defaulting to a blank string."' >&2 ;;
+  *pull*) echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *) : ;;
+esac
+STUBEOF
+: > "$LOG"
+run_with_stub "$STUB" github-runners
+exited "unset compose variables fail the unit" 1
+refute "a gutted project is never pulled" "PULLED" "$OUT"
+refute "a gutted project is never recreated" "RECREATED" "$OUT"
+check "the refusal says so in the journal" "project=github-runners has unset compose variables, refusing to recreate" "$LOG"
+
 rm -f "$LOG" "$OUT" "$STUB"
 echo
 echo "Results: $pass passed, $fail failed"

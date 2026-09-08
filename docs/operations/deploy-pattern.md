@@ -102,7 +102,10 @@ Five files per new service:
   reports `active waiting`. A failed refresh surfaces as a failed unit
   (`SystemdUnitFailed`); a timer that goes quiet or never fires surfaces as
   `DockerRefreshStale` / `DockerRefreshNeverRan`. Refreshes run Sunday between
-  08:00 and 14:00 Pacific, one project at a time.
+  08:00 and 14:00 Pacific, staggered but not serialized: each instance draws its
+  own `RandomizedDelaySec` independently, so overlaps are expected and nothing
+  holds a mutex. The point of the spread is that one wedged project cannot stall
+  the others, not that only one runs at a time.
 
 **Workflow conventions for `.github/workflows/deploy-<service>.yml`:**
 

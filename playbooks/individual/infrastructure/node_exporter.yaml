@@ -235,17 +235,30 @@
   # series is gone, and an alert cannot fire on a series that does not exist.
   # A genuinely deleted project has no containers at all and so is still absent
   # from -a, which is what keeps the comfyui/frigate cleanup working.
+  # NOTE: never allowed to fail the play. `which docker` above only proves the
+  # binary exists; a down daemon or an unreachable socket makes this exit
+  # non-zero, and because this play is hosts: all that would abort the whole run
+  # for that host, taking cadvisor, smart-exporter and the rest down with it
+  # over a transient docker problem. Refresh timers are the least important
+  # thing here, so they degrade rather than block.
   - name: Enumerate compose projects
     ansible.builtin.command: docker compose ls -a --format json
     register: compose_projects
     changed_when: false
     check_mode: false
+    failed_when: false
     when: docker_check.rc == 0
 
+  # NOTE: gating on rc is what makes the tolerated failure above safe. A failed
+  # enumeration yields empty stdout, which would resolve to an empty project
+  # list, and the teardown below would then read that as "every project is gone"
+  # and disable the entire host's refresh timers. Leaving the fact undefined
+  # skips all three tasks instead, so a sick docker daemon costs one apply's
+  # worth of timer reconciliation rather than the whole host's coverage.
   - name: Select the compose projects that may be refreshed
     ansible.builtin.set_fact:
       refreshable_projects: "{{ compose_projects.stdout | from_json | map(attribute='Name') | difference(docker_refresh_exclude) }}"
-    when: docker_check.rc == 0
+    when: docker_check.rc == 0 and compose_projects.rc == 0
 
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
@@ -253,7 +266,7 @@
       state: started
       enabled: true
     loop: "{{ refreshable_projects }}"
-    when: docker_check.rc == 0
+    when: refreshable_projects is defined
 
   - name: Find enabled refresh timers
     ansible.builtin.find:
@@ -261,7 +274,7 @@
       patterns: 'docker-refresh@*.timer'
       file_type: link
     register: refresh_timer_links
-    when: docker_check.rc == 0
+    when: refreshable_projects is defined
 
   # A deleted service (comfyui, frigate) would otherwise keep an enabled timer
   # that fails weekly against a project that no longer exists, and page for it.
@@ -276,7 +289,7 @@
     loop: "{{ refresh_timer_links.files | map(attribute='path') | map('basename') | list | difference(wanted_refresh_timers) }}"
     vars:
       wanted_refresh_timers: "{{ refreshable_projects | map('regex_replace', '^(.*)$', 'docker-refresh@\\1.timer') | list }}"
-    when: docker_check.rc == 0
+    when: refreshable_projects is defined
 
   - name: Create node exporter Docker Compose directory
     ansible.builtin.file:
