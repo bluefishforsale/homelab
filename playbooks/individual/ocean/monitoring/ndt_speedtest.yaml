@@ -94,3 +94,15 @@
         enabled: true
         state: "{{ 'restarted' if (build_context is changed or ndt_compose is changed or ndt_unit is changed or ndt_legacy.rc == 0) else 'started' }}"
         daemon_reload: true
+
+    # The image is built on this host, so docker-refresh skips it and nothing
+    # else ever recreates the container. Without this it runs until the next
+    # apply, where the old `docker run` unit recycled it every 7 days. It also
+    # matters more here than elsewhere: this exporter polls the M-Lab Locate
+    # API, which rate-limits persistent callers, and a wedged client used to
+    # clear itself on that weekly recycle.
+    - name: Enable the weekly container restart
+      ansible.builtin.systemd:
+        name: "docker-restart@{{ ndt_exporter_service }}.timer"
+        state: started
+        enabled: true

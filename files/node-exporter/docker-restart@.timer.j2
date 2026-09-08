@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly restart of container %i
+
+[Timer]
+# Saturday, deliberately not the Sunday refresh window: a restart landing in the
+# middle of a recreate would fight it.
+OnCalendar=Sat *-*-* 03:00:00 America/Los_Angeles
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -125,17 +125,55 @@ groups:
 
   # A timer that has never fired reports 0 forever, and the rule above cannot
   # see it. A freshly enabled instance legitimately reads 0 until its first
-  # Sunday, so this waits out a full cadence plus a day before calling it
-  # broken. A prometheus restart resets the pending window, which delays this
-  # alert but cannot lose it: the condition is still true afterwards.
+  # scheduled day (dns02 is on Wed, everything else on Sun), so this has to wait
+  # out a full cadence plus a day before calling it broken.
+  #
+  # NOTE: that 8 days lives in the query, not in `for:`. `for: 8d` needs 8
+  # continuous days of in-memory pending state, and prometheus here restarted 23
+  # times in the last 30 days (changes(process_start_time_seconds[30d]) = 23,
+  # longest unbroken stretch 13.3d), so a `for:` that long is reset before it
+  # ever fires. This PR makes that worse, not better: prometheus now has its own
+  # docker-refresh@prometheus timer, so an upstream image move recreates the
+  # evaluator. Reading the window from TSDB survives every restart.
+  #
+  # The count ratio is the "has existed long enough" guard, replacing what `for:`
+  # used to do. A series covering the full window scores 8d/1h = 192; 150 leaves
+  # room for scrape gaps, and it is a ratio so it holds at any scrape interval.
   - alert: DockerRefreshNeverRan
-    expr: node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"} == 0
-    for: 8d
+    expr: >
+      (max_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d]) == 0)
+       and
+      (count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[8d])
+        / count_over_time(node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"}[1h]) > 150)
+    for: 1h
     labels:
       severity: warning
     annotations:
       summary: "image refresh never ran for {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} has been enabled for over 8 days without firing once, so that project has never been refreshed"
+
+  # Both rules above are plain vector selectors, so a host with zero
+  # docker-refresh@ timers produces zero series and cannot alert on anything.
+  # That is the dangerous state, not a stale one: node_exporter.yaml deletes the
+  # old sweep units before it enables the new instances, so an apply that dies in
+  # between leaves a host with nothing refreshing and nothing to be stale. It
+  # also removes the old docker_refresh.prom heartbeat, so the previous
+  # host-level signal is gone rather than left behind to fire.
+  #
+  # Any host running docker is expected to carry at least one instance. 2h rides
+  # out the rollout window, where a host still on the old single sweep has no
+  # docker-refresh@ series yet.
+  - alert: DockerRefreshTimersMissing
+    expr: >
+      count by (instance) (node_systemd_unit_state{name="docker.service",state="active"} == 1)
+       unless
+      count by (instance) (node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"})
+    for: 2h
+    labels:
+      severity: warning
+    annotations:
+      summary: "no image refresh timers on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.instance }}" }} runs docker but has no docker-refresh@ timer at all, so nothing there is tracking upstream images and the staleness rules have no series to fire on"
 
   # Kometa has not completed a clean run in two days. It runs nightly, its
   # container reports healthy while doing nothing, and its stdout is silent, so

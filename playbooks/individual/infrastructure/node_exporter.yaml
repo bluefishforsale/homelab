@@ -204,6 +204,22 @@
       dest: /etc/systemd/system/docker-refresh@.timer
       mode: '0644'
 
+  # Installed fleet-wide but enabled by nobody here. A service that needs a
+  # periodic restart enables its own instance from its own playbook, because the
+  # service's playbook is the only thing that knows it is built on the host and
+  # therefore never recreated by a refresh.
+  - name: Create docker-restart template service
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/docker-restart@.service"
+      dest: /etc/systemd/system/docker-restart@.service
+      mode: '0644'
+
+  - name: Create docker-restart template timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/docker-restart@.timer.j2"
+      dest: /etc/systemd/system/docker-restart@.timer
+      mode: '0644'
+
   - name: Reload systemd for the docker-refresh templates
     ansible.builtin.systemd:
       daemon_reload: true
