@@ -6,7 +6,11 @@
     src: docker-compose.yml.j2
     dest: "{{ dns_home }}/docker-compose.yml"
     mode: '0644'
-  notify: Restart dns-stack
+  # Reload, not Restart: compose recreates exactly the services whose definition
+  # changed, so this applies the change without stopping DNS. The config-file
+  # tasks below still Restart, because a bind-mounted file changing is invisible
+  # to compose and the process has to be bounced to reread it.
+  notify: Reload dns-stack
 
 - name: Deploy PowerDNS configuration
   ansible.builtin.template:

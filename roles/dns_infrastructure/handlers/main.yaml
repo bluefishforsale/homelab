@@ -5,7 +5,23 @@
   ansible.builtin.systemd:
     daemon_reload: true
 
+# NOTE: this stops the WHOLE stack. The unit's ExecStop is `docker compose
+# down`, so a restart removes powerdns, dnsdist, pdns-recursor and kea, not just
+# the thing that changed, and the play runs against both dns servers. Reach for
+# it only when a bind-mounted config file changed, because compose cannot see
+# inside a mount and the process genuinely has to be restarted to reread it.
 - name: Restart dns-stack
   ansible.builtin.systemd:
     name: "{{ dns_service_name }}.service"
     state: restarted
+
+# The compose file is different: compose diffs each service definition and
+# recreates only the ones that actually changed, so ExecReload (`up -d`) applies
+# the change without touching DNS at all. A one-line healthcheck edit to
+# netbootxyz used to take the entire stack down on both servers to deploy it,
+# and gh-runner-01 has a single resolver (192.168.1.2), so the runner running
+# the play would lose DNS partway through its own deploy.
+- name: Reload dns-stack
+  ansible.builtin.systemd:
+    name: "{{ dns_service_name }}.service"
+    state: reloaded
