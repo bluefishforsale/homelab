@@ -44,6 +44,8 @@ Status and future plans for the homelab infrastructure.
 - **Agentbox**: Autonomous agent fleet VM (OpenTelemetry collector telemetry)
 - **Kea DHCP**: DHCP server with Prometheus exporter
 - **Mail Relay**: Deployed service
+- **Proxmox QEMU Agent**: Deployed service
+- **Raspberry Pi**: Deployed service
 
 ### Media Stack
 
@@ -122,6 +124,7 @@ Status and future plans for the homelab infrastructure.
 - **Docker journald logging**: Centralized container logs
 - **Idempotent playbooks**: Safe multiple runs
 - **Fail2ban**: SSH and service protection with Prometheus exporter
+- **Certbot**: Deployed service
 
 ---
 
