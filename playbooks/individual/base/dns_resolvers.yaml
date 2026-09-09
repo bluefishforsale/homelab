@@ -1,0 +1,120 @@
+---
+# Point every host at BOTH internal resolvers, and at nothing else.
+#
+# Why this exists: on 2026-09-09 seven of nine hosts carried a single
+# `nameserver 192.168.1.2`, so dns01 dying took DNS from most of the fleet.
+# That is the chain that stuck CI when dns01's disk filled: the runner lost
+# resolution and its failure surfaced as an unrelated "invalid token". A pair of
+# DNS servers only buys redundancy if clients are told about both.
+#
+# Docker inherits this. Containers copy the host's resolv.conf at creation, so
+# fixing the host fixes every service on it, which is cheaper and less
+# disruptive than a daemon.json `dns` key (that needs a dockerd restart, and
+# dockerd restarts bounce every container on the host). Existing containers keep
+# their current resolv.conf until they are next recreated.
+#
+# pihole is deliberately absent. It is a single non-HA box and was being handed
+# out as the FIRST resolver to every DHCP client by kea-dhcp4; that is fixed in
+# the dns_infrastructure role. Nothing on this fleet resolves via pihole.
+- name: Configure internal DNS resolvers on every host
+  # dns_servers are excluded on purpose: a resolver pointing at itself for
+  # recursion is a different problem, and the dns_infrastructure role already
+  # gives each of them its peer plus a public upstream.
+  hosts: all:!dns_servers
+  become: true
+  gather_facts: true
+  # One host at a time with a hard stop, because a bad resolver list is a
+  # self-inflicted outage that also removes the means of fixing it. If a host
+  # comes back unable to resolve, stop rather than doing the same to the rest.
+  serial: 1
+  any_errors_fatal: true
+
+  vars:
+    # Local-first ordering is deliberate per host would be nicer, but every
+    # client here is equidistant, so plain order is fine: dns01 then dns02.
+    dns_resolvers:
+      - 192.168.1.2
+      - 192.168.1.3
+    dns_search_domain: home
+    # A name that only the internal servers can answer. Resolving it proves we
+    # are talking to the homelab resolvers, not to a public fallback that would
+    # happily answer for anything else.
+    dns_probe_name: ocean.home
+
+  tasks:
+    - name: Detect whether systemd-resolved owns resolv.conf
+      ansible.builtin.command: systemctl is-active systemd-resolved
+      register: resolved_state
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    # --- systemd-resolved hosts (the VMs; netplan feeds resolved) -------------
+    # netplan sets per-link DNS, and link DNS wins over resolved's global DNS,
+    # so a resolved.conf drop-in would be silently ignored here. The override
+    # has to be netplan's own, at a filename that sorts after 50-cloud-init so
+    # it wins the merge and survives cloud-init regenerating that file.
+    - name: Write netplan resolver override
+      ansible.builtin.copy:
+        dest: /etc/netplan/99-homelab-dns.yaml
+        mode: '0600'
+        content: |
+          # Managed by playbooks/individual/base/dns_resolvers.yaml
+          network:
+            version: 2
+            ethernets:
+              {{ ansible_default_ipv4.interface }}:
+                nameservers:
+                  addresses: [{{ dns_resolvers | join(', ') }}]
+                  search: [{{ dns_search_domain }}]
+      when: resolved_state.stdout == "active"
+      register: netplan_override
+
+    - name: Apply netplan
+      ansible.builtin.command: netplan apply
+      when: netplan_override is changed
+      changed_when: true
+
+    # --- bare metal (Proxmox: static resolv.conf, no resolved, no netplan) ----
+    - name: Write static resolv.conf
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        mode: '0644'
+        content: |
+          # Managed by playbooks/individual/base/dns_resolvers.yaml
+          search {{ dns_search_domain }}
+          {% for r in dns_resolvers %}
+          nameserver {{ r }}
+          {% endfor %}
+      when: resolved_state.stdout != "active"
+
+    # --- the gate ------------------------------------------------------------
+    # Both servers are checked individually, not just "can this host resolve".
+    # A host that reaches only one of them still looks healthy to a plain lookup
+    # while having exactly the single point of failure this play exists to
+    # remove.
+    - name: Verify each resolver answers from this host
+      ansible.builtin.command:
+        argv: ["dig", "+short", "+timeout=3", "+tries=2", "@{{ item }}", "{{ dns_probe_name }}"]
+      loop: "{{ dns_resolvers }}"
+      register: dns_probe
+      changed_when: false
+      failed_when: dns_probe.rc != 0 or (dns_probe.stdout | trim | length == 0)
+      retries: 6
+      delay: 5
+      until: dns_probe.rc == 0 and (dns_probe.stdout | trim | length > 0)
+
+    - name: Verify the host's own resolver stack works end to end
+      ansible.builtin.command:
+        argv: ["getent", "hosts", "{{ dns_probe_name }}"]
+      register: dns_getent
+      changed_when: false
+      retries: 6
+      delay: 5
+      until: dns_getent.rc == 0
+
+    - name: Report configured resolvers
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} resolvers={{ dns_resolvers | join(',') }}
+          ({{ 'systemd-resolved' if resolved_state.stdout == 'active' else 'static resolv.conf' }})
