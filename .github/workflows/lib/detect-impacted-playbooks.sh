@@ -83,11 +83,18 @@ emit() {
   #   - github_docker_runners: main-apply runs ON these runners, so a push-deploy
   #     would recreate the very runner executing the job (it kills itself
   #     mid-apply). Self-referential infra is hand-applied on the homelab network.
+  #   - deprecated/**: kept for reference, not for running. Nothing maintains
+  #     them, so they rot: dns02_standalone.yaml includes tasks/dpkg_lock.yaml
+  #     at a path that no longer resolves. On 2026-09-09 a one-line healthcheck
+  #     edit under files/dns-stack/ reverse-mapped into it and failed the
+  #     production apply, because a files/<svc> input maps to EVERY playbook
+  #     referencing that dir, deprecated ones included.
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
     playbooks/operations/backup/*) return 0 ;;
     playbooks/individual/infrastructure/github_docker_runners.yaml) return 0 ;;
+    playbooks/deprecated/*) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"

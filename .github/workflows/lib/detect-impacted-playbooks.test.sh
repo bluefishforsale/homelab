@@ -211,6 +211,20 @@ assert_eq "backup playbook never auto-applies" "[]" "$out"
 out=$(printf 'playbooks/individual/infrastructure/github_docker_runners.yaml\n' | bash "$SCRIPT")
 assert_eq "runner playbook never auto-applies" "[]" "$out"
 
+# 33. Deprecated playbooks are reference material and nothing maintains them, so
+#     they rot: dns02_standalone.yaml includes a tasks file at a path that no
+#     longer resolves. A direct edit must map to nothing.
+out=$(printf 'playbooks/deprecated/dns02_standalone.yaml\n' | bash "$SCRIPT")
+assert_eq "deprecated playbook never auto-applies" "[]" "$out"
+
+# 34. The one that actually bit: a files/<svc> input maps to EVERY playbook
+#     referencing that dir, so a one-line healthcheck edit under files/dns-stack/
+#     reverse-mapped into the deprecated play and failed the 2026-09-09 apply.
+#     It must resolve to the live playbook only.
+out=$(printf 'files/dns-stack/docker-compose.yml.j2\n' | bash "$SCRIPT")
+assert_eq "files/ reverse-mapping skips deprecated playbooks" \
+  '["playbooks/individual/core/services/dns_ha_stack.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
