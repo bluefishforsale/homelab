@@ -23,6 +23,13 @@
   hosts: dns_servers
   become: true
   gather_facts: true
+  # NOTE: one server at a time, which is the entire point of running a pair.
+  # Without this, a config change that notifies Restart dns-stack runs `docker
+  # compose down` on dns01 and dns02 simultaneously and the network has no
+  # resolver at all. That is unrecoverable from here: gh-runner-01 resolves via
+  # 192.168.1.2 only, so the runner mid-deploy loses DNS and cannot finish, or
+  # roll back, the thing that broke it.
+  serial: 1
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"

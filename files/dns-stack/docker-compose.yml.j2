@@ -212,7 +212,12 @@ services:
     environment:
       TZ: America/Los_Angeles
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000", "||", "exit", "1"]
+      # CMD is exec form: there is no shell, so a trailing `|| exit 1` is passed
+      # to wget as literal argv and it dies with `wget: bad address '||'`. This
+      # probe could therefore never pass, and netbootxyz has been unhealthy since
+      # it was written. The `||` was redundant anyway, since --spider already
+      # exits non-zero when the URL does not answer.
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 5s
       retries: 3
