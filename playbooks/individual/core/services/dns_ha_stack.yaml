@@ -29,7 +29,13 @@
   # resolver at all. That is unrecoverable from here: gh-runner-01 resolves via
   # 192.168.1.2 only, so the runner mid-deploy loses DNS and cannot finish, or
   # roll back, the thing that broke it.
+  #
+  # serial alone only paces the outage: it would break dns01, then proceed to
+  # break dns02 just as thoroughly. any_errors_fatal plus the post-host resolver
+  # check below is what makes it protective, by stopping at the first host that
+  # comes back unable to answer.
   serial: 1
+  any_errors_fatal: true
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
@@ -52,6 +58,36 @@
         dns_service_name: "{{ service }}"
 
   post_tasks:
+    # The gate between hosts. With serial: 1 and any_errors_fatal, a host that
+    # comes back unable to resolve stops the play before it touches the other
+    # one, which is the whole reason for deploying a resolver pair one at a
+    # time. Queries THIS host specifically rather than the system resolver,
+    # which would happily be answered by the peer and hide the failure.
+    - name: Verify this server still answers DNS before moving to the next
+      ansible.builtin.command:
+        argv:
+          - dig
+          - +short
+          - +timeout=3
+          - +tries=2
+          - "@{{ ansible_default_ipv4.address }}"
+          - ocean.home
+      register: dns_selfcheck
+      changed_when: false
+      retries: 6
+      delay: 5
+      until: dns_selfcheck.rc == 0 and dns_selfcheck.stdout | trim | length > 0
+      tags: [always]
+
+    - name: Fail loudly if this server is not resolving
+      ansible.builtin.fail:
+        msg: >-
+          {{ inventory_hostname }} is not answering DNS after deploy
+          (rc={{ dns_selfcheck.rc }}, out={{ dns_selfcheck.stdout | trim }}).
+          Stopping before the peer is touched, so one working resolver remains.
+      when: dns_selfcheck.rc != 0 or (dns_selfcheck.stdout | trim | length == 0)
+      tags: [always]
+
     - name: Display HA status
       ansible.builtin.debug:
         msg: >-
