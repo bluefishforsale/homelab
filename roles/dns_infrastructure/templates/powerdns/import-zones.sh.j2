@@ -2,8 +2,17 @@
 # Import BIND zone data into PowerDNS
 # Managed by Ansible - do not edit manually
 #
-# This script is idempotent: it deletes and recreates zones on each run.
 # Run inside the powerdns container: docker exec powerdns /import-zones.sh
+#
+# NOT idempotent in the sense that matters. Recreating a zone reaches the same
+# end state, but it goes through an empty one to get there, and an empty zone
+# means PowerDNS answers REFUSED for every name in it. On a secondary that is
+# worse still: the records only come back on the next AXFR from the primary, so
+# the hole lasts until a transfer completes. On 2026-09-09 that took dns01 out
+# for minutes on two separate applies. Every client on this fleet lists
+# 192.168.1.2 first, so a hole on dns01 is a fleet-wide DNS outage.
+#
+# Secondary zones below are therefore created only when ABSENT.
 
 set -euo pipefail
 
@@ -174,8 +183,11 @@ $PDNSUTIL add-autoprimary {{ pdns_primary_ip }} ddns-key 2>/dev/null || echo "  
 # ── Configure slave zones ──────────────────────────────────────────────────
 echo ""
 echo "--- Configuring slave zone: home. ---"
-$PDNSUTIL delete-zone home. 2>/dev/null || true
-$PDNSUTIL create-zone home.
+if $PDNSUTIL list-zone home. >/dev/null 2>&1; then
+  echo "  home. already present, leaving its records alone"
+else
+  $PDNSUTIL create-zone home.
+fi
 $PDNSUTIL set-kind home. SLAVE
 $PDNSUTIL set-meta home. AXFR-MASTER-TSIG ddns-key
 $PDNSUTIL change-secondary-zone-primary home. {{ pdns_primary_ip }}:5300
@@ -183,8 +195,11 @@ echo "  home. slave zone: OK"
 
 echo ""
 echo "--- Configuring slave zone: cluster.local. ---"
-$PDNSUTIL delete-zone cluster.local. 2>/dev/null || true
-$PDNSUTIL create-zone cluster.local.
+if $PDNSUTIL list-zone cluster.local. >/dev/null 2>&1; then
+  echo "  cluster.local. already present, leaving its records alone"
+else
+  $PDNSUTIL create-zone cluster.local.
+fi
 $PDNSUTIL set-kind cluster.local. SLAVE
 $PDNSUTIL set-meta cluster.local. AXFR-MASTER-TSIG ddns-key
 $PDNSUTIL change-secondary-zone-primary cluster.local. {{ pdns_primary_ip }}:5300
@@ -192,8 +207,11 @@ echo "  cluster.local. slave zone: OK"
 
 echo ""
 echo "--- Configuring slave zone: 1.168.192.in-addr.arpa. ---"
-$PDNSUTIL delete-zone 1.168.192.in-addr.arpa. 2>/dev/null || true
-$PDNSUTIL create-zone 1.168.192.in-addr.arpa.
+if $PDNSUTIL list-zone 1.168.192.in-addr.arpa. >/dev/null 2>&1; then
+  echo "  1.168.192.in-addr.arpa. already present, leaving its records alone"
+else
+  $PDNSUTIL create-zone 1.168.192.in-addr.arpa.
+fi
 $PDNSUTIL set-kind 1.168.192.in-addr.arpa. SLAVE
 $PDNSUTIL set-meta 1.168.192.in-addr.arpa. AXFR-MASTER-TSIG ddns-key
 $PDNSUTIL change-secondary-zone-primary 1.168.192.in-addr.arpa. {{ pdns_primary_ip }}:5300
