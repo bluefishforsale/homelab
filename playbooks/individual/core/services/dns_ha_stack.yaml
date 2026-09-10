@@ -74,7 +74,14 @@
           - ocean.home
       register: dns_selfcheck
       changed_when: false
-      retries: 6
+      # NOTE: this has to outlast a full `docker compose down` + `up` of the
+      # whole stack, not just a query timeout. The config tasks notify Restart
+      # dns-stack, and on 2026-09-09 dns02 needed longer than the original 6x5s
+      # to start answering again, so the gate failed a deploy that was actually
+      # fine and would have recovered seconds later. 3 minutes is past the
+      # observed recovery with room to spare; the unit's own TimeoutStartSec is
+      # 120s, so anything slower than this is genuinely stuck, not slow.
+      retries: 36
       delay: 5
       until: dns_selfcheck.rc == 0 and dns_selfcheck.stdout | trim | length > 0
       tags: [always]
