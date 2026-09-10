@@ -46,6 +46,11 @@ Status and future plans for the homelab infrastructure.
 - **Mail Relay**: Deployed service
 - **Proxmox QEMU Agent**: Deployed service
 - **Raspberry Pi**: Deployed service
+- **deb12_docker**: Deployed service
+- **dell_perc_raid**: Deployed service
+- **dns02_vm**: Deployed service
+- **gcloud_sdk**: Deployed service
+- **pki_tools**: Deployed service
 
 ### Media Stack
 
@@ -68,6 +73,9 @@ Status and future plans for the homelab infrastructure.
 - **paia**: Personal AI assistant
 - **terminalbench**: LLM benchmarking and testing
 - **mem0**: AI memory service
+- **gpu-test**: Deployed service
+- **terminalbench_model**: Deployed service
+- **terminalbench_run**: Deployed service
 
 ### Monitoring Stack
 
@@ -114,6 +122,10 @@ Status and future plans for the homelab infrastructure.
 - **Photonic Inventory**: Deployed service
 - **RA Mirror**: Deployed service
 - **terrac.com**: Deployed service
+- **blog_saetnere_com_wp**: Deployed service
+- **blog_terrac_com_static**: Deployed service
+- **globalview_backend**: Deployed service
+- **globalview_stack**: Deployed service
 
 ### Automation & Security
 
