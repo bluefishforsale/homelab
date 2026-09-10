@@ -22,6 +22,8 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 | `dns-drift-check.sh` | divergence between the two authoritative PowerDNS nodes (internal) | `dns-drift-check.sh` |
 | `dns-parity-check.sh` | compare dns01 vs dns02 HA nodes record-by-record (internal) | `dns-parity-check.sh` |
 | `homelab-health.sh` | fleet health gate by diff: `snapshot <f>` / `verify <f>` (used by the ship flow) | `homelab-health.sh verify /tmp/base.json` |
+| `plex-playback.py` | what actually plays and what it costs, from Tautulli: `summary` / `clients` / `audio` / `video` / `why` / `languages` / `users` | `plex-playback.py audio -s 500` |
+| `tdarr.py` | Tdarr without the web UI: `status` / `errors` / `survey` / `libraries` / `flows` / `flow-get` / `flow-put` / `library-flow` / `requeue` / `probe` | `tdarr.py errors -n 5` |
 
 ## DNS & mail-auth (external / public domains)
 
