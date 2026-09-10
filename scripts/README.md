@@ -42,6 +42,7 @@ artesiannetwork.com deliverability tooling. `dig`/`whois`, stdlib only.
 | Script | What | Notes |
 |---|---|---|
 | `fleet-restart.sh` | `restart <unit> <host>` (recreates via compose down/pull/up) or `container <name> <host>` (in-place bounce) | one host, existence-checked, confirm unless `-y`, passwordless `sudo -n` only |
+| `fleet-recreate.sh` | `plan` / `apply [-y] [host…]`: bounce every container on a host whose `/etc/resolv.conf` predates a resolver change, so it stops answering from the old list | one host at a time, `homelab-health.sh`-gated between hosts, `plan` is the read-only default; ocean goes last because it runs the gate, and dns01/dns02/gh-runner-01 are skipped unless named |
 | `cf.sh` | Cloudflare: `zones` / `cache-status <url>` / `dns <zone> [name]` / `dns-add …` / `purge <zone> [url…]` | vault creds; `purge` pairs with the 2h static edge cache |
 | `cloudflare-harden.py` | per-zone TLS/HSTS + security headers + host-scoped static cache rule | idempotent; classifier may block the live run → run by hand |
 | `cloudflare-waf.py` | per-zone WAF block + rate-limit rules (WordPress zones) | idempotent; run by hand |
@@ -67,8 +68,9 @@ pre-`--since` and the well-rated; cull the mediocre recent.
 | `HOMELAB_PROM` | `http://192.168.1.143:9090` | prom.sh, homelab-health.sh |
 | `HOMELAB_ALERTMANAGER` | `http://192.168.1.143:9093` | alerts.sh, homelab-health.sh |
 | `HOMELAB_LOKI` | `http://192.168.1.143:3100` | loki.sh |
-| `HOMELAB_INVENTORY` | `inventories/production/hosts.ini` | fleet-systemctl.sh, docker.sh, fleet-restart.sh |
+| `HOMELAB_INVENTORY` | `inventories/production/hosts.ini` | fleet-systemctl.sh, docker.sh, fleet-restart.sh, fleet-recreate.sh |
 | `SSH_TIMEOUT` | `5` | the ssh-based fleet tools |
+| `FLEET_RECREATE_*` | see `fleet-recreate.sh --help` | `RESOLVERS`, `PROBE`, `SKIP`, `SETTLE`, `TIMEOUT` |
 | `HOMELAB_VAULT` | `vault/secrets.yaml` | vault.py (point it at a copy to rehearse a rotation) |
 | `ANSIBLE_VAULT_PASSWORD_FILE` | `~/.ansible_vault_pass` | vault.py |
 | `~/.ansible_vault_pass` | — | cf.sh, cloudflare-*.py |

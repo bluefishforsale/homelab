@@ -120,18 +120,47 @@
     src: powerdns/import-zones.sh.j2
     dest: "{{ dns_home }}/import-zones.sh"
     mode: '0755'
+  register: import_script
 
 - name: Copy zone import script into PowerDNS container
   ansible.builtin.command:
     cmd: docker cp {{ dns_home }}/import-zones.sh powerdns:/import-zones.sh
   changed_when: false
 
+- name: Check which zones already exist
+  ansible.builtin.command:
+    cmd: docker exec powerdns pdnsutil list-all-zones
+  register: existing_zones
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# NOTE: this used to run unconditionally, and on the primary the script still
+# deletes and recreates each zone to rebuild it. That means every apply, however
+# unrelated, put the fleet's DNS through an empty zone and PowerDNS answered
+# REFUSED until ~69 records were back. Prometheus reported it as "server
+# misbehaving" and seven scrape targets dropped on 2026-09-09, twice.
+#
+# Gating on "the rendered script actually changed, or a zone is missing" makes a
+# routine deploy a genuine no-op, so DNS stops being collateral damage of an
+# unrelated playbook run. Changing a record still costs a rebuild window on the
+# primary; the secondary is safe either way now, because it only creates zones
+# that are absent. Removing that last window needs the record generation
+# converted to a single atomic `pdnsutil load-zone`, which is a bigger change
+# than belongs in an outage fix.
 - name: Run zone import
   ansible.builtin.command:
     cmd: docker exec powerdns /bin/bash /import-zones.sh
   register: zone_import
   changed_when: "'Zone Import' in zone_import.stdout"
+  when: >-
+    import_script is changed
+    or existing_zones.rc != 0
+    or 'home' not in (existing_zones.stdout | default(''))
 
 - name: Display zone import output
   ansible.builtin.debug:
     msg: "{{ zone_import.stdout_lines }}"
+  # zone_import is skipped on a no-op run, and a skipped result carries no
+  # stdout_lines, so this would fail on exactly the runs the gate makes safe.
+  when: zone_import is not skipped
