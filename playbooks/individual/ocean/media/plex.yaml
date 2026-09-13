@@ -44,8 +44,9 @@
     exporter_image: ghcr.io/axsuul/plex-media-server-exporter
     # Pin an explicit release: upstream's :latest tag is frozen at 1.0.0 (2023-11-10),
     # which predates the media-downloads username fix (1.1.3) and emits a :user label
-    # that collides with :username, 500-ing /metrics. 2.1.0 is the current release.
-    exporter_version: "2.1.0"
+    # that collides with :username, 500-ing /metrics. 1.1.3 is the last working release
+    # (2.x introduced a broken multi-stage Dockerfile that drops the ruby gems).
+    exporter_version: "1.1.3"
     exporter_port: "{{ service_ports.plex_exporter.port }}"
     meta_manager_service: plex-meta-manager
     meta_manager_image: kometateam/kometa
