@@ -458,6 +458,9 @@
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0644'
+      # Skills ship as <name>/SKILL.md; without this the nested dirs
+      # inherit 0644 and become untraversable, so the skill silently vanishes.
+      directory_mode: '0755'
     loop:
       - "{{ home }}/.claude"
       - "{{ home }}/.config/opencode"
