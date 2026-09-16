@@ -173,6 +173,28 @@
       dest: /usr/local/bin/opencode
       state: link
 
+  # photonic_inventory is a uv project (uv.lock), so an RC session that cannot
+  # see uv cannot run its tests. Hand-installed on the box since 2026-06-30;
+  # adopting it here so a rebuild does not lose it.
+  - name: Install uv (official installer)
+    ansible.builtin.shell: timeout 300 bash -c 'curl -fsSL --connect-timeout 20 --max-time 240 https://astral.sh/uv/install.sh | sh'
+    args:
+      creates: "{{ home }}/.local/bin/uv"
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+
+  # The unit files pin PATH to /usr/local/bin:/usr/bin:/bin, so ~/.local/bin is
+  # invisible to every lane without these.
+  - name: Symlink uv onto PATH
+    ansible.builtin.file:
+      src: "{{ home }}/.local/bin/{{ item }}"
+      dest: "/usr/local/bin/{{ item }}"
+      state: link
+    loop:
+      - uv
+      - uvx
+
   # --- Telemetry: OpenTelemetry Collector (contrib) ---
   - name: Download otelcol-contrib deb
     ansible.builtin.get_url:
