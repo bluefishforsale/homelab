@@ -188,16 +188,17 @@
     environment:
       HOME: "{{ home }}"
 
-  # The unit files pin PATH to /usr/local/bin:/usr/bin:/bin, so ~/.local/bin is
-  # invisible to every lane without these.
-  - name: Symlink uv onto PATH
-    ansible.builtin.file:
-      src: "{{ home }}/.local/bin/{{ item }}"
-      dest: "/usr/local/bin/{{ item }}"
-      state: link
-    loop:
-      - uv
-      - uvx
+  # tvly backs the tavily-search skill; it authenticates from TAVILY_API_KEY in
+  # agentbox.env, so there is no `tvly login` to do on the box. graphify is not
+  # installed here on purpose: its skill runs its own `uv tool install` on first
+  # use, which the unit PATH now picks up.
+  - name: Install the Tavily CLI as a uv tool
+    ansible.builtin.command: "{{ home }}/.local/bin/uv tool install tavily-cli"
+    args:
+      creates: "{{ home }}/.local/bin/tvly"
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
 
   # --- Telemetry: OpenTelemetry Collector (contrib) ---
   - name: Download otelcol-contrib deb
