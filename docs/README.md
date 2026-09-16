@@ -58,6 +58,7 @@ is the same host wherever it appears.
 - [Dell Hardware](operations/dell-hardware.md) - iDRAC, RAID, firmware
 - [UniFi Network](operations/unifi.md) - Switch and AP configuration
 - [Database Restore](operations/db-restore.md) - Per-service runbook, dry-run by default, point-in-time from GCS generations
+- [Decommissioning](operations/decommission.md) - Retiring a service from the fleet, report-first, alerts then services then files
 
 ---
 

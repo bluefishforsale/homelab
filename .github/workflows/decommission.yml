@@ -1,0 +1,250 @@
+---
+name: Decommission Service
+
+# One-time service teardown. Dispatch only: there is no push trigger, and
+# playbooks/operations/decommission/** is on the detector's never-auto-apply
+# list, so merging a decommission playbook does nothing until someone runs it
+# here deliberately.
+#
+# REPORT BY DEFAULT. mode=report walks every phase and prints what it would do
+# without touching anything. mode=apply requires typing the service name into
+# `confirm`, and data removal requires a second token on top of that.
+#
+# Order is fixed by the role: alerts, then services, then files.
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to decommission (must match playbooks/operations/decommission/<service>.yaml)"
+        required: true
+        type: string
+      mode:
+        description: "report = print the plan and change nothing. apply = actually tear down."
+        required: true
+        type: choice
+        default: report
+        options:
+          - report
+          - apply
+      confirm:
+        description: "Type the service name exactly. Required for mode=apply."
+        required: false
+        type: string
+        default: ""
+      phase_alerts:
+        description: "Phase 1: silence the service's alerts before touching it"
+        required: false
+        type: boolean
+        default: true
+      phase_services:
+        description: "Phase 2: stop/disable/remove the unit and container"
+        required: false
+        type: boolean
+        default: true
+      phase_files:
+        description: "Phase 3: remove the compose dir and config paths"
+        required: false
+        type: boolean
+        default: true
+      remove_data:
+        description: "Also remove declared data paths (tarred and verified first)"
+        required: false
+        type: boolean
+        default: false
+      confirm_data:
+        description: "Type DELETE-DATA to arm data removal. Ignored unless remove_data is set."
+        required: false
+        type: string
+        default: ""
+      remove_image:
+        description: "Also remove the service's image from the host"
+        required: false
+        type: boolean
+        default: false
+      archive:
+        description: "On success, git mv the playbook into playbooks/archive/ and push to master"
+        required: false
+        type: boolean
+        default: true
+
+# Same group as every other host deploy, so a teardown can never interleave with
+# an apply that would put the service straight back.
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
+
+# contents: write is needed only for the archive push at the end.
+permissions:
+  contents: write
+
+jobs:
+  decommission:
+    name: "Decommission ${{ inputs.service }} (${{ inputs.mode }})"
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Confirmation gate
+        env:
+          SERVICE: ${{ inputs.service }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM: ${{ inputs.confirm }}
+          REMOVE_DATA: ${{ inputs.remove_data }}
+          CONFIRM_DATA: ${{ inputs.confirm_data }}
+        run: |
+          set -euo pipefail
+          PLAYBOOK="playbooks/operations/decommission/${SERVICE}.yaml"
+
+          if [ ! -f "$PLAYBOOK" ]; then
+            echo "::error::No decommission playbook at $PLAYBOOK"
+            echo "Available:"
+            ls -1 playbooks/operations/decommission/ | grep -v '^_TEMPLATE' || echo "  (none)"
+            exit 1
+          fi
+
+          case "$SERVICE" in
+            _*) echo "::error::Refusing to run the template"; exit 1 ;;
+          esac
+
+          if [ "$MODE" = "apply" ] && [ "$CONFIRM" != "$SERVICE" ]; then
+            echo "::error::NOT CONFIRMED. mode=apply needs confirm to equal '${SERVICE}' exactly (got '${CONFIRM}')."
+            exit 1
+          fi
+
+          if [ "$MODE" = "apply" ] && [ "$REMOVE_DATA" = "true" ] && [ "$CONFIRM_DATA" != "DELETE-DATA" ]; then
+            echo "::error::remove_data is set but confirm_data is '${CONFIRM_DATA}', expected DELETE-DATA."
+            exit 1
+          fi
+
+          echo "PLAYBOOK=$PLAYBOOK" >> "$GITHUB_ENV"
+          echo "Gate passed: $MODE on $SERVICE"
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --quiet ansible
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      # Every dispatch input crosses into the shell through env, never through
+      # ${{ }} interpolated into the command line: an interpolated string input
+      # is a script-injection hole, and any value with a space would also split
+      # the --extra-vars pair in half.
+      - name: Run the decommission playbook
+        env:
+          SERVICE: ${{ inputs.service }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM_DATA: ${{ inputs.confirm_data }}
+          PHASE_ALERTS: ${{ inputs.phase_alerts }}
+          PHASE_SERVICES: ${{ inputs.phase_services }}
+          PHASE_FILES: ${{ inputs.phase_files }}
+          REMOVE_DATA: ${{ inputs.remove_data }}
+          REMOVE_IMAGE: ${{ inputs.remove_image }}
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # The confirm token is what arms the role. In report mode we pass an
+          # empty one, so every phase prints its plan and changes nothing.
+          CONFIRM_VAR=""
+          if [ "$MODE" = "apply" ]; then
+            CONFIRM_VAR="$SERVICE"
+          fi
+
+          ansible-playbook \
+            -i inventories/production/hosts.ini \
+            --vault-password-file=/tmp/.vault_pass \
+            "$PLAYBOOK" \
+            --extra-vars "decom_confirm=$CONFIRM_VAR" \
+            --extra-vars "decom_confirm_data=$CONFIRM_DATA" \
+            --extra-vars "decom_phase_alerts=$PHASE_ALERTS" \
+            --extra-vars "decom_phase_services=$PHASE_SERVICES" \
+            --extra-vars "decom_phase_files=$PHASE_FILES" \
+            --extra-vars "decom_remove_data=$REMOVE_DATA" \
+            --extra-vars "decom_remove_image=$REMOVE_IMAGE"
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      # Only a real, complete, successful teardown retires the playbook. A report
+      # run, a partial run (any phase skipped), or a failure all leave it in place
+      # so it can be finished later.
+      - name: Archive the playbook
+        id: archive
+        if: >-
+          success() &&
+          inputs.mode == 'apply' &&
+          inputs.archive &&
+          inputs.phase_alerts && inputs.phase_services && inputs.phase_files
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: |
+          set -euo pipefail
+          SRC="playbooks/operations/decommission/${SERVICE}.yaml"
+          DEST="playbooks/archive/$(date -u +%Y-%m-%d)-${SERVICE}.yaml"
+
+          git config user.name "homelab-ci"
+          git config user.email "ci@homelab.local"
+          git mv "$SRC" "$DEST"
+
+          # [skip ci] keeps this push from triggering main-apply. The move is a
+          # playbooks/** change and would otherwise match its path filter.
+          git commit -q -m "chore(archive): retire ${SERVICE} decommission playbook [skip ci]" \
+                        -m "Ran to completion via the Decommission Service workflow (run ${GITHUB_RUN_ID}). Receipt on the target host under /data01/decommissioned/."
+
+          # Another merge can land between checkout and push; rebase and retry.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:master; then
+              echo "archived=true" >> "$GITHUB_OUTPUT"
+              echo "Archived $SRC -> $DEST"
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt), rebasing"
+            git fetch origin master
+            git rebase origin/master || { git rebase --abort; true; }
+          done
+
+          echo "::error::Teardown SUCCEEDED but the archive push failed (branch protection on master?)."
+          echo "::error::Move it by hand: git mv $SRC $DEST"
+          exit 1
+
+      - name: Summary
+        if: always()
+        env:
+          SERVICE: ${{ inputs.service }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          {
+            echo "## Decommission: ${SERVICE}"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| mode | \`${MODE}\` |"
+            echo "| phases | alerts=${{ inputs.phase_alerts }}, services=${{ inputs.phase_services }}, files=${{ inputs.phase_files }} |"
+            echo "| remove data | ${{ inputs.remove_data }} |"
+            echo "| remove image | ${{ inputs.remove_image }} |"
+            echo "| archived | ${{ steps.archive.outputs.archived || 'no' }} |"
+            echo ""
+            if [ "${MODE}" = "report" ]; then
+              echo "Report only, nothing was changed. Re-run with mode=apply and confirm=\`${SERVICE}\` to tear down."
+            else
+              echo "Receipt on the target host: \`/data01/decommissioned/${SERVICE}-<stamp>.json\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

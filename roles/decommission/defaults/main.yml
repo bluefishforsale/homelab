@@ -1,0 +1,37 @@
+---
+# Shared decommission role. See roles/decommission/README.md and
+# docs/operations/decommission.md.
+#
+# SAFETY MODEL: report-only unless armed. Nothing destructive runs until
+# decom_confirm exactly equals decom_service. The gate is an explicit variable,
+# never `ansible --check`: a command task with check_mode:false executes under
+# --check, so --check is not a safety boundary here (same reasoning as
+# playbooks/operations/backup/db_restore.yaml).
+
+# --- identity (set by the per-service playbook) --------------------------
+decom_service: ""            # required, e.g. "ra_mirror"
+decom_reason: ""             # required, why this is being torn down
+decom_unit: ""               # systemd unit, e.g. "ra_mirror.service" ("" to skip)
+decom_container: ""          # container name ("" to skip)
+decom_compose_dir: ""        # dir holding the generated compose file (treated as CONFIG)
+decom_config_paths: []       # extra config/unit paths to remove
+decom_data_paths: []         # DATA. Only touched when decom_remove_data is armed.
+decom_image: ""              # image to remove when decom_remove_image is set
+
+# --- confirmation --------------------------------------------------------
+decom_confirm: ""            # must equal decom_service to arm anything
+decom_confirm_data: ""       # must equal "DELETE-DATA" to arm data removal
+
+# --- phase toggles (alerts -> services -> files) -------------------------
+decom_phase_alerts: true
+decom_phase_services: true
+decom_phase_files: true
+decom_remove_data: false     # opt-in, and still needs decom_confirm_data
+decom_remove_image: false
+
+# --- knobs ---------------------------------------------------------------
+decom_alertmanager: "http://192.168.1.143:9093"
+decom_silence_hours: 72
+decom_alert_matchers: []     # default built in alerts.yml from unit + host
+decom_archive_dir: "/data01/decommissioned"
+decom_stop_timeout: 60

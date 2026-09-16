@@ -83,6 +83,14 @@ emit() {
   #   - github_docker_runners: main-apply runs ON these runners, so a push-deploy
   #     would recreate the very runner executing the job (it kills itself
   #     mid-apply). Self-referential infra is hand-applied on the homelab network.
+  #   - operations/decommission/**: one-time teardowns. These DESTROY a service
+  #     (stop the unit, remove the container, delete its files). Auto-applying one
+  #     on push would mean merging the playbook is what tears the service down,
+  #     with no confirmation and no report step. They run only via the
+  #     Decommission Service workflow, which gates on a typed confirmation.
+  #   - archive/**: already-run one-time playbooks, kept as a record. Re-running
+  #     one is never what a push meant, and a files/ or roles/ change must not be
+  #     able to reverse-map into a teardown that already happened.
   #   - deprecated/**: kept for reference, not for running. Nothing maintains
   #     them, so they rot: dns02_standalone.yaml includes tasks/dpkg_lock.yaml
   #     at a path that no longer resolves. On 2026-09-09 a one-line healthcheck
@@ -94,6 +102,8 @@ emit() {
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
     playbooks/operations/backup/*) return 0 ;;
     playbooks/individual/infrastructure/github_docker_runners.yaml) return 0 ;;
+    playbooks/operations/decommission/*) return 0 ;;
+    playbooks/archive/*) return 0 ;;
     playbooks/deprecated/*) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
