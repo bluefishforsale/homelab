@@ -7,7 +7,10 @@ Wants=network-online.target
 Type=oneshot
 User={{ user }}
 Environment=HOME=/home/{{ user }}
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# ~/.local/bin is on PATH because uv tools land there: tvly for the
+# tavily-search skill, and whatever a skill installs for itself at runtime
+# (graphify does its own `uv tool install` on first use).
+Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
 WorkingDirectory={{ home }}
 ExecStart=/usr/local/bin/agentbox-roadmap-reconcile.sh
