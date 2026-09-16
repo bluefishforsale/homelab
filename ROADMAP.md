@@ -51,6 +51,21 @@ Status and future plans for the homelab infrastructure.
 - **dns02_vm**: Deployed service
 - **gcloud_sdk**: Deployed service
 - **pki_tools**: Deployed service
+- **authorized_keys**: Deployed service
+- **gpu_power**: Deployed service
+- **io_cpu_ups**: Deployed service
+- **logging**: Deployed service
+- **mask_deprecated_units**: Deployed service
+- **packages**: Deployed service
+- **ramdisk**: Deployed service
+- **tz_sysctl_udev**: Deployed service
+- **unattended_upgrade**: Deployed service
+- **users**: Deployed service
+- **ethtool**: Deployed service
+- **qdisc**: Deployed service
+- **nvidia_containerd**: Deployed service
+- **proxmox_repos**: Deployed service
+- **update_github_token_in_vault**: Deployed service
 
 ### Media Stack
 
