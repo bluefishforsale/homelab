@@ -1,0 +1,121 @@
+---
+# Give every fleet host both resolvers, so losing one DNS server is a
+# degradation instead of a fleet-wide outage.
+#
+# dns01 and dns02 are a redundant pair, but until this play only the two DNS
+# servers themselves listed a second resolver (roles/dns_infrastructure/tasks/
+# common.yaml writes the peer plus 1.1.1.1). Every other host named
+# 192.168.1.2 alone, so dns01 going down took name resolution out everywhere
+# while a healthy dns02 sat idle. dns_ha_stack.yaml's own comment already names
+# the consequence: "gh-runner-01 resolves via 192.168.1.2 only, so the runner
+# mid-deploy loses DNS and cannot finish, or roll back, the thing that broke
+# it." That is the hole this closes.
+#
+# Clients only. It never touches the DNS servers and never restarts a resolver,
+# so the worst case is one host reconfiguring its own resolver list, which the
+# gate below checks before the play moves on to the next host.
+#
+# Two host shapes, because the fleet has two:
+#   - cloud-init netplan (ocean, pihole, agentbox, gh-runner-01,
+#     registry-cache-01): a 99- drop-in wins over 50-cloud-init.yaml by
+#     filename order, and survives cloud-init regenerating that file on boot.
+#   - hand-written /etc/resolv.conf (node005, node006): write it directly.
+#
+# NOTE: the VM creation playbooks still pass a single `--nameserver
+# 192.168.1.2` to cloud-init (create_agentbox_vm.yaml, create_runner_vm.yaml,
+# create_registry_cache_vm.yaml), so a rebuilt VM comes back with one resolver
+# until this play runs against it again. Fixing that default is deliberately
+# not bundled here: those playbooks create VMs, and editing one puts it in the
+# auto-apply set.
+#
+# Usage:
+#   ansible-playbook -i inventories/production/hosts.ini \
+#     playbooks/individual/base/fleet_resolvers.yaml
+
+- name: Give every host both resolvers
+  hosts: all:!dns_servers
+  become: true
+  gather_facts: true
+  # NOTE: serial plus any_errors_fatal is what makes this safe to run against
+  # the whole fleet. Without it, a drop-in that resolves to an unreachable
+  # server would be applied everywhere before anyone noticed. The gate is the
+  # protective part; serial only decides how far the damage gets.
+  serial: 1
+  any_errors_fatal: true
+
+  vars:
+    fleet_resolvers:
+      - 192.168.1.2
+      - 192.168.1.3
+    fleet_search_domain: home
+
+  tasks:
+    - name: Check whether this host is netplan-managed
+      ansible.builtin.stat:
+        path: /etc/netplan
+      register: netplan_dir
+
+    - name: Add the second resolver via a netplan drop-in
+      ansible.builtin.copy:
+        dest: /etc/netplan/99-homelab-dns.yaml
+        # 0600: netplan warns loudly about world-readable config and ignores
+        # some of it.
+        mode: '0600'
+        content: |
+          # Managed by playbooks/individual/base/fleet_resolvers.yaml.
+          # Overrides the single nameserver cloud-init writes into
+          # 50-cloud-init.yaml, which it regenerates on every boot.
+          network:
+            version: 2
+            ethernets:
+              {{ ansible_default_ipv4.interface }}:
+                nameservers:
+                  addresses: [{{ fleet_resolvers | join(', ') }}]
+                  search: [{{ fleet_search_domain }}]
+      when: netplan_dir.stat.isdir | default(false)
+      register: netplan_dropin
+
+    - name: Apply the netplan drop-in
+      ansible.builtin.command: netplan apply
+      when: netplan_dropin.changed
+      changed_when: true
+
+    - name: Write both resolvers into resolv.conf directly
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        mode: '0644'
+        content: |
+          # Managed by playbooks/individual/base/fleet_resolvers.yaml.
+          {% for r in fleet_resolvers %}
+          nameserver {{ r }}
+          {% endfor %}
+          search {{ fleet_search_domain }}
+          # glibc waits 5s per server by default, so a dead first resolver
+          # still reads as an outage to anything with a timeout of its own.
+          options timeout:1 attempts:2
+      when: not (netplan_dir.stat.isdir | default(false))
+
+    # Gate: prove the host both knows about the second resolver and can still
+    # resolve, before serial moves on. A host that comes back unable to answer
+    # stops the play here rather than taking the next one with it.
+    - name: Gate - both resolvers configured and resolution still works
+      ansible.builtin.shell: |
+        set -eu
+        ns=$(resolvectl status 2>/dev/null | sed -n 's/.*DNS Servers: //p' | tr '\n' ' ')
+        [ -n "$ns" ] || ns=$(awk '/^nameserver/{printf "%s ", $2}' /etc/resolv.conf)
+        for want in {{ fleet_resolvers | join(' ') }}; do
+          case " $ns " in
+            *" $want "*) ;;
+            *) echo "resolver $want missing (have: $ns)"; exit 1 ;;
+          esac
+        done
+        getent hosts ocean.home >/dev/null || { echo "cannot resolve ocean.home"; exit 1; }
+        echo "resolvers: $ns"
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: resolver_gate
+
+    - name: Report the resolvers now in effect
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ resolver_gate.stdout }}"
