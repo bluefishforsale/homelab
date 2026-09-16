@@ -146,7 +146,12 @@ deploy races, and resource hijacking.
 6. **CI-mediated vs manual.** Ordinary ocean services deploy via CI/dispatch.
    Self-referential infra (the GitHub Actions runners themselves) and anything
    that would kill the job mid-run are applied **manually on the homelab network,
-   never via CI** — a runner cannot redeploy itself.
+   never via CI** — a runner cannot redeploy itself. "Manually on the homelab
+   network" means from **agentbox**, not the laptop; before a mutating run,
+   confirm no deploy is in flight, because running outside CI means running
+   outside the `deploy-ocean` concurrency group that would otherwise serialize
+   you. Non-mutating runs (`--check`, `--syntax-check`, report-mode plays) need
+   no such ceremony and are the expected way to verify a play from agentbox.
 
 7. **Propose → review → merge → deploy → verify.** Agents propose via PR; merge
    per the authority rule below; the owning agent then deploys and reports
