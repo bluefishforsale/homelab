@@ -1,0 +1,22 @@
+# Fleet SSH config for the agent lanes. Rendered by
+# playbooks/individual/agentbox/agentbox.yaml from the production inventory, so
+# a host added there is reachable here on the next deploy. Do not edit on the box.
+
+Host *
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+    # Deliberate TOFU on a private LAN, into a file this playbook owns: the
+    # box's pre-existing known_hosts predates a host rebuild and now mismatches,
+    # which accept-new alone cannot recover from. Scoped to a fresh file rather
+    # than deleting the old one.
+    UserKnownHostsFile ~/.ssh/known_hosts_fleet
+    StrictHostKeyChecking accept-new
+
+{% for h in groups['all'] | unique | sort if h != inventory_hostname %}
+
+Host {{ h }} {{ h }}.home
+    HostName {{ hostvars[h].ansible_ssh_host | default(h) }}
+    User {{ hostvars[h].ansible_user | default('debian') }}
+{% endfor %}
