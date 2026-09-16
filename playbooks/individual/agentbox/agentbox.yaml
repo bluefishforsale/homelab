@@ -11,6 +11,10 @@
 #   gcloud auth login      # only if not using a vaulted service-account key
 #   for r in homelab photonic_inventory my-ta-jose; do \
 #     gh repo clone bluefishforsale/$r repos/$r; done   # rc-repo clones
+#   # Fleet SSH: the playbook generates ~/.ssh/id_ed25519 and prints the pubkey.
+#   # Paste it into https://github.com/settings/keys once; every host re-pulls
+#   # https://github.com/bluefishforsale.keys every 5 minutes. Delete it there
+#   # to revoke fleet-wide.
 #   sudo systemctl start agentbox-rc@homelab.service     # ...per rc repo, after /login
 #
 # Structure mirrors playbooks/individual/ocean/ai/paia.yaml.
@@ -256,6 +260,36 @@
       GH_TOKEN: "{{ (agentbox | default({})).github_pat | default('') }}"
     changed_when: false
 
+  # --- Fleet SSH (remediation from a phone-driven RC session) ---
+  # Every fleet host pulls authorized_keys from https://github.com/<user>.keys
+  # and re-pulls every 5 minutes (playbooks/individual/base/authorized_keys.yaml),
+  # so this key is granted and revoked THERE, not by a fleet-wide apply.
+  # NOTE: adding the pubkey to that account grants shell on every host in the
+  # inventory. Deleting it from GitHub removes that within 5 minutes.
+  - name: Generate the agentbox fleet SSH key
+    ansible.builtin.user:
+      name: "{{ user }}"
+      generate_ssh_key: true
+      ssh_key_type: ed25519
+      ssh_key_file: .ssh/id_ed25519
+      ssh_key_comment: "agentbox@{{ ansible_hostname }}"
+    register: agentbox_ssh_key
+
+  - name: Render the fleet ssh_config
+    ansible.builtin.template:
+      src: "{{ files }}/ssh_config.j2"
+      dest: "{{ home }}/.ssh/config"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+
+  - name: Show the pubkey to authorize (first run only)
+    ansible.builtin.debug:
+      msg: >-
+        Add to https://github.com/settings/keys, then the fleet accepts it
+        within 5 minutes: {{ agentbox_ssh_key.ssh_public_key }}
+    when: agentbox_ssh_key.ssh_public_key is defined
+
   # --- Config + secrets ---
   - name: Render opencode config
     ansible.builtin.template:
@@ -282,6 +316,30 @@
       group: "{{ user }}"
       mode: '0600'
     when: (agentbox | default({})).gcloud_sa_json | default('') | length > 0
+
+  # Shipping a homelab fix from a phone session means reading vault-encrypted
+  # vars and running `make validate`, both of which need this file. main-apply
+  # already has the password in the apply step's environment, so this introduces
+  # no new secret location: the password is never written into the repo or the
+  # vault. Any other entry point (workflow_dispatch of a different workflow, a
+  # laptop run) leaves the file untouched rather than writing an empty one.
+  - name: Install the vault password file for the agent lanes
+    ansible.builtin.copy:
+      content: "{{ lookup('env', 'ANSIBLE_VAULT_PASSWORD') }}\n"
+      dest: "{{ home }}/.ansible_vault_pass"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0600'
+    no_log: true
+    when: lookup('env', 'ANSIBLE_VAULT_PASSWORD') | length > 0
+
+  - name: Say why the vault password file was skipped
+    ansible.builtin.debug:
+      msg: >-
+        ANSIBLE_VAULT_PASSWORD is not in this run's environment, so
+        {{ home }}/.ansible_vault_pass was left as-is. Deploy via main-apply
+        (push to master) to install or rotate it.
+    when: lookup('env', 'ANSIBLE_VAULT_PASSWORD') | length == 0
 
   - name: Render OpenTelemetry Collector config
     ansible.builtin.template:
