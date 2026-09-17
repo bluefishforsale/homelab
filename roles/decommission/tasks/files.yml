@@ -38,6 +38,12 @@
       removal, or narrow decom_compose_dir/decom_config_paths.
   loop: "{{ _decom_config_all }}"
   when:
+    # _decom_armed, not just the data token: report mode removes nothing, so
+    # refusing there makes `mode=report` unusable for exactly the services worth
+    # reviewing before a teardown. globalview-stack hit that on 2026-09-17, its
+    # report failing on a plan that was correct. The guard protects the delete,
+    # so it belongs on the delete.
+    - _decom_armed
     - decom_data_paths | length > 0
     - not _decom_data_armed
 
