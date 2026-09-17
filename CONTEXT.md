@@ -13,8 +13,22 @@ inventory under `inventories/production/`, rendered config templates under
 `vault/secrets.yaml`, ansible-vault encrypted, decrypted with the password file
 at `~/.ansible_vault_pass`.
 
-The laptop is dev/test only. **Never run `ansible-playbook` locally.** Changes
-reach hosts through CI and a self-hosted runner inside the homelab network.
+Changes reach hosts through CI and a self-hosted runner inside the homelab
+network. Where you run `ansible-playbook` from decides what you may run:
+
+- **The laptop is dev/test only. Never run `ansible-playbook` there.** It sits
+  outside the homelab network, so an apply from it is untracked, unrepeatable,
+  and invisible to everyone else.
+- **agentbox may run it.** Being inside the homelab network is the point of
+  agentbox existing. Non-mutating invocations are always fine there:
+  `--syntax-check`, `--list-tasks`, `--list-hosts`, `--check`, and report-mode
+  plays that gate their own destructive steps behind an explicit variable (a
+  decommission dry run, `db_restore.yaml` without `restore_confirm`).
+- **Mutating applies to shared hosts still go through CI**, from either machine.
+  Not bureaucracy: the `deploy-ocean` concurrency group is the only thing
+  serializing deploys, and a direct apply bypasses it and can race a running one.
+  The exception is self-referential infra CI cannot apply, which is item 6 of the
+  coordination rules in [agents.md](agents.md). agentbox is where those run.
 
 ## Topology
 
