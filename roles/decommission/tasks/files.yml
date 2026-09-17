@@ -1,0 +1,109 @@
+---
+# Files come last, and split in two: CONFIG is removed whenever the run is
+# armed, DATA needs its own second token. Config is regenerable from the repo;
+# data is not, so they do not deserve the same gate.
+
+- name: Collect the config paths
+  ansible.builtin.set_fact:
+    _decom_config_all: "{{ (([decom_compose_dir] if decom_compose_dir | length > 0 else []) + decom_config_paths) | unique }}"
+
+- name: Refuse a config path that is not clearly ours
+  ansible.builtin.assert:
+    that:
+      - item is match('^/(data01/services|etc|opt|srv)/.+')
+      - item | regex_replace('/+$', '') | length > 12
+    fail_msg: >-
+      Refusing to remove '{{ item }}': a decommission only deletes paths under
+      /data01/services, /etc, /opt or /srv, and never a short top-level path.
+  loop: "{{ _decom_config_all }}"
+
+- name: Report the config removal
+  ansible.builtin.debug:
+    msg: "REPORT-ONLY: would remove config paths {{ _decom_config_all }}"
+  when:
+    - not _decom_armed
+    - _decom_config_all | length > 0
+
+- name: Remove the config paths
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _decom_config_all }}"
+  when: _decom_armed
+
+# ---------------------------------------------------------------- data ----
+# /data01 is a ZFS pool and the repo's storage invariant is that no committed
+# playbook mutates ZFS. Deleting files inside a dataset is not a zfs operation,
+# but deleting a dataset MOUNTPOINT is a different and much worse mistake, so
+# refuse it outright. `zfs list` is a read and is allowed.
+- name: List the ZFS dataset mountpoints
+  ansible.builtin.command: "zfs list -H -o mountpoint"
+  register: _decom_zfs_mounts
+  changed_when: false
+  failed_when: false
+  when: decom_data_paths | length > 0
+
+- name: Refuse to delete a ZFS dataset mountpoint
+  ansible.builtin.assert:
+    that: (item | regex_replace('/+$', '')) not in (_decom_zfs_mounts.stdout_lines | default([]) | map('regex_replace', '/+$', '') | list)
+    fail_msg: >-
+      '{{ item }}' is a ZFS dataset mountpoint. Removing a dataset is a
+      coordinated, hand-run, snapshot-first task, never a decommission side
+      effect. Remove the contents by hand or narrow decom_data_paths.
+  loop: "{{ decom_data_paths }}"
+
+- name: Report the data handling
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'REPORT-ONLY: would archive then remove' if not _decom_armed else 'NOT ARMED for data: leaving in place' }}
+      data paths {{ decom_data_paths }}
+  when:
+    - decom_data_paths | length > 0
+    - not _decom_data_armed
+
+- name: Ensure the decommission archive directory exists
+  ansible.builtin.file:
+    path: "{{ decom_archive_dir }}"
+    state: directory
+    mode: '0750'
+  when: _decom_data_armed
+
+- name: Archive the data before removing it
+  ansible.builtin.command:
+    cmd: "tar czf {{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.tgz {{ decom_data_paths | map('quote') | join(' ') }}"
+  register: _decom_tar
+  changed_when: _decom_tar.rc == 0
+  when: _decom_data_armed
+
+# A tarball that exists but is empty or truncated is worse than no tarball,
+# because it reads as a successful backup. Count the members before deleting.
+- name: Verify the archive lists its members
+  ansible.builtin.command: "tar tzf {{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.tgz"
+  register: _decom_tar_verify
+  changed_when: false
+  when: _decom_data_armed
+
+- name: Refuse to delete data behind an unverifiable archive
+  ansible.builtin.assert:
+    that:
+      - _decom_tar_verify.rc == 0
+      - _decom_tar_verify.stdout_lines | length > 0
+    fail_msg: >-
+      {{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.tgz did not
+      verify, so the data has NOT been removed. Investigate before retrying.
+  when: _decom_data_armed
+
+- name: Remove the data paths
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ decom_data_paths }}"
+  when: _decom_data_armed
+
+- name: Record where the data went
+  ansible.builtin.debug:
+    msg: >-
+      Data archived to {{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.tgz
+      ({{ _decom_tar_verify.stdout_lines | length }} members) and removed. Delete the
+      tarball by hand once you are satisfied.
+  when: _decom_data_armed

@@ -1,0 +1,83 @@
+---
+# A decommission that reports success without checking is how orphans survive.
+# Re-read the live state and fail if anything we claimed to remove is still here.
+
+- name: Re-check the unit
+  ansible.builtin.command: "systemctl is-active {{ decom_unit }}"
+  register: _decom_unit_after
+  changed_when: false
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_unit | length > 0
+
+- name: Re-check the container
+  ansible.builtin.command: "docker ps -a --filter name=^/{{ decom_container }}$ --quiet"
+  register: _decom_container_after
+  changed_when: false
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_container | length > 0
+
+- name: Re-check the config paths
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: _decom_config_after
+  loop: "{{ _decom_config_all | default([]) }}"
+  when: _decom_armed
+
+- name: Fail if the service survived the teardown
+  ansible.builtin.assert:
+    that:
+      - decom_unit | length == 0 or _decom_unit_after.stdout | default('inactive') != 'active'
+      - decom_container | length == 0 or (_decom_container_after.stdout | default('') | trim) == ''
+      - (_decom_config_after.results | default([]) | selectattr('stat.exists') | list | length) == 0
+    fail_msg: >-
+      Decommission incomplete. unit_active={{ _decom_unit_after.stdout | default('n/a') }},
+      container={{ _decom_container_after.stdout | default('') | trim | default('gone', true) }},
+      surviving paths={{ _decom_config_after.results | default([]) | selectattr('stat.exists') | map(attribute='item') | list }}
+  when:
+    - _decom_armed
+    - decom_phase_services | bool
+    - decom_phase_files | bool
+
+- name: Write the receipt
+  ansible.builtin.copy:
+    dest: "{{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.json"
+    mode: '0640'
+    content: |
+      {
+        "service": "{{ decom_service }}",
+        "host": "{{ inventory_hostname }}",
+        "reason": {{ decom_reason | to_json }},
+        "completed_at": "{{ _decom_stamp }}",
+        "phases": {
+          "alerts": {{ decom_phase_alerts | bool | to_json }},
+          "services": {{ decom_phase_services | bool | to_json }},
+          "files": {{ decom_phase_files | bool | to_json }}
+        },
+        "unit": "{{ decom_unit }}",
+        "container": "{{ decom_container }}",
+        "config_paths_removed": {{ _decom_config_all | default([]) | to_json }},
+        "data_paths_removed": {{ (decom_data_paths if _decom_data_armed else []) | to_json }},
+        "data_archive": "{{ (decom_archive_dir ~ '/' ~ decom_service ~ '-' ~ _decom_stamp ~ '.tgz') if _decom_data_armed else '' }}",
+        "image_removed": "{{ decom_image if (decom_remove_image | bool and _decom_armed) else '' }}"
+      }
+  when: _decom_armed
+
+- name: Summarise
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      {{ decom_service }}: {{ 'DECOMMISSIONED' if _decom_armed else 'REPORT-ONLY, nothing changed' }}
+      ============================================================
+      {% if _decom_armed %}
+      receipt : {{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.json
+      data    : {{ ('archived to ' ~ decom_archive_dir ~ '/' ~ decom_service ~ '-' ~ _decom_stamp ~ '.tgz, then removed') if _decom_data_armed else 'left in place' }}
+      next    : remove the service definition from the repo if that has not merged yet,
+                and let the CI job archive this playbook.
+      {% else %}
+      Re-run with decom_confirm={{ decom_service }} to actually tear this down.
+      {% endif %}
+      ============================================================

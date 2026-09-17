@@ -1,0 +1,79 @@
+---
+- name: Require an identity
+  ansible.builtin.assert:
+    that:
+      - decom_service | length > 0
+      - decom_reason | length > 0
+    fail_msg: "decom_service and decom_reason are required. Copy playbooks/operations/decommission/_TEMPLATE.yaml."
+
+- name: Reject a confirmation that does not match the service
+  ansible.builtin.assert:
+    that: decom_confirm | length == 0 or decom_confirm == decom_service
+    fail_msg: >-
+      decom_confirm is '{{ decom_confirm }}' but this playbook decommissions
+      '{{ decom_service }}'. Refusing to run: a mismatched confirmation almost
+      always means the wrong playbook was dispatched.
+
+- name: Arm or stay in report-only
+  ansible.builtin.set_fact:
+    _decom_armed: "{{ decom_confirm == decom_service }}"
+    _decom_stamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+
+- name: Arm data removal only with its own second token
+  ansible.builtin.set_fact:
+    _decom_data_armed: "{{ _decom_armed and (decom_remove_data | bool) and decom_confirm_data == 'DELETE-DATA' }}"
+
+- name: Explain a refused data removal
+  ansible.builtin.debug:
+    msg: >-
+      Data removal requested but NOT armed: decom_confirm_data is
+      '{{ decom_confirm_data }}', expected 'DELETE-DATA'. Data paths will be left alone.
+  when:
+    - _decom_armed
+    - decom_remove_data | bool
+    - not _decom_data_armed
+
+- name: Look up the unit state
+  ansible.builtin.command: "systemctl is-active {{ decom_unit }}"
+  register: _decom_unit_active
+  changed_when: false
+  failed_when: false
+  when: decom_unit | length > 0
+
+- name: Look up whether the unit is enabled
+  ansible.builtin.command: "systemctl is-enabled {{ decom_unit }}"
+  register: _decom_unit_enabled
+  changed_when: false
+  failed_when: false
+  when: decom_unit | length > 0
+
+- name: Look up the container
+  ansible.builtin.command: "docker ps -a --filter name=^/{{ decom_container }}$ --format {{ '{{.Names}} {{.Status}} {{.Image}}' | quote }}"
+  register: _decom_container_state
+  changed_when: false
+  failed_when: false
+  when: decom_container | length > 0
+
+- name: Measure every path this run could touch
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: _decom_path_stat
+  loop: "{{ (decom_config_paths + decom_data_paths + ([decom_compose_dir] if decom_compose_dir | length > 0 else [])) | unique }}"
+
+- name: Show the plan
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      DECOMMISSION {{ decom_service }} on {{ inventory_hostname }}
+      {{ 'ARMED - THIS RUN DESTROYS' if _decom_armed else 'REPORT-ONLY - nothing will be changed' }}
+      ============================================================
+      reason        : {{ decom_reason }}
+      phases        : alerts={{ decom_phase_alerts }} services={{ decom_phase_services }} files={{ decom_phase_files }}
+      unit          : {{ decom_unit | default('-', true) }} (active={{ _decom_unit_active.stdout | default('n/a') }}, enabled={{ _decom_unit_enabled.stdout | default('n/a') }})
+      container     : {{ _decom_container_state.stdout | default('n/a') | trim | default('absent', true) }}
+      image removal : {{ decom_remove_image }}
+      config paths  : {{ ([decom_compose_dir] if decom_compose_dir | length > 0 else []) + decom_config_paths }}
+      data paths    : {{ decom_data_paths }}
+      data removal  : {{ 'ARMED (tar, verify, delete)' if _decom_data_armed else 'not armed - data left in place' }}
+      existing paths: {{ _decom_path_stat.results | selectattr('stat.exists') | map(attribute='item') | list }}
+      ============================================================

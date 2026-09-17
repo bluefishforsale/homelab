@@ -225,6 +225,27 @@ out=$(printf 'files/dns-stack/docker-compose.yml.j2\n' | bash "$SCRIPT")
 assert_eq "files/ reverse-mapping skips deprecated playbooks" \
   '["playbooks/individual/core/services/dns_ha_stack.yaml"]' "$out"
 
+# 35. A decommission playbook DESTROYS a service. If merging one auto-applied it,
+#     the merge itself would be the teardown: no report step, no typed
+#     confirmation, no chance to run alerts-only first. It must map to nothing and
+#     only ever run via the Decommission Service workflow.
+out=$(printf 'playbooks/operations/decommission/ra_mirror.yaml\n' | bash "$SCRIPT")
+assert_eq "decommission playbook never auto-applies" "[]" "$out"
+
+# 36. Same for the template, which is not a runnable play at all.
+out=$(printf 'playbooks/operations/decommission/_TEMPLATE.yaml\n' | bash "$SCRIPT")
+assert_eq "decommission template never auto-applies" "[]" "$out"
+
+# 37. An archived playbook already ran. Re-running it is never what a push meant.
+out=$(printf 'playbooks/archive/2026-09-16-ra_mirror.yaml\n' | bash "$SCRIPT")
+assert_eq "archived playbook never auto-applies" "[]" "$out"
+
+# 38. The decommission role is shared by every teardown play, and all of those are
+#     never-auto-apply. So editing the role must deploy nothing rather than
+#     fanning out into a teardown of every service that ever had one.
+out=$(printf 'roles/decommission/tasks/services.yml\n' | bash "$SCRIPT")
+assert_eq "decommission role edit deploys nothing" "[]" "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

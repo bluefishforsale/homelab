@@ -1,0 +1,33 @@
+---
+# One-time teardown of ra_mirror, the static nginx mirror of
+# radiantatmospheres.com that ran on ocean:8099.
+#
+# radiantatmospheres.com now serves a full styled site from Cloudflare Pages, so
+# the mirror is dead weight. Its repo definition (playbook, files/, and the
+# deploy-ra-mirror workflow) is removed in PR #445; that removal maps to no
+# playbook, so merging it does NOT stop the running container. This play is what
+# actually stops it.
+#
+# No data paths: /data01/services/ra_mirror holds only the generated
+# docker-compose.yml (9.5K measured 2026-09-16). The site content was baked into
+# the image, so there is nothing to archive.
+#
+# Dispatch via the Decommission Service workflow. Never auto-applies on push.
+- name: Decommission ra_mirror
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars:
+    decom_service: ra_mirror
+    decom_reason: "Superseded by the Cloudflare Pages build of radiantatmospheres.com"
+
+    decom_unit: ra_mirror.service
+    decom_container: ra_mirror
+    decom_compose_dir: /data01/services/ra_mirror
+    decom_config_paths: []
+    decom_data_paths: []
+    decom_image: "ghcr.io/bluefishforsale/ra_mirror:latest"
+
+  roles:
+    - decommission

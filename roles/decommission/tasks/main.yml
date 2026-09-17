@@ -1,0 +1,25 @@
+---
+# Order is fixed and deliberate: alerts, then services, then files.
+# Silencing first means the teardown itself never pages. Removing the service
+# before its files means the unit's ExecStop (docker compose down) still has a
+# compose file to read.
+- name: Preflight - validate, arm, and record what is about to happen
+  ansible.builtin.include_tasks: preflight.yml
+
+- name: "Phase 1/3 - alerts"
+  ansible.builtin.include_tasks: alerts.yml
+  when: decom_phase_alerts | bool
+  tags: [decom_alerts]
+
+- name: "Phase 2/3 - services"
+  ansible.builtin.include_tasks: services.yml
+  when: decom_phase_services | bool
+  tags: [decom_services]
+
+- name: "Phase 3/3 - files"
+  ansible.builtin.include_tasks: files.yml
+  when: decom_phase_files | bool
+  tags: [decom_files]
+
+- name: Postflight - verify and write the receipt
+  ansible.builtin.include_tasks: postflight.yml

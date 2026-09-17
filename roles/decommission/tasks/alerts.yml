@@ -1,0 +1,65 @@
+---
+# Alerts go first so the teardown itself never pages. Stopping a unit and
+# deleting its container is exactly the shape of a real outage, and an operator
+# who gets paged by their own planned decommission learns to ignore the pager.
+#
+# The silence is time-boxed (decom_silence_hours) rather than permanent: if the
+# teardown is abandoned half-done, the alerts come back on their own instead of
+# being hidden forever. `systemctl reset-failed` in phase 2 is what actually
+# clears the underlying SystemdUnitFailed.
+
+- name: Build the default silence matchers
+  ansible.builtin.set_fact:
+    _decom_matchers: >-
+      {{ decom_alert_matchers if decom_alert_matchers | length > 0 else
+         [
+           {'name': 'instance', 'value': '^' ~ inventory_hostname ~ '(\..*)?$', 'isRegex': true, 'isEqual': true},
+           {'name': 'name', 'value': '^(' ~ ([decom_unit, decom_container] | select | join('|')) ~ ')$', 'isRegex': true, 'isEqual': true}
+         ] }}
+  when: (decom_unit | length > 0) or (decom_container | length > 0) or (decom_alert_matchers | length > 0)
+
+- name: Skip silencing when there is nothing to match on
+  ansible.builtin.debug:
+    msg: "No unit, container, or explicit decom_alert_matchers, so there is nothing to silence. Skipping phase 1."
+  when: _decom_matchers is not defined
+
+- name: Compute the silence window
+  ansible.builtin.set_fact:
+    _decom_silence_start: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%S.000Z') }}"
+    _decom_silence_end: "{{ lookup('pipe', 'date -u -d \"+' ~ decom_silence_hours ~ ' hours\" +%Y-%m-%dT%H:%M:%S.000Z') }}"
+  when: _decom_matchers is defined
+
+- name: Report the silence that would be created
+  ansible.builtin.debug:
+    msg: "REPORT-ONLY: would silence {{ _decom_matchers }} until {{ _decom_silence_end }}"
+  when:
+    - _decom_matchers is defined
+    - not _decom_armed
+
+- name: Silence the service's alerts
+  ansible.builtin.uri:
+    url: "{{ decom_alertmanager }}/api/v2/silences"
+    method: POST
+    body_format: json
+    body:
+      matchers: "{{ _decom_matchers }}"
+      startsAt: "{{ _decom_silence_start }}"
+      endsAt: "{{ _decom_silence_end }}"
+      createdBy: "decommission role ({{ decom_service }})"
+      comment: "Decommissioning {{ decom_service }}: {{ decom_reason }}"
+    status_code: [200, 201]
+    timeout: 15
+  register: _decom_silence
+  when:
+    - _decom_matchers is defined
+    - _decom_armed
+
+- name: Record the silence id
+  ansible.builtin.debug:
+    msg: >-
+      Silenced {{ decom_service }} until {{ _decom_silence_end }}
+      (silenceID={{ _decom_silence.json.silenceID | default('unknown') }}).
+      It expires on its own if this teardown is abandoned.
+  when:
+    - _decom_matchers is defined
+    - _decom_armed

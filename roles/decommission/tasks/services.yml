@@ -1,0 +1,96 @@
+---
+# Services come after alerts and before files, because the unit's ExecStop is
+# usually `docker compose down` and it needs its compose file to still exist.
+# Deleting files first orphans the container instead of removing it.
+
+- name: Find the unit files to remove
+  ansible.builtin.set_fact:
+    _decom_unit_files: >-
+      {{ ['/etc/systemd/system/' ~ decom_unit,
+          '/etc/systemd/system/' ~ decom_unit ~ '.d']
+         if decom_unit | length > 0 else [] }}
+
+- name: Report the service teardown
+  ansible.builtin.debug:
+    msg: |
+      REPORT-ONLY: would stop+disable+reset-failed {{ decom_unit | default('(no unit)', true) }},
+      remove unit files {{ _decom_unit_files | default([]) }},
+      then force-remove container {{ decom_container | default('(none)', true) }}{{ ', then remove image ' ~ decom_image if decom_remove_image | bool and decom_image | length > 0 else '' }}.
+  when: not _decom_armed
+
+- name: Stop the unit (its ExecStop runs compose down)
+  ansible.builtin.systemd:
+    name: "{{ decom_unit }}"
+    state: stopped
+  register: _decom_stop
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_unit | length > 0
+
+- name: Disable the unit so it cannot come back at boot
+  ansible.builtin.systemd:
+    name: "{{ decom_unit }}"
+    enabled: false
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_unit | length > 0
+
+# Without this the unit stays in `failed` in systemd's memory even after the
+# unit file is gone, and node-exporter keeps exporting it, so the alert we just
+# silenced would fire again the moment the silence expires.
+- name: Clear any failed state
+  ansible.builtin.command: "systemctl reset-failed {{ decom_unit }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_unit | length > 0
+
+- name: Remove the unit file and any drop-in dir
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _decom_unit_files }}"
+  when: _decom_armed
+
+- name: Reload systemd so the removed unit stops being listed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - _decom_armed
+    - decom_unit | length > 0
+
+# Belt and braces: if the unit was already dead, or never had an ExecStop, the
+# container can still be running. Compose down first (it also removes the
+# project network), then force-remove anything left by name.
+- name: Compose down in the project directory
+  ansible.builtin.command:
+    cmd: "docker compose -p {{ decom_service }} down --timeout {{ decom_stop_timeout }}"
+    chdir: "{{ decom_compose_dir }}"
+  register: _decom_compose_down
+  changed_when: _decom_compose_down.rc == 0
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_compose_dir | length > 0
+
+- name: Force-remove the container if it survived
+  ansible.builtin.command: "docker rm -f {{ decom_container }}"
+  register: _decom_rm
+  changed_when: _decom_rm.rc == 0
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_container | length > 0
+
+- name: Remove the image
+  ansible.builtin.command: "docker image rm {{ decom_image }}"
+  register: _decom_image_rm
+  changed_when: _decom_image_rm.rc == 0
+  failed_when: false
+  when:
+    - _decom_armed
+    - decom_remove_image | bool
+    - decom_image | length > 0

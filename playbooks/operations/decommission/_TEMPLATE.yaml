@@ -1,0 +1,28 @@
+---
+# TEMPLATE - copy to playbooks/operations/decommission/<service>.yaml and fill in.
+# Do not run this file; it has no service and will refuse in preflight.
+#
+# A decommission playbook is ONE-TIME. Dispatch it via the Decommission Service
+# workflow, which archives it into playbooks/archive/ once it succeeds.
+#
+# Lives under operations/decommission/ -> never auto-applies on push. Merging it
+# does nothing; only workflow_dispatch runs it. See docs/operations/decommission.md.
+- name: "Decommission <service>"
+  hosts: <host>
+  become: true
+  gather_facts: false
+
+  vars:
+    decom_service: "<service>"
+    decom_reason: "<why this is going away, one line>"
+
+    # Leave a field empty to skip that part of the teardown.
+    decom_unit: "<service>.service"
+    decom_container: "<service>"
+    decom_compose_dir: "/data01/services/<service>"
+    decom_config_paths: []
+    decom_data_paths: []
+    decom_image: ""
+
+  roles:
+    - decommission
