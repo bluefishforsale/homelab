@@ -207,6 +207,56 @@ rm -f /tmp/dr_after
 exited "a recreate that comes back broken fails the unit" 1
 check "the unhealthy recreate says so in the journal" "did not come back healthy" "$LOG"
 
+# The settle deadline used to be a hardcoded 120s, which was SHORTER than the
+# health budget the services themselves declare. plex and jellyfin declare
+# start_period 60s + 30s x 3 retries = 150s, llamacpp 60s + 30s x 5 = 210s, so
+# all three could still be legitimately "starting" when the script had already
+# failed the unit. Four projects failed exactly that way on 2026-09-13. The
+# deadline has to come from what the project declares, not from a guess.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"slowstart","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*) : ;;
+  *images*) if [ -f /tmp/dr_after ]; then echo sha256:new; else echo sha256:old; fi ;;
+  *pull*) touch /tmp/dr_after; echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *ps*) echo '[{"Name":"slowstart","State":"running","Health":"healthy"}]' ;;
+  *image\ inspect*) echo ghcr.io/x/slowstart@sha256:deadbeef ;;
+  *inspect*)
+    # 60s start period + 30s interval x 5 retries = 210s declared budget.
+    echo '{"StartPeriod":60000000000,"Interval":30000000000,"Retries":5}' ;;
+  *) : ;;
+esac
+STUBEOF
+rm -f /tmp/dr_after; : > "$LOG"
+run_with_stub "$STUB" slowstart
+rm -f /tmp/dr_after
+exited "a project that settles inside its declared budget passes" 0
+check "the deadline is derived from the declared health budget, not 120s" "budget=210s" "$LOG"
+
+# The other half of the clamp: a project that declares no healthcheck has
+# nothing to derive from, so it keeps the old 120s rather than falling through
+# to zero and failing instantly.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls --format json")
+    echo '[{"Name":"plain","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*) : ;;
+  *images*) if [ -f /tmp/dr_after ]; then echo sha256:new; else echo sha256:old; fi ;;
+  *pull*) touch /tmp/dr_after; echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *ps*) echo '[{"Name":"plain","State":"running","Health":""}]' ;;
+  *image\ inspect*) echo ghcr.io/x/plain@sha256:cafe ;;
+  *inspect*) echo null ;;
+  *) : ;;
+esac
+STUBEOF
+rm -f /tmp/dr_after; : > "$LOG"
+run_with_stub "$STUB" plain
+rm -f /tmp/dr_after
+check "a project with no healthcheck keeps the 120s floor" "budget=120s" "$LOG"
+
 rm -f "$LOG" "$OUT" "$STUB"
 echo
 echo "Results: $pass passed, $fail failed"
