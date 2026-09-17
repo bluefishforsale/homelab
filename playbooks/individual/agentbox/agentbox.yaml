@@ -74,6 +74,21 @@
     #   - name: somehttp
     #     url: https://example.com/mcp
     #     headers: {Authorization: "Bearer ..."}
+    # Plugins mirrored from the laptop so a phone session has the same
+    # workflows. agentcraft is deliberately absent: on the laptop it is a
+    # local-path install, not something a marketplace can resolve here.
+    # NOTE: a marketplace here is third-party code that runs on this host. The
+    # anthropics/ one is already trusted on the box; ponytail is not, and adding
+    # a marketplace is the decision, not the install that follows it.
+    agentbox_plugin_marketplaces:
+      - DietrichGebert/ponytail
+    agentbox_plugins:
+      - ponytail@ponytail
+      - superpowers@claude-plugins-official
+      - pr-review-toolkit@claude-plugins-official
+      - code-simplifier@claude-plugins-official
+      - security-guidance@claude-plugins-official
+
     agentbox_mcp_servers:
       # Fleet memory (playbooks/individual/ocean/ai/mem0.yaml). One store for
       # every lane and the laptop, so a decision recorded in one place is
@@ -619,6 +634,46 @@
       - agentbox_mcp_servers | length > 0
       - item.name not in (claude_mcp_list.stdout | default(''))
     no_log: true
+    notify: Restart RC sessions
+
+  # Plugins, like MCP, go in through the CLI rather than a template: they live
+  # in ~/.claude/plugins alongside Claude's own runtime state, and installing
+  # them upstream keeps provenance and leaves `claude plugin update` meaningful.
+  # Both steps are add-only, so upgrading one is a command on the box, not a
+  # redeploy. --yes is required because stdout is not a TTY under ansible.
+  - name: List Claude plugin marketplaces
+    ansible.builtin.command: timeout 60 claude plugin marketplace list
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    register: claude_marketplace_list
+    changed_when: false
+    failed_when: false
+
+  - name: Add missing plugin marketplaces
+    ansible.builtin.command: timeout 180 claude plugin marketplace add {{ item | quote }}
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    loop: "{{ agentbox_plugin_marketplaces }}"
+    when: item.split('/') | last not in (claude_marketplace_list.stdout | default(''))
+
+  - name: List installed Claude plugins
+    ansible.builtin.command: timeout 60 claude plugin list
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    register: claude_plugin_list
+    changed_when: false
+    failed_when: false
+
+  - name: Install shared Claude plugins
+    ansible.builtin.command: timeout 300 claude plugin install --yes {{ item | quote }}
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+    loop: "{{ agentbox_plugins }}"
+    when: item.split('@') | first not in (claude_plugin_list.stdout | default(''))
     notify: Restart RC sessions
 
   handlers:
