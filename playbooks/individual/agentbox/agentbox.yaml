@@ -41,8 +41,6 @@
     agentbox_repos:
       - paia
       - blog_terrac_com
-      - globalview
-      - globalview-backend-py
       - my-ta-jose
       - photonic_inventory
       - terrac_com_2026

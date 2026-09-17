@@ -106,7 +106,7 @@ Before any of this, an apply dumps the current state to
 - **mysql** (`grafana-mysql`, `wordpress`): `mysqldump --all-databases` for the
   pre-restore copy, then pipes the backup into `mysql` in the running container.
   The container stays up.
-- **pg** (`globalview-timescaledb`, `jellystat-db`, `mem0-postgres`):
+- **pg** (`jellystat-db`, `mem0-postgres`):
   `pg_dumpall` for the pre-restore copy, then pipes the dump into `psql`. Auth
   is the container's local socket (trust), so no password is needed even though
   these all set `POSTGRES_PASSWORD`. The container stays up.
@@ -126,7 +126,6 @@ Service names are exactly these. A name that is not listed is rejected with
 | --- | --- | --- | --- | --- |
 | `grafana-mysql` | mysql | `grafana-mysql/grafana-mysql.sql.gz` | `grafana-mysql` |  |
 | `wordpress` | mysql | `wordpress/wordpress.sql.gz` | (from `WORDPRESS_DB_CONTAINER`) |  |
-| `globalview-timescaledb` | pg | `globalview-timescaledb/globalview-timescaledb.sql.gz` | `globalview-timescaledb` |  |
 | `jellystat-db` | pg | `jellystat-db/jellystat-db.sql.gz` | `jellystat-db` |  |
 | `mem0-postgres` | pg | `mem0-postgres/mem0-postgres.sql.gz` | `mem0-postgres` |  |
 | `mysql-atrest` | tar | `mysql-atrest/mysql-atrest.tar.gz` | `mysql` | `/data01/services/mysql/data` |
