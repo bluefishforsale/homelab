@@ -66,6 +66,16 @@ Status and future plans for the homelab infrastructure.
 - **nvidia_containerd**: Deployed service
 - **proxmox_repos**: Deployed service
 - **update_github_token_in_vault**: Deployed service
+- **fleet_resolvers**: Deployed service
+- **docker**: Deployed service
+- **create_agentbox_vm**: Deployed service
+- **create_registry_cache_vm**: Deployed service
+- **create_runner_vm**: Deployed service
+- **docker_ce**: Deployed service
+- **github_docker_runners**: Deployed service
+- **github_runner_token_check**: Deployed service
+- **github_runner_token_update_vault**: Deployed service
+- **ocean_cpu_host**: Deployed service
 
 ### Media Stack
 
