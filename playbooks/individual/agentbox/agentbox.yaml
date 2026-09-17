@@ -118,6 +118,19 @@
         - ripgrep
         - fd-find
         - ansible-core
+        # agentbox sits inside the homelab network so it can verify a play
+        # before shipping it (CONTEXT.md). Running one needs ansible-core above;
+        # checking one needs the two linters CI runs, which were missing, so a
+        # play could only be verified by pushing it and watching CI.
+        # Note the skew: CI pip-installs the latest ansible-lint, Debian 12
+        # ships 6.13. A local pass is indicative, not authoritative; a local
+        # failure is still a true failure and that is where the value is.
+        - ansible-lint
+        - yamllint
+        # Not used by anything here yet. It is what makes the CI-matching
+        # install (`pip install --user ansible-lint`) possible without another
+        # deploy, on a box where `python3 -m pip` is otherwise absent.
+        - python3-pip
       state: present
       update_cache: yes
 
