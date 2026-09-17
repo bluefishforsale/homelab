@@ -17,19 +17,29 @@
       /data01/services, /etc, /opt or /srv, and never a short top-level path.
   loop: "{{ _decom_config_all }}"
 
-- name: Report the config removal
-  ansible.builtin.debug:
-    msg: "REPORT-ONLY: would remove config paths {{ _decom_config_all }}"
-  when:
-    - not _decom_armed
-    - _decom_config_all | length > 0
 
-- name: Remove the config paths
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
+# A compose dir is normally the PARENT of the service's bind-mounted volumes on
+# this fleet (/data01/services/<svc>/ holds both docker-compose.yml and the data
+# dirs). `file: state=absent` on it is recursive, so removing it as "config"
+# would take the data with it: no archive, no tarball verification, and the
+# DELETE-DATA token bypassed entirely. globalview-stack is exactly that shape,
+# 278M of timescaledb and redis volumes under its compose dir.
+#
+# So data is archived and removed FIRST, below, and config removal follows.
+# When data is not armed, a config path that contains a declared data path is
+# refused outright rather than silently deleting what the gate exists to protect.
+- name: Refuse a config path that would swallow unarmed data
+  ansible.builtin.assert:
+    that:
+      - not (decom_data_paths | select('match', (item | regex_replace('/+$', '')) ~ '(/|$)') | list | length > 0)
+    fail_msg: >-
+      Config path '{{ item }}' contains a declared data path, and data removal
+      is not armed. Removing it would delete that data unarchived. Arm data
+      removal, or narrow decom_compose_dir/decom_config_paths.
   loop: "{{ _decom_config_all }}"
-  when: _decom_armed
+  when:
+    - decom_data_paths | length > 0
+    - not _decom_data_armed
 
 # ---------------------------------------------------------------- data ----
 # /data01 is a ZFS pool and the repo's storage invariant is that no committed
@@ -107,3 +117,22 @@
       ({{ _decom_tar_verify.stdout_lines | length }} members) and removed. Delete the
       tarball by hand once you are satisfied.
   when: _decom_data_armed
+
+
+# ------------------------------------------------------------- config ----
+# Last, because a compose dir may be the parent of the data dirs above: those
+# are archived and gone by now, so removing it cannot take anything with it.
+- name: Report the config removal
+  ansible.builtin.debug:
+    msg: "REPORT-ONLY: would remove config paths {{ _decom_config_all }}"
+  when:
+    - not _decom_armed
+    - _decom_config_all | length > 0
+
+- name: Remove the config paths
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _decom_config_all }}"
+  when: _decom_armed
+
