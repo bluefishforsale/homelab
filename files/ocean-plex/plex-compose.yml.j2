@@ -74,7 +74,7 @@ services:
       PLEX_TOKEN: "{{ media_services.plex.api_key }}"
       # Keep below Prometheus scrape_timeout (default 10s) so scrapes don't
       # time out while the exporter waits on a hung Plex.
-      PLEX_TIMEOUT: "5"
+      PLEX_TIMEOUT: "2"
       PLEX_RETRIES_COUNT: "3"
       PLEX_SSL_VERIFY: "false"
       RACK_ENV: "production"
