@@ -22,8 +22,9 @@ ExecStart=docker run --rm \
     -e VERSION={{ exporter_version }} \
     -e URL=http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ sonarr_port }} \
     -e PORT={{ exporter_port }} \
+    -e ENABLE_ADDITIONAL_METRICS=true \
     -p {{ exporter_port }}:{{ exporter_port }} \
-    -e API_KEY="{{ media_services.sonarr.api_key }}" \
+    -e APIKEY="{{ media_services.sonarr.api_key }}" \
     {{ exporter_image }}:{{ exporter_version }} \
       sonarr
 ExecStop=docker rm -f %N

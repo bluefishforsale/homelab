@@ -20,7 +20,8 @@ ExecStart=docker run --rm \
     -e VERSION={{ exporter_version }} \
     -e URL=http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ radarr_port }} \
     -e PORT={{ exporter_port }} \
-    -e API_KEY="{{ media_services.radarr.api_key }}" \
+    -e APIKEY="{{ media_services.radarr.api_key }}" \
+    -e ENABLE_ADDITIONAL_METRICS=true \
     -p {{ exporter_port }}:{{ exporter_port }} \
   {{ exporter_image }}:{{ exporter_version }} \
     radarr
