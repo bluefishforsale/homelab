@@ -92,13 +92,6 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:80"
 
-        # globalview OSINT dashboard (SPA + backend at single host, nginx
-        # path-routes /api/ to backend). Admin-gated via Cloudflare Access
-        # (NOT in fully_public_services).
-        - hostname: "globalview.terrac.com"
-          service_type: "http"
-          service_url: "http://192.168.1.143:80"
-
         # photonic_inventory lighting rental inventory web app. Single FastAPI
         # backend, so the tunnel hits the container's published port directly
         # (no nginx hop). The app has its own login (sessions + CSRF + argon2);

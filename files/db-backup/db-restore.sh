@@ -48,7 +48,6 @@ meta(){
   case "$1" in
     grafana-mysql)          echo "mysql|grafana-mysql.sql.gz|grafana-mysql|" ;;
     wordpress)              echo "mysql|wordpress.sql.gz|$WORDPRESS_DB_CONTAINER|" ;;
-    globalview-timescaledb) echo "pg|globalview-timescaledb.sql.gz|globalview-timescaledb|" ;;
     jellystat-db)           echo "pg|jellystat-db.sql.gz|jellystat-db|" ;;
     mem0-postgres)          echo "pg|mem0-postgres.sql.gz|mem0-postgres|" ;;
     mysql-atrest)           echo "tar|mysql-atrest.tar.gz|mysql|$SERVICES_DIR/mysql/data" ;;
@@ -71,7 +70,7 @@ meta(){
     *) echo "" ;;
   esac
 }
-ALL="grafana-mysql wordpress globalview-timescaledb jellystat-db mem0-postgres mysql-atrest sonarr radarr lidarr prowlarr bazarr jellyfin navidrome tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
+ALL="grafana-mysql wordpress jellystat-db mem0-postgres mysql-atrest sonarr radarr lidarr prowlarr bazarr jellyfin navidrome tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
 
 restore_one(){
   local svc="$1" m engine obj container target uri gen payload base
