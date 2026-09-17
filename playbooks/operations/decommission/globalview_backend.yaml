@@ -1,0 +1,32 @@
+---
+# One-time teardown of the globalview backend API + WebSocket on ocean.
+#
+# Retired alongside the frontend, ahead of the God's Eye rebuild behind a
+# Cloudflare tunnel. See the tracking issue for that work.
+#
+# Two of three. Run after globalview and before globalview-stack: this is what
+# holds connections to the database that the stack play removes.
+#
+# No data paths: /data01/services/globalview_backend holds only the generated
+# compose file and env (19K measured 2026-09-17). Everything durable lives in
+# the timescaledb volume under globalview-stack, which that play archives.
+#
+# Dispatch via the Decommission Service workflow. Never auto-applies on push.
+- name: Decommission globalview_backend
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars:
+    decom_service: globalview_backend
+    decom_reason: "Retired ahead of the God's Eye rebuild behind a Cloudflare tunnel"
+
+    decom_unit: globalview_backend.service
+    decom_container: globalview_backend
+    decom_compose_dir: /data01/services/globalview_backend
+    decom_config_paths: []
+    decom_data_paths: []
+    decom_image: "ghcr.io/bluefishforsale/globalview-backend-py:latest"
+
+  roles:
+    - decommission

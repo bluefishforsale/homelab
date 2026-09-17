@@ -1,0 +1,47 @@
+---
+# One-time teardown of the globalview data stack (TimescaleDB + Redis) on ocean.
+#
+# Three of three, and the only one that destroys data. Run it AFTER
+# globalview.yaml and globalview_backend.yaml: those hold connections to this
+# database, and tearing the database out from under a running backend is a
+# worse failure than a clean ordered stop.
+#
+# The compose project runs two containers, globalview-timescaledb and
+# globalview-redis. `compose down` in the project dir stops both;
+# decom_container names the database one so the postflight survival check is
+# pointed at the thing that matters.
+#
+# DATA: 278M measured 2026-09-17, timescaledb-data 245M and redis-data 34M, both
+# bind mounts under the compose dir. They are named individually rather than
+# letting the compose dir take them, because the role removes the compose dir as
+# CONFIG and config removal is not behind the DELETE-DATA gate. Naming them here
+# is what routes them through archive-then-verify-then-delete instead.
+#
+# This means the run needs BOTH tokens: the service name to arm it at all, and
+# DELETE-DATA to touch the volumes. Without the second the play stops the stack
+# and leaves 278M in place, which is a legitimate way to run it first.
+#
+# Dispatch via the Decommission Service workflow. Never auto-applies on push.
+- name: Decommission globalview-stack
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars:
+    decom_service: globalview-stack
+    decom_reason: "Retired ahead of the God's Eye rebuild behind a Cloudflare tunnel"
+
+    decom_unit: globalview-stack.service
+    decom_container: globalview-timescaledb
+    decom_compose_dir: /data01/services/globalview-stack
+    decom_config_paths: []
+    decom_data_paths:
+      - /data01/services/globalview-stack/timescaledb-data
+      - /data01/services/globalview-stack/redis-data
+    # Third-party base images, not ours, and shared with nothing else here.
+    # Left on the host: pulling them again is cheap and removing them buys
+    # nothing a prune would not.
+    decom_image: ""
+
+  roles:
+    - decommission
