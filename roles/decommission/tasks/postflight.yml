@@ -42,6 +42,18 @@
     - decom_phase_services | bool
     - decom_phase_files | bool
 
+# The receipt owns this directory rather than inheriting it. files.yml creates
+# it too, but only when data removal is armed, so a service with no data paths
+# tore down correctly and then failed here with "Destination directory
+# /data01/decommissioned does not exist" -- losing the audit record for the
+# teardown that had already happened. ra_mirror hit exactly that on 2026-09-17.
+- name: Ensure the decommission archive directory exists
+  ansible.builtin.file:
+    path: "{{ decom_archive_dir }}"
+    state: directory
+    mode: '0750'
+  when: _decom_armed
+
 - name: Write the receipt
   ansible.builtin.copy:
     dest: "{{ decom_archive_dir }}/{{ decom_service }}-{{ _decom_stamp }}.json"
