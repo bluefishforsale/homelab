@@ -179,8 +179,70 @@ if bad:
 '
 }
 
+# How long to wait comes from what the project declares about itself, not from
+# a number picked here. Docker reports a container as "starting" until its
+# start_period elapses AND its retries are spent, so any deadline shorter than
+# start_period + interval x retries fails a service that is still legitimately
+# coming up. The old hardcoded 120s was shorter than plex's 150s, jellyfin's
+# 150s and llamacpp's 210s, and failed all three on 2026-09-13 while every
+# container was in fact fine.
+#
+# Clamped at both ends. The floor keeps the previous behaviour for a project
+# that declares no healthcheck at all (nothing to derive from, and `settled`
+# treats no-health as a verdict anyway). The cap exists because the unit's
+# TimeoutStartSec (4200) has to outlast PULL_TIMEOUT + UP_TIMEOUT + this wait,
+# or systemd kills the run instead: 2700 + 600 + 600 leaves 300s of headroom.
+# A project whose declared budget exceeds the cap is a compose file to fix,
+# not a deadline to keep raising.
+SETTLE_FLOOR=120
+SETTLE_CAP=600
+
+health_budget() {
+  local names budget
+  names=$(docker compose -p "$PROJECT" "${CFG_ARGS[@]}" ps --format json 2>/dev/null | python3 -c '
+import json, sys
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(0)
+try:
+    rows = json.loads(raw)
+except json.JSONDecodeError:
+    rows = [json.loads(l) for l in raw.splitlines() if l.strip()]
+if isinstance(rows, dict):
+    rows = [rows]
+for r in rows:
+    n = r.get("Name")
+    if n:
+        print(n)
+')
+  budget=$SETTLE_FLOOR
+  local n hc secs
+  for n in $names; do
+    hc=$(docker inspect "$n" --format '{{json .Config.Healthcheck}}' 2>/dev/null)
+    [ -z "$hc" ] || [ "$hc" = "null" ] && continue
+    # Nanoseconds in, seconds out. A missing field means docker's own default,
+    # which is 0s start period and 30s interval with 3 retries.
+    secs=$(printf '%s' "$hc" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin) or {}
+except Exception:
+    sys.exit(0)
+sp = int(d.get("StartPeriod") or 0) // 10**9
+iv = int(d.get("Interval") or 30 * 10**9) // 10**9
+rt = int(d.get("Retries") or 3)
+print(sp + iv * rt)
+' 2>/dev/null)
+    [ -n "$secs" ] && [ "$secs" -gt "$budget" ] 2>/dev/null && budget=$secs
+  done
+  [ "$budget" -gt "$SETTLE_CAP" ] && budget=$SETTLE_CAP
+  printf '%s' "$budget"
+}
+
 if [ "$updated" -gt 0 ]; then
-  deadline=$((SECONDS + 120))
+  budget=$(health_budget)
+  logger -t docker-refresh "project=$PROJECT waiting for health budget=${budget}s"
+  deadline=$((SECONDS + budget))
   while :; do
     # Captured on its own line: after an `if` whose branch does not run, bash
     # resets $? to 0, so testing the status separately is the only way to tell
@@ -190,7 +252,7 @@ if [ "$updated" -gt 0 ]; then
     [ "$rc" -eq 0 ] && break
     if [ "$rc" -ne 3 ] || [ "$SECONDS" -ge "$deadline" ]; then
       logger -t docker-refresh \
-        "project=$PROJECT recreated but did not come back healthy: ${err:-still starting after 120s}"
+        "project=$PROJECT recreated but did not come back healthy: ${err:-still starting after ${budget}s}"
       exit 1
     fi
     sleep 5
