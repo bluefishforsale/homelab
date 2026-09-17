@@ -44,9 +44,18 @@ case "$mode" in
     sleep 3
     echo "after:  $(on_host "$dest" "systemctl is-active '$target'; systemctl show '$target' -p SubState --value" | paste -sd' ' -)" ;;
   container)
-    cn=$(on_host "$dest" "docker ps -a --filter name=$target --format '{{.Names}}' | head -1") \
-      || die "unreachable: $host"
-    [ -n "$cn" ] || die "no container matching '$target' on $host"
+    # Exact name, not docker's --filter name= substring match. That filter is a
+    # regex over the name, so `sonarr` also matches `sonarr-exporter`, and the
+    # old `| head -1` then picked whichever docker listed first. On ocean that
+    # is the exporter: asking to restart sonarr, prowlarr or globalview bounced
+    # sonarr-exporter, prowlarr-exporter and globalview-timescaledb instead, and
+    # reported success. A mutating tool acting on a container you did not name
+    # is worse than one that refuses, so an unmatched name is now an error.
+    # Listed and matched in two steps so an unreachable host stays
+    # distinguishable from a name that simply is not there.
+    names=$(on_host "$dest" "docker ps -a --format '{{.Names}}'") || die "unreachable: $host"
+    cn=$(printf '%s\n' "$names" | grep -Fx "$target") \
+      || die "no container named exactly '$target' on $host"
     echo "before: $(on_host "$dest" "docker inspect $cn --format '{{.State.Status}} restarts={{.RestartCount}}'")"
     confirm "docker restart '$cn' on $host?" || die "aborted"
     on_host "$dest" "docker restart $cn" >/dev/null || die "docker restart failed"
