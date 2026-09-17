@@ -66,9 +66,11 @@ services:
       - "--metrics"
       - "--verbose"
     
-    # Health check - check if server is responding
+    # Health check - check if server is responding. Must be an unauthenticated
+    # route: --api-key-file guards /v1/*, so probing /v1/models returns 401 and
+    # curl -f fails even when the server is fine. /health is not behind the key.
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/v1/models || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5

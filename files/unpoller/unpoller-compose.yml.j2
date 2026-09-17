@@ -35,13 +35,11 @@ services:
       - UP_UNIFI_DEFAULT_SAVE_ANOMALIES=false
       - UP_DEBUG=true
     
-    # Health Check (check metrics endpoint)
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9130/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # No compose healthcheck: the golift/unifi-poller image is scratch, holding
+    # only /usr/bin/unpoller. There is no shell and no wget, so every exec-based
+    # probe fails with "executable file not found" regardless of server state.
+    # Health comes from the 'unpoller' Prometheus scrape job against :9130 --
+    # up == 0 is the failure signal, and it probes from outside the container.
     
     # Security
     security_opt:
