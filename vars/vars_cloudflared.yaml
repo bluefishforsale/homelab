@@ -109,6 +109,13 @@ cloudflared:
           service_type: "http"
           service_url: "http://192.168.1.143:8123"
         
+        # God's Eye - Globalview replacement
+        # Routed through cloudflared directly (no nginx hop)
+        # Access gated by Cloudflare Access (default)
+        - hostname: "globalview.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8094"
+        
         # SSH Access for all hosts (dynamically generated from inventory)
         # This section will be populated by the template from Ansible inventory
         # Ocean SSH access (local)
