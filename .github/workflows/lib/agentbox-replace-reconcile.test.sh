@@ -53,7 +53,7 @@ def run(issues, live, healthy=True, absent_map=None, prom_fails=False):
 def issue(n, dev):
     return {"number": n, "marker": f"ocean.home/{dev}", "device": dev}
 
-D_GONE, D_LIVE = "wwn-0x5000c500b2281882", "wwn-0x5000c500b345abd9"
+D_GONE, D_LIVE = "wwn-0x5000c500b49ff149", "wwn-0x5000c500b345abd9"
 
 # 1. A drive still reporting is never closed, no matter what else is true.
 #    absent_map deliberately says "absent for the whole window" for a device
