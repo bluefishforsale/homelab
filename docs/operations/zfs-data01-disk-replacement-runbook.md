@@ -12,13 +12,12 @@ the HBA passed through). RAIDZ2 tolerates **2** simultaneous drive failures.
 
 As of the last check (`zpool status -v data01`):
 
-- **2 drives FAULTED** — `wwn-0x5000c500b30c1db0`, `wwn-0x5000c500b2281882`
-  ("too many errors").
-- **1 more drive degrading** — `wwn-0x5000c500b38b622b`, ~14 read errors, still ONLINE.
+- **1 drive FAULTED** — `wwn-0x5000c500b2281882` ("too many errors").
+- **2 more drives degrading** — `wwn-0x5000c500b38b622b` (~14 read errors) and `sdi` (pending sectors), still ONLINE.
 - `errors: No known data errors` (no corruption yet).
 
-With 2 drives faulted, **the pool has zero remaining parity**. If a third drive
-fails — and one is already throwing errors — the pool is lost. Treat this as
+With 1 drive faulted and 2 degrading, **the pool parity is at risk**. If a second drive
+fails — and two are already throwing errors — the pool is lost. Treat this as
 act-soon, not someday.
 
 ## Golden rules
@@ -49,7 +48,7 @@ act-soon, not someday.
       one. Do NOT guess:
       ```
       # wwn -> /dev/sdX
-      ls -l /dev/disk/by-id/ | grep wwn-0x5000c500b30c1db0
+      ls -l /dev/disk/by-id/ | grep wwn-0x5000c500b2281882
       # /dev/sdX -> serial + model (write the serial on paper)
       smartctl -i /dev/sdX
       # make the bay LED blink if the HBA/enclosure supports it
@@ -95,10 +94,10 @@ watch -n 30 'zpool status -v data01'
 ## Step 3 — Verify, then the second drive
 
 - [ ] `zpool status -v data01` shows the replaced drive ONLINE, resilver complete,
-      `errors: No known data errors`, and the vdev back to one-fault (or better).
-- [ ] Only now repeat Step 2 for the second faulted drive
-      (`wwn-0x5000c500b30c1db0`), full resilver, verify again.
-- [ ] Watch `wwn-0x5000c500b38b622b` (the 14-read-error drive). If its error count
+      `errors: No known data errors`, and the vdev back to fully healthy.
+- [ ] Only now repeat Step 2 for the second drive
+      (`wwn-0x5000c500b38b622b`), full resilver, verify again.
+- [ ] Watch `sdi` (pending sectors). If its error count
       keeps climbing, plan to replace it too — but one at a time, redundancy restored
       between each.
 
