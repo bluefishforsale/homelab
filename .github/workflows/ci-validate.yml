@@ -310,6 +310,11 @@ jobs:
       - name: Agent draft detection
         run: bash .github/workflows/lib/agentbox-draft-detection.test.sh
 
+      # A blanket `git add -A` put the agent's own leavings in two PRs months
+      # apart: photonic_inventory#2 (.agent-1.log) and homelab#429 (check.py).
+      - name: Agent commits the fix, not its scratch
+        run: bash .github/workflows/lib/agentbox-scratch-staging.test.sh
+
       # A collapsed ladder or a paid model creeping in breaks nothing visibly;
       # it just changes the bill. Assert the shape instead.
       - name: Agent lane ladder stays local-first and free

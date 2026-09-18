@@ -56,6 +56,32 @@ no_prod_effect() {  # $1 = newline-separated changed files
   return 0
 }
 
+# Agent debris, not the fix. `git add -A` shipped it twice: photonic_inventory#2
+# committed the watcher's own `.agent-1.log` beside a 2-line CSS fix (back when
+# the log was written into the worktree), and homelab#429 committed 153 lines of
+# scratch `check.py` and nothing else. agents.md has said "stage explicit paths,
+# never -A" the whole time; this is that rule applied to a tree an agent dirtied.
+#
+# NOTE: a NEW file at the repo ROOT counts as scratch too. That is the only
+# signal separating check.py from a real fix, and it is deliberately biased
+# toward withholding, because debris in a PR is the failure being fixed here.
+# The cost is a fix that legitimately adds a root-level file, so what was
+# withheld is printed and goes into the PR body instead of vanishing.
+SCRATCH_RE='(^|/)(\.agent-.*|.*\.log|.*\.orig|.*\.rej|.*\.tmp|.*~|\.DS_Store)$'
+
+stage_draft() {  # $1 = worktree; prints the paths it withheld, one per line
+  local wt="$1" rec path
+  while IFS= read -r -d '' rec; do
+    path=${rec:3}
+    if [ "${rec:0:2}" = '??' ] \
+       && { printf '%s' "$path" | grep -Eq "$SCRATCH_RE" || [ "$path" = "${path#*/}" ]; }; then
+      printf '%s\n' "$path"
+      continue
+    fi
+    git -C "$wt" add -- "$path"
+  done < <(git -C "$wt" status --porcelain -z)
+}
+
 resolve_issue() {  # $1 = repo (short name); $2 = issue number
   local repo="$1" num="$2" slug="$OWNER/$1"
   # Per-repo/per-lane telemetry labels for everything this tier emits.
@@ -106,12 +132,17 @@ Make the minimal, correct change; keep the build and tests green."
   fi
   printf '%s\n' "$out"
 
+  local withheld
+  withheld=$(stage_draft "$wt")
+  [ -z "$withheld" ] || echo "$slug#$num: withheld agent scratch: ${withheld//$'\n'/ }" >&2
+  git -C "$wt" diff --cached --quiet || git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+
   # The agent may commit its own work rather than leaving the tree dirty, so a
   # clean tree is not the same as "produced nothing". Ask whether the branch
   # moved off origin/HEAD at all; the watcher had this wrong and threw away a
-  # correct fix because of it.
-  if [ -z "$(git -C "$wt" status --porcelain)" ] \
-     && [ -z "$(git -C "$wt" log --oneline origin/HEAD..HEAD)" ]; then
+  # correct fix because of it. Asked AFTER staging, so a run that produced only
+  # scratch (homelab#429) lands here rather than opening a PR full of debris.
+  if [ -z "$(git -C "$wt" log --oneline origin/HEAD..HEAD)" ]; then
     # Put it back in the queue instead of stranding it. This function claims the
     # issue as agent-working up front, and the watcher skips that label while
     # this drain only selects needs-escalation — so returning here without
@@ -125,14 +156,17 @@ Make the minimal, correct change; keep the build and tests green."
       --remove-label "$LABEL_WORKING" --add-label "$LABEL_HUMAN" >/dev/null 2>&1 || true
     return 0
   fi
-  if [ -n "$(git -C "$wt" status --porcelain)" ]; then
-    git -C "$wt" add -A
-    git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
-  fi
+  local pr_body="Resolves #$num. Drafted by the escalation tier (\`$ESCALATE_MODEL\`) after the cheaper lanes failed."
+  [ -z "$withheld" ] || pr_body="$pr_body
+
+Withheld from the commit as agent scratch:
+\`\`\`
+$withheld
+\`\`\`"
   git -C "$wt" push -q -u origin "agent/issue-$num"
   gh pr create --repo "$slug" --head "agent/issue-$num" \
     --title "fix: $title (#$num)" \
-    --body "Resolves #$num. Drafted by the escalation tier (\`$ESCALATE_MODEL\`) after the cheaper lanes failed." || true
+    --body "$pr_body" || true
 
   local changed
   changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)

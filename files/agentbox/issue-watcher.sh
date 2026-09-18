@@ -19,7 +19,8 @@ ISSUE_AUTHOR_ALLOWLIST="${ISSUE_AUTHOR_ALLOWLIST:-$OWNER}"
 # Separate from repos/ (the RC sessions' cwd) so the watcher's clone + commits
 # can't collide with a live remote-control session on the same repo.
 WORKROOT="{{ home }}/work"
-# Draft logs live OUTSIDE the worktree so `git add -A` never commits them.
+# Draft logs live OUTSIDE the worktree. Writing one into it is how
+# photonic_inventory#2 came to commit .agent-1.log; see stage_draft below.
 LOGDIR="{{ home }}/agent-logs"
 LABEL_WORKING="agent-working"
 LABEL_ESCALATE="needs-escalation"
@@ -65,6 +66,32 @@ NOPROD_RE='^(docs/|README|CONTEXT|.*\.md$|.*_test\.|test/|tests/|spec/)'
 has_draft() {  # $1 = worktree
   [ -n "$(git -C "$1" status --porcelain)" ] && return 0
   [ -n "$(git -C "$1" log --oneline origin/HEAD..HEAD)" ]
+}
+
+# Agent debris, not the fix. `git add -A` shipped it twice: photonic_inventory#2
+# committed the watcher's own `.agent-1.log` beside a 2-line CSS fix (back when
+# the log was written into the worktree), and homelab#429 committed 153 lines of
+# scratch `check.py` and nothing else. agents.md has said "stage explicit paths,
+# never -A" the whole time; this is that rule applied to a tree an agent dirtied.
+#
+# NOTE: a NEW file at the repo ROOT counts as scratch too. That is the only
+# signal separating check.py from a real fix, and it is deliberately biased
+# toward withholding, because debris in a PR is the failure being fixed here.
+# The cost is a fix that legitimately adds a root-level file, so what was
+# withheld is printed and goes into the PR body instead of vanishing.
+SCRATCH_RE='(^|/)(\.agent-.*|.*\.log|.*\.orig|.*\.rej|.*\.tmp|.*~|\.DS_Store)$'
+
+stage_draft() {  # $1 = worktree; prints the paths it withheld, one per line
+  local wt="$1" rec path
+  while IFS= read -r -d '' rec; do
+    path=${rec:3}
+    if [ "${rec:0:2}" = '??' ] \
+       && { printf '%s' "$path" | grep -Eq "$SCRATCH_RE" || [ "$path" = "${path#*/}" ]; }; then
+      printf '%s\n' "$path"
+      continue
+    fi
+    git -C "$wt" add -- "$path"
+  done < <(git -C "$wt" status --porcelain -z)
 }
 
 # One attempt per tier. A capability failure means escalate, not retry: the same
@@ -160,51 +187,65 @@ Make the minimal, correct change. Do not touch unrelated code. Keep the build an
       echo "$slug#$num: $model produced no usable diff" >&2
     done
 
+    withheld=""
     if [ -n "$drafted" ]; then
-      # Only commit what the drafter left loose; committing nothing exits 1 and
-      # would abort the run under set -e.
-      if [ -n "$(git -C "$wt" status --porcelain)" ]; then
-        git -C "$wt" add -A
-        git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
-      fi
-      git -C "$wt" push -q -u origin "agent/issue-$num"
-      pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
-        --title "fix: $title (#$num)" \
-        --body "Resolves #$num. Drafted by agentbox on \`$drafted\`.") || pr_url=""
+      withheld=$(stage_draft "$wt")
+      [ -z "$withheld" ] || echo "$slug#$num: withheld agent scratch: ${withheld//$'\n'/ }" >&2
+      # Committing nothing exits 1 and would abort the run under set -e.
+      git -C "$wt" diff --cached --quiet || git -C "$wt" commit -q -m "fix: resolve #$num ($title)"
+      # Scratch alone is not a draft. #429's drafter wrote check.py and nothing
+      # else, which read as success and opened a PR of pure debris.
+      [ -n "$(git -C "$wt" log --oneline origin/HEAD..HEAD)" ] \
+        || { echo "$slug#$num: nothing but agent scratch, no fix" >&2; drafted=""; }
+    fi
 
-      # Independent review by the strongest free model. A human still merges;
-      # this only informs that decision.
-      #
-      # Runs from LOGDIR, not the worktree, with the diff inline: a reviewer
-      # that can edit the branch it is reviewing is not a reviewer. --agent plan
-      # is read-only, and the cwd holds no repo, so both belt and braces.
-      if [ -n "$pr_url" ]; then
-        diff=$(git -C "$wt" diff origin/HEAD...HEAD); diff=${diff:0:60000}
-        review=$( cd "$LOGDIR" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=review,service=agentbox" \
-          timeout 600 opencode run --agent plan -m "$REVIEW_MODEL" \
-          "Review this agent-drafted diff resolving issue #$num ($title) in $slug. It was written by $drafted. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
-
-$diff" 2>/dev/null ) || review=""
-        [ -n "$review" ] && gh pr comment "$pr_url" --repo "$slug" \
-          --body "Independent review ($REVIEW_MODEL):
-
-$review" >/dev/null 2>&1 || true
-      fi
-
-      # Tiered autonomy (ADR 0001): default is open PR + label + stop, a human
-      # merges from the phone. Auto-merge only when the repo opted in AND the
-      # diff touches no prod-affecting paths.
-      changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
-      if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
-         && no_prod_effect "$changed"; then
-        gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
-      else
-        gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
-      fi
-    else
+    if [ -z "$drafted" ]; then
       # Every free lane on the ladder failed -> hand to the escalation tier.
       gh issue edit "$num" --repo "$slug" \
         --remove-label "$LABEL_WORKING" --add-label "$LABEL_ESCALATE" >/dev/null
+      continue
+    fi
+
+    pr_body="Resolves #$num. Drafted by agentbox on \`$drafted\`."
+    [ -z "$withheld" ] || pr_body="$pr_body
+
+Withheld from the commit as agent scratch:
+\`\`\`
+$withheld
+\`\`\`"
+    git -C "$wt" push -q -u origin "agent/issue-$num"
+    pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
+      --title "fix: $title (#$num)" \
+      --body "$pr_body") || pr_url=""
+
+    # Independent review by the strongest free model. A human still merges;
+    # this only informs that decision.
+    #
+    # Runs from LOGDIR, not the worktree, with the diff inline: a reviewer
+    # that can edit the branch it is reviewing is not a reviewer. --agent plan
+    # is read-only, and the cwd holds no repo, so both belt and braces.
+    if [ -n "$pr_url" ]; then
+      diff=$(git -C "$wt" diff origin/HEAD...HEAD); diff=${diff:0:60000}
+      review=$( cd "$LOGDIR" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=review,service=agentbox" \
+        timeout 600 opencode run --agent plan -m "$REVIEW_MODEL" \
+        "Review this agent-drafted diff resolving issue #$num ($title) in $slug. It was written by $drafted. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
+
+$diff" 2>/dev/null ) || review=""
+      [ -n "$review" ] && gh pr comment "$pr_url" --repo "$slug" \
+        --body "Independent review ($REVIEW_MODEL):
+
+$review" >/dev/null 2>&1 || true
+    fi
+
+    # Tiered autonomy (ADR 0001): default is open PR + label + stop, a human
+    # merges from the phone. Auto-merge only when the repo opted in AND the
+    # diff touches no prod-affecting paths.
+    changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
+    if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
+       && no_prod_effect "$changed"; then
+      gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
+    else
+      gh issue edit "$num" --repo "$slug" --add-label "$LABEL_REVIEW" >/dev/null || true
     fi
   done
 
