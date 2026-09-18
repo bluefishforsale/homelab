@@ -37,8 +37,22 @@
     alert_receiver_port: 9098
     alert_ntfy_url: "http://ntfy.home:8090/homelab"
     alert_issue_repo: bluefishforsale/homelab
-    # Deployable repos (Shape A/B) whose open issues the fleet resolves.
+    # Deployable repos (Shape A/B) whose open issues the fleet resolves, plus
+    # homelab itself.
+    #
+    # homelab is the master config repo, so merging there IS deploying to the
+    # fleet. It is watched anyway, deliberately: the watcher only ever opens a
+    # PR and labels it, and homelab is absent from agentbox_automerge_repos
+    # below, so every agent change to the fleet waits on a human merge. The
+    # decision being made here is "an agent may draft against production", not
+    # "an agent may change production".
+    #
+    # The limits an agent must respect once it is drafting against this repo are
+    # in files/agentbox/shared/AGENTS.md, because that is what the lanes
+    # actually read: never DNS, never anything that could drop SSH, and one
+    # service at a time.
     agentbox_repos:
+      - homelab
       - paia
       - blog_terrac_com
       - my-ta-jose
