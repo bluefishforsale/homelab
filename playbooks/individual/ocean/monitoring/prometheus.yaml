@@ -10,7 +10,7 @@
 
   vars:
     image: prom/prometheus
-    version: latest
+    version: v2.54.1
     service: prometheus
     prom_port: "{{ service_ports.prometheus.port }}"
     prom_retention: 180d
@@ -31,7 +31,7 @@
     # Alertmanager (Docker Compose deployment)
     alertmanager_service: alertmanager
     alertmanager_image: prom/alertmanager
-    alertmanager_version: latest
+    alertmanager_version: v0.27.0
     alertmanager_port: "{{ service_ports.alertmanager.port }}"
     alertmanager_home: "{{ path_data01 }}/{{ alertmanager_service }}"
     alertmanager_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
