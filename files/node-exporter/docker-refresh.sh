@@ -128,6 +128,8 @@ before=$(images)
 # build their image on the host from repo source, so the tag exists in no
 # registry and pulling it fails. Skipping them here is the difference between a
 # weekly no-op and a weekly page. Their update path is a repo change, not a pull.
+# Log to make this behavior visible rather than silent.
+logger -t docker-refresh "project=$PROJECT pulling with --ignore-buildable (skips services with build configs)"
 if ! timeout "$PULL_TIMEOUT" docker compose -p "$PROJECT" "${CFG_ARGS[@]}" pull --quiet --ignore-buildable; then
   logger -t docker-refresh "project=$PROJECT pull failed or exceeded ${PULL_TIMEOUT}s, nothing recreated"
   exit 1
