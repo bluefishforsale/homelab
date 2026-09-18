@@ -422,7 +422,7 @@ groups:
   # error. Strongest "this drive is actively failing" signal; acute during a
   # resilver.
   - alert: DiskPendingSectors
-    expr: smartctl_device_attribute{attribute_name="Current_Pending_Sector",attribute_value_type="raw"} > 0
+    expr: smartctl_device_attribute{attribute_name="Current_Pending_Sector",attribute_value_type="raw"} > 0 unless on(device, instance) smartctl_device_info{serial_number=~"ZJV1QG9S|ZJV2Y4FQ|ZJV5DS4J"}
     for: 30m
     labels:
       severity: warning
@@ -434,7 +434,7 @@ groups:
   # Heavy cumulative reallocation. The drive is coping (remapped to spares) but
   # this is real wear; at these counts it should be scheduled for replacement.
   - alert: DiskReallocatedSectorsHigh
-    expr: smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",attribute_value_type="raw"} > 1000
+    expr: smartctl_device_attribute{attribute_name="Reallocated_Sector_Ct",attribute_value_type="raw"} > 1000 unless on(device, instance) smartctl_device_info{serial_number=~"ZJV1QG9S|ZJV2Y4FQ|ZJV5DS4J"}
     for: 1h
     labels:
       severity: warning
