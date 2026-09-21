@@ -445,6 +445,10 @@
     loop_control:
       label: "{{ item.name }}"
 
+  # NOTE: systemd reads EnvironmentFile once, at unit start, so a long-running
+  # unit keeps the values it booted with. Rendering a new GH_TOKEN here without
+  # restarting left every lane and the alert receiver authenticating with the
+  # revoked one until a human bounced them by hand.
   - name: Render agentbox environment file
     ansible.builtin.template:
       src: "{{ files }}/agentbox.env.j2"
@@ -455,6 +459,9 @@
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
+    notify:
+      - Restart RC sessions
+      - Restart alert receiver
 
   # GH_TOKEN, the ntfy creds and TAVILY_API_KEY reach the lanes through the
   # units' EnvironmentFile. A login shell reads nothing of the sort, so
@@ -540,6 +547,14 @@
       - { src: notify-auth-expired.sh, dest: agentbox-notify-auth-expired.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
+    # Two of these are the ExecStart of a long-running unit, so the process is
+    # already running the previous copy: rc-launch.sh for agentbox-rc@, and
+    # alert-receiver.py for the receiver. PR #479 landed a launcher fix at
+    # 16:29 that the lanes, up since 14:18, never executed. The rest are
+    # timer-driven and re-exec on their own, so notifying costs them nothing.
+    notify:
+      - Restart RC sessions
+      - Restart alert receiver
 
   # Installed with copy, NOT template: the PromQL inside contains `{{device=...}}`
   # (an f-string brace escape) which jinja would try to evaluate. It reads its
@@ -893,6 +908,15 @@
   - name: Restart otelcol
     ansible.builtin.systemd:
       name: otelcol-contrib
+      state: restarted
+
+  # Kept out of the RC glob below on purpose: this is a different service with a
+  # different blast radius, and a skills sync has no business bouncing it. Only
+  # the two inputs it actually reads -- its own code and the env file -- notify
+  # it. Restarting is safe: Alertmanager retries a refused POST.
+  - name: Restart alert receiver
+    ansible.builtin.systemd:
+      name: agentbox-alert-receiver.service
       state: restarted
 
   # try-restart only touches active instances (no-op before first login), so a
