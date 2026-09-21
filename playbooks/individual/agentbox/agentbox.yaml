@@ -29,8 +29,12 @@
 
   vars:
     service: agentbox
-    user: debian
-    home: "/home/debian"
+    # The box's own login user, not a hardcoded name: agentbox runs as debian,
+    # the laptop runs as terrac, and ocean already runs as terrac in the same
+    # inventory. Everything below builds on {{ user }}/{{ home }}, so this pair
+    # is the only place the identity is decided.
+    user: "{{ ansible_user }}"
+    home: "/home/{{ ansible_user }}"
     files: "{{ playbook_dir }}/../../../files/agentbox"
     # Alert receiver: Alertmanager -> ntfy push + GitHub issues on the infra repo.
     # Ports hardcoded (not in vars_service_ports) so this deploy stays scoped.
