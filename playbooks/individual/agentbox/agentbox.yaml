@@ -7,6 +7,8 @@
 # ONE-TIME MANUAL BOOTSTRAP (cannot be automated; interactive OAuth):
 #   ssh debian@agentbox
 #   claude /login          # Pro/Max subscription. Do NOT export ANTHROPIC_API_KEY.
+#   # ...and once per account in agentbox_accounts, since the OAuth token is
+#   # per-HOME: ssh terrac@agentbox && claude /login
 #   gh auth login          # only if no vaulted PAT (agentbox.github_pat)
 #   gcloud auth login      # only if not using a vaulted service-account key
 #   for r in homelab photonic_inventory my-ta-jose; do \
@@ -31,6 +33,37 @@
     service: agentbox
     user: debian
     home: "/home/debian"
+    # Accounts that get the developer environment on this box.
+    #
+    # `user` above stays the lane owner: the systemd units, the fleet SSH key
+    # and the vault password are the unattended agent's alone, and a second copy
+    # of any of them would be a second thing to revoke. Everything an
+    # interactive session needs in order to behave like the laptop -- git
+    # identity, gh credentials, the shared skills/commands/instructions, plugins
+    # and MCP -- is per-account instead.
+    #
+    # terrac is the human account. 01_base_system creates it on every host
+    # (playbooks/individual/base/users.yaml) but gives it only a shell and
+    # authorized_keys, so an `ssh terrac@agentbox` session landed in an account
+    # with no gitconfig, no gh auth and no ~/.claude at all, while every
+    # provisioned thing sat in /home/debian.
+    #
+    # NOTE: both accounts are NOPASSWD sudo (users.yaml), so scoping the token
+    # away from terrac would protect nothing it cannot already read out of
+    # /home/debian. The trust boundary on this box is the box.
+    agentbox_accounts:
+      - name: debian
+        home: /home/debian
+        shell_rc: .bashrc
+        git:
+          - { k: user.name, v: agentbox }
+          - { k: user.email, v: agentbox@terrac.com }
+      - name: terrac
+        home: /home/terrac
+        shell_rc: .zshrc
+        git:
+          - { k: user.name, v: Terrac Skiens }
+          - { k: user.email, v: "3721396+bluefishforsale@users.noreply.github.com" }
     files: "{{ playbook_dir }}/../../../files/agentbox"
     # Alert receiver: Alertmanager -> ntfy push + GitHub issues on the infra repo.
     # Ports hardcoded (not in vars_service_ports) so this deploy stays scoped.
@@ -275,30 +308,48 @@
   # --- Directories ---
   - name: Ensure agentbox directories exist
     ansible.builtin.file:
-      path: "{{ item }}"
+      path: "{{ item.0.home }}/{{ item.1 }}"
+      state: directory
+      owner: "{{ item.0.name }}"
+      group: "{{ item.0.name }}"
+      mode: '0755'
+    loop: "{{ agentbox_accounts | product(['repos', 'work', 'agent-logs', '.config/opencode', '.config/opencode/skills', '.config/opencode/commands', '.config/agentbox', '.claude', '.claude/skills', '.claude/commands']) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
+
+  # RC clones belong to the lane owner only; the units' WorkingDirectory is
+  # {{ home }}/repos/<repo>, so a second copy elsewhere would just go stale.
+  - name: Ensure RC lane repo directories exist
+    ansible.builtin.file:
+      path: "{{ home }}/repos/{{ item }}"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
-    loop: "{{ [home + '/repos', home + '/work', home + '/agent-logs', home + '/.config/opencode', home + '/.config/opencode/skills', home + '/.config/opencode/commands', home + '/.config/agentbox', home + '/.claude', home + '/.claude/skills', home + '/.claude/commands'] + (agentbox_rc_repos | map('regex_replace', '^', home + '/repos/') | list) }}"
+    loop: "{{ agentbox_rc_repos }}"
 
-  # --- git config for the agent lanes (commit identity + token-backed https) ---
-  - name: Set git commit identity for the agent user
-    ansible.builtin.command: "git config --global {{ item.k }} \"{{ item.v }}\""
-    become_user: "{{ user }}"
+  # --- git config per account (commit identity + token-backed https) ---
+  # The lane commits as `agentbox`; the human account commits as itself, so a
+  # push from an interactive session is not attributed to the robot.
+  - name: Set git commit identity per account
+    ansible.builtin.command: "git config --global {{ item.1.k }} \"{{ item.1.v }}\""
+    become_user: "{{ item.0.name }}"
     environment:
-      HOME: "{{ home }}"
-    loop:
-      - { k: user.name, v: agentbox }
-      - { k: user.email, v: agentbox@terrac.com }
+      HOME: "{{ item.0.home }}"
+    loop: "{{ agentbox_accounts | subelements('git') }}"
+    loop_control:
+      label: "{{ item.0.name }} {{ item.1.k }}"
     changed_when: false
 
   - name: Register gh as the git credential helper (authenticated https)
     ansible.builtin.command: gh auth setup-git
-    become_user: "{{ user }}"
+    become_user: "{{ item.name }}"
     environment:
-      HOME: "{{ home }}"
+      HOME: "{{ item.home }}"
       GH_TOKEN: "{{ (agentbox | default({})).github_pat | default('') }}"
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
     changed_when: false
 
   # --- Fleet SSH (remediation from a phone-driven RC session) ---
@@ -335,19 +386,49 @@
   - name: Render opencode config
     ansible.builtin.template:
       src: "{{ files }}/opencode.json.j2"
-      dest: "{{ home }}/.config/opencode/opencode.json"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.home }}/.config/opencode/opencode.json"
+      owner: "{{ item.name }}"
+      group: "{{ item.name }}"
       # 0600: MCP server headers put a bearer token in this file.
       mode: '0600'
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
 
   - name: Render agentbox environment file
     ansible.builtin.template:
       src: "{{ files }}/agentbox.env.j2"
-      dest: "{{ home }}/.config/agentbox/agentbox.env"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.home }}/.config/agentbox/agentbox.env"
+      owner: "{{ item.name }}"
+      group: "{{ item.name }}"
       mode: '0600'
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
+
+  # GH_TOKEN, the ntfy creds and TAVILY_API_KEY reach the lanes through the
+  # units' EnvironmentFile. A login shell reads nothing of the sort, so
+  # `gh auth status` in an interactive session reported "not logged into any
+  # GitHub hosts" on a box whose unattended lanes were authenticating fine --
+  # and every hand-run `gh`/`git push`/`tvly` failed for the same reason.
+  # Sourcing it from the rc puts both entry points on the same environment.
+  - name: Source the agentbox environment from interactive shells
+    ansible.builtin.blockinfile:
+      path: "{{ item.home }}/{{ item.shell_rc }}"
+      create: true
+      owner: "{{ item.name }}"
+      group: "{{ item.name }}"
+      mode: '0644'
+      marker: "# {mark} ANSIBLE MANAGED: agentbox environment"
+      block: |
+        if [ -r "$HOME/.config/agentbox/agentbox.env" ]; then
+          set -a
+          . "$HOME/.config/agentbox/agentbox.env"
+          set +a
+        fi
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}:{{ item.shell_rc }}"
 
   - name: Write Google service-account credentials (when present in vault)
     ansible.builtin.copy:
@@ -575,28 +656,28 @@
   - name: Sync shared skills to both lanes
     ansible.builtin.copy:
       src: "{{ files }}/shared/skills/"
-      dest: "{{ item }}/skills/"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.0.home }}/{{ item.1 }}/skills/"
+      owner: "{{ item.0.name }}"
+      group: "{{ item.0.name }}"
       mode: '0644'
       # Skills ship as <name>/SKILL.md; without this the nested dirs
       # inherit 0644 and become untraversable, so the skill silently vanishes.
       directory_mode: '0755'
-    loop:
-      - "{{ home }}/.claude"
-      - "{{ home }}/.config/opencode"
+    loop: "{{ agentbox_accounts | product(['.claude', '.config/opencode']) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
     notify: Restart RC sessions
 
   - name: Sync shared commands to both lanes
     ansible.builtin.copy:
       src: "{{ files }}/shared/commands/"
-      dest: "{{ item }}/commands/"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.0.home }}/{{ item.1 }}/commands/"
+      owner: "{{ item.0.name }}"
+      group: "{{ item.0.name }}"
       mode: '0644'
-    loop:
-      - "{{ home }}/.claude"
-      - "{{ home }}/.config/opencode"
+    loop: "{{ agentbox_accounts | product(['.claude', '.config/opencode']) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
     notify: Restart RC sessions
 
   - name: Install shared agent scripts on PATH
@@ -610,22 +691,25 @@
   - name: Sync shared instructions (opencode AGENTS.md + Claude import target)
     ansible.builtin.copy:
       src: "{{ files }}/shared/AGENTS.md"
-      dest: "{{ item }}"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.0.home }}/{{ item.1 }}"
+      owner: "{{ item.0.name }}"
+      group: "{{ item.0.name }}"
       mode: '0644'
-    loop:
-      - "{{ home }}/.config/opencode/AGENTS.md"
-      - "{{ home }}/.claude/AGENTS.md"
+    loop: "{{ agentbox_accounts | product(['.config/opencode/AGENTS.md', '.claude/AGENTS.md']) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
     notify: Restart RC sessions
 
   - name: Point Claude user memory at the shared instructions
     ansible.builtin.copy:
       content: "@AGENTS.md\n"
-      dest: "{{ home }}/.claude/CLAUDE.md"
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      dest: "{{ item.home }}/.claude/CLAUDE.md"
+      owner: "{{ item.name }}"
+      group: "{{ item.name }}"
       mode: '0644'
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
     notify: Restart RC sessions
 
   # MCP into Claude is added (not templated): ~/.claude.json also holds Claude's
@@ -637,27 +721,40 @@
   # belt-and-suspenders guard against any CLI hang.
   - name: List Claude MCP servers (user scope)
     ansible.builtin.command: timeout 30 claude mcp list
-    become_user: "{{ user }}"
+    become_user: "{{ item.name }}"
     environment:
-      HOME: "{{ home }}"
+      HOME: "{{ item.home }}"
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
     register: claude_mcp_list
     changed_when: false
     failed_when: false
     when: agentbox_mcp_servers | length > 0
 
+  # Each account has its own ~/.claude.json, so the gate below has to ask
+  # "registered for THIS account", not "registered anywhere on the box".
+  # NOTE: `command` does not run under --check, so stdout is absent there and
+  # the default('') makes every server look unregistered. That is the safe
+  # direction: a dry run over-reports what it would add, rather than crashing.
+  - name: Index the MCP listing per account
+    ansible.builtin.set_fact:
+      agentbox_mcp_present: "{{ dict(claude_mcp_list.results | map(attribute='item.name') | zip(claude_mcp_list.results | map(attribute='stdout', default=''))) }}"
+    when: agentbox_mcp_servers | length > 0
+
   - name: Register shared MCP servers in Claude Code (user scope)
     ansible.builtin.command: >
-      timeout 30 claude mcp add-json {{ item.name | quote }}
-      {{ ({'type': 'http', 'url': item.url, 'headers': item.headers | default({})} if item.url is defined
-          else {'type': 'stdio', 'command': item.command, 'args': item.args | default([]), 'env': item.env | default({})}) | to_json | quote }}
+      timeout 30 claude mcp add-json {{ item.1.name | quote }}
+      {{ ({'type': 'http', 'url': item.1.url, 'headers': item.1.headers | default({})} if item.1.url is defined
+          else {'type': 'stdio', 'command': item.1.command, 'args': item.1.args | default([]), 'env': item.1.env | default({})}) | to_json | quote }}
       --scope user
-    become_user: "{{ user }}"
+    become_user: "{{ item.0.name }}"
     environment:
-      HOME: "{{ home }}"
-    loop: "{{ agentbox_mcp_servers }}"
+      HOME: "{{ item.0.home }}"
+    loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
     when:
       - agentbox_mcp_servers | length > 0
-      - item.name not in (claude_mcp_list.stdout | default(''))
+      - item.1.name not in (agentbox_mcp_present[item.0.name] | default(''))
     no_log: true
     notify: Restart RC sessions
 
@@ -668,37 +765,55 @@
   # redeploy. --yes is required because stdout is not a TTY under ansible.
   - name: List Claude plugin marketplaces
     ansible.builtin.command: timeout 60 claude plugin marketplace list
-    become_user: "{{ user }}"
+    become_user: "{{ item.name }}"
     environment:
-      HOME: "{{ home }}"
+      HOME: "{{ item.home }}"
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
     register: claude_marketplace_list
     changed_when: false
     failed_when: false
 
+  - name: Index the marketplace listing per account
+    ansible.builtin.set_fact:
+      agentbox_marketplaces_present: "{{ dict(claude_marketplace_list.results | map(attribute='item.name') | zip(claude_marketplace_list.results | map(attribute='stdout', default=''))) }}"
+
   - name: Add missing plugin marketplaces
-    ansible.builtin.command: timeout 180 claude plugin marketplace add {{ item | quote }}
-    become_user: "{{ user }}"
+    ansible.builtin.command: timeout 180 claude plugin marketplace add {{ item.1 | quote }}
+    become_user: "{{ item.0.name }}"
     environment:
-      HOME: "{{ home }}"
-    loop: "{{ agentbox_plugin_marketplaces }}"
-    when: item.split('/') | last not in (claude_marketplace_list.stdout | default(''))
+      HOME: "{{ item.0.home }}"
+    loop: "{{ agentbox_accounts | product(agentbox_plugin_marketplaces) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
+    when: item.1.split('/') | last not in (agentbox_marketplaces_present[item.0.name] | default(''))
 
   - name: List installed Claude plugins
     ansible.builtin.command: timeout 60 claude plugin list
-    become_user: "{{ user }}"
+    become_user: "{{ item.name }}"
     environment:
-      HOME: "{{ home }}"
+      HOME: "{{ item.home }}"
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
     register: claude_plugin_list
     changed_when: false
     failed_when: false
 
+  - name: Index the plugin listing per account
+    ansible.builtin.set_fact:
+      agentbox_plugins_present: "{{ dict(claude_plugin_list.results | map(attribute='item.name') | zip(claude_plugin_list.results | map(attribute='stdout', default=''))) }}"
+
   - name: Install shared Claude plugins
-    ansible.builtin.command: timeout 300 claude plugin install --yes {{ item | quote }}
-    become_user: "{{ user }}"
+    ansible.builtin.command: timeout 300 claude plugin install --yes {{ item.1 | quote }}
+    become_user: "{{ item.0.name }}"
     environment:
-      HOME: "{{ home }}"
-    loop: "{{ agentbox_plugins }}"
-    when: item.split('@') | first not in (claude_plugin_list.stdout | default(''))
+      HOME: "{{ item.0.home }}"
+    loop: "{{ agentbox_accounts | product(agentbox_plugins) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
+    when: item.1.split('@') | first not in (agentbox_plugins_present[item.0.name] | default(''))
     notify: Restart RC sessions
 
   handlers:
