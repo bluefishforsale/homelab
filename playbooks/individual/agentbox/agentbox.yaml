@@ -9,7 +9,7 @@
 #   claude /login          # Pro/Max subscription. Do NOT export ANTHROPIC_API_KEY.
 #   # ...and once per account in agentbox_accounts, since the OAuth token is
 #   # per-HOME: ssh terrac@agentbox && claude /login
-#   gh auth login          # only if no vaulted PAT (agentbox.github_pat)
+#   gh auth login          # only if no vaulted PAT (agentbox.fleet_pat)
 #   gcloud auth login      # only if not using a vaulted service-account key
 #   for r in homelab photonic_inventory my-ta-jose; do \
 #     gh repo clone bluefishforsale/$r repos/$r; done   # rc-repo clones
@@ -346,7 +346,7 @@
     become_user: "{{ item.name }}"
     environment:
       HOME: "{{ item.home }}"
-      GH_TOKEN: "{{ (agentbox | default({})).github_pat | default('') }}"
+      GH_TOKEN: "{{ (agentbox | default({})).fleet_pat | default('') }}"
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
