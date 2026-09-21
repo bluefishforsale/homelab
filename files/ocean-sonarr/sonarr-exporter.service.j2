@@ -24,7 +24,7 @@ ExecStart=docker run --rm \
     -e PORT={{ exporter_port }} \
     -e ENABLE_ADDITIONAL_METRICS=true \
     -p {{ exporter_port }}:{{ exporter_port }} \
-    -e APIKEY="{{ media_services.sonarr.api_key }}" \
+    -e API_KEY="{{ media_services.sonarr.api_key }}" \
     {{ exporter_image }}:{{ exporter_version }} \
       sonarr
 ExecStop=docker rm -f %N
