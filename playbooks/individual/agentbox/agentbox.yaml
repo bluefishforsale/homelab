@@ -734,9 +734,12 @@
 
   # Each account has its own ~/.claude.json, so the gate below has to ask
   # "registered for THIS account", not "registered anywhere on the box".
+  # NOTE: `command` does not run under --check, so stdout is absent there and
+  # the default('') makes every server look unregistered. That is the safe
+  # direction: a dry run over-reports what it would add, rather than crashing.
   - name: Index the MCP listing per account
     ansible.builtin.set_fact:
-      agentbox_mcp_present: "{{ dict(claude_mcp_list.results | map(attribute='item.name') | zip(claude_mcp_list.results | map(attribute='stdout'))) }}"
+      agentbox_mcp_present: "{{ dict(claude_mcp_list.results | map(attribute='item.name') | zip(claude_mcp_list.results | map(attribute='stdout', default=''))) }}"
     when: agentbox_mcp_servers | length > 0
 
   - name: Register shared MCP servers in Claude Code (user scope)
@@ -774,7 +777,7 @@
 
   - name: Index the marketplace listing per account
     ansible.builtin.set_fact:
-      agentbox_marketplaces_present: "{{ dict(claude_marketplace_list.results | map(attribute='item.name') | zip(claude_marketplace_list.results | map(attribute='stdout'))) }}"
+      agentbox_marketplaces_present: "{{ dict(claude_marketplace_list.results | map(attribute='item.name') | zip(claude_marketplace_list.results | map(attribute='stdout', default=''))) }}"
 
   - name: Add missing plugin marketplaces
     ansible.builtin.command: timeout 180 claude plugin marketplace add {{ item.1 | quote }}
@@ -800,7 +803,7 @@
 
   - name: Index the plugin listing per account
     ansible.builtin.set_fact:
-      agentbox_plugins_present: "{{ dict(claude_plugin_list.results | map(attribute='item.name') | zip(claude_plugin_list.results | map(attribute='stdout'))) }}"
+      agentbox_plugins_present: "{{ dict(claude_plugin_list.results | map(attribute='item.name') | zip(claude_plugin_list.results | map(attribute='stdout', default=''))) }}"
 
   - name: Install shared Claude plugins
     ansible.builtin.command: timeout 300 claude plugin install --yes {{ item.1 | quote }}
