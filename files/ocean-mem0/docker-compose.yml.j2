@@ -115,7 +115,10 @@ services:
 
     environment:
       - TZ=America/Los_Angeles
-      - OLLAMA_NUM_PARALLEL=2
+      # Force sequential evaluation. Setting this >1 causes thread oversubscription
+      # since each request uses 6 threads (the quota), which thrashes the CPU and
+      # degrades search latency past the 6s recall budget.
+      - OLLAMA_NUM_PARALLEL=1
       # Never unload. The default 5-minute idle timeout meant a session's one
       # recall almost always paid full model-load cost, and the recall hook
       # gives the entire search 6 seconds.
