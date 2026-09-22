@@ -183,6 +183,9 @@ service_ports:
   my_ta_jose:
     port: 8092
 
+  godseye:
+    port: 8094
+
   photonic_inventory:
     port: 8095
 
