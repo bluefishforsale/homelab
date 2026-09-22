@@ -14,14 +14,29 @@ vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
 
 ## Rules
 
-- Check the issue before you implement it. An issue body records what was
-  believed when it was filed, which may no longer be true. Before editing,
-  test its claims against the tree in front of you: does the code still look
-  like that, is there a rationale documented beside the line you are about to
-  change, has the design moved since. If the premise does not hold, say so on
-  the issue and stop. Implementing a wrong premise competently is worse than
-  not starting, because the confident summary that ships with it hides the
-  error.
+- Check the issue before you implement it, against the code AND against the
+  running system. An issue body records what was believed when it was filed,
+  which may no longer be true: someone may have fixed it, the design may have
+  moved, or the symptom may never have been what the reporter thought.
+
+  Against the code: does the line still look like that, is there a rationale
+  documented beside the thing you are about to change, has the design moved
+  since it was filed.
+
+  Against the running system: reproduce the symptom before you fix it. Run the
+  command that is said to fail. `curl` the endpoint and read the status and the
+  body, not just one of them. `ssh <host> systemctl status <unit>` and
+  `journalctl -u <unit>` for a service; every inventory host is reachable by
+  name through the fleet `~/.ssh/config` and the fleet key. Check the file is
+  really absent, the port really closed, the container really down. Prefer the
+  cheap read-only probe over inference from a config file: a template says what
+  should have been deployed, the host says what was.
+
+  If the premise does not hold, say so on the issue and stop. If you cannot
+  reproduce the symptom at all, that is a finding worth reporting, not a reason
+  to implement the fix anyway and hope. Implementing a wrong premise competently
+  is worse than not starting, because the confident summary that ships with it
+  hides the error.
 - Never reason from a checkout you have not fetched. A grep that finds nothing
   in a stale tree is an artifact, not an absence. If a fetch fails, say so, and
   treat every conclusion drawn from that tree as provisional.
