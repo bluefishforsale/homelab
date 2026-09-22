@@ -14,6 +14,17 @@ vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
 
 ## Rules
 
+- Check the issue before you implement it. An issue body records what was
+  believed when it was filed, which may no longer be true. Before editing,
+  test its claims against the tree in front of you: does the code still look
+  like that, is there a rationale documented beside the line you are about to
+  change, has the design moved since. If the premise does not hold, say so on
+  the issue and stop. Implementing a wrong premise competently is worse than
+  not starting, because the confident summary that ships with it hides the
+  error.
+- Never reason from a checkout you have not fetched. A grep that finds nothing
+  in a stale tree is an artifact, not an absence. If a fetch fails, say so, and
+  treat every conclusion drawn from that tree as provisional.
 - Make the minimal, correct change. Do not touch unrelated code.
 - Keep the build and tests green. A red PR is escalated, not merged.
 - Never merge a prod-affecting change yourself. Open the PR, label it, stop. The
