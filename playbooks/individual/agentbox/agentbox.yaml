@@ -193,18 +193,6 @@
       state: directory
       mode: '0755'
 
-  - name: Add Claude Code apt key
-    ansible.builtin.get_url:
-      url: https://downloads.claude.ai/keys/claude-code.asc
-      dest: /etc/apt/keyrings/claude-code.asc
-      mode: '0644'
-
-  - name: Add Claude Code apt repository
-    ansible.builtin.apt_repository:
-      repo: "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main"
-      filename: claude-code
-      state: present
-
   - name: Add GitHub CLI apt key
     ansible.builtin.get_url:
       url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
@@ -221,17 +209,79 @@
   # loop needs only gh + claude + opencode). Its apt repo also breaks on Google's
   # rotated signing key. Re-add later by dearmoring the key:
   #   curl -fsSL .../apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-  # state: latest, not present: remote-control is a fast-moving beta whose
-  # client/server protocol desyncs when the CLI falls behind (an old CLI holds
-  # a live socket but spawns no session). Keep claude-code current so RC works.
-  - name: Install Claude Code and GitHub CLI
+  - name: Install GitHub CLI
     ansible.builtin.apt:
       name:
-        - claude-code
         - gh
       state: latest
-      update_cache: yes
+      update_cache: true
+
+  # Claude Code comes from the official native installer, not apt. The apt repo
+  # publishes late: it sat on 2.1.267-1 as both candidate and installed while
+  # the laptop and tautog were already on 2.1.278, and a CLI that falls behind
+  # desyncs from the remote-control server (it holds a live socket but spawns no
+  # session). The native channel is also what the other two machines run, so this
+  # is the one that gets parity instead of a third, slower release train.
+  #
+  # The installer puts everything under $HOME and refuses to run under sudo, so
+  # it runs unprivileged once per account rather than once for the box.
+  #
+  # Bootstrap and upgrade are one task on purpose: the bootstrap script
+  # re-downloads the whole ~217MB binary every time it runs, while
+  # `claude install latest` fetches only when a newer build exists. So bootstrap
+  # is the cold path and the installed binary updates itself after that.
+  #
+  # NOTE: changed is decided by the version symlink moving, not by grepping
+  # installer output. Get that wrong and every deploy reports changed and
+  # restarts all three RC lanes for nothing.
+  - name: Install or update Claude Code (native installer)
+    ansible.builtin.shell: |
+      set -eu
+      bin="$HOME/.local/bin/claude"
+      before=$(readlink -f "$bin" 2>/dev/null || echo none)
+      if [ -x "$bin" ]; then
+        timeout 300 "$bin" install latest
+      else
+        timeout 600 bash -c 'curl -fsSL --connect-timeout 20 --max-time 540 https://claude.ai/install.sh | bash -s latest'
+      fi
+      [ -x "$bin" ] || { echo "installer left no $bin" >&2; exit 1; }
+      [ "$(readlink -f "$bin")" = "$before" ] || echo VERSION-CHANGED
+    become_user: "{{ item.name }}"
+    environment:
+      HOME: "{{ item.home }}"
+    loop: "{{ agentbox_accounts }}"
+    loop_control:
+      label: "{{ item.name }}"
+    register: agentbox_claude_native
+    changed_when: "'VERSION-CHANGED' in agentbox_claude_native.stdout"
     notify: Restart RC sessions
+
+  # Removed, not merely left unmanaged: /usr/bin/claude sitting next to
+  # ~/.local/bin/claude means PATH order decides which binary a caller gets, and
+  # that ambiguity is the whole reason this change exists. The repo and key go
+  # with it so nothing can quietly reinstall the package later.
+  #
+  # NOTE: this must stay AFTER the native install above, so the box is never
+  # without a claude. A live RC lane holds the deleted inode and keeps running;
+  # it picks up the native binary when the handler restarts it, because the unit
+  # PATH already prefers {{ home }}/.local/bin
+  # (files/agentbox/agentbox-rc@.service.j2).
+  - name: Remove the apt-packaged Claude Code
+    ansible.builtin.apt:
+      name: claude-code
+      state: absent
+    notify: Restart RC sessions
+
+  - name: Remove the Claude Code apt repository
+    ansible.builtin.apt_repository:
+      repo: "deb [signed-by=/etc/apt/keyrings/claude-code.asc] https://downloads.claude.ai/claude-code/apt/stable stable main"
+      filename: claude-code
+      state: absent
+
+  - name: Remove the Claude Code apt signing key
+    ansible.builtin.file:
+      path: /etc/apt/keyrings/claude-code.asc
+      state: absent
 
   # The npm package's postinstall is flaky at fetching the platform binary; the
   # official installer drops a self-contained binary. Install as the user (it
@@ -395,6 +445,10 @@
     loop_control:
       label: "{{ item.name }}"
 
+  # NOTE: systemd reads EnvironmentFile once, at unit start, so a long-running
+  # unit keeps the values it booted with. Rendering a new GH_TOKEN here without
+  # restarting left every lane and the alert receiver authenticating with the
+  # revoked one until a human bounced them by hand.
   - name: Render agentbox environment file
     ansible.builtin.template:
       src: "{{ files }}/agentbox.env.j2"
@@ -405,6 +459,9 @@
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
+    notify:
+      - Restart RC sessions
+      - Restart alert receiver
 
   # GH_TOKEN, the ntfy creds and TAVILY_API_KEY reach the lanes through the
   # units' EnvironmentFile. A login shell reads nothing of the sort, so
@@ -490,6 +547,14 @@
       - { src: notify-auth-expired.sh, dest: agentbox-notify-auth-expired.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
       - { src: alert-receiver.py, dest: agentbox-alert-receiver.py }
+    # Two of these are the ExecStart of a long-running unit, so the process is
+    # already running the previous copy: rc-launch.sh for agentbox-rc@, and
+    # alert-receiver.py for the receiver. PR #479 landed a launcher fix at
+    # 16:29 that the lanes, up since 14:18, never executed. The rest are
+    # timer-driven and re-exec on their own, so notifying costs them nothing.
+    notify:
+      - Restart RC sessions
+      - Restart alert receiver
 
   # Installed with copy, NOT template: the PromQL inside contains `{{device=...}}`
   # (an f-string brace escape) which jinja would try to evaluate. It reads its
@@ -719,11 +784,20 @@
   # Whole section is gated on having servers so a fresh/unauthenticated `claude`
   # is never invoked at deploy time (it can block on first-run). `timeout` is a
   # belt-and-suspenders guard against any CLI hang.
+  #
+  # NOTE: every `claude` task from here down carries the account's ~/.local/bin
+  # in `environment.PATH`. The command module does not read the account's shell
+  # rc, so a bare `claude` would resolve against the connection PATH only, and
+  # the native install lives under $HOME. Same prefix the units use
+  # (files/agentbox/agentbox-rc@.service.j2), so deploy-time and runtime resolve
+  # to the same binary. Prepend rather than an absolute path, because `claude`
+  # shells out (git, npm) during `plugin install` and still needs a real PATH.
   - name: List Claude MCP servers (user scope)
     ansible.builtin.command: timeout 30 claude mcp list
     become_user: "{{ item.name }}"
     environment:
       HOME: "{{ item.home }}"
+      PATH: "{{ item.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
@@ -751,6 +825,7 @@
     become_user: "{{ item.0.name }}"
     environment:
       HOME: "{{ item.0.home }}"
+      PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
     when:
       - agentbox_mcp_servers | length > 0
@@ -768,6 +843,7 @@
     become_user: "{{ item.name }}"
     environment:
       HOME: "{{ item.home }}"
+      PATH: "{{ item.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
@@ -784,6 +860,7 @@
     become_user: "{{ item.0.name }}"
     environment:
       HOME: "{{ item.0.home }}"
+      PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts | product(agentbox_plugin_marketplaces) | list }}"
     loop_control:
       label: "{{ item.0.name }}:{{ item.1 }}"
@@ -794,6 +871,7 @@
     become_user: "{{ item.name }}"
     environment:
       HOME: "{{ item.home }}"
+      PATH: "{{ item.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts }}"
     loop_control:
       label: "{{ item.name }}"
@@ -810,6 +888,7 @@
     become_user: "{{ item.0.name }}"
     environment:
       HOME: "{{ item.0.home }}"
+      PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
     loop: "{{ agentbox_accounts | product(agentbox_plugins) | list }}"
     loop_control:
       label: "{{ item.0.name }}:{{ item.1 }}"
@@ -829,6 +908,15 @@
   - name: Restart otelcol
     ansible.builtin.systemd:
       name: otelcol-contrib
+      state: restarted
+
+  # Kept out of the RC glob below on purpose: this is a different service with a
+  # different blast radius, and a skills sync has no business bouncing it. Only
+  # the two inputs it actually reads -- its own code and the env file -- notify
+  # it. Restarting is safe: Alertmanager retries a refused POST.
+  - name: Restart alert receiver
+    ansible.builtin.systemd:
+      name: agentbox-alert-receiver.service
       state: restarted
 
   # try-restart only touches active instances (no-op before first login), so a
