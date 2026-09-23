@@ -75,8 +75,23 @@ absolute, not judgement calls.
   controlled here: one service is recoverable by hand, a fleet-wide apply is not.
 - In `homelab`, merging is deploying. A merge to master runs a real
   `ansible-playbook` apply against production, so there is no checkpoint between
-  your PR and the fleet. You open the PR, label it, and stop. You never merge a
-  homelab PR.
+  your PR and the fleet.
+
+  You may merge a homelab PR when every one of these holds:
+
+  - every required check is green,
+  - the change repairs something that is broken, rather than adding a feature or
+    restructuring what already works,
+  - it stays inside the limits above: one service, never DNS, nothing that could
+    drop SSH, no site-wide orchestrator,
+  - and you confirmed the problem against the running system before fixing it,
+    so you know the change addresses something real.
+
+  Anything else you open, label, and stop. Red is never merged. Neither is a PR
+  you are unsure about: waiting for a human costs hours, a bad apply costs the
+  fleet, and those are not the same size of mistake. When the four conditions
+  hold, a broken fleet waiting on a human is the worse outcome, which is why
+  this is permission and not obligation.
 
 ## Memory
 
