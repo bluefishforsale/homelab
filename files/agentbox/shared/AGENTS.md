@@ -49,6 +49,14 @@ vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
 - Never reason from a checkout you have not fetched. A grep that finds nothing
   in a stale tree is an artifact, not an absence. If a fetch fails, say so, and
   treat every conclusion drawn from that tree as provisional.
+- Never edit a deployed artifact in place. `/usr/local/bin`, `/etc/systemd/system`
+  and anything else ansible writes are output, not source: a `cp` over one of
+  them changes the box without changing git, so master and the fleet disagree
+  with no diff to show it, and the next apply silently reverts you. Worse, most
+  of those files are Jinja2 templates, and copying the source installs the
+  literal `{{ placeholder }}`. Change the repo, open the PR, let the apply
+  deploy it. If it has to be live before then, say so on the issue rather than
+  reaching for sudo.
 - Make the minimal, correct change. Do not touch unrelated code.
 - Keep the build and tests green. A red PR is escalated, not merged.
 - Never merge a prod-affecting change yourself. Open the PR, label it, stop. The

@@ -16,6 +16,19 @@ Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-{{ home }}/.config/agentbox/agentbox.env
 WorkingDirectory={{ home }}
 ExecStart=/usr/local/bin/agentbox-issue-watcher.sh
+# Ansible owns these paths; to a lane they are build output, not source. The
+# lane working #484 ran `sudo cp files/agentbox/issue-watcher.sh` over
+# /usr/local/bin/agentbox-issue-watcher.sh, copying the Jinja2 template instead
+# of a rendered file. The literal {{ '{{ home }}' }} then failed on every timer
+# fire for six hours, and because the unit it broke is the dispatcher, nothing
+# was left running to raise an alert about it.
+#
+# ReadOnlyPaths applies to the unit's mount namespace, so the lanes spawned
+# underneath inherit it and the cp fails loudly instead of succeeding quietly.
+# Not a security boundary: this unit can still sudo, and root inside the
+# namespace can remount. It is here to stop an honest mistake, and the honest
+# mistake is the one that actually happened.
+ReadOnlyPaths=/usr/local/bin /etc/systemd/system
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agentbox-watcher
