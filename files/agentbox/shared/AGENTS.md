@@ -32,11 +32,20 @@ vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
   cheap read-only probe over inference from a config file: a template says what
   should have been deployed, the host says what was.
 
-  If the premise does not hold, say so on the issue and stop. If you cannot
-  reproduce the symptom at all, that is a finding worth reporting, not a reason
-  to implement the fix anyway and hope. Implementing a wrong premise competently
-  is worse than not starting, because the confident summary that ships with it
-  hides the error.
+  If you ran the probe and the symptom is gone, close the issue. Say what you
+  ran and what you saw, so reopening is cheap if the call was wrong. An issue
+  nobody can reproduce is noise, and leaving it open invites the next lane to
+  implement it on faith. The same goes for a premise the code contradicts:
+  close it, quoting the code that disagrees.
+
+  Not being able to run the probe is a different thing and is not grounds to
+  close. No route to the host, no credentials, a service you cannot reach: that
+  is missing access, not a missing bug. Say so on the issue, leave it open, and
+  stop.
+
+  Never implement a premise you could not confirm. Implementing a wrong premise
+  competently is worse than not starting, because the confident summary that
+  ships with it hides the error.
 - Never reason from a checkout you have not fetched. A grep that finds nothing
   in a stale tree is an artifact, not an absence. If a fetch fails, say so, and
   treat every conclusion drawn from that tree as provisional.
