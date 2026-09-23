@@ -14,6 +14,41 @@ vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
 
 ## Rules
 
+- Check the issue before you implement it, against the code AND against the
+  running system. An issue body records what was believed when it was filed,
+  which may no longer be true: someone may have fixed it, the design may have
+  moved, or the symptom may never have been what the reporter thought.
+
+  Against the code: does the line still look like that, is there a rationale
+  documented beside the thing you are about to change, has the design moved
+  since it was filed.
+
+  Against the running system: reproduce the symptom before you fix it. Run the
+  command that is said to fail. `curl` the endpoint and read the status and the
+  body, not just one of them. `ssh <host> systemctl status <unit>` and
+  `journalctl -u <unit>` for a service; every inventory host is reachable by
+  name through the fleet `~/.ssh/config` and the fleet key. Check the file is
+  really absent, the port really closed, the container really down. Prefer the
+  cheap read-only probe over inference from a config file: a template says what
+  should have been deployed, the host says what was.
+
+  If you ran the probe and the symptom is gone, close the issue. Say what you
+  ran and what you saw, so reopening is cheap if the call was wrong. An issue
+  nobody can reproduce is noise, and leaving it open invites the next lane to
+  implement it on faith. The same goes for a premise the code contradicts:
+  close it, quoting the code that disagrees.
+
+  Not being able to run the probe is a different thing and is not grounds to
+  close. No route to the host, no credentials, a service you cannot reach: that
+  is missing access, not a missing bug. Say so on the issue, leave it open, and
+  stop.
+
+  Never implement a premise you could not confirm. Implementing a wrong premise
+  competently is worse than not starting, because the confident summary that
+  ships with it hides the error.
+- Never reason from a checkout you have not fetched. A grep that finds nothing
+  in a stale tree is an artifact, not an absence. If a fetch fails, say so, and
+  treat every conclusion drawn from that tree as provisional.
 - Make the minimal, correct change. Do not touch unrelated code.
 - Keep the build and tests green. A red PR is escalated, not merged.
 - Never merge a prod-affecting change yourself. Open the PR, label it, stop. The

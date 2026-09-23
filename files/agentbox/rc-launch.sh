@@ -18,6 +18,63 @@
 set -euo pipefail
 
 repo="$1"
+
+# A remote-control session reads whatever this checkout was last left in, and
+# nothing else refreshes it. repos/homelab sat 34 commits behind master on a
+# feature branch that never merged, and a session reasoning from it reported
+# code as absent that had landed weeks earlier: a grep over a stale tree is an
+# artifact, not an absence. The issue-watcher lanes already cut every branch
+# from a fresh origin/HEAD; only this path lacked it.
+#
+# Fetch unconditionally so origin/* is current even when the tree cannot be
+# moved. Fast-forward only a clean checkout sitting on the default branch:
+# a dirty tree or a feature branch is someone's work in progress, and silently
+# moving it would be worse than the staleness. Every refusal says so on stderr
+# so the reason is in the journal rather than inferred later.
+refresh_checkout() {
+  local dir="$1" default branch behind
+  [ -d "$dir/.git" ] || return 0
+
+  if ! git -C "$dir" fetch -q --prune origin 2>/dev/null; then
+    echo "WARN: fetch failed for ${dir}; treat this checkout as possibly stale" >&2
+    return 0
+  fi
+
+  # origin/HEAD is absent on clones made with --single-branch; ask the remote.
+  default=$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || default=""
+  if [ -z "$default" ]; then
+    git -C "$dir" remote set-head -a origin >/dev/null 2>&1 || true
+    default=$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || default=""
+  fi
+  [ -n "$default" ] || { echo "WARN: ${dir} has no origin/HEAD; not fast-forwarding" >&2; return 0; }
+  default=${default#origin/}
+
+  # --untracked-files=no on purpose: a fast-forward preserves untracked files,
+  # and repos/ accumulates them (a stray scripts/*.sh sat there for days).
+  # Counting them as "dirty" would pin the checkout stale forever, which is the
+  # bug this function exists to fix. Only tracked modifications block.
+  if [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
+    echo "WARN: ${dir} has uncommitted tracked changes; fetched but not fast-forwarded" >&2
+    return 0
+  fi
+
+  branch=$(git -C "$dir" rev-parse --abbrev-ref HEAD)
+  if [ "$branch" != "$default" ]; then
+    behind=$(git -C "$dir" rev-list --count "HEAD..origin/${default}" 2>/dev/null || echo 0)
+    echo "WARN: ${dir} is on ${branch}, not ${default} (${behind} commit(s) behind); fetched but not fast-forwarded" >&2
+    return 0
+  fi
+
+  behind=$(git -C "$dir" rev-list --count "HEAD..origin/${default}" 2>/dev/null || echo 0)
+  [ "$behind" -gt 0 ] || return 0
+  if git -C "$dir" merge --ff-only "origin/${default}" >/dev/null 2>&1; then
+    echo "refreshed ${dir}: fast-forwarded ${behind} commit(s) to origin/${default}"
+  else
+    echo "WARN: ${dir} is ${behind} commit(s) behind origin/${default} and would not fast-forward" >&2
+  fi
+}
+
+refresh_checkout "${HOME}/repos/${repo}"
 /usr/local/bin/agentbox-trust-dir.sh "${HOME}/repos/${repo}"
 
 # One launch attempt under a pty, exiting with the child's status so the caller
