@@ -22,6 +22,33 @@ if ! command -v zpool >/dev/null 2>&1; then
   exit 0
 fi
 
+# Helper function to extract WWN from device path
+# This function maps kernel device names to WWN identifiers using /dev/disk/by-id/
+get_wwn_from_device() {
+  local device="$1"
+  
+  # Try to resolve the device path to /dev/disk/by-id/ symlink to get WWN
+  if [[ -b "/dev/$device" ]]; then
+    # Look for WWN identifiers in /dev/disk/by-id/
+    local wwn_link=$(find /dev/disk/by-id/ -lname "*$device" -type l 2>/dev/null | head -1)
+    if [[ -n "$wwn_link" ]]; then
+      # Extract WWN from the symlink name
+      local wwn=$(basename "$wwn_link")
+      # Remove prefix if it's a wwn identifier
+      if [[ "$wwn" =~ ^wwn- ]]; then
+        echo "$wwn"
+      fi
+    fi
+  fi
+}
+
+# Helper function to extract serial from device path
+# This function gets serial numbers using lsblk
+get_serial_from_device() {
+  local device="$1"
+  lsblk -o SERIAL -n -r "/dev/$device" 2>/dev/null | head -1
+}
+
 health_num() {
   case "$1" in
     ONLINE) echo 0 ;;
@@ -65,6 +92,8 @@ num() {
   echo "# TYPE zpool_snapshot_used_bytes gauge"
   echo "# HELP zpool_vdev_redundancy_budget Disks this vdev can still lose before data loss (parity minus non-ONLINE leaves; raidzN=N, N-way mirror=N-1). Pool budget = min across its vdevs. 0 = at the edge."
   echo "# TYPE zpool_vdev_redundancy_budget gauge"
+  echo "# HELP disk_wwn_info Disk WWN and serial information for device mapping"
+  echo "# TYPE disk_wwn_info gauge"
 
   for pool in $(zp list -H -o name); do
     echo "zpool_health{pool=\"$pool\"} $(health_num "$(zp list -H -o health "$pool")")"
@@ -116,6 +145,16 @@ num() {
           echo "zpool_device_faulted{pool=\"$pool\",device=\"$dev\"} 0"
         fi
         echo "zpool_device_state{pool=\"$pool\",device=\"$dev\",state=\"$state\"} 1"
+        
+        # Add device-to-wwn mapping info
+        # First try to get WWN and serial info for the device
+        local wwn=$(get_wwn_from_device "$dev")
+        local serial=$(get_serial_from_device "$dev")
+        
+        # Only emit the disk_wwn_info if we found valid information
+        if [[ -n "$wwn" ]]; then
+          echo "disk_wwn_info{device=\"$dev\",wwn=\"$wwn\",serial=\"${serial:-}\"} 1"
+        fi
       done
 
     # Failure budget per vdev: parity minus non-ONLINE leaves. Parity comes from
