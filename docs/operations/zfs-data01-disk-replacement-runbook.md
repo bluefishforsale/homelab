@@ -45,11 +45,11 @@ act-soon, not someday.
       zpool list -v data01
       zpool events data01 | tail -50
       ```
-- [ ] Map every `wwn-*` to a physical drive (serial + bay) so you pull the right
-      one. Do NOT guess:
+- [ ] Map every member (`wwn-*` or `ata-*`) to a physical drive (serial + bay) so you pull the right
+      one. Note: 7 members use `wwn-*`, but `wwn-0x5000c500b43e1c50` was imported as `ata-ST12000NM0127_ZJV3KB10`. Do NOT guess:
       ```
-      # wwn -> /dev/sdX
-      ls -l /dev/disk/by-id/ | grep wwn-0x5000c500b30c1db0
+      # disk id -> /dev/sdX
+      ls -l /dev/disk/by-id/ | grep <id>
       # /dev/sdX -> serial + model (write the serial on paper)
       smartctl -i /dev/sdX
       # make the bay LED blink if the HBA/enclosure supports it
