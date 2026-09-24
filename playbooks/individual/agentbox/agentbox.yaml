@@ -133,6 +133,11 @@
       - pr-review-toolkit@claude-plugins-official
       - code-simplifier@claude-plugins-official
       - security-guidance@claude-plugins-official
+    # Installed but switched off, matching the laptop config. Ponytail's coding
+    # rules duplicate shared/AGENTS.md and the two drift apart; disabling beats
+    # uninstalling because the install loop above would just put it back.
+    agentbox_plugins_disabled:
+      - ponytail@ponytail
 
     agentbox_mcp_servers:
       # Fleet memory (playbooks/individual/ocean/ai/mem0.yaml). One store for
@@ -893,6 +898,22 @@
     loop_control:
       label: "{{ item.0.name }}:{{ item.1 }}"
     when: item.1.split('@') | first not in (agentbox_plugins_present[item.0.name] | default(''))
+    notify: Restart RC sessions
+
+  # Runs after the install loop so a plugin installed this pass is switched off
+  # in the same run. Disabling one that is already off exits 1 with
+  # already_in_goal_state, which is the idempotent case, not a failure.
+  - name: Disable plugins superseded by shared/AGENTS.md
+    ansible.builtin.command: timeout 60 claude plugin disable --scope user --json {{ item.1 | quote }}
+    become_user: "{{ item.0.name }}"
+    environment:
+      HOME: "{{ item.0.home }}"
+    loop: "{{ agentbox_accounts | product(agentbox_plugins_disabled) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}:{{ item.1 }}"
+    register: claude_plugin_disable
+    changed_when: claude_plugin_disable.rc == 0
+    failed_when: claude_plugin_disable.rc != 0 and 'already_in_goal_state' not in claude_plugin_disable.stdout
     notify: Restart RC sessions
 
   handlers:
