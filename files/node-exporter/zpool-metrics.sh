@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# zpool-metrics.sh — publish ZFS pool health to the node_exporter textfile
-# collector. READ-ONLY: it only runs `zpool list`/`zpool status` and NEVER
+# zpool-metrics.sh — publish ZFS pool health, and the kernel-name-to-wwn map, to
+# the node_exporter textfile collector. READ-ONLY: it only runs `zpool
+# list`/`zpool status` and reads /dev/disk/by-id symlinks, and NEVER
 # mutates a pool (no import/export/mount/replace/clear). Storage changes stay a
 # coordinated, hand-run task (see docs/operations and agents.md). Safe on hosts
 # without ZFS (no-op). Every zpool call is timeout-bounded so a suspended pool
@@ -65,6 +66,28 @@ num() {
   echo "# TYPE zpool_snapshot_used_bytes gauge"
   echo "# HELP zpool_vdev_redundancy_budget Disks this vdev can still lose before data loss (parity minus non-ONLINE leaves; raidzN=N, N-way mirror=N-1). Pool budget = min across its vdevs. 0 = at the edge."
   echo "# TYPE zpool_vdev_redundancy_budget gauge"
+  echo "# HELP disk_wwn_info Maps a kernel device name to its stable wwn and serial. Always 1; the identity is in the labels."
+  echo "# TYPE disk_wwn_info gauge"
+
+  # Kernel name -> wwn, so a drive's SMART wear and its ZFS errors can be joined.
+  # smartctl-exporter labels device with the kernel name (sdf) and exposes no
+  # wwn; zpool status gives the wwn and no kernel name. Same label, no shared
+  # value, so nothing could correlate the two halves of one physical disk. That
+  # also kept SMART wear alerts from ever filing a [replace] ticket, since the
+  # receiver only accepts stable by-id names (alert-receiver.py STABLE_DEV_RE).
+  #
+  # Reads symlink targets under /dev/disk/by-id only. Every disk with a wwn link
+  # is covered, including one the pool happens to have imported under its ata-
+  # path, because this keys on the by-id tree and not on zpool status.
+  shopt -s nullglob
+  for link in /dev/disk/by-id/wwn-*; do
+    case "$link" in *-part*) continue ;; esac   # partitions, not disks
+    dev=$(basename "$(readlink -f "$link")")
+    [ -n "$dev" ] || continue
+    serial=$(lsblk -dno SERIAL "/dev/$dev" 2>/dev/null | tr -d '[:space:]')
+    echo "disk_wwn_info{device=\"$dev\",wwn=\"$(basename "$link")\",serial=\"${serial:-unknown}\"} 1"
+  done
+  shopt -u nullglob
 
   for pool in $(zp list -H -o name); do
     echo "zpool_health{pool=\"$pool\"} $(health_num "$(zp list -H -o health "$pool")")"
