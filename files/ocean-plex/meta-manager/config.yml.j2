@@ -17,7 +17,12 @@ libraries:                                      # This is called out once within
       template_variables:
         collection_order: release
         build_collection: true
-        radarr_add_missing: true
+        # NOTE: keep this false. True makes Kometa push every missing entry of
+        # every franchise it builds a collection for back into Radarr, which
+        # re-adds the sequels you deliberately deleted and, with `monitor: true`
+        # below, starts hunting them again. It is the one knob here that turns a
+        # collection builder into a completionist.
+        radarr_add_missing: false
     - default: studio
     - default: tautulli
     - default: content_rating_us
