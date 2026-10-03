@@ -193,9 +193,17 @@ groups:
   # `unless in_progress` because these metrics describe the last COMPLETED run.
   # A long catch-up run would otherwise be alerted about for its entire
   # duration, on the strength of the very failure it is in the middle of fixing.
+  #
+  # NOTE: the absent() arm is not belt-and-braces, it is the arm that would have
+  # caught the real failure. Both arms above need the series to exist, and a
+  # single malformed line makes node_exporter reject the entire kometa.prom, so
+  # every kometa_* series disappears at once and this rule goes quiet at exactly
+  # the moment it has something to say. That is what a bad `grep -c ... || echo 0`
+  # in kometa-metrics.sh did. An absent collector is itself the alertable state.
   - alert: KometaNotRunning
     expr: >
-      ((kometa_last_success_timestamp_seconds == 0)
+      (absent(kometa_last_success_timestamp_seconds)
+       or (kometa_last_success_timestamp_seconds == 0)
        or (time() - kometa_last_success_timestamp_seconds > 172800))
       unless (kometa_run_in_progress == 1)
     for: 1h
@@ -203,7 +211,7 @@ groups:
       severity: warning
     annotations:
       summary: "Kometa has not had a clean run in over 48h"
-      description: "No Kometa run without a CRITICAL in 48h. Check `scripts/loki.sh` for job=kometa, or /data01/services/plex-meta-manager/config/logs/meta.log. Collections and overlays are not being updated."
+      description: "No Kometa run without a CRITICAL in 48h, or no kometa_* metrics at all. Check `scripts/loki.sh` for job=kometa, or /data01/services/kometa/config/logs/meta.log. If the series are missing rather than stale, check that /data01/services/node-exporter/text_files/kometa.prom is valid exposition -- one bad line drops the whole file. Collections and overlays are not being updated."
 
   # A run that finishes instantly did nothing. The original 8-month outage
   # looked exactly like this every night: Run Time 0:00:00, no crash visible

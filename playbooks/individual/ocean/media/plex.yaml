@@ -6,14 +6,14 @@
 #   --tags service          Deploy only systemd service definitions
 #   --tags setup            Create only directories
 #   --tags plex             Deploy only plex-related tasks
-#   --tags meta-manager     Deploy only meta-manager tasks
+#   --tags kometa           Deploy only kometa tasks
 #   --skip-tags restart     Prevent service restarts (use with --tags config)
 #
 # Usage examples:
 #   Deploy configs without restarting services:
 #     ansible-playbook playbooks/individual/ocean/media/plex.yaml --tags config --skip-tags restart
 #   
-#   Update only Plex configs (no meta-manager):
+#   Update only Plex configs (no kometa):
 #     ansible-playbook playbooks/individual/ocean/media/plex.yaml --tags plex,config --skip-tags restart
 #   
 #   Full deployment (default):
@@ -47,8 +47,8 @@
     # that collides with :username, 500-ing /metrics. 2.1.0 is the current release.
     exporter_version: "2.1.0"
     exporter_port: "{{ service_ports.plex_exporter.port }}"
-    meta_manager_service: plex-meta-manager
-    meta_manager_image: kometateam/kometa
+    kometa_service: kometa
+    kometa_image: kometateam/kometa
     # Pinned, not latest. A floating tag is how this service froze at PMM
     # v1.21.0 while the project renamed itself to Kometa and its defaults repo
     # started 404ing: nothing changed here, the world moved, and the nightly
@@ -57,12 +57,12 @@
     # logs and on Docker Hub that tag does not exist, so pinning to what the
     # log says gets you an image pull failure on the next recreate.
     # Bump deliberately; KometaNotRunning covers a bad upgrade.
-    meta_manager_version: v2.4.8
+    kometa_version: v2.4.8
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-plex"
     complete: "{{ data }}/complete"
     plex_home: "{{ data }}/services/{{ service }}"
-    meta_manager_home: "{{ data }}/services/{{ meta_manager_service }}"
+    kometa_home: "{{ data }}/services/{{ kometa_service }}"
     ramdisk: /mnt/ramdisk
     user: media
     uid: 1001
@@ -163,54 +163,143 @@
     register: plex_autoheal_result
     tags: [service, plex]
 
-  - name: Ensure meta-manager basedir exists
+  # One-shot migration off the Plex Meta Manager name. The unit, the compose
+  # project, the container and the data directory were all plex-meta-manager;
+  # upstream renamed itself to Kometa and this repo followed, so these tasks
+  # carry an already-deployed host across and then no-op forever.
+  #
+  # NOTE: order is load-bearing. The old unit's ExecStop points at the old
+  # directory, so it has to stop (which is what drops its container and its
+  # compose network) before anything moves, and its unit file can only be
+  # deleted after that. Moving the directory before stopping leaves compose
+  # unable to find its own project and the container running orphaned.
+  - name: Look for the pre-rename kometa unit and data directories
+    ansible.builtin.stat:
+      path: "{{ item }}"
+    loop:
+      - /etc/systemd/system/plex-meta-manager.service
+      - "{{ data }}/services/plex-meta-manager"
+      - "{{ kometa_home }}"
+    register: kometa_premigration
+    tags: [always, setup, kometa]
+
+  # Both paths present means a half-finished migration. Carrying on would write
+  # a fresh config into the new directory and silently abandon the old cache,
+  # assets and meta.log, which is also the history KometaNotRunning reads.
+  - name: Refuse to guess when both kometa data directories exist
+    ansible.builtin.fail:
+      msg: >-
+        Both {{ data }}/services/plex-meta-manager and {{ kometa_home }} exist.
+        Reconcile them by hand (the old one holds the real cache/assets/logs)
+        and remove the loser before re-running.
+    when:
+      - kometa_premigration.results[1].stat.exists
+      - kometa_premigration.results[2].stat.exists
+    tags: [always, setup, kometa]
+
+  - name: Stop the pre-rename kometa service before its directory moves
+    ansible.builtin.systemd:
+      name: plex-meta-manager.service
+      state: stopped
+      enabled: false
+    when: kometa_premigration.results[0].stat.exists
+    tags: [always, setup, kometa]
+
+  - name: Move the kometa data directory to its post-rename path
+    ansible.builtin.command:
+      cmd: mv {{ data }}/services/plex-meta-manager {{ kometa_home }}
+      creates: "{{ kometa_home }}"
+      removes: "{{ data }}/services/plex-meta-manager"
+    tags: [always, setup, kometa]
+
+  - name: Remove the pre-rename kometa unit
     ansible.builtin.file:
-      path: "{{ meta_manager_home }}"
+      path: /etc/systemd/system/plex-meta-manager.service
+      state: absent
+    register: kometa_old_unit
+    tags: [always, setup, kometa]
+
+  - name: Reload systemd after removing the pre-rename kometa unit
+    ansible.builtin.systemd:
+      daemon_reload: true
+    when: kometa_old_unit is changed
+    tags: [always, setup, kometa]
+
+  # The refresh timer instance IS the compose project name, so the rename
+  # orphans this one. node_exporter.yaml reconciles stale instances, but a
+  # files/ocean-plex change never runs it, so until something else does the old
+  # timer keeps firing weekly against a project that no longer exists -- the
+  # case node_exporter.yaml's own teardown task exists to stop paging for.
+  - name: Disable the pre-rename image-refresh timer
+    ansible.builtin.systemd:
+      name: docker-refresh@plex-meta-manager.timer
+      state: stopped
+      enabled: false
+    when: kometa_premigration.results[0].stat.exists
+    tags: [always, setup, kometa]
+
+  # Backstop: `compose down` above removes this with its project. It only
+  # survives if the old unit was already gone when this ran. Left in place it
+  # holds its subnet forever, which is how a renamed project ends up
+  # crash-looping on a subnet it cannot have back.
+  - name: Remove the stale pre-rename compose network
+    ansible.builtin.command:
+      cmd: docker network rm plex-meta-manager_default
+    register: kometa_old_network
+    changed_when: kometa_old_network.rc == 0
+    failed_when:
+      - kometa_old_network.rc != 0
+      - '"not found" not in kometa_old_network.stderr'
+    tags: [always, setup, kometa]
+
+  - name: Ensure kometa basedir exists
+    ansible.builtin.file:
+      path: "{{ kometa_home }}"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
-    tags: [always, setup, meta-manager]
+    tags: [always, setup, kometa]
 
-  - name: Create meta_manager_home preferences file
+  - name: Create kometa_home preferences file
     ansible.builtin.template:
-      src: "{{ files }}/meta-manager/config.yml.j2"
-      dest: "{{ meta_manager_home }}/config/config.yml"
+      src: "{{ files }}/kometa/config.yml.j2"
+      dest: "{{ kometa_home }}/config/config.yml"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
-    register: meta_manager_config_result
-    tags: [config, meta-manager]
+    register: kometa_config_result
+    tags: [config, kometa]
 
-  - name: Create meta-manager docker-compose files
+  - name: Create kometa docker-compose files
     ansible.builtin.template:
       src: "{{ files }}/{{ item.src }}"
-      dest: "{{ meta_manager_home }}/{{ item.dest }}"
+      dest: "{{ kometa_home }}/{{ item.dest }}"
       mode: '0644'
       owner: "{{ user }}"
       group: "{{ user }}"
     with_items:
-    - { src: "plex-meta-manager-compose.yml.j2", dest: "docker-compose.yml" }
-    - { src: "plex-meta-manager.env.j2", dest: ".env" }
-    register: meta_manager_compose_result
-    tags: [config, meta-manager]
+    - { src: "kometa-compose.yml.j2", dest: "docker-compose.yml" }
+    - { src: "kometa.env.j2", dest: ".env" }
+    register: kometa_compose_result
+    tags: [config, kometa]
 
-  - name: Create meta-manager docker-compose systemd service
+  - name: Create kometa docker-compose systemd service
     ansible.builtin.template:
       src: "{{ files }}/{{ item }}.j2"
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     with_items:
-    - plex-meta-manager.service
-    register: meta_manager_service_result
-    tags: [service, meta-manager]
+    - kometa.service
+    register: kometa_service_result
+    tags: [service, kometa]
 
-  - name: Enable meta-manager service
+  - name: Enable kometa service
     ansible.builtin.systemd:
-      name: plex-meta-manager.service
+      name: kometa.service
       enabled: true
       state: started
-    tags: [service, meta-manager]
+    tags: [service, kometa]
 
   # Kometa has no metrics endpoint and its stdout is silent, so the only
   # evidence a nightly run happened is meta.log. Publishing its outcome through
@@ -218,9 +307,9 @@
   - name: Deploy the Kometa metrics collector
     ansible.builtin.copy:
       src: "{{ files }}/kometa-metrics.sh"
-      dest: "{{ meta_manager_home }}/kometa-metrics.sh"
+      dest: "{{ kometa_home }}/kometa-metrics.sh"
       mode: '0755'
-    tags: [config, meta-manager]
+    tags: [config, kometa]
 
   - name: Install the Kometa metrics timer
     ansible.builtin.template:
@@ -228,11 +317,11 @@
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     vars:
-      home: "{{ meta_manager_home }}"
+      home: "{{ kometa_home }}"
     loop:
       - kometa-metrics.service
       - kometa-metrics.timer
-    tags: [service, meta-manager]
+    tags: [service, kometa]
 
   - name: Enable the Kometa metrics timer
     ansible.builtin.systemd:
@@ -240,7 +329,7 @@
       enabled: true
       state: started
       daemon_reload: true
-    tags: [service, meta-manager]
+    tags: [service, kometa]
 
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
@@ -256,11 +345,11 @@
       daemon_reload: "{{ plex_autoheal_result is changed }}"
     tags: [service, plex]
 
-  - name: Reload systemd daemon if meta-manager service changed
+  - name: Reload systemd daemon if kometa service changed
     ansible.builtin.systemd:
       daemon_reload: yes
-    when: meta_manager_service_result is defined and meta_manager_service_result is changed
-    tags: [restart, service, meta-manager]
+    when: kometa_service_result is defined and kometa_service_result is changed
+    tags: [restart, service, kometa]
 
   - name: Restart plex service if config or service changed
     ansible.builtin.systemd:
@@ -273,12 +362,12 @@
       (plex_service_result is defined and plex_service_result is changed)
     tags: [restart, plex]
 
-  - name: Restart meta-manager service if config or service changed
+  - name: Restart kometa service if config or service changed
     ansible.builtin.systemd:
-      name: plex-meta-manager.service
+      name: kometa.service
       state: restarted
     when: >
-      (meta_manager_config_result is defined and meta_manager_config_result is changed) or
-      (meta_manager_compose_result is defined and meta_manager_compose_result is changed) or
-      (meta_manager_service_result is defined and meta_manager_service_result is changed)
-    tags: [restart, meta-manager]
+      (kometa_config_result is defined and kometa_config_result is changed) or
+      (kometa_compose_result is defined and kometa_compose_result is changed) or
+      (kometa_service_result is defined and kometa_service_result is changed)
+    tags: [restart, kometa]

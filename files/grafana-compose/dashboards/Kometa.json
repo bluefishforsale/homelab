@@ -1,0 +1,1308 @@
+{
+ "uid": "kometa-overview",
+ "title": "Kometa",
+ "tags": [
+  "kometa",
+  "plex",
+  "media",
+  "ocean"
+ ],
+ "description": "Kometa (formerly Plex Meta Manager) nightly collection + overlay runs on ocean. Kometa has no metrics endpoint and a silent stdout, so everything here is parsed out of meta.log by kometa-metrics.sh into the node_exporter textfile collector.",
+ "timezone": "browser",
+ "editable": true,
+ "schemaVersion": 40,
+ "version": 1,
+ "refresh": "5m",
+ "time": {
+  "from": "now-7d",
+  "to": "now"
+ },
+ "panels": [
+  {
+   "type": "row",
+   "title": "Health",
+   "id": 1,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "collapsed": false,
+   "panels": []
+  },
+  {
+   "type": "stat",
+   "title": "Last run outcome",
+   "id": 2,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "1 when the most recent run logged a CRITICAL. Kometa exits 0 either way and its container stays healthy, so this is the only place a failed run shows up.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 1
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "OK",
+         "color": "green",
+         "index": 0
+        },
+        "1": {
+         "text": "FAILED",
+         "color": "red",
+         "index": 1
+        }
+       }
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_failed",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Running now",
+   "id": 3,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Set while meta.log is being written. Both Kometa alerts hold off on this, so a long run does not page.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 1
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "text",
+        "value": null
+       },
+       {
+        "color": "blue",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "IDLE",
+         "color": "text",
+         "index": 0
+        },
+        "1": {
+         "text": "RUNNING",
+         "color": "blue",
+         "index": 1
+        }
+       }
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_run_in_progress",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Since last clean run",
+   "id": 4,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Wall clock since the last run with no CRITICAL. KometaNotRunning fires past 48h, which is the red step here. Reads as a 56-year age if the metric is 0 (never succeeded).",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 1
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "yellow",
+        "value": 86400
+       },
+       {
+        "color": "red",
+        "value": 172800
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "time() - kometa_last_success_timestamp_seconds",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Since last run",
+   "id": 5,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Kometa runs nightly, so anything past ~26h means the scheduler itself stopped rather than a run failing.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 18,
+    "y": 1
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "yellow",
+        "value": 93600
+       },
+       {
+        "color": "red",
+        "value": 172800
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "time() - kometa_last_run_timestamp_seconds",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Criticals in last run",
+   "id": 6,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "CRITICAL lines in the most recent run. One is enough to mean collections or overlays did not fully update.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_criticals",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Last run duration",
+   "id": 7,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "A full run is tens of minutes. Under 60s means it aborted on a config or Plex-connection error and still printed a summary, which is what KometaRunDidNothing catches.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 60
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_duration_seconds",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Version",
+   "id": 8,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Parsed from the most recent run log, so it is the version that actually ran, not the tag the playbook pins.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 12,
+    "y": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "name",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_build_info",
+     "refId": "A",
+     "instant": true,
+     "range": false,
+     "legendFormat": "{{version}}"
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Collector freshness",
+   "id": 9,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Age of this dashboard's own data. kometa-metrics.timer runs every 15m; if this climbs, every other panel here is stale and the Kometa alerts are reading a frozen value.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 18,
+    "y": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "yellow",
+        "value": 1800
+       },
+       {
+        "color": "red",
+        "value": 3600
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "time() - kometa_metrics_last_success_timestamp_seconds",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Run logs on disk",
+   "id": 10,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Rotated run logs present. Kometa keeps a fixed window, so a collapse toward 1 means logs are being cleared or the config directory was replaced.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 0,
+    "y": 9
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 2
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_runs_logged",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Firing Kometa alerts",
+   "id": 11,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "KometaNotRunning and KometaRunDidNothing. Both suppress while a run is in progress.",
+   "gridPos": {
+    "h": 4,
+    "w": 6,
+    "x": 6,
+    "y": 9
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "count(ALERTS{alertname=~\"Kometa.*\",alertstate=\"firing\"}) or vector(0)",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "stat",
+   "title": "Image refresh last fired",
+   "id": 12,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "The weekly image pull for this compose project. The timer instance IS the project name, so after the Plex Meta Manager rename this panel is also the proof the new instance got enabled and the old one is gone.",
+   "gridPos": {
+    "h": 4,
+    "w": 12,
+    "x": 12,
+    "y": 9
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "color": {
+      "mode": "thresholds"
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "yellow",
+        "value": 864000
+       },
+       {
+        "color": "red",
+        "value": 1209600
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    },
+    "colorMode": "value",
+    "graphMode": "none",
+    "textMode": "auto",
+    "justifyMode": "auto"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "time() - node_systemd_timer_last_trigger_seconds{name=\"docker-refresh@kometa.timer\"}",
+     "refId": "A",
+     "range": true
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Trend",
+   "id": 13,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 13
+   },
+   "collapsed": false,
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "Time since last clean run",
+   "id": 14,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Sawtooth: each drop is a successful run. A flat climb through the 48h line is a service that stopped working, and the shape tells you whether it degraded or stopped dead.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 14
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 172800
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "time() - kometa_last_success_timestamp_seconds",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "age"
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Run duration",
+   "id": 15,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Step changes track what the run is doing. A sudden collapse to seconds is an abort; a steady climb is the library growing or Plex getting slower to answer.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 14
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 60
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_duration_seconds",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "duration"
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Criticals per run",
+   "id": 16,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Holds the last run's value until the next run replaces it, so a flat non-zero line is one bad run not yet retried, not an ongoing storm.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 22
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 20,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_criticals",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "criticals"
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Run state",
+   "id": 17,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "The two gauges the alerts read, side by side: the window where paging is suppressed, against the outcome it is suppressed around.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 22
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_run_in_progress",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "in progress"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "kometa_last_run_failed",
+     "refId": "B",
+     "range": true,
+     "legendFormat": "last run failed"
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Container",
+   "id": 18,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 30
+   },
+   "collapsed": false,
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "CPU",
+   "id": 19,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "Idle almost all day, with one spike per nightly run. The compose project caps it at 4 CPUs. Queries both container names so the series survives the Plex Meta Manager rename.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 31
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "off"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "rate(container_cpu_usage_seconds_total{name=~\"kometa|plex-meta-manager\"}[5m])",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "{{name}}"
+    }
+   ]
+  },
+  {
+   "type": "timeseries",
+   "title": "Memory",
+   "id": 20,
+   "datasource": {
+    "type": "prometheus",
+    "uid": "bf02tpxiz6m0wf"
+   },
+   "description": "mem_limit is 2g in the compose file, which is the red line. Kometa holds the whole library in memory during a run, so this is the panel that would show a big library OOM-ing the container mid-run.",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 31
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": true,
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 2147483648
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "bf02tpxiz6m0wf"
+     },
+     "editorMode": "code",
+     "expr": "container_memory_usage_bytes{name=~\"kometa|plex-meta-manager\"}",
+     "refId": "A",
+     "range": true,
+     "legendFormat": "{{name}}"
+    }
+   ]
+  },
+  {
+   "type": "row",
+   "title": "Logs",
+   "id": 21,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 39
+   },
+   "collapsed": false,
+   "panels": []
+  },
+  {
+   "type": "logs",
+   "title": "Criticals and errors",
+   "id": 22,
+   "datasource": {
+    "type": "loki",
+    "uid": "P8E80F9AEF21F6940"
+   },
+   "description": "The failure lines only. Empty is the healthy state. Promtail tails meta.log because Kometa's stdout says nothing, which is why `docker logs` on this container is blank.",
+   "gridPos": {
+    "h": 12,
+    "w": 24,
+    "x": 0,
+    "y": 40
+   },
+   "options": {
+    "showTime": true,
+    "showLabels": false,
+    "showCommonLabels": false,
+    "wrapLogMessage": true,
+    "prettifyLogMessage": false,
+    "enableLogDetails": true,
+    "dedupStrategy": "none",
+    "sortOrder": "Descending"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "loki",
+      "uid": "P8E80F9AEF21F6940"
+     },
+     "editorMode": "code",
+     "expr": "{job=\"kometa\"} |~ \"CRITICAL|ERROR\"",
+     "refId": "A",
+     "queryType": "range"
+    }
+   ]
+  },
+  {
+   "type": "logs",
+   "title": "Full run log",
+   "id": 23,
+   "datasource": {
+    "type": "loki",
+    "uid": "P8E80F9AEF21F6940"
+   },
+   "description": "Newest first. One run is a long block of per-collection sections ending in a run summary. Matches both container labels so history from before the rename is still here.",
+   "gridPos": {
+    "h": 12,
+    "w": 24,
+    "x": 0,
+    "y": 52
+   },
+   "options": {
+    "showTime": true,
+    "showLabels": false,
+    "showCommonLabels": false,
+    "wrapLogMessage": true,
+    "prettifyLogMessage": false,
+    "enableLogDetails": true,
+    "dedupStrategy": "none",
+    "sortOrder": "Descending"
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "loki",
+      "uid": "P8E80F9AEF21F6940"
+     },
+     "editorMode": "code",
+     "expr": "{job=\"kometa\", container=~\"kometa|plex-meta-manager\"}",
+     "refId": "A",
+     "queryType": "range"
+    }
+   ]
+  }
+ ]
+}

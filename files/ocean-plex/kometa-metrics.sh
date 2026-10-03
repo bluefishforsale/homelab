@@ -13,8 +13,12 @@
 # prints a summary, so "it finished" alone is not enough.
 set -uo pipefail
 
+# --selftest must not touch the real collector directory, and on a dev box that
+# path does not exist at all, so redirect it before the default is applied.
+[ "${1:-}" = "--selftest" ] && TEXTFILE_DIR=$(mktemp -d)
+
 : "${TEXTFILE_DIR:=/data01/services/node-exporter/text_files}"
-: "${LOG_DIR:=/data01/services/plex-meta-manager/config/logs}"
+: "${LOG_DIR:=/data01/services/kometa/config/logs}"
 
 prom="$TEXTFILE_DIR/kometa.prom"
 tmp="$prom.$$"
@@ -39,7 +43,35 @@ run_time_seconds() {
   echo "$rt" | awk -F: '{print ($1*3600)+($2*60)+$3}'
 }
 
-criticals() { grep -c '\[CRITICAL\]' "$1" 2>/dev/null || echo 0; }
+# NOTE: grep -c PRINTS 0 and EXITS 1 when nothing matches, so the obvious
+# `|| echo 0` appends a second line and the result is "0\n0". That broke this
+# collector two ways at once: `[ "$c" -eq 0 ]` below died with "integer
+# expression expected" so last_run_failed was pinned at 1 and
+# kometa_last_success_timestamp_seconds never left 0, and the stray line made
+# kometa.prom invalid exposition, which makes node_exporter drop the WHOLE file.
+# Every kometa_* series vanished, so both Kometa alerts matched nothing and the
+# outage they exist to catch was the one state they could not report.
+criticals() { local n; n=$(grep -c '\[CRITICAL\]' "$1" 2>/dev/null) || n=0; echo "${n:-0}"; }
+
+# Pins the bug above: criticals() must return exactly one integer line for a log
+# with no CRITICALs, which is the ordinary case and the one that corrupted
+# kometa.prom. Run: kometa-metrics.sh --selftest
+if [ "${1:-}" = "--selftest" ]; then
+  d=$(mktemp -d)
+  printf 'ok\nok\n' > "$d/none"
+  printf '[CRITICAL] a\n[CRITICAL] b\n' > "$d/two"
+  for case in none:0 two:2 missing:0; do
+    f="$d/${case%%:*}"; want="${case##*:}"; got=$(criticals "$f")
+    [ "$(printf '%s' "$got" | wc -l | tr -d ' ')" = "0" ] \
+      || { echo "FAIL ${case%%:*}: multi-line result $(printf '%q' "$got")"; exit 1; }
+    [ "$got" = "$want" ] || { echo "FAIL ${case%%:*}: want $want got $got"; exit 1; }
+    [ "$got" -eq 0 ] 2>/dev/null || [ "$got" -gt 0 ] \
+      || { echo "FAIL ${case%%:*}: not usable in an arithmetic test"; exit 1; }
+  done
+  rm -rf "$d" "$TEXTFILE_DIR"
+  echo "ok"
+  exit 0
+fi
 
 last_run_ts=0
 last_run_failed=1

@@ -22,7 +22,7 @@ vault/secrets.yaml.lock
 
 # plaintext config files with hardcoded secrets (use .j2 templates instead)
 files/ocean-nzbget/config/nzbget.conf
-files/ocean-plex/meta-manager/config.yml
+files/ocean-plex/kometa/config.yml
 files/ocean-plex/config/Preferences.xml
 files/audible-downloader/.audible/audible.json
 files/audible-downloader/compress.sh
