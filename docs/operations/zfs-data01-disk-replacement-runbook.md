@@ -68,11 +68,30 @@ which is not the case here.
 Do the **most-failed** drive first (`wwn-0x5000c500b2281882`, which has read +
 write + checksum errors), so the worst offender stops dragging on the pool.
 
+> **Pass `/dev/disk/by-id/wwn-*` for the new device. Check it before you press enter.**
+> Both argument positions of `zpool replace pool device [new-device]` accept `wwn-`
+> paths, so there is never a reason to use another form here.
+>
+> On 2026-08-18 a replace was given `/dev/disk/by-id/ata-ST12000NM0127_ZJV3KB10`
+> instead, between two sibling replaces two days either side that both used `wwn-`.
+> Three out of four followed the convention. Nothing caught the fourth, because
+> nothing was checking, and a rule kept 75% of the time looks exactly like a rule
+> that works. Both names are stable `/dev/disk/by-id` paths, so this cost
+> consistency rather than data — but tooling that assumes a `wwn-` prefix silently
+> skips that disk. Every future swap passing a `wwn-` path converges the pool back,
+> one drive at a time, for free. See `zfs-disk-replacement.md` for the full record
+> and for the two higher-cost rename routes.
+
 If the enclosure has a **free bay** (preferred — keeps the old drive readable):
 ```
 # insert the new drive into the spare bay, find its id
 ls -l /dev/disk/by-id/ | grep wwn        # identify the NEW drive's wwn/dev
-zpool replace data01 wwn-0x5000c500b2281882 /dev/disk/by-id/wwn-<NEW>
+
+# confirm the path you are about to pass really is a wwn- path
+NEW=/dev/disk/by-id/wwn-<NEW>
+case "$NEW" in */wwn-*) ;; *) echo "REFUSE: not a wwn- path"; exit 1 ;; esac
+
+zpool replace data01 wwn-0x5000c500b2281882 "$NEW"
 ```
 
 If you must **swap in place** (no free bay):
