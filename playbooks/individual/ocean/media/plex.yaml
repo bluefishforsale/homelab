@@ -301,6 +301,22 @@
       state: started
     tags: [service, kometa]
 
+  # The refresh timer instance IS the compose project name, so only the playbook
+  # that renames a project knows the old instance is now wrong. node_exporter.yaml
+  # reconciles instances from `docker compose ls`, but it is a safety net running
+  # on its own schedule, not a guarantee: in the rename deploy both playbooks ran
+  # in one main-apply, the reconciliation read the project BEFORE this playbook
+  # renamed it, and the migration above then disabled the old instance. Net result
+  # was 28 enabled timers for 29 compose projects, with kometa the gap -- an image
+  # that would never be refreshed again, silently, because nothing alerts on a
+  # timer that was never created. Own the timer here instead of hoping about order.
+  - name: Enable the kometa image-refresh timer
+    ansible.builtin.systemd:
+      name: "docker-refresh@{{ kometa_service }}.timer"
+      enabled: true
+      state: started
+    tags: [service, kometa]
+
   # Kometa has no metrics endpoint and its stdout is silent, so the only
   # evidence a nightly run happened is meta.log. Publishing its outcome through
   # the textfile collector is what makes a run that stops happening visible.
