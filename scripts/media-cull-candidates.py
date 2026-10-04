@@ -18,8 +18,16 @@ The default policy — tuned on this library — is:
   media-cull-candidates.py movies > movie-cull.tsv
   media-cull-candidates.py tv --since 2011 --keep-genre Horror,Documentary
 
-Nothing is deleted here; this only prints candidates. Run on ocean (localhost)
-or point *_URL / *_APIKEY env at the services (see media_clients).
+--by-collection (movies only) swaps the year/rating policy for a franchise one:
+judge each entry against the best film in its OWN collection, so the weak tail
+of a series is culled while a strong franchise keeps all of it. --since does not
+apply, because franchises span decades and the bad sequel is often the old one.
+
+  media-cull-candidates.py movies --by-collection > franchise-cull.tsv
+
+Nothing is deleted here; this only prints candidates. media_clients reaches the
+other services from the laptop via the vault, but Overseerr's self-generated key
+is not in the vault, so this script needs ocean or OVERSEERR_APIKEY.
 """
 import argparse
 import os
@@ -79,11 +87,51 @@ def rating_ok(it, kind, tv_bar):
     return (r.get("value") or 0) >= tv_bar
 
 
+def best_in_collection(items, collections):
+    """tmdbId -> (collection title, best IMDb among OWNED entries, [owned titles]).
+
+    Radarr leaves `collection` null on /movie, so membership has to come from
+    /collection, whose `movies` list includes entries that were never in the
+    library. Only owned-with-a-file entries define the franchise's bar; a
+    collection the library holds one film from has no tail to cut.
+    """
+    owned = {it["tmdbId"]: it for it in items if it.get("hasFile")}
+    out = {}
+    for c in collections:
+        mem = [owned[m["tmdbId"]] for m in c.get("movies") or [] if m["tmdbId"] in owned]
+        if len(mem) < 2:
+            continue
+        rated = [(it.get("ratings") or {}).get("imdb", {}).get("value") for it in mem]
+        rated = [v for v in rated if v is not None]
+        if not rated:
+            continue
+        for it in mem:
+            out[it["tmdbId"]] = (c["title"], max(rated), mem)
+    return out
+
+
 def rating_cols(it, kind):
     r = it.get("ratings") or {}
     if kind == "movies":
         return f"{r.get('imdb', {}).get('value')}\t{r.get('rottenTomatoes', {}).get('value')}"
     return f"{r.get('value')}"
+
+
+def _weak_in_franchise(it, best, a):
+    """Clearly worse than its own franchise's best, and not rescued by RT.
+
+    The RT arm matters: a 6.3 IMDb with RT 76 (Scream 2022, Nobody 2) is a well
+    reviewed film sitting next to an outlier, not a bad sequel. Same OR-logic as
+    rating_ok, kept separate because the bar here is relative, not absolute.
+    """
+    r = it.get("ratings") or {}
+    imdb = r.get("imdb", {}).get("value")
+    rt = r.get("rottenTomatoes", {}).get("value")
+    if imdb is None:
+        return False
+    if rt is not None and rt >= 70:
+        return False
+    return (best - imdb) >= a.gap and imdb < a.imdb_bar
 
 
 def main():
@@ -92,17 +140,61 @@ def main():
     p.add_argument("--since", type=int, default=2011, help="cull only titles from this year onward")
     p.add_argument("--keep-genre", default="Horror", help="comma list of genres to always keep")
     p.add_argument("--tv-bar", type=float, default=7.5, help="tv: keep rating >= this")
+    p.add_argument("--by-collection", action="store_true",
+                   help="movies: judge each entry against the best in its own franchise")
+    p.add_argument("--gap", type=float, default=1.0,
+                   help="--by-collection: cull at least this far below the franchise best")
+    p.add_argument("--imdb-bar", type=float, default=6.5,
+                   help="--by-collection: and below this absolute IMDb score")
     a = p.parse_args()
+
+    if a.by_collection and a.kind != "movies":
+        sys.exit("--by-collection needs Radarr collections; sonarr has no equivalent")
 
     app = APP[a.kind]
     protect = {g.strip() for g in a.keep_genre.split(",") if g.strip()}
     played = played_titles(app["section"])
-    inflight = inflight_ids("movie" if a.kind == "movies" else "tv", app["idfield"])
+    # Overseerr generates its own API key into settings.json and it is in
+    # neither the vault nor this repo, so unlike the other services it has no
+    # off-host fallback. Refuse rather than proceed: in-flight requests are the
+    # guard that stops this list recommending something somebody just asked for.
+    try:
+        inflight = inflight_ids("movie" if a.kind == "movies" else "tv", app["idfield"])
+    except Exception as e:
+        sys.exit(f"overseerr unreachable ({e}); its in-flight requests are a required "
+                 f"safety check, so run this on ocean or set OVERSEERR_APIKEY")
     items = mc.get(app["svc"], app["endpoint"])
 
     def watched(it):
         k = (it.get("title"), str(it.get("year") or "")) if a.kind == "movies" else it.get("title")
         return k in played
+
+    if a.by_collection:
+        franchise = best_in_collection(items, mc.get("radarr", "/api/v3/collection"))
+        cull = [it for it in items
+                if it["tmdbId"] in franchise
+                and not (protect & set(it.get("genres") or []))
+                and not watched(it)
+                and it.get(app["idfield"]) not in inflight
+                and size_gb(it) > 0
+                and _weak_in_franchise(it, franchise[it["tmdbId"]][1], a)]
+        cull.sort(key=lambda it: (franchise[it["tmdbId"]][0], it.get("year") or 0))
+        print(f"# movie franchise cull candidates: unwatched, not-requested, >= {a.gap} IMDb below "
+              f"the best in their own collection, below IMDb {a.imdb_bar}, not rescued by RT>=70, "
+              f"keep-genre={','.join(sorted(protect))}")
+        print(f"# {len(cull)} titles / {sum(size_gb(it) for it in cull)/1000:.2f} TB. DELETE rows "
+              f"to KEEP, save, feed col 1 to media-reclaim-delete.py --service movies --ids",
+              file=sys.stderr)
+        print("ID\tGB\tIMDB\tRT\tYEAR\tTITLE\tFRANCHISE (what stays)")
+        for it in cull:
+            title, _, mem = franchise[it["tmdbId"]]
+            culled = {c["tmdbId"] for c in cull}
+            stays = ", ".join(f"{m['title']}({(m.get('ratings') or {}).get('imdb', {}).get('value')})"
+                              for m in sorted(mem, key=lambda m: m.get("year") or 0)
+                              if m["tmdbId"] not in culled)
+            print(f"{it['id']}\t{size_gb(it):.1f}\t{rating_cols(it, 'movies')}\t{it.get('year')}"
+                  f"\t{it.get('title')}\t{title} -> {stays}")
+        return
 
     cull = [it for it in items
             if (it.get("year") or 0) >= a.since

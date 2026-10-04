@@ -10,17 +10,37 @@ so nothing secret is committed. Importable (get/post/SERVICES) and a CLI:
   media_clients.py get overseerr /api/v1/request count=5
   media_clients.py tdarr-stats              # tdarr transcode totals
 
-Run on ocean (defaults to localhost). Plex Preferences.xml is 0600 owned by
-media, so plex needs PLEX_TOKEN in env or run as media/root (or sudo).
+Works from either side. On ocean it reads each key from the live config and
+talks to localhost. From the laptop it falls back to the ansible vault for the
+key and to MEDIA_HOST (default ocean.home) for the address, so no caller has to
+export RADARR_URL/RADARR_APIKEY by hand. An explicit env var always wins.
+
+On ocean, Plex Preferences.xml is 0600 owned by media, so plex needs PLEX_TOKEN
+in env or a run as media/root (or sudo); off-host the vault covers it.
 """
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
 
 DATA = "/data01/services"
+# Off-host, the on-host config files are unreadable, so the vault is the key
+# source and ocean answers in place of localhost.
+OFF_HOST = not os.path.isdir(DATA)
+MEDIA_HOST = os.environ.get("MEDIA_HOST", "ocean.home")
+VAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vault.py")
+
+
+def _vault(path):
+    """Read one secret via scripts/vault.py, which owns the password file."""
+    out = subprocess.run([sys.executable, VAULT, "get", path],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        raise RuntimeError(f"vault.py get {path}: {out.stderr.strip() or out.returncode}")
+    return out.stdout.strip()
 
 
 def _xml_key(path):
@@ -48,17 +68,21 @@ def _tautulli_key():
 # auth: how the key rides the request. ('query', name) | ('header', name) | None
 SERVICES = {
     "radarr":    {"url": "http://localhost:8903", "auth": ("query", "apikey"),
-                  "key_env": "RADARR_APIKEY", "key": lambda: _xml_key(f"{DATA}/radarr/config.xml")},
+                  "key_env": "RADARR_APIKEY", "vault": "media_services.radarr.api_key",
+                  "key": lambda: _xml_key(f"{DATA}/radarr/config.xml")},
     "sonarr":    {"url": "http://localhost:8902", "auth": ("query", "apikey"),
-                  "key_env": "SONARR_APIKEY", "key": lambda: _xml_key(f"{DATA}/sonarr/config.xml")},
+                  "key_env": "SONARR_APIKEY", "vault": "media_services.sonarr.api_key",
+                  "key": lambda: _xml_key(f"{DATA}/sonarr/config.xml")},
     "tdarr":     {"url": "http://localhost:8265", "auth": None,
                   "key_env": None, "key": lambda: None},
     "plex":      {"url": "http://localhost:32400", "auth": ("query", "X-Plex-Token"),
-                  "key_env": "PLEX_TOKEN", "key": _plex_token},
+                  "key_env": "PLEX_TOKEN", "vault": "media_services.plex.api_key",
+                  "key": _plex_token},
     "overseerr": {"url": "http://localhost:5055", "auth": ("header", "X-Api-Key"),
                   "key_env": "OVERSEERR_APIKEY", "key": _overseerr_key},
     "tautulli":  {"url": "http://localhost:8905", "auth": ("query", "apikey"),
-                  "key_env": "TAUTULLI_APIKEY", "key": _tautulli_key},
+                  "key_env": "TAUTULLI_APIKEY", "vault": "media_services.tautulli.api_key",
+                  "key": _tautulli_key},
 }
 
 
@@ -66,11 +90,21 @@ def _key(name):
     s = SERVICES[name]
     if s["key_env"] and os.environ.get(s["key_env"]):
         return os.environ[s["key_env"]]
+    # Overseerr's key lives only in its own settings.json, so off-host it has no
+    # fallback and says so rather than failing with a FileNotFoundError.
+    if OFF_HOST:
+        if not s.get("vault"):
+            raise RuntimeError(f"{name} has no vault key; set {s['key_env']} or run on ocean")
+        return _vault(s["vault"])
     return s["key"]()
 
 
 def _url(name):
-    return os.environ.get(f"{name.upper()}_URL", SERVICES[name]["url"])
+    env = os.environ.get(f"{name.upper()}_URL")
+    if env:
+        return env
+    url = SERVICES[name]["url"]
+    return url.replace("localhost", MEDIA_HOST) if OFF_HOST else url
 
 
 def _request(name, path, params, data=None, method=None):
