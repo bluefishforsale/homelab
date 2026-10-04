@@ -5,6 +5,7 @@ Procedures for replacing failed or failing disks in ZFS pools. Applies to both H
 **Pool Reference:**
 
 - **data01**: 64TB RAIDZ2 pool on ocean VM (8x 12TB HDD via SAS passthrough)
+  - **Member naming**: Seven members are imported by WWN (`/dev/disk/by-id/wwn-*`). Member `wwn-0x5000c500b43e1c50` is currently imported under its ATA ID `ata-ST12000NM0127_ZJV3KB10` (attached during the 2026-08-28 resilver). Both forms are stable across reboots. Do not mutate the pool solely to fix the path (committed ZFS mutations are forbidden). When the pool is next exported and imported or when a drive in this vdev is next swapped, specify `/dev/disk/by-id/wwn-0x5000c500b43e1c50` to restore uniform naming. Any pool export requires stopping all services using `/data01` first to prevent writes into root's empty mountpoint.
 
 ---
 
