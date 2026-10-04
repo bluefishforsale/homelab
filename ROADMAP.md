@@ -87,7 +87,7 @@ Status and future plans for the homelab infrastructure.
 - **Overseerr**: Media request management
 - **Tautulli**: Plex statistics and monitoring
 - **Tdarr**: Automated media transcoding
-- **Plex Meta Manager**: Library metadata automation
+- **Kometa**: Library metadata automation
 - **Audible Downloader**: Audiobook acquisition
 - **Jellyfin**: Media server (alternative to Plex)
 

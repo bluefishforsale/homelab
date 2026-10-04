@@ -321,8 +321,8 @@
                 labels:
                   job: kometa
                   host: {{ inventory_hostname }}
-                  container: plex-meta-manager
-                  __path__: "/data01/services/plex-meta-manager/config/logs/meta.log"
+                  container: kometa
+                  __path__: "/data01/services/kometa/config/logs/meta.log"
             pipeline_stages:
               - regex:
                   expression: '^\[(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d{3}\] \[[^\]]+\]\s+\[(?P<level>[A-Z]+)\]'

@@ -1,5 +1,5 @@
 [Unit]
-Description=Plex Meta Manager Docker Compose Service
+Description=Kometa Docker Compose Service
 Requires=docker.service zfs.target data01.mount
 After=docker.service zfs.target data01.mount plex.service
 Wants=network-online.target
@@ -10,24 +10,24 @@ Type=oneshot
 RemainAfterExit=yes
 User=root
 Group=root
-WorkingDirectory={{ meta_manager_home }}
+WorkingDirectory={{ kometa_home }}
 
 # Environment
-Environment=COMPOSE_PROJECT_NAME=plex-meta-manager
+Environment=COMPOSE_PROJECT_NAME=kometa
 Environment=COMPOSE_HTTP_TIMEOUT=60
 Environment=TMPDIR=/tmp
 Environment=TMP=/tmp
 Environment=TEMP=/tmp
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml down --remove-orphans --timeout 30
-ExecStartPre=-/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml pull --quiet
+ExecStartPre=/usr/bin/docker compose -f {{ kometa_home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=-/usr/bin/docker compose -f {{ kometa_home }}/docker-compose.yml pull --quiet
 
 # Start command
-ExecStart=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml up -d
+ExecStart=/usr/bin/docker compose -f {{ kometa_home }}/docker-compose.yml up -d
 
 # Stop command
-ExecStop=/usr/bin/docker compose -f {{ meta_manager_home }}/docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f {{ kometa_home }}/docker-compose.yml down
 
 # Service behavior
 Restart=on-failure
@@ -37,13 +37,13 @@ TimeoutStopSec=60
 
 # Security
 NoNewPrivileges=true
-ReadWritePaths={{ meta_manager_home }} /tmp
+ReadWritePaths={{ kometa_home }} /tmp
 ReadOnlyPaths=/var/run/docker.sock
 
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=plex-meta-manager
+SyslogIdentifier=kometa
 
 [Install]
 WantedBy=multi-user.target

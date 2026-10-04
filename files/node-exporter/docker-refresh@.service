@@ -7,11 +7,12 @@ Requires=docker.service
 [Service]
 Type=oneshot
 # NOTE: %i, never %I. %i is the instance name literally as written; %I unescapes
-# it, and systemd unescapes a hyphen into a slash. Six of the fleet's project
-# names contain hyphens, so %I would turn globalview-stack into globalview/stack
-# and plex-meta-manager into plex/meta/manager. The script would then find no
-# such project, log "not running, skipped", exit 0, and the timer would stamp a
-# clean run forever while refreshing nothing. One character, silent, permanent.
+# it, and systemd unescapes a hyphen into a slash. Hyphenated compose projects
+# are the norm here, not the exception (ocean alone runs 8 of them), so %I would
+# turn node-exporter into node/exporter and globalview-stack into
+# globalview/stack. The script would then find no such project, log "not
+# running, skipped", exit 0, and the timer would stamp a clean run forever while
+# refreshing nothing. One character, silent, permanent.
 ExecStart=/usr/local/bin/docker-refresh.sh %i
 # Backstop only, and it must stay above the script's own budgets or it becomes
 # the thing it exists to prevent: systemd killing the unit mid-recreate leaves

@@ -1,10 +1,10 @@
 version: '3.8'
 
 services:
-  plex-meta-manager:
-    image: {{ meta_manager_image }}:{{ meta_manager_version }}
-    container_name: plex-meta-manager
-    hostname: plex-meta-manager
+  kometa:
+    image: {{ kometa_image }}:{{ kometa_version }}
+    container_name: kometa
+    hostname: kometa
     restart: unless-stopped
     user: "{{ uid }}:{{ uid }}"
     cpus: 4
@@ -17,9 +17,9 @@ services:
       - TZ=America/Los_Angeles
       - PUID={{ uid }}
       - PGID={{ uid }}
-      - VERSION={{ meta_manager_version }}
+      - VERSION={{ kometa_version }}
     volumes:
-      - {{ meta_manager_home }}/config:/config:rw
+      - {{ kometa_home }}/config:/config:rw
     healthcheck:
       # `test -f` only proved a file existed, so this container reported healthy
       # through nine months of never completing a run. Parsing the config at
@@ -36,4 +36,4 @@ services:
 
 networks:
   default:
-    name: plex-meta-manager_default
+    name: kometa_default
