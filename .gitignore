@@ -1,8 +1,15 @@
 # git worktrees
 .worktrees/
 
-# Claude Code local state (per-project settings, worktrees, etc.)
-.claude/
+# Claude Code local state (worktrees, session state, personal overrides).
+# settings.json is the shared project config and IS tracked: the read-only
+# allowlist in it belongs to the repo, so every clone and every agent lane gets
+# it instead of re-approving the same probes. settings.local.json stays ignored,
+# it is where one machine's own approvals land.
+# The pattern globs the contents rather than naming the directory, because git
+# cannot re-include a file whose parent directory is itself excluded.
+.claude/*
+!.claude/settings.json
 
 # macOS files
 .DS_Store
