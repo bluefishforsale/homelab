@@ -5,6 +5,45 @@ Procedures for replacing failed or failing disks in ZFS pools. Applies to both H
 **Pool Reference:**
 
 - **data01**: 64TB RAIDZ2 pool on ocean VM (8x 12TB HDD via SAS passthrough)
+  - **Member naming**: seven of eight members are imported by WWN (`/dev/disk/by-id/wwn-*`). The eighth, `wwn-0x5000c500b43e1c50` (serial `ZJV3KB10`, currently `sdh`), is imported under its ATA ID `ata-ST12000NM0127_ZJV3KB10`.
+
+    It got that way on **2026-08-18**, from `zpool history`:
+
+    ```
+    2026-08-16.19:36:58  zpool replace data01 ... /dev/disk/by-id/wwn-0x5000c500b5bde8e2       wwn
+    2026-08-18.08:29:15  zpool replace data01 ... /dev/disk/by-id/ata-ST12000NM0127_ZJV3KB10   ata  <-- this one
+    2026-08-20.11:38:26  zpool replace data01 ... /dev/disk/by-id/wwn-0x5000c500dbf44985       wwn
+    2026-08-28.08:23:34  zpool replace data01 ... /dev/disk/by-id/wwn-0x5000c500c5f18ac7       wwn
+    ```
+
+    Four replacements in twelve days; three passed a `wwn-` path and one passed an `ata-` path. Nothing detected it, because nothing was checking. A convention followed three times out of four is indistinguishable from a convention that works, right up until tooling that assumes `wwn-` skips a disk in silence.
+
+    **This is a consistency problem, not a safety one.** `ata-ST12000NM0127_ZJV3KB10` is a `/dev/disk/by-id` path like the others and is equally stable across reboots: it embeds the serial, and is nothing like a `/dev/sdX` name. The pool is `ONLINE` with zero read/write/checksum errors on this member.
+
+    **Monitoring is no longer blind to it.** `disk_wwn_info` (see `files/node-exporter/zpool-metrics.sh`) emits `device -> wwn -> serial` for every disk carrying a `wwn-*` symlink, keyed on the by-id tree rather than on `zpool status`, so this member is covered regardless of the name the pool imported it under:
+
+    ```
+    disk_wwn_info{device="sdh", wwn="wwn-0x5000c500b43e1c50", serial="ZJV3KB10"} 1
+    ```
+
+    **Both argument positions accept `wwn-` paths.** From `man zpool-replace`:
+
+    ```
+    zpool replace [-fsw] [-o property=value] pool device [new-device]
+
+    new-device is required if the pool is not redundant.  If new-device is not
+    specified, it defaults to device.
+    ```
+
+    `device` and `new-device` are both ordinary vdev paths, so `/dev/disk/by-id/wwn-*` is valid in either. The single-argument form is also real, and is the one to use when a disk was physically swapped into the same slot.
+
+    Routes to uniform naming, in order of preference:
+
+    1. **Let it converge on the next swap.** Free, no outage, no risk: every `zpool replace` passes a `/dev/disk/by-id/wwn-*` path for the new disk, and the pool drifts back to uniform one drive at a time. The next scheduled swap is `wwn-0x5000c500b345abd9` (serial `ZJV2N4GW`, currently `sdf`), which has pending sectors and a replacement on order.
+    2. **In-place rename via replace — UNTESTED on this pool.** `zpool replace data01 ata-ST12000NM0127_ZJV3KB10 /dev/disk/by-id/wwn-0x5000c500b43e1c50` names the same physical disk under its other alias. `-f` exists precisely to force a new-device that "appears to be in use", so this may well work. It is recorded here as plausible, **not** as verified: nobody has run it on data01, and it would be attempted only by hand, snapshot-first, with a healthy pool and no sibling already degraded. Do not reach for it while `sdf` has pending sectors.
+    3. **Export and import.** `zpool import -d /dev/disk/by-id` takes a *search directory*, not per-device paths, so you cannot request a specific alias and it binds whichever it finds first — an export/import may land on `ata-` again. It also requires stopping every service using `/data01` first, or they write into root's empty mountpoint, invisible until the next remount. Highest cost, least certain outcome.
+
+    Committed ZFS mutations remain forbidden; all three of the above are hand-run decisions, and (1) is the one that needs no decision at all.
 
 ---
 

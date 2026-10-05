@@ -108,6 +108,19 @@ is the worst possible outcome. So storage is exempt from "merge = deploy":
   Beware side effects: an unmount with open file handles makes services write into the empty
   mountpoint on root (invisible after remount), and property changes (`mountpoint`,
   `canmount`) silently trigger remounts.
+- **Always identify a drive by WWN, never by `/dev/sdX`.** `zpool replace pool device
+  [new-device]` takes an ordinary vdev path in *both* positions, so
+  `/dev/disk/by-id/wwn-*` is always available and is the only form to use. `sdX` names are
+  reassigned across reboots, so a command, an alert matcher or a silence keyed on one can
+  silently come to mean a different physical disk.
+  This is not hypothetical: of four `data01` replacements in August 2026, three passed a
+  `wwn-` path and the 2026-08-18 one passed `ata-ST12000NM0127_ZJV3KB10`. That member is
+  still imported under its ATA ID, and nothing detected the deviation because nothing was
+  checking. A convention honoured three times in four reads as a convention that works.
+  Both are stable by-id paths so no data was at risk, but anything matching on a `wwn-`
+  prefix skips that disk. `disk_wwn_info` (`files/node-exporter/zpool-metrics.sh`) now maps
+  kernel name -> wwn -> serial for every disk, so monitoring is no longer blind to it.
+  Full record and the rename options: [`docs/operations/zfs-disk-replacement.md`](docs/operations/zfs-disk-replacement.md).
 
 ---
 
