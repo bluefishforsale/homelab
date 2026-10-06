@@ -79,7 +79,12 @@
         "option-data": [
             {
                 "name": "domain-name-servers",
-                "data": "192.168.1.9, {{ ansible_host }}"
+                // Both internal resolvers, this server first for locality, its
+                // peer second so a client keeps working when one dies. pihole
+                // (192.168.1.9) used to be handed out FIRST here, which put a
+                // non-HA box in front of the HA pair for every DHCP client on
+                // the network. Nothing on the fleet resolves via pihole.
+                "data": "{{ ansible_host }}, {{ ha_peer_ip }}"
             },
             {
                 "name": "domain-name",
