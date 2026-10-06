@@ -6,18 +6,18 @@
     src: kea/kea-dhcp4.conf.j2
     dest: "{{ dns_home }}/config/kea-dhcp4.conf"
     mode: '0644'
-  notify: Restart dns-stack
+  notify: Restart kea
 
 - name: Deploy Kea DHCP-DDNS configuration
   ansible.builtin.template:
     src: kea/kea-dhcp-ddns.conf.j2
     dest: "{{ dns_home }}/config/kea-dhcp-ddns.conf"
     mode: '0644'
-  notify: Restart dns-stack
+  notify: Restart kea
 
 - name: Deploy Kea Control Agent configuration
   ansible.builtin.template:
     src: kea/kea-ctrl-agent.conf.j2
     dest: "{{ dns_home }}/config/kea-ctrl-agent.conf"
     mode: '0644'
-  notify: Restart dns-stack
+  notify: Restart kea

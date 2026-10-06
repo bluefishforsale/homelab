@@ -25,3 +25,26 @@
   ansible.builtin.systemd:
     name: "{{ dns_service_name }}.service"
     state: reloaded
+
+# A bind-mounted config DOES need its process restarted, but only ITS process.
+# `docker compose restart <service>` stops and starts just those containers, so
+# the daemon rereads the mounted file while powerdns, pdns-recursor and dnsdist
+# keep answering. Restarting the whole stack to apply a DHCP or log-shipping
+# change is what turned a two-line edit into a fleet-wide DNS outage window on
+# both servers, one after the other.
+#
+# NOTE: restart, not `up -d`. Compose sees no change in the service definition
+# (only the file inside the mount changed), so `up -d` is a no-op here and the
+# daemon would keep running with its old config -- applied, deployed, and
+# silently not in effect.
+- name: Restart kea
+  ansible.builtin.command:
+    cmd: /usr/bin/docker compose restart kea-dhcp4 kea-dhcp-ddns kea-ctrl-agent
+    chdir: "{{ dns_home }}"
+  changed_when: true
+
+- name: Restart promtail
+  ansible.builtin.command:
+    cmd: /usr/bin/docker compose restart promtail
+    chdir: "{{ dns_home }}"
+  changed_when: true
