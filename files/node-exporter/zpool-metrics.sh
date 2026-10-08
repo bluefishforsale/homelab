@@ -76,16 +76,27 @@ num() {
   # also kept SMART wear alerts from ever filing a [replace] ticket, since the
   # receiver only accepts stable by-id names (alert-receiver.py STABLE_DEV_RE).
   #
-  # Reads symlink targets under /dev/disk/by-id only. Every disk with a wwn link
-  # is covered, including one the pool happens to have imported under its ata-
-  # path, because this keys on the by-id tree and not on zpool status.
+  # Reads symlink targets under /dev/disk/by-id. ZFS member names are prioritized
+  # so a disk imported under an ata- path maps to that ata- path, keeping it
+  # joinable with its zpool_device_errors series.
+  declare -A seen_dev
+  for id in $(zp status | awk '/^[[:blank:]]+(wwn-|ata-|nvme-|scsi-|dm-uuid-|usb-)/ {print $1}'); do
+    dev=$(basename "$(readlink -f "/dev/disk/by-id/$id" 2>/dev/null)" 2>/dev/null)
+    [ -n "$dev" ] && [ "$dev" != "$id" ] || continue
+    serial=$(lsblk -dno SERIAL "/dev/$dev" 2>/dev/null | tr -d '[:space:]')
+    echo "disk_wwn_info{device=\"$dev\",wwn=\"$id\",serial=\"${serial:-unknown}\"} 1"
+    seen_dev["$dev"]=1
+  done
+
   shopt -s nullglob
   for link in /dev/disk/by-id/wwn-*; do
     case "$link" in *-part*) continue ;; esac   # partitions, not disks
     dev=$(basename "$(readlink -f "$link")")
     [ -n "$dev" ] || continue
+    [ -n "${seen_dev["$dev"]:-}" ] && continue
     serial=$(lsblk -dno SERIAL "/dev/$dev" 2>/dev/null | tr -d '[:space:]')
     echo "disk_wwn_info{device=\"$dev\",wwn=\"$(basename "$link")\",serial=\"${serial:-unknown}\"} 1"
+    seen_dev["$dev"]=1
   done
   shopt -u nullglob
 
