@@ -213,7 +213,7 @@ Withheld from the commit as agent scratch:
 \`\`\`
 $withheld
 \`\`\`"
-    git -C "$wt" push -q -u origin "agent/issue-$num"
+    git -C "$wt" push -q -f -u origin "agent/issue-$num"
     pr_url=$(gh pr create --repo "$slug" --head "agent/issue-$num" \
       --title "fix: $title (#$num)" \
       --body "$pr_body") || pr_url=""
