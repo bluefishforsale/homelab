@@ -20,10 +20,10 @@ Procedures for replacing failed or failing disks in ZFS pools. Applies to both H
 
     **This is a consistency problem, not a safety one.** `ata-ST12000NM0127_ZJV3KB10` is a `/dev/disk/by-id` path like the others and is equally stable across reboots: it embeds the serial, and is nothing like a `/dev/sdX` name. The pool is `ONLINE` with zero read/write/checksum errors on this member.
 
-    **Monitoring is no longer blind to it.** `disk_wwn_info` (see `files/node-exporter/zpool-metrics.sh`) emits `device -> wwn -> serial` for every disk carrying a `wwn-*` symlink, keyed on the by-id tree rather than on `zpool status`, so this member is covered regardless of the name the pool imported it under:
+    **Monitoring is no longer blind to it.** `disk_wwn_info` (see `files/node-exporter/zpool-metrics.sh`) emits `device -> wwn -> serial` for every disk, keying first on `zpool status` to capture the exact name ZFS uses. This member is covered by the name it was imported under:
 
     ```
-    disk_wwn_info{device="sdh", wwn="wwn-0x5000c500b43e1c50", serial="ZJV3KB10"} 1
+    disk_wwn_info{device="sdh", wwn="ata-ST12000NM0127_ZJV3KB10", serial="ZJV3KB10"} 1
     ```
 
     **Both argument positions accept `wwn-` paths.** From `man zpool-replace`:
