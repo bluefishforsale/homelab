@@ -40,6 +40,7 @@
     # itself mid-job without killing the job that is doing the recreating.
     docker_refresh_exclude:
       - github-runners
+      - smart-exporter
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
