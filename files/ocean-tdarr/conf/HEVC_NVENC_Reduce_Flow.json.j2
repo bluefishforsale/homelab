@@ -1,7 +1,7 @@
 {
   "_id": "MinimalHEVC",
   "name": "HEVC NVenc - Minimal Single-Plugin",
-  "description": "HEVC NVenc - Minimal Single-Plugin",
+  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC NVENC encode for non-HEVC video",
   "tags": "",
   "flowPlugins": [
     {
@@ -29,6 +29,21 @@
       }
     },
     {
+      "name": "Audio Policy",
+      "sourceRepo": "Community",
+      "pluginName": "customFunction",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "audioPolicy",
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "inputsDB": {
+        "code": {{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/audio-policy.js') | to_json }}
+      }
+    },
+    {
       "name": "Check Video Codec",
       "sourceRepo": "Community",
       "pluginName": "checkVideoCodec",
@@ -39,7 +54,7 @@
       "fpEnabled": true,
       "id": "checkCodec",
       "position": {
-        "x": 400,
+        "x": 600,
         "y": 0
       }
     },
@@ -54,7 +69,7 @@
       "fpEnabled": true,
       "id": "encodeAll",
       "position": {
-        "x": 600,
+        "x": 800,
         "y": 0
       }
     },
@@ -70,7 +85,7 @@
       "fpEnabled": true,
       "id": "setContainer",
       "position": {
-        "x": 800,
+        "x": 1000,
         "y": 0
       }
     },
@@ -82,7 +97,7 @@
       "fpEnabled": true,
       "id": "execute",
       "position": {
-        "x": 1000,
+        "x": 1200,
         "y": 0
       }
     },
@@ -94,7 +109,7 @@
       "fpEnabled": true,
       "id": "compareSize",
       "position": {
-        "x": 1200,
+        "x": 1400,
         "y": 0
       }
     },
@@ -106,7 +121,7 @@
       "fpEnabled": true,
       "id": "compareDuration",
       "position": {
-        "x": 1400,
+        "x": 1600,
         "y": 0
       }
     },
@@ -118,7 +133,7 @@
       "fpEnabled": true,
       "id": "replace",
       "position": {
-        "x": 1600,
+        "x": 1800,
         "y": 0
       }
     },
@@ -130,8 +145,48 @@
       "fpEnabled": true,
       "id": "setOriginal",
       "position": {
-        "x": 1600,
-        "y": 100
+        "x": 1800,
+        "y": 150
+      }
+    },
+    {
+      "name": "Set Container MKV (audio only)",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandSetContainer",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "setContainerAudio",
+      "position": {
+        "x": 800,
+        "y": 300
+      },
+      "inputsDB": {
+        "container": "mkv",
+        "forceConform": "false"
+      }
+    },
+    {
+      "name": "Execute (audio only)",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandExecute",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "executeAudio",
+      "position": {
+        "x": 1000,
+        "y": 300
+      }
+    },
+    {
+      "name": "Compare Duration (audio only)",
+      "sourceRepo": "Community",
+      "pluginName": "compareFileDurationRatio",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "compareDurationAudio",
+      "position": {
+        "x": 1200,
+        "y": 300
       }
     }
   ],
@@ -146,86 +201,128 @@
     {
       "source": "beginCmd",
       "sourceHandle": "1",
-      "target": "checkCodec",
+      "target": "audioPolicy",
       "targetHandle": null,
       "id": "e2"
     },
     {
-      "source": "checkCodec",
+      "source": "audioPolicy",
       "sourceHandle": "1",
-      "target": "setOriginal",
+      "target": "checkCodec",
       "targetHandle": null,
       "id": "e3"
+    },
+    {
+      "source": "checkCodec",
+      "sourceHandle": "1",
+      "target": "setContainerAudio",
+      "targetHandle": null,
+      "id": "e4"
     },
     {
       "source": "checkCodec",
       "sourceHandle": "2",
       "target": "encodeAll",
       "targetHandle": null,
-      "id": "e4"
+      "id": "e5"
     },
     {
       "source": "encodeAll",
       "sourceHandle": "1",
       "target": "setContainer",
       "targetHandle": null,
-      "id": "e5"
+      "id": "e6"
     },
     {
       "source": "setContainer",
       "sourceHandle": "1",
       "target": "execute",
       "targetHandle": null,
-      "id": "e6"
+      "id": "e7"
     },
     {
       "source": "execute",
       "sourceHandle": "1",
       "target": "compareSize",
       "targetHandle": null,
-      "id": "e7"
-    },
-    {
-      "source": "compareSize",
-      "sourceHandle": "1",
-      "target": "compareDuration",
-      "targetHandle": null,
       "id": "e8"
     },
     {
       "source": "compareSize",
-      "sourceHandle": "2",
+      "sourceHandle": "1",
       "target": "compareDuration",
       "targetHandle": null,
       "id": "e9"
     },
     {
       "source": "compareSize",
+      "sourceHandle": "2",
+      "target": "compareDuration",
+      "targetHandle": null,
+      "id": "e10"
+    },
+    {
+      "source": "compareSize",
       "sourceHandle": "3",
       "target": "setOriginal",
       "targetHandle": null,
-      "id": "e10"
+      "id": "e11"
     },
     {
       "source": "compareDuration",
       "sourceHandle": "1",
       "target": "replace",
       "targetHandle": null,
-      "id": "e11"
+      "id": "e12"
     },
     {
       "source": "compareDuration",
       "sourceHandle": "2",
       "target": "setOriginal",
       "targetHandle": null,
-      "id": "e12"
+      "id": "e13"
     },
     {
       "source": "compareDuration",
       "sourceHandle": "3",
       "target": "setOriginal",
       "targetHandle": null,
-      "id": "e13"
+      "id": "e14"
+    },
+    {
+      "source": "setContainerAudio",
+      "sourceHandle": "1",
+      "target": "executeAudio",
+      "targetHandle": null,
+      "id": "e15"
+    },
+    {
+      "source": "executeAudio",
+      "sourceHandle": "1",
+      "target": "compareDurationAudio",
+      "targetHandle": null,
+      "id": "e16"
+    },
+    {
+      "source": "compareDurationAudio",
+      "sourceHandle": "1",
+      "target": "replace",
+      "targetHandle": null,
+      "id": "e17"
+    },
+    {
+      "source": "compareDurationAudio",
+      "sourceHandle": "2",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e18"
+    },
+    {
+      "source": "compareDurationAudio",
+      "sourceHandle": "3",
+      "target": "setOriginal",
+      "targetHandle": null,
+      "id": "e19"
     }
   ]
 }
