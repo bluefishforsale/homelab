@@ -106,6 +106,8 @@
   # NOTE: Execute already emits `-map 0:N -c:N copy` for every stream, so the
   # flow's custom arguments must carry codec options only. Any `-map` there
   # muxes streams twice, which is what broke ~1,185 library files.
+  # The `-disposition:V:0 +default` there is deliberate: with no explicit
+  # disposition, ffmpeg marks the first subtitle default and players turn subs on.
   - name: Read committed tdarr flow
     ansible.builtin.set_fact:
       tdarr_flow: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json') | from_json }}"
