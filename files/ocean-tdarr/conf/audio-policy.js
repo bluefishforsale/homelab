@@ -93,8 +93,10 @@ module.exports = async (args) => {
   });
 
   // Dialogue-forward stereo: centre at full level, fronts and surrounds at 0.3,
-  // then loudness-normalised. Measured on A Complete Unknown: -28.4 -> -17 LUFS.
-  // loudnorm resamples to 192 kHz internally, hence the aresample back to 48k.
+  // then loudness-normalised to land near -18 LUFS. Single-pass loudnorm
+  // undershoots over a whole film, so it aims at -16: full films measured
+  // -17.8 (Amistad) and -19.2 (The Tree of Life), against -20.1 and -21.3 when
+  // aimed at -18. loudnorm resamples to 192 kHz, hence the aresample to 48k.
   // Some encoders leave the layout unset; 6 and 8 channels are 5.1 and 7.1.
   const layout = main.channel_layout || { 6: '5.1', 8: '7.1' }[main.channels] || '';
   const surr = (side) => (/7\.1/.test(layout) ? `0.3*B${side}+0.3*S${side}`
@@ -115,7 +117,7 @@ module.exports = async (args) => {
   };
   clearStats(dialogue);
   dialogue.outputArgs.push('-c:{outputIndex}', 'aac', '-b:{outputIndex}', '192k',
-      '-filter:{outputIndex}', `${downmix},loudnorm=I=-18:LRA=9:TP=-1.5,aresample=48000`,
+      '-filter:{outputIndex}', `${downmix},loudnorm=I=-16:LRA=7:TP=-1.5,aresample=48000`,
       '-metadata:s:{outputIndex}', `title=${DIALOGUE_TITLE}`,
       '-metadata:s:{outputIndex}', `language=${lang(main)}`,
       '-disposition:{outputIndex}', 'default');
