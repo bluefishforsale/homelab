@@ -25,6 +25,7 @@ Tautulli, then the rest. Movies only for now; TV comes as season packs.
 """
 import argparse
 import datetime as dt
+import fcntl
 import importlib.util
 import json
 import os
@@ -287,6 +288,17 @@ def cmd_status(a):
                 print(f"   {i['title']}: {i['log'][-1] if i['log'] else ''}")
 
 
+def lock():
+    """Hold an exclusive lock for this process's lifetime, or exit."""
+    os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
+    fd = open(LEDGER + ".lock", "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit("another media-refetch.py is running against this ledger")
+    return fd
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -302,6 +314,9 @@ def main():
     s.add_argument("-v", "--verbose", action="store_true")
     s.set_defaults(fn=cmd_status)
     a = ap.parse_args()
+    # NOTE: two runs over one ledger both see an item as planned and both grab
+    # a release; this happened on batch 1 (Sinners grabbed twice, seconds apart).
+    _held = lock()  # noqa: F841
     a.fn(a)
 
 
