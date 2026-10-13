@@ -45,6 +45,14 @@ HOST_ROOT, NODE_ROOT = "/data01/complete/", "/media/"
 SIGNATURE = ("codec_type", "codec_name", "profile", "width", "height", "pix_fmt",
              "channels", "sample_rate")
 SIGNATURE_TAGS = ("title", "language", "BPS", "DURATION", "ENCODER")
+# The muxer rewrites DURATION, and BPS is cleared below, so the remux is checked
+# against the source without them.
+VERIFY_TAGS = ("title", "language", "ENCODER")
+# mkvmerge statistics copied from the original Blu-ray remux. They describe the
+# AVC source, not the HEVC re-encode, and Plex trusts BPS: S03E02 advertised
+# 30.7 Mbps and Plex sized its transcode target from that.
+STALE_TAGS = ("BPS", "NUMBER_OF_BYTES", "NUMBER_OF_FRAMES", "_STATISTICS_TAGS",
+              "_STATISTICS_WRITING_APP", "_STATISTICS_WRITING_DATE_UTC")
 PACKETS_COMPARED = 64
 
 
@@ -96,9 +104,9 @@ def probe(npath):
     return json.loads(out)
 
 
-def signature(s):
+def signature(s, tag_names=SIGNATURE_TAGS):
     tags = {k.upper(): v for k, v in (s.get("tags") or {}).items()}
-    return tuple(s.get(k) for k in SIGNATURE) + tuple(tags.get(k.upper()) for k in SIGNATURE_TAGS)
+    return tuple(s.get(k) for k in SIGNATURE) + tuple(tags.get(k.upper()) for k in tag_names)
 
 
 def packets(npath, index, interval):
@@ -139,13 +147,16 @@ def plan(info, npath):
         winner = g[0] if len(g) == 1 else max(g, key=lambda i: sample_bytes(npath, i))
         keep.append(winner)
         dropped.update({i: winner for i in g if i != winner})
-    return sorted(keep), dropped
+    # Video first: the source interleaves v, a, v, a and Plex plays the first video.
+    kind = {st["index"]: st["codec_type"] for st in info["streams"]}
+    return sorted(keep, key=lambda i: (kind[i] != "video", i)), dropped
 
 
 def verify(src, out, keep):
     """Raise unless `out` holds exactly the kept streams, same length, plausible size."""
-    want = [signature(s) for s in src["streams"] if s["index"] in keep]
-    got = [signature(s) for s in out["streams"]]
+    by_index = {s["index"]: s for s in src["streams"]}
+    want = [signature(by_index[i], VERIFY_TAGS) for i in keep]
+    got = [signature(s, VERIFY_TAGS) for s in out["streams"]]
     if got != want:
         raise RuntimeError(f"stream list mismatch: kept {len(want)}, remux has {len(got)}")
     d_src, d_out = float(src["format"]["duration"]), float(out["format"]["duration"])
@@ -162,8 +173,9 @@ def repair(hpath, keep, src, keep_orig):
     d, base = os.path.split(hpath)
     tmp = os.path.join(d, f".{base}.dedupe.mkv")
     maps = [a for i in keep for a in ("-map", f"0:{i}")]
+    clear = [a for t in STALE_TAGS for a in ("-metadata:s", f"{t}=")]
     node(["ffmpeg", "-v", "error", "-nostdin", "-y", "-i", node_path(hpath), *maps,
-          "-c", "copy", "-map_metadata", "0", "-map_chapters", "0", node_path(tmp)])
+          "-c", "copy", "-map_metadata", "0", "-map_chapters", "0", *clear, node_path(tmp)])
     try:
         verify(src, probe(node_path(tmp)), keep)
     except Exception:
