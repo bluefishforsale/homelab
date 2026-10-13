@@ -141,6 +141,10 @@ def post(name, path, data, **params):
     return _request(name, path, params, data=data)
 
 
+def put(name, path, data, **params):
+    return _request(name, path, params, data=data, method="PUT")
+
+
 def delete(name, path, **params):
     return _request(name, path, params, method="DELETE")
 

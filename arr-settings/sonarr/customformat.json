@@ -1,0 +1,5009 @@
+[
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "10-bit",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(10-bit)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "10-bit",
+        "negate": false,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "AMZN",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(amzn|amazon(hd)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Amazon",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "DSNP",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dsnp|dsny|disney|Disney\\+)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Disney+",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "DV",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DV",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b(HDR(10)?(P(lus)?)?)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]SDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "DV HDR10",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b((HDR10(?!(P(lus)?)\\b|\\+))|(HDR))\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DV HDR10",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b((HDR10(?=(P(lus)?)\\b|\\+))))"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10Plus",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]SDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "DV HDR10+",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b((HDR10(?=(P(lus)?)\\b|\\+))))"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DV HDR10+",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]SDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "DV HLG",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DV HLG",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b(HDR(10)?(P(lus)?)?)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]SDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "DV SDR",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]SDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DV SDR",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b(HDR(10)?(P(lus)?)?)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(DV[ .]HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HLG",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "HBO",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(hbo)(?![ ._-]max)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HBO",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\[(HBO)\\b|\\b(HBO)\\]"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HBO Rename",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HD Bluray Tier 01",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 6
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BLURAY",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 7
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not REMUX",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Resolution",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "R360p",
+                "order": 360,
+                "value": 360
+              },
+              {
+                "name": "R480p",
+                "order": 480,
+                "value": 480
+              },
+              {
+                "name": "R540p",
+                "order": 540,
+                "value": 540
+              },
+              {
+                "name": "R576p",
+                "order": 576,
+                "value": 576
+              },
+              {
+                "name": "R720p",
+                "order": 720,
+                "value": 720
+              },
+              {
+                "name": "R1080p",
+                "order": 1080,
+                "value": 1080
+              },
+              {
+                "name": "R2160p",
+                "order": 2160,
+                "value": 2160
+              }
+            ],
+            "type": "select",
+            "value": 2160
+          }
+        ],
+        "implementation": "ResolutionSpecification",
+        "implementationName": "Resolution",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not 2160p",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Chotab)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Chotab",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CtrlHD)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CtrlHD",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(DON)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DON",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(EbP)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "EbP",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NTb)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NTb",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(PTer)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PTer",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HD Bluray Tier 02",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 6
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BLURAY",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 7
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not REMUX",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Resolution",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "R360p",
+                "order": 360,
+                "value": 360
+              },
+              {
+                "name": "R480p",
+                "order": 480,
+                "value": 480
+              },
+              {
+                "name": "R540p",
+                "order": 540,
+                "value": 540
+              },
+              {
+                "name": "R576p",
+                "order": 576,
+                "value": 576
+              },
+              {
+                "name": "R720p",
+                "order": 720,
+                "value": 720
+              },
+              {
+                "name": "R1080p",
+                "order": 1080,
+                "value": 1080
+              },
+              {
+                "name": "R2160p",
+                "order": 2160,
+                "value": 2160
+              }
+            ],
+            "type": "select",
+            "value": 2160
+          }
+        ],
+        "implementation": "ResolutionSpecification",
+        "implementationName": "Resolution",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not 2160p",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SA89)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SA89",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(sbR)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "sbR",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HDR",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HDR)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HDR",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(?!\\+|Plus)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(\\+|P(lus)?\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10+",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHLG(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not PQ",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(FraMeSToR|HQMUX|SiCFoI)\\b"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not RlsGrp (Missing HDR)",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bSDR(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HDR (undefined)",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(FraMeSToR|HQMUX|SiCFoI)\\b"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "RlsGrp (Missing HDR)",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Resolution",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "R360p",
+                "order": 360,
+                "value": 360
+              },
+              {
+                "name": "R480p",
+                "order": 480,
+                "value": 480
+              },
+              {
+                "name": "R540p",
+                "order": 540,
+                "value": 540
+              },
+              {
+                "name": "R576p",
+                "order": 576,
+                "value": 576
+              },
+              {
+                "name": "R720p",
+                "order": 720,
+                "value": 720
+              },
+              {
+                "name": "R1080p",
+                "order": 1080,
+                "value": 1080
+              },
+              {
+                "name": "R2160p",
+                "order": 2160,
+                "value": 2160
+              }
+            ],
+            "type": "select",
+            "value": 2160
+          }
+        ],
+        "implementation": "ResolutionSpecification",
+        "implementationName": "Resolution",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "2160p",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(?!\\+|Plus)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(\\+|P(lus)?\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10+",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not PQ",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bSDR(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HDR10",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(?!\\+|Plus)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HDR10",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b(HDR(10)?(P(lus)?)?)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not PQ",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bSDR(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not SDR",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HDR10+",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(\\+|P(lus)?\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HDR10+",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(?=.*\\b(DV|DoVi|Dolby[ .]?V(ision)?)\\b)(?=.*\\b(HDR(10)?(P(lus)?)?)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not PQ",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bSDR(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not SDR",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "HLG",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HLG",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(\\+|P(lus)?\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10+",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(?!\\+|Plus)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not PQ",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "HMAX",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(hmax|hbom|hbo[ ._-]?max)\\b(?=[ ._-]web[ ._-]?(dl|rip)\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HBO Max",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\[(HMAX)\\b|\\b(HMAX)\\]"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HMAX Rename",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "HULU",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(hulu)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Hulu",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "PQ",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(PQ)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PQ",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(dv|dovi|dolby[ .]?v(ision)?)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not DV",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(?!\\+|Plus)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bHDR10(\\+|P(lus)?\\b)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HDR10+",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(HLG)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not HLG",
+        "negate": true,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\bSDR(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Not SDR",
+        "negate": true,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "Remux Tier 01",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 7
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Remux",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(BLURANiUM)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BLURANiUM",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(BMF)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BMF",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(FraMeSToR)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "FraMeSToR",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(PmP)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PmP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "Remux Tier 02",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 7
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Remux",
+        "negate": false,
+        "required": true
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(decibeL)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "decibeL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(EPSiLON)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "EPSiLON",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(HiFi)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HiFi",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(KRaLiMaRKo)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "KRaLiMaRKo",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(playBD)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "playBD",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(PTer)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PTer",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SiCFoI)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SiCFoI",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(TRiToN)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "TRiToN",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "SHO",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(sho|showtime)\\b[ ._-]web[ ._-]?(dl|rip)?\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SHOWTIME",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\[(SHO)\\b|\\b(SHO)\\]"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SHO Rename",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": true,
+    "name": "SYFY",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "\\b(SYFY)\\b"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SYFY",
+        "negate": false,
+        "required": true
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "WEB Scene",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(DEFLATE)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DEFLATE",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(INFLATE)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "INFLATE",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "WEB Tier 01",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(ABBiE)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "ABBiE",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(AJP69)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "AJP69",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(APEX|PAXA|PEXA|XEPA)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "APEX",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CasStudio)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CasStudio",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CRFW)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CRFW",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CtrlHD)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CtrlHD",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(FLUX)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "FLUX",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(HONE)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "HONE",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(KiNGS)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "KiNGS",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Kitsune)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Kitsune",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(monkee)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "monkee",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NOSiViD)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NOSiViD",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NTb)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NTb",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NTG)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NTG",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(QOQ)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "QOQ",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(RTN)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "RTN",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SiC)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SiC",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(T6D)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "T6D",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(TOMMY)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "TOMMY",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(ViSUM)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "ViSUM",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "WEB Tier 02",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(3cTWeB)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "3cTWeB",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(BLUTONiUM)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BLUTONiUM",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(BTW)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "BTW",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Chotab)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Chotab",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Cinefeel)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Cinefeel",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CiT)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CiT",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(CMRG)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "CMRG",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Coo7)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Coo7",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(dB)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "dB",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(DEEP)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "DEEP",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(END)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "END",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(ETHiCS)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "ETHiCS",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(FC)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "FC",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(Flights)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "Flights",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(GNOME)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "GNOME",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(iJP)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "iJP",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(iKA)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "iKA",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(iT00NZ)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "iT00NZ",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(JETIX)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "JETIX",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(KHN)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "KHN",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(KiMCHI)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "KiMCHI",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(LAZY)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "LAZY",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(MiU)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "MiU",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(MZABI)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "MZABI",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NPMS)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NPMS",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(NYH)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "NYH",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(orbitron)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "orbitron",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(PHOENiX)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PHOENiX",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(playWEB)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "playWEB",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(PSiG)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "PSiG",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(ROCCaT)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "ROCCaT",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(RTFM)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "RTFM",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SA89)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SA89",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SbR)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SbR",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SDCC)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SDCC",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SIGMA)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SIGMA",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SMURF)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SMURF",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(SPiRiT)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "SPiRiT",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(TEPES)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "TEPES",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(TVSmash)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "TVSmash",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(WELP)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WELP",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "^(XEBEC|4KBEC|CEBEX)$"
+          }
+        ],
+        "implementation": "ReleaseGroupSpecification",
+        "implementationName": "Release Group",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "XEBEC",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 3
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBDL",
+        "negate": false,
+        "required": false
+      },
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "isFloat": false,
+            "label": "Source",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "selectOptions": [
+              {
+                "name": "Unknown",
+                "order": 0,
+                "value": 0
+              },
+              {
+                "name": "Television",
+                "order": 1,
+                "value": 1
+              },
+              {
+                "name": "TelevisionRaw",
+                "order": 2,
+                "value": 2
+              },
+              {
+                "name": "Web",
+                "order": 3,
+                "value": 3
+              },
+              {
+                "name": "WebRip",
+                "order": 4,
+                "value": 4
+              },
+              {
+                "name": "DVD",
+                "order": 5,
+                "value": 5
+              },
+              {
+                "name": "Bluray",
+                "order": 6,
+                "value": 6
+              },
+              {
+                "name": "BlurayRaw",
+                "order": 7,
+                "value": 7
+              }
+            ],
+            "type": "select",
+            "value": 4
+          }
+        ],
+        "implementation": "SourceSpecification",
+        "implementationName": "Source",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "WEBRIP",
+        "negate": false,
+        "required": false
+      }
+    ]
+  },
+  {
+    "includeCustomFormatWhenRenaming": false,
+    "name": "x265",
+    "specifications": [
+      {
+        "fields": [
+          {
+            "advanced": false,
+            "helpText": "Custom Format RegEx is Case Insensitive",
+            "isFloat": false,
+            "label": "Regular Expression",
+            "name": "value",
+            "order": 0,
+            "privacy": "normal",
+            "type": "textbox",
+            "value": "[xh][ ._-]?265|\\bHEVC(\\b|\\d)"
+          }
+        ],
+        "implementation": "ReleaseTitleSpecification",
+        "implementationName": "Release Title",
+        "infoLink": "https://wiki.servarr.com/sonarr/settings#custom-formats-2",
+        "name": "x|h265",
+        "negate": false,
+        "required": true
+      }
+    ]
+  }
+]

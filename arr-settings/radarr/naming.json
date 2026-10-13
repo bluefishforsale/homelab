@@ -1,0 +1,7 @@
+{
+  "colonReplacementFormat": "delete",
+  "movieFolderFormat": "{Movie CleanTitle} ({Release Year})",
+  "renameMovies": true,
+  "replaceIllegalCharacters": true,
+  "standardMovieFormat": "{Movie CleanTitle} {(Release Year)} {imdb-{ImdbId}} {edition-{Edition Tags}} {[Custom Formats]}{[Quality Full]}{[MediaInfo 3D]}{[MediaInfo VideoDynamicRangeType]}{[Mediainfo AudioCodec}{ Mediainfo AudioChannels}][{Mediainfo VideoCodec}]{-Release Group}{Edition Tags}{Edition Tags}"
+}

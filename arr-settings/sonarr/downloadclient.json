@@ -1,0 +1,186 @@
+[
+  {
+    "configContract": "NzbgetSettings",
+    "enable": true,
+    "fields": [
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Host",
+        "name": "host",
+        "order": 0,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "192.168.1.143"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Port",
+        "name": "port",
+        "order": 1,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": 8901
+      },
+      {
+        "advanced": false,
+        "helpText": "Use secure connection when connection to NZBGet",
+        "isFloat": false,
+        "label": "Use SSL",
+        "name": "useSsl",
+        "order": 2,
+        "privacy": "normal",
+        "type": "checkbox",
+        "value": false
+      },
+      {
+        "advanced": true,
+        "helpText": "Adds a prefix to the NZBGet url, such as http://[host]:[port]/[urlBase]/jsonrpc",
+        "isFloat": false,
+        "label": "URL Base",
+        "name": "urlBase",
+        "order": 3,
+        "privacy": "normal",
+        "type": "textbox"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Username",
+        "name": "username",
+        "order": 4,
+        "privacy": "userName",
+        "type": "textbox",
+        "value": "nzbget"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Password",
+        "name": "password",
+        "order": 5,
+        "privacy": "password",
+        "type": "password",
+        "value": "********"
+      },
+      {
+        "advanced": false,
+        "helpText": "Adding a category specific to Sonarr avoids conflicts with unrelated non-Sonarr downloads. Using a category is optional, but strongly recommended.",
+        "isFloat": false,
+        "label": "Category",
+        "name": "tvCategory",
+        "order": 6,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "tv"
+      },
+      {
+        "advanced": false,
+        "helpText": "Priority to use when grabbing episodes that aired within the last 14 days",
+        "isFloat": false,
+        "label": "Recent Priority",
+        "name": "recentTvPriority",
+        "order": 7,
+        "privacy": "normal",
+        "selectOptions": [
+          {
+            "name": "VeryLow",
+            "order": -100,
+            "value": -100
+          },
+          {
+            "name": "Low",
+            "order": -50,
+            "value": -50
+          },
+          {
+            "name": "Normal",
+            "order": 0,
+            "value": 0
+          },
+          {
+            "name": "High",
+            "order": 50,
+            "value": 50
+          },
+          {
+            "name": "VeryHigh",
+            "order": 100,
+            "value": 100
+          },
+          {
+            "name": "Force",
+            "order": 900,
+            "value": 900
+          }
+        ],
+        "type": "select",
+        "value": 0
+      },
+      {
+        "advanced": false,
+        "helpText": "Priority to use when grabbing episodes that aired over 14 days ago",
+        "isFloat": false,
+        "label": "Older Priority",
+        "name": "olderTvPriority",
+        "order": 8,
+        "privacy": "normal",
+        "selectOptions": [
+          {
+            "name": "VeryLow",
+            "order": -100,
+            "value": -100
+          },
+          {
+            "name": "Low",
+            "order": -50,
+            "value": -50
+          },
+          {
+            "name": "Normal",
+            "order": 0,
+            "value": 0
+          },
+          {
+            "name": "High",
+            "order": 50,
+            "value": 50
+          },
+          {
+            "name": "VeryHigh",
+            "order": 100,
+            "value": 100
+          },
+          {
+            "name": "Force",
+            "order": 900,
+            "value": 900
+          }
+        ],
+        "type": "select",
+        "value": 0
+      },
+      {
+        "advanced": false,
+        "helpText": "This option requires at least NzbGet version 16.0",
+        "isFloat": false,
+        "label": "Add Paused",
+        "name": "addPaused",
+        "order": 9,
+        "privacy": "normal",
+        "type": "checkbox",
+        "value": false
+      }
+    ],
+    "implementation": "Nzbget",
+    "implementationName": "NZBGet",
+    "infoLink": "https://wiki.servarr.com/sonarr/supported#nzbget",
+    "name": "NzbGet",
+    "priority": 1,
+    "protocol": "usenet",
+    "removeCompletedDownloads": false,
+    "removeFailedDownloads": false,
+    "tags": []
+  }
+]

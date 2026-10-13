@@ -1,0 +1,7 @@
+{
+  "autoRedownloadFailed": true,
+  "autoRedownloadFailedFromInteractiveSearch": true,
+  "checkForFinishedDownloadInterval": 1,
+  "downloadClientWorkingFolders": "_UNPACK_|_FAILED_",
+  "enableCompletedDownloadHandling": true
+}
