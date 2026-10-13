@@ -21,6 +21,7 @@ commit, pushes them back, and drives the queue.
   tdarr.py workers <type> <n> [node]    # set a worker limit, e.g. transcodegpu 1
   tdarr.py schedule on|off [node]       # hourly worker schedule (it overwrites limits on the hour)
   tdarr.py queue [-n 20]                # next files in the order the queue will take them
+  tdarr.py drive [--newer-than-days 7]  # paused node: run recent arrivals, not the backlog
 
 Env: TDARR_URL (default http://ocean.home:8265).
 """
@@ -30,6 +31,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.request
 
 URL = os.environ.get("TDARR_URL", "http://ocean.home:8265").rstrip("/")
@@ -326,6 +328,43 @@ def cmd_queue(a):
         print(f"  {(r.get('file_size') or 0)/1024:6.1f} GB  {r.get('file')}")
 
 
+def cmd_drive(a):
+    """Let a paused node take recent arrivals one at a time, leaving the backlog alone.
+
+    With the queue newest first, resuming hands the workers the newest files;
+    pausing once a transcode has started stops it collecting anything after.
+    A node someone left running is not touched."""
+    for n in nodes(a.node):
+        if not n["nodePaused"]:
+            print(f"{n['nodeName']}: running, not driving it")
+            continue
+        if any((w.get("workerType") or "").startswith("transcode") for w in n["workers"].values()):
+            print(f"{n['nodeName']}: already transcoding")
+            continue
+        queued = list(rows(TABLES["queued"]))
+        if not queued:
+            print("queue empty")
+            return
+        newest = max(queued, key=lambda r: r.get("createdAt") or 0)
+        age_days = (time.time() * 1000 - (newest.get("createdAt") or 0)) / 86_400_000
+        if age_days > a.newer_than_days:
+            print(f"newest queued file is {age_days:.0f} days old; leaving the backlog paused")
+            return
+        busy = []
+        update_node(n, nodePaused=False)
+        try:
+            deadline = time.time() + 120
+            while time.time() < deadline:
+                time.sleep(5)
+                busy = [w for w in nodes(n["_id"])[0]["workers"].values()
+                        if (w.get("workerType") or "").startswith("transcode")]
+                if busy:
+                    break
+        finally:
+            update_node(n, nodePaused=True)
+        print(f"{n['nodeName']}: started {[(w.get('file') or '')[-70:] for w in busy] if busy else 'nothing'}")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -386,6 +425,11 @@ def main():
     sc.add_argument("state", choices=("on", "off"))
     sc.add_argument("node", nargs="?")
     sc.set_defaults(fn=cmd_schedule)
+
+    dr = sub.add_parser("drive")
+    dr.add_argument("--newer-than-days", type=float, default=7)
+    dr.add_argument("node", nargs="?")
+    dr.set_defaults(fn=cmd_drive)
 
     q = sub.add_parser("queue")
     q.add_argument("-n", "--limit", type=int, default=20)
