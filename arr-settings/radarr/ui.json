@@ -1,0 +1,13 @@
+{
+  "calendarWeekColumnHeader": "ddd M/D",
+  "enableColorImpairedMode": false,
+  "firstDayOfWeek": 0,
+  "longDateFormat": "dddd, MMMM D YYYY",
+  "movieInfoLanguage": 1,
+  "movieRuntimeFormat": "hoursMinutes",
+  "shortDateFormat": "MMM D YYYY",
+  "showRelativeDates": true,
+  "theme": "auto",
+  "timeFormat": "h(:mm)a",
+  "uiLanguage": 1
+}

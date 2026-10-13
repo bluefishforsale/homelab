@@ -1,0 +1,194 @@
+[
+  {
+    "configContract": "RSSImportSettings",
+    "enableAuto": false,
+    "enabled": false,
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "Link to the rss feed of movies.",
+        "isFloat": false,
+        "label": "RSS Link",
+        "name": "link",
+        "order": 0,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "https://movieweb.com/feed/"
+      }
+    ],
+    "implementation": "RSSImport",
+    "implementationName": "RSS List",
+    "infoLink": "https://wiki.servarr.com/radarr/supported#rssimport",
+    "listOrder": 6,
+    "listType": "advanced",
+    "minRefreshInterval": "12:00:00",
+    "minimumAvailability": "inCinemas",
+    "monitor": "movieOnly",
+    "name": "Movieweb",
+    "qualityProfileId": "HD  REMUX + WEB",
+    "rootFolderPath": "/movies",
+    "searchOnAdd": false,
+    "tags": []
+  },
+  {
+    "configContract": "StevenLu2Settings",
+    "enableAuto": true,
+    "enabled": true,
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "StevenLu ratings source",
+        "isFloat": false,
+        "label": "Rating source",
+        "name": "source",
+        "order": 0,
+        "privacy": "normal",
+        "selectOptions": [
+          {
+            "dividerAfter": false,
+            "name": "Standard",
+            "order": 0,
+            "value": 0
+          },
+          {
+            "dividerAfter": false,
+            "name": "Imdb",
+            "order": 1,
+            "value": 1
+          },
+          {
+            "dividerAfter": false,
+            "name": "Metacritic",
+            "order": 2,
+            "value": 2
+          },
+          {
+            "dividerAfter": false,
+            "name": "RottenTomatoes",
+            "order": 3,
+            "value": 3
+          }
+        ],
+        "type": "select",
+        "value": 3
+      },
+      {
+        "advanced": false,
+        "helpText": "Only applies if 'Rating source' is not 'Standard'",
+        "isFloat": false,
+        "label": "Minimum Score",
+        "name": "minScore",
+        "order": 1,
+        "privacy": "normal",
+        "type": "number",
+        "value": 6
+      }
+    ],
+    "implementation": "StevenLu2Import",
+    "implementationName": "StevenLu List",
+    "infoLink": "https://wiki.servarr.com/radarr/supported#stevenlu2import",
+    "listOrder": 5,
+    "listType": "other",
+    "minRefreshInterval": "12:00:00",
+    "minimumAvailability": "inCinemas",
+    "monitor": "movieOnly",
+    "name": "StevenLu",
+    "qualityProfileId": "HD  REMUX + WEB",
+    "rootFolderPath": "/movies/",
+    "searchOnAdd": true,
+    "tags": []
+  },
+  {
+    "configContract": "RSSImportSettings",
+    "enableAuto": false,
+    "enabled": false,
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "Link to the rss feed of movies.",
+        "isFloat": false,
+        "label": "RSS Link",
+        "name": "link",
+        "order": 0,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "https://www.comingsoon.net/feed"
+      }
+    ],
+    "implementation": "RSSImport",
+    "implementationName": "RSS List",
+    "infoLink": "https://wiki.servarr.com/radarr/supported#rssimport",
+    "listOrder": 6,
+    "listType": "advanced",
+    "minRefreshInterval": "12:00:00",
+    "minimumAvailability": "inCinemas",
+    "monitor": "movieOnly",
+    "name": "comingsoon.net",
+    "qualityProfileId": "HD  REMUX + WEB",
+    "rootFolderPath": "/movies",
+    "searchOnAdd": false,
+    "tags": []
+  },
+  {
+    "configContract": "RSSImportSettings",
+    "enableAuto": false,
+    "enabled": false,
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "Link to the rss feed of movies.",
+        "isFloat": false,
+        "label": "RSS Link",
+        "name": "link",
+        "order": 0,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "https://www.filmjabber.com/rss/rss-current.php"
+      }
+    ],
+    "implementation": "RSSImport",
+    "implementationName": "RSS List",
+    "infoLink": "https://wiki.servarr.com/radarr/supported#rssimport",
+    "listOrder": 6,
+    "listType": "advanced",
+    "minRefreshInterval": "12:00:00",
+    "minimumAvailability": "announced",
+    "monitor": "movieOnly",
+    "name": "filmjabber current",
+    "qualityProfileId": "HD  REMUX + WEB",
+    "rootFolderPath": "/movies",
+    "searchOnAdd": false,
+    "tags": []
+  },
+  {
+    "configContract": "RSSImportSettings",
+    "enableAuto": false,
+    "enabled": false,
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "Link to the rss feed of movies.",
+        "isFloat": false,
+        "label": "RSS Link",
+        "name": "link",
+        "order": 0,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "https://www.filmjabber.com/rss/rss-upcoming.php"
+      }
+    ],
+    "implementation": "RSSImport",
+    "implementationName": "RSS List",
+    "infoLink": "https://wiki.servarr.com/radarr/supported#rssimport",
+    "listOrder": 6,
+    "listType": "advanced",
+    "minRefreshInterval": "12:00:00",
+    "minimumAvailability": "announced",
+    "monitor": "movieOnly",
+    "name": "filmjabber upcoming",
+    "qualityProfileId": "HD  REMUX + WEB",
+    "rootFolderPath": "/movies",
+    "searchOnAdd": false,
+    "tags": []
+  }
+]

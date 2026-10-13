@@ -1,0 +1,141 @@
+[
+  {
+    "configContract": "PlexServerSettings",
+    "fields": [
+      {
+        "advanced": false,
+        "helpText": "Select server from plex.tv account after authenticating",
+        "isFloat": false,
+        "label": "Server",
+        "name": "server",
+        "order": 0,
+        "privacy": "normal",
+        "selectOptionsProviderAction": "servers",
+        "type": "select"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Host",
+        "name": "host",
+        "order": 1,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": "192.168.1.143"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Port",
+        "name": "port",
+        "order": 2,
+        "privacy": "normal",
+        "type": "textbox",
+        "value": 32400
+      },
+      {
+        "advanced": false,
+        "helpText": "Connect to Plex over HTTPS instead of HTTP",
+        "isFloat": false,
+        "label": "Use SSL",
+        "name": "useSsl",
+        "order": 3,
+        "privacy": "normal",
+        "type": "checkbox",
+        "value": false
+      },
+      {
+        "advanced": true,
+        "helpText": "Adds a prefix to the Plex url, such as http://[host]:[port]/[urlBase]/plex",
+        "isFloat": false,
+        "label": "URL Base",
+        "name": "urlBase",
+        "order": 4,
+        "privacy": "normal",
+        "type": "textbox"
+      },
+      {
+        "advanced": true,
+        "isFloat": false,
+        "label": "Auth Token",
+        "name": "authToken",
+        "order": 5,
+        "privacy": "apiKey",
+        "type": "textbox",
+        "value": "********"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Authenticate with Plex.tv",
+        "name": "signIn",
+        "order": 6,
+        "privacy": "normal",
+        "type": "oAuth",
+        "value": "startOAuth"
+      },
+      {
+        "advanced": false,
+        "isFloat": false,
+        "label": "Update Library",
+        "name": "updateLibrary",
+        "order": 7,
+        "privacy": "normal",
+        "type": "checkbox",
+        "value": true
+      },
+      {
+        "advanced": true,
+        "helpText": "Sonarr path, used to modify series paths when Plex sees library path location differently from Sonarr (Requires 'Update Library')",
+        "isFloat": false,
+        "label": "Map Paths From",
+        "name": "mapFrom",
+        "order": 8,
+        "privacy": "normal",
+        "type": "textbox"
+      },
+      {
+        "advanced": true,
+        "helpText": "Plex path, used to modify series paths when Plex sees library path location differently from Sonarr (Requires 'Update Library')",
+        "isFloat": false,
+        "label": "Map Paths To",
+        "name": "mapTo",
+        "order": 9,
+        "privacy": "normal",
+        "type": "textbox"
+      }
+    ],
+    "implementation": "PlexServer",
+    "implementationName": "Plex Media Server",
+    "includeHealthWarnings": false,
+    "infoLink": "https://wiki.servarr.com/sonarr/supported#plexserver",
+    "name": "ocean",
+    "onApplicationUpdate": false,
+    "onDownload": true,
+    "onEpisodeFileDelete": false,
+    "onEpisodeFileDeleteForUpgrade": true,
+    "onGrab": false,
+    "onHealthIssue": false,
+    "onHealthRestored": false,
+    "onImportComplete": false,
+    "onManualInteractionRequired": false,
+    "onRename": true,
+    "onSeriesAdd": false,
+    "onSeriesDelete": false,
+    "onUpgrade": true,
+    "supportsOnApplicationUpdate": false,
+    "supportsOnDownload": true,
+    "supportsOnEpisodeFileDelete": true,
+    "supportsOnEpisodeFileDeleteForUpgrade": true,
+    "supportsOnGrab": false,
+    "supportsOnHealthIssue": false,
+    "supportsOnHealthRestored": false,
+    "supportsOnImportComplete": true,
+    "supportsOnManualInteractionRequired": false,
+    "supportsOnRename": true,
+    "supportsOnSeriesAdd": true,
+    "supportsOnSeriesDelete": true,
+    "supportsOnUpgrade": true,
+    "tags": []
+  }
+]

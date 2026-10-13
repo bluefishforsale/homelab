@@ -1,0 +1,6 @@
+{
+  "maximumSize": 0,
+  "minimumAge": 30,
+  "retention": 5000,
+  "rssSyncInterval": 10
+}

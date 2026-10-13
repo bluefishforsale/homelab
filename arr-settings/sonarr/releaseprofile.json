@@ -1,0 +1,32 @@
+[
+  {
+    "enabled": true,
+    "ignored": [
+      "/\\b(-alfaHD|-BAT|-BNd|-C\\.A\\.A|-Cory|-FF|-FOXX|-G4RiS|-GUEIRA|-N3G4N|-PD|-RiPER|-RK|-SiGLA|-Tars|-WTV|-Yatogam1|-YusukeFLA)\\b/i"
+    ],
+    "indexerId": 0,
+    "name": "Ignore Bad Dual Audio Groups",
+    "required": [],
+    "tags": []
+  },
+  {
+    "enabled": true,
+    "ignored": [
+      "/^(?!.*(web[ ]dl|-deflate|-inflate))(?=.*([_. ]WEB[_. ]|-CAKES\\b|-GGEZ\\b|-GGWP\\b|-GLHF\\b|-GOSSIP\\b|-KOGI\\b|-PECULATE\\b)).*/i"
+    ],
+    "indexerId": 0,
+    "name": "dislike scene releases",
+    "required": [],
+    "tags": []
+  },
+  {
+    "enabled": true,
+    "ignored": [
+      "/\\bS\\d+\\b(?!E\\d+\\b)/i"
+    ],
+    "indexerId": 0,
+    "name": "no season packs",
+    "required": [],
+    "tags": []
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "allowHardcodedSubs": false,
+  "availabilityDelay": 0,
+  "maximumSize": 0,
+  "minimumAge": 0,
+  "preferIndexerFlags": true,
+  "retention": 5000,
+  "rssSyncInterval": 30,
+  "whitelistedHardcodedSubs": ""
+}

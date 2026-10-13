@@ -1,0 +1,23 @@
+{
+  "autoRenameFolders": false,
+  "autoUnmonitorPreviouslyDownloadedMovies": true,
+  "chmodFolder": "755",
+  "chownGroup": "1001",
+  "copyUsingHardlinks": true,
+  "createEmptyMovieFolders": false,
+  "deleteEmptyFolders": true,
+  "downloadPropersAndRepacks": "doNotPrefer",
+  "enableMediaInfo": true,
+  "extraFileExtensions": "srt",
+  "fileDate": "cinemas",
+  "importExtraFiles": true,
+  "minimumFreeSpaceWhenImporting": 100,
+  "pathsDefaultStatic": false,
+  "recycleBin": "",
+  "recycleBinCleanupDays": 7,
+  "rescanAfterRefresh": "always",
+  "scriptImportPath": "",
+  "setPermissionsLinux": true,
+  "skipFreeSpaceCheckWhenImporting": false,
+  "useScriptImport": false
+}
