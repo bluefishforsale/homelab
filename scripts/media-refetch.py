@@ -256,9 +256,16 @@ def step(item, yes):
         note(item, f"conforms ({','.join(why) or 'clean'}); restore Plex added date {added}")
         if not yes:
             return False
-        plex_md = mc.get("plex", f"/library/metadata/{item['rating_key']}")["MediaContainer"]["Metadata"][0]
+        # NOTE: the delete-and-import gives the movie a new Plex item (which is
+        # why its added date reset), so the rating key recorded at plan time is
+        # gone. Find the item that holds the new file now.
+        current = plex_items().get(item["path"])
+        if not current:
+            return False                               # Plex has not scanned the new file yet
+        rk = current[0]
+        plex_md = mc.get("plex", f"/library/metadata/{rk}")["MediaContainer"]["Metadata"][0]
         mc._request("plex", f"/library/sections/{plex_md['librarySectionID']}/all",
-                    {"type": 1, "id": item["rating_key"], "addedAt.value": item["added_at"],
+                    {"type": 1, "id": rk, "addedAt.value": item["added_at"],
                      "addedAt.locked": 1}, method="PUT")
         item["state"] = "done"
         return True
@@ -268,10 +275,13 @@ def step(item, yes):
 def cmd_run(a):
     ledger = load()
     for item in ledger.values():
-        while step(item, a.yes):
-            save(ledger)
-            if not a.yes:
-                break
+        try:
+            while step(item, a.yes):
+                save(ledger)
+                if not a.yes:
+                    break
+        except Exception as e:  # one bad item must not stall the rest of the batch
+            print(f"ERROR    {item['title']}: {e}")
     if not a.yes:
         print("dry run: re-run with --yes to act")
 
