@@ -158,7 +158,11 @@
       name: tdarr.service
       state: restarted
 
+  # NOTE: each unit pulls :latest on start, and the node refuses to work for a
+  # server of another version. Restarting the server alone split them 3.00.00
+  # vs 2.94.03 on 2026-10-12 and stopped all transcoding, so they restart together.
   - name: Restart tdarr node service
+    listen: Restart tdarr service
     ansible.builtin.systemd:
       name: tdarr_node.service
       state: restarted
