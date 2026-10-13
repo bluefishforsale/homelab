@@ -49,7 +49,7 @@
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "inputsDB": {
-        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -dn"
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeAll",
