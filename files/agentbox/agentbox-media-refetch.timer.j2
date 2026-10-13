@@ -1,0 +1,10 @@
+[Unit]
+Description=Advance the library re-download batches every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=5min
+Unit=agentbox-media-refetch.service
+
+[Install]
+WantedBy=timers.target
