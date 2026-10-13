@@ -358,7 +358,9 @@ def cmd_drive(a):
                 time.sleep(5)
                 busy = [w for w in nodes(n["_id"])[0]["workers"].values()
                         if (w.get("workerType") or "").startswith("transcode")]
-                if busy:
+                # A worker exists a few seconds before it is given a file; wait
+                # for the file so the log says what started.
+                if busy and all(w.get("file") for w in busy):
                     break
         finally:
             update_node(n, nodePaused=True)
