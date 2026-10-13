@@ -120,7 +120,11 @@ def same_content(npath, kind, a, b):
     """True when stream b carries the same content as earlier stream a."""
     pa, pb = (packets(npath, i, f"%+#{PACKETS_COMPARED}") for i in (a, b))
     if kind == "audio":
-        return pa == pb
+        # NOTE: a film that opens on silence encodes every track's first packets
+        # identically, so the opening alone would fold a commentary into the main
+        # mix and delete it. The mid-file window is what tells them apart.
+        mid = f"600%+#{PACKETS_COMPARED}"
+        return pa == pb and packets(npath, a, mid) == packets(npath, b, mid)
     timeline = lambda ps: [(p[0], p[2]) for p in ps]  # pts, keyframe flag
     return timeline(pa) == timeline(pb)
 
