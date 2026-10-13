@@ -152,6 +152,22 @@
     when: live.name | default('') != tdarr_flow.name or live_plugins != want_plugins or live_edges != want_edges
     changed_when: true
 
+  # Newest first, so a fresh download (a request, or a media-refetch.py batch)
+  # is processed within hours instead of waiting behind the whole backlog.
+  - name: Process the tdarr queue newest first
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/cruddb"
+      method: POST
+      body_format: json
+      body:
+        data:
+          collection: SettingsGlobalJSONDB
+          mode: update
+          docID: globalsettings
+          obj:
+            queueSortType: sortDateNewest
+    changed_when: false
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
