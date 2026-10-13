@@ -733,7 +733,12 @@ NzbDirFileAge=60
 # manually unpause another duplicate (if any exists in queue).
 #
 # NOTE: For more info on duplicates see http://nzbget.net/rss.
-DupeCheck=yes
+#
+# NOTE: off because Radarr and Sonarr own duplicate handling (they send
+# DupeMode=ALL), and the check still deletes an exact copy of anything
+# downloaded before as DELETED/COPY. Re-fetching a release the library
+# already had (media-refetch.py) then fails in Radarr every time.
+DupeCheck=no
 
 
 ##############################################################################
