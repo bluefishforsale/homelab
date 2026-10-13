@@ -40,7 +40,7 @@
         "y": 0
       },
       "inputsDB": {
-        "code": {{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/audio-policy.js') | to_json }}
+        "code": {{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/audio-policy.js') | tojson }}
       }
     },
     {
