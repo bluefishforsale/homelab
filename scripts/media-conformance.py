@@ -5,7 +5,8 @@ The standard is what the tdarr flow and its audio policy
 (files/ocean-tdarr/conf/audio-policy.js) produce, plus an English subtitle
 from the release itself:
 
-  video      one HEVC stream, no stale mkvmerge BPS left from a re-encode
+  video      one HEVC stream, no stale mkvmerge BPS left from a re-encode; or the
+             source codec, when the flow found HEVC came out larger and kept it
   audio      default "Stereo (dialogue boost)" track; surround only AC3/EAC3;
              nothing lossless
   subtitles  at least one English (or untagged) subtitle stream
@@ -58,7 +59,10 @@ def reasons(streams):
         out.append("double-muxed")
     if not any((tags(s).get("LANGUAGE") or "").lower() in ENGLISH for s in subs):
         out.append("no-english-subs")
-    if video and video[0].get("codec_name") != "hevc":
+    # The flow keeps the source video when HEVC came out larger (a lean WEB-DL),
+    # and still runs the audio policy; its dialogue track marks that decision.
+    has_dialogue = any(tags(s).get("TITLE") == DIALOGUE_TITLE for s in audio)
+    if video and video[0].get("codec_name") != "hevc" and not has_dialogue:
         out.append("video-not-hevc")
     if video and any(k in tags(video[0]) for k in STALE) and "Lavc" in tags(video[0]).get("ENCODER", ""):
         out.append("stale-bps")
