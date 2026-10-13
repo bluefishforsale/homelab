@@ -47,7 +47,8 @@ def api(path, payload=None, timeout=120):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         body = r.read()
-    return json.loads(body) if body else {}
+    # The mutating endpoints (update-node, alter-worker-limit) answer a bare "OK".
+    return json.loads(body) if body.startswith((b"{", b"[")) else body.decode()
 
 
 def crud(collection, mode, **kw):
