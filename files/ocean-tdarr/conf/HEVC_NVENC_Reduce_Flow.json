@@ -44,12 +44,12 @@
       }
     },
     {
-      "name": "Complete Encode Command",
+      "name": "Encode Video Only",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "inputsDB": {
-        "outputArguments": "-map 0:v -c:v hevc_nvenc -preset:v:0 p7 -rc:v:0 vbr -cq:v:0 23 -b:v 30M -maxrate 40M -bufsize 50M -level:v 5.1 -profile:v main10 -map 0:a:0 -c:a aac -b:a 384k -ac 6 -sn -dn -colorspace bt2020nc -color_primaries bt2020 -color_trc smpte2084"
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -dn"
       },
       "fpEnabled": true,
       "id": "encodeAll",
