@@ -99,6 +99,55 @@
       enabled: true
       state: started
 
+  # The flow lives in tdarr's own DB, so until this task the committed JSON was
+  # only documentation and the live flow drifted from it unseen. Push it through
+  # the API, and only when it differs, so a run with no flow change stays a no-op.
+  # Node positions and the UI's edge styling keys are ignored in the comparison.
+  # NOTE: Execute already emits `-map 0:N -c:N copy` for every stream, so the
+  # flow's custom arguments must carry codec options only. Any `-map` there
+  # muxes streams twice, which is what broke ~1,185 library files.
+  - name: Read committed tdarr flow
+    ansible.builtin.set_fact:
+      tdarr_flow: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json') | from_json }}"
+
+  - name: Fetch live tdarr flow
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/cruddb"
+      method: POST
+      body_format: json
+      body:
+        data:
+          collection: FlowsJSONDB
+          mode: getById
+          docID: "{{ tdarr_flow._id }}"
+    register: tdarr_live_flow
+    retries: 12
+    delay: 10
+    until: tdarr_live_flow.status == 200
+
+  - name: Push tdarr flow when it differs from the committed one
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/cruddb"
+      method: POST
+      body_format: json
+      body:
+        data:
+          collection: FlowsJSONDB
+          mode: update
+          docID: "{{ tdarr_flow._id }}"
+          obj:
+            name: "{{ tdarr_flow.name }}"
+            flowPlugins: "{{ tdarr_flow.flowPlugins }}"
+            flowEdges: "{{ tdarr_flow.flowEdges }}"
+    vars:
+      live: "{{ tdarr_live_flow.json | default({}, true) }}"
+      live_plugins: "{{ live.flowPlugins | default([]) | map('dict2items') | map('rejectattr', 'key', 'equalto', 'position') | map('items2dict') | list }}"
+      want_plugins: "{{ tdarr_flow.flowPlugins | map('dict2items') | map('rejectattr', 'key', 'equalto', 'position') | map('items2dict') | list }}"
+      live_edges: "{{ live.flowEdges | default([]) | map(attribute='source') | zip(live.flowEdges | default([]) | map(attribute='sourceHandle'), live.flowEdges | default([]) | map(attribute='target')) | list }}"
+      want_edges: "{{ tdarr_flow.flowEdges | map(attribute='source') | zip(tdarr_flow.flowEdges | map(attribute='sourceHandle'), tdarr_flow.flowEdges | map(attribute='target')) | list }}"
+    when: live.name | default('') != tdarr_flow.name or live_plugins != want_plugins or live_edges != want_edges
+    changed_when: true
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
