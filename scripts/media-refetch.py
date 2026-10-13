@@ -25,6 +25,7 @@ Tautulli, then the rest. Movies only for now; TV comes as season packs.
 """
 import argparse
 import datetime as dt
+import fcntl
 import importlib.util
 import json
 import os
@@ -212,6 +213,15 @@ def step(item, yes):
         grabbed = dt.datetime.fromisoformat(item["grabbed_at"])
         mf = movie.get("movieFile") or {}
         if not movie.get("hasFile") or dt.datetime.fromisoformat(mf["dateAdded"].replace("Z", "+00:00")) < grabbed:
+            # A failed download (missing articles) is blocklisted by Radarr, but
+            # its own re-search may find nothing it will take; search again here.
+            failed = [h for h in mc.get("radarr", "/api/v3/history/movie", movieId=mid, eventType=4)  # 4 = downloadFailed
+                      if dt.datetime.fromisoformat(h["date"].replace("Z", "+00:00")) > grabbed]
+            if failed and not mc.get("radarr", "/api/v3/queue/details", movieId=mid):
+                note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
+                if yes:
+                    item["state"] = "planned"
+                return yes
             if now() - grabbed > GRAB_TIMEOUT:
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
@@ -246,9 +256,16 @@ def step(item, yes):
         note(item, f"conforms ({','.join(why) or 'clean'}); restore Plex added date {added}")
         if not yes:
             return False
-        plex_md = mc.get("plex", f"/library/metadata/{item['rating_key']}")["MediaContainer"]["Metadata"][0]
+        # NOTE: the delete-and-import gives the movie a new Plex item (which is
+        # why its added date reset), so the rating key recorded at plan time is
+        # gone. Find the item that holds the new file now.
+        current = plex_items().get(item["path"])
+        if not current:
+            return False                               # Plex has not scanned the new file yet
+        rk = current[0]
+        plex_md = mc.get("plex", f"/library/metadata/{rk}")["MediaContainer"]["Metadata"][0]
         mc._request("plex", f"/library/sections/{plex_md['librarySectionID']}/all",
-                    {"type": 1, "id": item["rating_key"], "addedAt.value": item["added_at"],
+                    {"type": 1, "id": rk, "addedAt.value": item["added_at"],
                      "addedAt.locked": 1}, method="PUT")
         item["state"] = "done"
         return True
@@ -258,10 +275,13 @@ def step(item, yes):
 def cmd_run(a):
     ledger = load()
     for item in ledger.values():
-        while step(item, a.yes):
-            save(ledger)
-            if not a.yes:
-                break
+        try:
+            while step(item, a.yes):
+                save(ledger)
+                if not a.yes:
+                    break
+        except Exception as e:  # one bad item must not stall the rest of the batch
+            print(f"ERROR    {item['title']}: {e}")
     if not a.yes:
         print("dry run: re-run with --yes to act")
 
@@ -276,6 +296,17 @@ def cmd_status(a):
         if a.verbose:
             for i in items:
                 print(f"   {i['title']}: {i['log'][-1] if i['log'] else ''}")
+
+
+def lock():
+    """Hold an exclusive lock for this process's lifetime, or exit."""
+    os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
+    fd = open(LEDGER + ".lock", "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit("another media-refetch.py is running against this ledger")
+    return fd
 
 
 def main():
@@ -293,6 +324,9 @@ def main():
     s.add_argument("-v", "--verbose", action="store_true")
     s.set_defaults(fn=cmd_status)
     a = ap.parse_args()
+    # NOTE: two runs over one ledger both see an item as planned and both grab
+    # a release; this happened on batch 1 (Sinners grabbed twice, seconds apart).
+    _held = lock()  # noqa: F841
     a.fn(a)
 
 
