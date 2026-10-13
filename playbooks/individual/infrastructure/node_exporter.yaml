@@ -42,7 +42,16 @@
       - github-runners
     process_exporter_service: process-exporter
     process_exporter_image: ncabatoff/process-exporter
-    process_exporter_version: latest
+    # Pinned, and this one floated harder than smart-exporter did. It is a bare
+    # `docker run` systemd unit, not a compose project, so the
+    # docker-refresh@ timers never covered it (they enumerate from
+    # `docker compose ls`). Instead its own unit upgrades it: RuntimeMaxSec=7d
+    # with Restart=always cycles it weekly, and ExecStartPre does
+    # `docker rmi -f` on the image and then pulls the tag again. On a floating
+    # tag that is an unattended upgrade every 7 days on all three hosts, with
+    # the old image deleted first so there is nothing to roll back to.
+    # v0.8.7 is the digest already running everywhere.
+    process_exporter_version: v0.8.7
     process_exporter_port: "{{ service_ports.process_exporter.port }}"
     # NVIDIA GPU Exporter (Docker Compose deployment)
     nvidia_gpu_exporter_service: nvidia-gpu-exporter
@@ -54,7 +63,20 @@
     # SMART monitoring (Docker Compose deployment)
     smart_exporter_service: smart-exporter
     smart_exporter_image: prometheuscommunity/smartctl-exporter
-    smart_exporter_version: latest
+    # Pinned. On a floating tag the weekly docker-refresh timer moves this on a
+    # Sunday with nobody watching: on 2026-10-11 it jumped the fleet from
+    # v0.14.0 (2025-04-22) to v0.15.0 (2026-10-06), the first upstream release
+    # in 18 months, across all three hosts that run it. That upgrade happened
+    # to be harmless, which is the point: nothing chose it and nothing checked
+    # it. v0.15.0 is the digest ocean and node006 are serving healthily today.
+    #
+    # Not a fix for node005, whose exporter returns HTTP 500 on duplicate
+    # smartctl_device_attribute series for device="sdf". Verified
+    # version-independent: v0.14.0 in a throwaway container on that host
+    # produces the identical 12-error page, so the collision is its MegaRAID
+    # topology (one disk reachable as both /dev/sdf and a /dev/bus/0 megaraid
+    # device), not the upgrade. That needs the device list scoped.
+    smart_exporter_version: v0.15.0
     smart_exporter_port: "{{ service_ports.smart_exporter.port }}"
     smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"
     smart_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
