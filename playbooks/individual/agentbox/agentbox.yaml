@@ -33,6 +33,9 @@
     service: agentbox
     user: debian
     home: "/home/debian"
+    # A homelab clone only the media timers use, kept on master by their own
+    # `git pull`. Not repos/homelab: an RC session may have a branch checked out.
+    media_tools: "/home/debian/media-tools"
     # Accounts that get the developer environment on this box.
     #
     # `user` above stays the lane owner: the systemd units, the fleet SSH key
@@ -581,6 +584,16 @@
     loop:
       - agentbox-escalate-to-claude.sh   # -> agentbox-escalate.sh (PR #374)
 
+  # --- Library cleanup (media-refetch.py, tdarr.py drive) ---
+  - name: Clone homelab for the media timers
+    ansible.builtin.git:
+      repo: https://github.com/bluefishforsale/homelab.git
+      dest: "{{ media_tools }}"
+      version: master
+      update: false
+    become: true
+    become_user: "{{ user }}"
+
   # --- systemd units ---
   - name: Install systemd units
     ansible.builtin.template:
@@ -598,6 +611,10 @@
       - agentbox-replace-reconcile.timer
       - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
+      - agentbox-media-refetch.service
+      - agentbox-media-refetch.timer
+      - agentbox-tdarr-drive.service
+      - agentbox-tdarr-drive.timer
     notify: Reload systemd daemon
 
   - name: Flush handlers so units are registered before enabling
@@ -614,6 +631,8 @@
       - agentbox-escalate.timer
       - agentbox-roadmap-reconcile.timer
       - agentbox-replace-reconcile.timer
+      - agentbox-media-refetch.timer
+      - agentbox-tdarr-drive.timer
 
   - name: Enable and start the alert receiver
     ansible.builtin.systemd:

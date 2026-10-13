@@ -1,0 +1,22 @@
+[Unit]
+Description=Let the paused tdarr node take recent arrivals (tdarr.py drive)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME={{ home }}
+Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MEDIA_HOST=ocean.home
+Environment=TDARR_URL=http://ocean.home:8265
+WorkingDirectory={{ media_tools }}
+# Runs master's scripts as of this minute: a fix merged to scripts/ (outside
+# the deploy filter) reaches the box on the next run without a redeploy.
+ExecStartPre=/usr/bin/git -C {{ media_tools }} pull --ff-only --quiet
+# Only acts on a paused node and only for files queued in the last 7 days, so
+# the old backlog stays parked until someone resumes the node by hand.
+ExecStart=/usr/bin/python3 scripts/tdarr.py drive
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-tdarr-drive
