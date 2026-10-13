@@ -103,6 +103,8 @@
   # only documentation and the live flow drifted from it unseen. Push it through
   # the API, and only when it differs, so a run with no flow change stays a no-op.
   # Node positions and the UI's edge styling keys are ignored in the comparison.
+  # The template inlines files/ocean-tdarr/conf/audio-policy.js as the Audio
+  # Policy node's code, so the JS is reviewed as JS rather than an escaped string.
   # NOTE: Execute already emits `-map 0:N -c:N copy` for every stream, so the
   # flow's custom arguments must carry codec options only. Any `-map` there
   # muxes streams twice, which is what broke ~1,185 library files.
@@ -110,7 +112,7 @@
   # disposition, ffmpeg marks the first subtitle default and players turn subs on.
   - name: Read committed tdarr flow
     ansible.builtin.set_fact:
-      tdarr_flow: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json') | from_json }}"
+      tdarr_flow: "{{ lookup('ansible.builtin.template', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json.j2', convert_data=false) | from_json }}"
 
   - name: Fetch live tdarr flow
     ansible.builtin.uri:
