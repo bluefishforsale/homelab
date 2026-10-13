@@ -212,6 +212,15 @@ def step(item, yes):
         grabbed = dt.datetime.fromisoformat(item["grabbed_at"])
         mf = movie.get("movieFile") or {}
         if not movie.get("hasFile") or dt.datetime.fromisoformat(mf["dateAdded"].replace("Z", "+00:00")) < grabbed:
+            # A failed download (missing articles) is blocklisted by Radarr, but
+            # its own re-search may find nothing it will take; search again here.
+            failed = [h for h in mc.get("radarr", "/api/v3/history/movie", movieId=mid, eventType=4)  # 4 = downloadFailed
+                      if dt.datetime.fromisoformat(h["date"].replace("Z", "+00:00")) > grabbed]
+            if failed and not mc.get("radarr", "/api/v3/queue/details", movieId=mid):
+                note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
+                if yes:
+                    item["state"] = "planned"
+                return yes
             if now() - grabbed > GRAB_TIMEOUT:
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
