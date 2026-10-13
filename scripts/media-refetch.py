@@ -19,6 +19,7 @@ The old file is only deleted once a search has found a release to replace it.
   media-refetch.py run                              # what the next step would do
   media-refetch.py run --yes                        # do it; re-run until all done
   media-refetch.py status
+  media-refetch.py auto --yes                       # unattended: plan when idle, then run
 
 Order: double-muxed files first (they are broken today), then most played in
 Tautulli, then the rest. Movies only for now; TV comes as season packs.
@@ -286,6 +287,22 @@ def cmd_run(a):
         print("dry run: re-run with --yes to act")
 
 
+def free_tb():
+    return int(ssh("df -B1 --output=avail /data01 | tail -1").strip()) / 1e12
+
+
+def cmd_auto(a):
+    """What the agentbox timer runs: start the next batch once the last is through."""
+    active = [i for i in load().values() if i["state"] in ("planned", "grabbed", "imported")]
+    if not active:
+        free = free_tb()
+        if free < a.min_free_tb:
+            print(f"not planning: /data01 has {free:.1f} TB free, floor is {a.min_free_tb} TB")
+        else:
+            cmd_plan(a)
+    cmd_run(a)
+
+
 def cmd_status(a):
     ledger = load()
     by = {}
@@ -320,6 +337,13 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("--yes", action="store_true")
     r.set_defaults(fn=cmd_run)
+    au = sub.add_parser("auto")
+    au.add_argument("--movies", type=int, default=25)
+    au.add_argument("--max-gb", type=float, default=2000)
+    au.add_argument("--min-free-tb", type=float, default=3.0,
+                    help="do not start a batch with less than this free on /data01")
+    au.add_argument("--yes", action="store_true")
+    au.set_defaults(fn=cmd_auto, show_skipped=False)
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
     s.set_defaults(fn=cmd_status)
