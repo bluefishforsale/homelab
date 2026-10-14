@@ -115,7 +115,10 @@ emit() {
 # Prints matching playbook paths relative to repo root.
 grep_playbooks() {
   local needle="$1"
-  (cd "$REPO_ROOT" && grep -rlF "$needle" playbooks/ 2>/dev/null \
+  # Whole-line comments are dropped: a path named in prose is not ownership.
+  (cd "$REPO_ROOT" && grep -rF "$needle" playbooks/ 2>/dev/null \
+    | grep -vE '^[^:]+:[[:space:]]*#' \
+    | cut -d: -f1 | sort -u \
     | grep -E '\.ya?ml$' \
     | grep -v '/tasks/' \
     || true)
