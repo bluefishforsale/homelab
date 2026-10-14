@@ -27,7 +27,8 @@ ExecStart=docker run --rm \
     -v {{ path_home }}/config:/config \
     {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} \
       --config.file=/config/blackbox.yml \
-      --log.level=warn
+      --log.level=warn \
+      --log.prober=warn
 ExecStop=docker rm -f {{ blackbox_exporter_service }}
 
 [Install]
