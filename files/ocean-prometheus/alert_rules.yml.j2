@@ -3,13 +3,13 @@ groups:
   rules:
   # High CPU usage alert
   - alert: HighCpuUsage
-    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
     for: 5m
     labels:
       severity: warning
     annotations:
       summary: "High CPU usage on {{ "{{ $labels.instance }}" }}"
-      description: "CPU usage is above 80% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
+      description: "CPU usage is above 90% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
 
   # High memory usage alert. The Proxmox hypervisors (node005/node006) run VMs
   # that pre-allocate RAM, so they sit near-full by design; they get a higher
