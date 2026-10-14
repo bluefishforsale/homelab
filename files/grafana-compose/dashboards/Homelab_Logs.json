@@ -38,8 +38,9 @@
           "uid": "P8E80F9AEF21F6940"
         },
         "query": {
-          "qryType": 1,
-          "query": "label_values(nodename)",
+          "type": 1,
+          "label": "nodename",
+          "stream": "",
           "refId": "LokiVariableQueryEditor-VariableQuery"
         },
         "definition": "label_values(nodename)",
@@ -68,8 +69,9 @@
           "uid": "P8E80F9AEF21F6940"
         },
         "query": {
-          "qryType": 1,
-          "query": "label_values({nodename=~\"$host\"}, unit)",
+          "type": 1,
+          "label": "unit",
+          "stream": "{nodename=~\"$host\"}",
           "refId": "LokiVariableQueryEditor-VariableQuery"
         },
         "definition": "label_values({nodename=~\"$host\"}, unit)",
@@ -98,8 +100,9 @@
           "uid": "P8E80F9AEF21F6940"
         },
         "query": {
-          "qryType": 1,
-          "query": "label_values({nodename=~\"$host\"}, container)",
+          "type": 1,
+          "label": "container",
+          "stream": "{nodename=~\"$host\"}",
           "refId": "LokiVariableQueryEditor-VariableQuery"
         },
         "definition": "label_values({nodename=~\"$host\"}, container)",
