@@ -21,7 +21,7 @@ commit, pushes them back, and drives the queue.
   tdarr.py workers <type> <n> [node]    # set a worker limit, e.g. transcodegpu 1
   tdarr.py schedule on|off [node]       # hourly worker schedule (it overwrites limits on the hour)
   tdarr.py queue [-n 20]                # next files in the order the queue will take them
-  tdarr.py drive [--newer-than-days 7]  # paused node: run recent arrivals, not the backlog
+  tdarr.py drive [--newer-than-days 7]  # paused node: fill free slots with recent arrivals only
 
 Env: TDARR_URL (default http://ocean.home:8265).
 """
@@ -328,41 +328,49 @@ def cmd_queue(a):
         print(f"  {(r.get('file_size') or 0)/1024:6.1f} GB  {r.get('file')}")
 
 
+def transcoding(node):
+    return [w for w in node["workers"].values() if (w.get("workerType") or "").startswith("transcode")]
+
+
 def cmd_drive(a):
-    """Let a paused node take recent arrivals one at a time, leaving the backlog alone.
+    """Let a paused node take recent arrivals, leaving the backlog alone.
 
     With the queue newest first, resuming hands the workers the newest files;
-    pausing once a transcode has started stops it collecting anything after.
-    A node someone left running is not touched."""
+    pausing once they have started stops the node collecting anything after.
+    Fills every free GPU slot the node's (scheduled) limit allows, but never
+    more slots than there are recent files, or a spare worker would pull an old
+    backlog file. A node someone left running is not touched."""
     for n in nodes(a.node):
         if not n["nodePaused"]:
             print(f"{n['nodeName']}: running, not driving it")
             continue
-        if any((w.get("workerType") or "").startswith("transcode") for w in n["workers"].values()):
-            print(f"{n['nodeName']}: already transcoding")
+        limit = n["workerLimits"].get("transcodegpu", 0) + n["workerLimits"].get("transcodecpu", 0)
+        running = len(transcoding(n))
+        if running >= limit:
+            print(f"{n['nodeName']}: {running}/{limit} transcoding")
             continue
-        queued = list(rows(TABLES["queued"]))
-        if not queued:
-            print("queue empty")
-            return
-        newest = max(queued, key=lambda r: r.get("createdAt") or 0)
-        age_days = (time.time() * 1000 - (newest.get("createdAt") or 0)) / 86_400_000
-        if age_days > a.newer_than_days:
-            print(f"newest queued file is {age_days:.0f} days old; leaving the backlog paused")
-            return
+        now_ms = time.time() * 1000
+        recent = sum(1 for r in rows(TABLES["queued"])
+                     if (now_ms - (r.get("createdAt") or 0)) / 86_400_000 <= a.newer_than_days)
+        if not recent:
+            print(f"no queued file is under {a.newer_than_days:g} days old; leaving the backlog paused")
+            continue
+        want = running + min(limit - running, recent)
         busy = []
         update_node(n, nodePaused=False)
         try:
             deadline = time.time() + 120
             while time.time() < deadline:
                 time.sleep(5)
-                busy = [w for w in nodes(n["_id"])[0]["workers"].values()
-                        if (w.get("workerType") or "").startswith("transcode")]
-                if busy:
+                busy = transcoding(nodes(n["_id"])[0])
+                # A worker exists a few seconds before it is given a file; wait
+                # for the files so the log says what started.
+                if len(busy) >= want and all(w.get("file") for w in busy):
                     break
         finally:
             update_node(n, nodePaused=True)
-        print(f"{n['nodeName']}: started {[(w.get('file') or '')[-70:] for w in busy] if busy else 'nothing'}")
+        print(f"{n['nodeName']}: {len(busy)}/{limit} transcoding "
+              f"{[(w.get('file') or '')[-70:] for w in busy]}")
 
 
 def main():
