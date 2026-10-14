@@ -644,8 +644,13 @@ scrape_configs:
         labels:
           probe_type: "http"
           category: "internal_services"
-          __param_module: kea_version
     relabel_configs:
+      # A __param_module target label does not override the job's params;
+      # a relabel rule does.
+      - source_labels: [__address__]
+        regex: 'http://192\.168\.1\.3:8000'
+        target_label: __param_module
+        replacement: kea_version
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
