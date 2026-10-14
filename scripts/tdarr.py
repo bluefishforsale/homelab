@@ -34,6 +34,8 @@ import sys
 import time
 import urllib.request
 
+import offsite_proxy  # noqa: F401  (off-LAN: urllib through the offsite.sh tunnel)
+
 URL = os.environ.get("TDARR_URL", "http://ocean.home:8265").rstrip("/")
 # Tables Tdarr keys its queues by. Named here because "table3" at a call site is
 # unreadable and the numbering is not guessable.

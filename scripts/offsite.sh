@@ -4,8 +4,8 @@
 # The way in is a SOCKS tunnel to home.terrac.com on port 6759 (not 22; 22, 443
 # and 2222 are filtered). With it up, curl-based scripts (prom.sh, loki.sh,
 # alerts.sh) work once ALL_PROXY points at it, and ssh to *.home / 192.168.1.*
-# works through the Match block printed by `ssh-config`. The Python media
-# scripts use urllib, which cannot speak SOCKS, so they stay LAN-only.
+# works through the Match block printed by `ssh-config`. The Python scripts that
+# reach the LAN over HTTP import offsite_proxy.py, which reads the same ALL_PROXY.
 #
 # Usage:
 #   offsite.sh up            start the tunnel if off-LAN and not already up

@@ -34,6 +34,8 @@ import sys
 import urllib.parse
 import urllib.request
 
+import offsite_proxy  # noqa: F401  (off-LAN: urllib through the offsite.sh tunnel)
+
 URL = os.environ.get("TAUTULLI_URL", "http://ocean.home:8905").rstrip("/")
 CFG = "/data01/services/tautulli/config/config.ini"
 UNKNOWN = "?"
