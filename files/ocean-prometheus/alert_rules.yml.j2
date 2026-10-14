@@ -1,15 +1,29 @@
 groups:
 - name: basic_alerts
   rules:
-  # High CPU usage alert
+  # High CPU usage alert. ocean runs batch media transcoding (Tdarr/Plex/Jellyfin)
+  # and sits above 80% during normal encode batches; it gets a companion rule
+  # below at 95%. All other hosts alert at 80%.
   - alert: HighCpuUsage
-    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{instance!="ocean.home",mode="idle"}[5m])) * 100) > 80
     for: 5m
     labels:
       severity: warning
     annotations:
       summary: "High CPU usage on {{ "{{ $labels.instance }}" }}"
       description: "CPU usage is above 80% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
+
+  # Transcode host CPU: ocean.home runs batch media transcoding (Tdarr NVENC/audio
+  # policy, Plex credits/audio analysis, Jellyfin trickplay) by design, so only
+  # alert at 95%: real host-wide exhaustion, not normal batch transcoding.
+  - alert: HighCpuUsageTranscode
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{instance="ocean.home",mode="idle"}[5m])) * 100) > 95
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on transcode host {{ "{{ $labels.instance }}" }}"
+      description: "CPU usage is above 95% for more than 5 minutes on transcode host {{ "{{ $labels.instance }}" }}"
 
   # High memory usage alert. The Proxmox hypervisors (node005/node006) run VMs
   # that pre-allocate RAM, so they sit near-full by design; they get a higher
