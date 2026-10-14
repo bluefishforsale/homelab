@@ -6,8 +6,8 @@ one-offs stop getting rewritten every session.
 
 Everything here runs from the dev laptop (or a checkout on the LAN). The query tools need
 the homelab LAN reachable, or, off-LAN, `offsite.sh up` and `eval "$(scripts/offsite.sh env)"`
-(curl- and ssh-based tools then work; the Python media scripts do not, urllib has no
-SOCKS). The Cloudflare tools need the ansible vault
+(curl- and ssh-based tools then work, and so do the Python ones that import
+`offsite_proxy.py`). The Cloudflare tools need the ansible vault
 (`~/.ansible_vault_pass`). **`scripts/` is outside the `main-apply` push filter — changes
 here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 

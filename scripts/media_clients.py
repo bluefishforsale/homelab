@@ -26,6 +26,8 @@ import sys
 import urllib.parse
 import urllib.request
 
+import offsite_proxy  # noqa: F401  (off-LAN: urllib through the offsite.sh tunnel)
+
 DATA = "/data01/services"
 # Off-host, the on-host config files are unreadable, so the vault is the key
 # source and ocean answers in place of localhost.
