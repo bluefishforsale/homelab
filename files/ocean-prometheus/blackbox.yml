@@ -63,8 +63,9 @@ modules:
       fail_if_ssl: false
       fail_if_not_ssl: false
       valid_status_codes: [200]
-      fail_if_body_not_matches_regexp:
-        - "application/json"
+      fail_if_header_not_matches:
+        - header: Content-Type
+          regexp: "application/json"
       tls_config:
         insecure_skip_verify: false
       headers:
@@ -85,6 +86,21 @@ modules:
         insecure_skip_verify: false
       headers:
         User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+  # Kea control agent: JSON POST only, and a 200 can still carry an error
+  kea_version:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body: '{"command": "version-get"}'
+      valid_status_codes: [200]
+      fail_if_body_not_matches_regexp:
+        - '"result": 0'
 
   # HTTP POST with body (for API testing)
   http_post_json:
