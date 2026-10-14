@@ -5,7 +5,9 @@ hand-rolling `ssh host 'docker ...'` or `curl prometheus | jq`** — they exist 
 one-offs stop getting rewritten every session.
 
 Everything here runs from the dev laptop (or a checkout on the LAN). The query tools need
-the homelab LAN reachable; the Cloudflare tools need the ansible vault
+the homelab LAN reachable, or, off-LAN, `offsite.sh up` and `eval "$(scripts/offsite.sh env)"`
+(curl- and ssh-based tools then work; the Python media scripts do not, urllib has no
+SOCKS). The Cloudflare tools need the ansible vault
 (`~/.ansible_vault_pass`). **`scripts/` is outside the `main-apply` push filter — changes
 here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 
@@ -13,6 +15,7 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 
 | Script | What | Example |
 |---|---|---|
+| `offsite.sh` | off-LAN access: SOCKS tunnel via the gateway (`up` / `down` / `status`), `env` for `ALL_PROXY`, `ssh-config` for a `Match` block that proxies fleet ssh only while off-LAN | `offsite.sh up && eval "$(scripts/offsite.sh env)"` |
 | `prom.sh` | Prometheus: `q '<promql>'`, `raw`, `names [regex]`, `labels <metric>`, `targets [up\|down]` | `prom.sh q 'up==0'` |
 | `loki.sh` | logs for a service on a host (auto container→unit; `-c`/`-u` to force) | `loki.sh blog_saetnere_com_wp ocean 2h 200 error` |
 | `fleet-systemctl.sh` | systemd across the fleet: `all` / `list [host]` / `<service> [host]` / `host <host>` | `fleet-systemctl.sh all` |
