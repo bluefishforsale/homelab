@@ -105,6 +105,9 @@
   # Node positions and the UI's edge styling keys are ignored in the comparison.
   # The template inlines files/ocean-tdarr/conf/audio-policy.js as the Audio
   # Policy node's code, so the JS is reviewed as JS rather than an escaped string.
+  # When the HEVC encode comes out larger than the source (a lean WEB-DL), the
+  # flow resets to the source and runs the audio-only path, keeping the video:
+  # discarding everything left such files unfixed and marked "Not required".
   # NOTE: Execute already emits `-map 0:N -c:N copy` for every stream, so the
   # flow's custom arguments must carry codec options only. Any `-map` there
   # muxes streams twice, which is what broke ~1,185 library files.
