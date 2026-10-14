@@ -584,6 +584,27 @@
     loop:
       - agentbox-escalate-to-claude.sh   # -> agentbox-escalate.sh (PR #374)
 
+  # base/logging.yaml keeps every host's journal in RAM, capped at 100M. agentbox
+  # runs three RC lanes plus the media timers, and wants a day of local history;
+  # Loki holds 30 days, this is for `journalctl` on the box itself.
+  - name: Ensure the journald drop-in directory exists
+    ansible.builtin.file:
+      path: /etc/systemd/journald.conf.d
+      state: directory
+      mode: '0755'
+
+  - name: Give agentbox's in-memory journal 256M
+    ansible.builtin.copy:
+      dest: /etc/systemd/journald.conf.d/agentbox.conf
+      mode: '0644'
+      content: |
+        # Managed by playbooks/individual/agentbox/agentbox.yaml
+        [Journal]
+        RuntimeMaxUse=256M
+        RuntimeMaxFileSize=32M
+        RuntimeMaxFiles=8
+    notify: Restart systemd-journald
+
   # --- Library cleanup (media-refetch.py, tdarr.py drive) ---
   - name: Clone homelab for the media timers
     ansible.builtin.git:
@@ -962,6 +983,11 @@
 
   # try-restart only touches active instances (no-op before first login), so a
   # shared-config change reloads any live RC session without starting new ones.
+  - name: Restart systemd-journald
+    ansible.builtin.systemd:
+      name: systemd-journald
+      state: restarted
+
   - name: Restart RC sessions
     # restart, not try-restart: try-restart skips units that are stopped/failed,
     # leaving a dead lane dead. restart revives them so config changes reconcile
