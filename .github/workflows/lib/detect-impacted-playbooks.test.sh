@@ -246,6 +246,13 @@ assert_eq "archived playbook never auto-applies" "[]" "$out"
 out=$(printf 'roles/decommission/tasks/services.yml\n' | bash "$SCRIPT")
 assert_eq "decommission role edit deploys nothing" "[]" "$out"
 
+# 39. A path mentioned in a comment is prose, not ownership. cloudflare_exporter
+#     notes that its docker-restart@ template "lives in files/node-exporter", and
+#     that sentence alone pulled it into every node-exporter deploy (#576).
+out=$(printf 'files/node-exporter/smart-exporter-compose.yml.j2\n' | bash "$SCRIPT")
+assert_eq "files/<svc> named only in a comment does not map" \
+  '["playbooks/individual/infrastructure/node_exporter.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
