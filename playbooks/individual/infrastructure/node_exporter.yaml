@@ -58,6 +58,14 @@
     smart_exporter_port: "{{ service_ports.smart_exporter.port }}"
     smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"
     smart_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
+    # Disks the SMART exporter skips, by /dev/disk/by-id name (this one has no
+    # wwn- link). node005's Innodisk SATADOM boot module lists SMART attribute 1
+    # four times in its own table, and smartctl-exporter turns that into
+    # duplicate series and fails the whole /metrics with HTTP 500. The container
+    # goes unhealthy, docker-refresh@smart-exporter fails its health wait, and
+    # SystemdUnitFailed pages until someone resets it.
+    smart_exporter_exclude_by_id:
+      - ata-SATADOM-ML_3SE_TW00T4M44829386L0022
     uid: 1001  # Ocean user ID
     gid: 1001  # Users group ID
 

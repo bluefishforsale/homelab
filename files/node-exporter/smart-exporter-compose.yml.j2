@@ -6,6 +6,19 @@ services:
     container_name: {{ smart_exporter_service }}
     hostname: {{ inventory_hostname }}
     restart: unless-stopped
+
+    # NOTE: the exporter's exclude regex only matches kernel names (sdf), and
+    # those move across reboots, so a hardcoded name would eventually drop a
+    # healthy disk instead. Resolving the stable by-id names at container start
+    # follows the device, and a by-id absent on this host resolves to nothing.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ex=""
+        for id in {{ smart_exporter_exclude_by_id | join(' ') }}; do
+          [ -e "/dev/disk/by-id/$$id" ] && ex="$${ex:+$$ex|}$$(basename "$$(readlink -f "/dev/disk/by-id/$$id")")"
+        done
+        exec /bin/smartctl_exporter $${ex:+--smartctl.device-exclude=^($$ex)\$$}
     
     # Networking
     ports:
