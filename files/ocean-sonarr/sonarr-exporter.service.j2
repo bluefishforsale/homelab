@@ -15,7 +15,12 @@ TimeoutStartSec=300s
 ExecStartPre=-docker rm -f {{ exporter_service }}
 ExecStartPre=-docker images --filter reference={{ exporter_image }}:{{ exporter_version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ exporter_image }}:{{ exporter_version }}
+# NOTE: docker's journald log driver plus this unit relaying the attached
+# `docker run` journaled every line twice. --log-driver=none keeps only the
+# unit's copy (journalctl -u), which also holds pull and startup errors;
+# `docker logs` no longer works for this container.
 ExecStart=docker run --rm \
+    --log-driver=none \
     --name {{ exporter_service }} \
     --hostname {{ exporter_service }} \
     -e TZ="America/Los_Angeles" \
