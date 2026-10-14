@@ -294,7 +294,14 @@ def free_tb():
 def cmd_auto(a):
     """What the agentbox timer runs: start the next batch once the last is through."""
     active = [i for i in load().values() if i["state"] in ("planned", "grabbed", "imported")]
-    if not active:
+    start, end = (int(h) for h in a.window.split("-"))
+    hour = dt.datetime.now().hour
+    if not active and not start <= hour < end:
+        # NOTE: a batch deletes each old file when it grabs the new one. Started
+        # at 20:30 on 2026-10-13, after NZBGet's 18:00 pause, 25 popular movies
+        # sat missing from Plex until downloads resumed at 02:00.
+        print(f"not planning: {hour:02d}:00 is outside the {a.window}h batch window")
+    elif not active:
         free = free_tb()
         if free < a.min_free_tb:
             print(f"not planning: /data01 has {free:.1f} TB free, floor is {a.min_free_tb} TB")
@@ -340,6 +347,8 @@ def main():
     au = sub.add_parser("auto")
     au.add_argument("--movies", type=int, default=25)
     au.add_argument("--max-gb", type=float, default=2000)
+    au.add_argument("--window", default="2-12",
+                    help="local hours START-END in which a new batch may start; NZBGet downloads 02-18")
     au.add_argument("--min-free-tb", type=float, default=3.0,
                     help="do not start a batch with less than this free on /data01")
     au.add_argument("--yes", action="store_true")
