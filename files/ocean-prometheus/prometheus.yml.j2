@@ -103,7 +103,12 @@ scrape_configs:
   - job_name: 'smart-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
-    - targets: ['ocean.home:9633']
+{# Every host runs the exporter, but the other VMs only see a QEMU virtual
+   disk with no SMART data. ocean is the one VM with real disks: the data01
+   pool's drives are passed through to it. #}
+{% for host in groups['baremetal'] + ['ocean'] %}
+    - targets: ['{{ host }}.home:9633']
+{% endfor %}
 
   - job_name: 'unpoller'
     relabel_configs: *dropPortNumber
