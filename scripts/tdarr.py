@@ -267,9 +267,11 @@ def cmd_requeue(a):
             print(f"  ... and {len(targets)-10} more")
         print("re-run with --yes to actually queue")
         return
+    # NOTE: /api/v2/update-file-tdarr is gone in tdarr 3.00 (404); the file
+    # record is updated through cruddb like every other collection.
     for r in targets:
-        api("/api/v2/update-file-tdarr", {"data": {"_id": r["_id"], "TranscodeDecisionMaker":
-                                                   "Queued", "lastTranscodeDate": 0}})
+        crud("FileJSONDB", "update", docID=r["_id"],
+             obj={"TranscodeDecisionMaker": "Queued", "lastTranscodeDate": 0})
     print(f"re-queued {len(targets)}")
 
 
