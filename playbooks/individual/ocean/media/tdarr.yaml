@@ -103,12 +103,19 @@
   # only documentation and the live flow drifted from it unseen. Push it through
   # the API, and only when it differs, so a run with no flow change stays a no-op.
   # Node positions and the UI's edge styling keys are ignored in the comparison.
+  # The template inlines files/ocean-tdarr/conf/audio-policy.js as the Audio
+  # Policy node's code, so the JS is reviewed as JS rather than an escaped string.
+  # When the HEVC encode comes out larger than the source (a lean WEB-DL), the
+  # flow resets to the source and runs the audio-only path, keeping the video:
+  # discarding everything left such files unfixed and marked "Not required".
   # NOTE: Execute already emits `-map 0:N -c:N copy` for every stream, so the
   # flow's custom arguments must carry codec options only. Any `-map` there
   # muxes streams twice, which is what broke ~1,185 library files.
+  # The `-disposition:V:0 +default` there is deliberate: with no explicit
+  # disposition, ffmpeg marks the first subtitle default and players turn subs on.
   - name: Read committed tdarr flow
     ansible.builtin.set_fact:
-      tdarr_flow: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json') | from_json }}"
+      tdarr_flow: "{{ lookup('ansible.builtin.template', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/HEVC_NVENC_Reduce_Flow.json.j2', convert_data=false) | from_json }}"
 
   - name: Fetch live tdarr flow
     ansible.builtin.uri:
@@ -148,6 +155,22 @@
     when: live.name | default('') != tdarr_flow.name or live_plugins != want_plugins or live_edges != want_edges
     changed_when: true
 
+  # Newest first, so a fresh download (a request, or a media-refetch.py batch)
+  # is processed within hours instead of waiting behind the whole backlog.
+  - name: Process the tdarr queue newest first
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/cruddb"
+      method: POST
+      body_format: json
+      body:
+        data:
+          collection: SettingsGlobalJSONDB
+          mode: update
+          docID: globalsettings
+          obj:
+            queueSortType: sortDateNewest
+    changed_when: false
+
   handlers:
   - name: Reload systemd daemon
     ansible.builtin.systemd:
@@ -158,7 +181,11 @@
       name: tdarr.service
       state: restarted
 
+  # NOTE: each unit pulls :latest on start, and the node refuses to work for a
+  # server of another version. Restarting the server alone split them 3.00.00
+  # vs 2.94.03 on 2026-10-12 and stopped all transcoding, so they restart together.
   - name: Restart tdarr node service
+    listen: Restart tdarr service
     ansible.builtin.systemd:
       name: tdarr_node.service
       state: restarted

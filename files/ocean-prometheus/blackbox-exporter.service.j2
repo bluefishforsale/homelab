@@ -14,14 +14,21 @@ TimeoutStartSec=180s
 ExecStartPre=-docker rm -f {{ blackbox_exporter_service }}
 ExecStartPre=-docker images --filter reference={{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} -q | xargs docker rmi -f
 ExecStartPre=-/usr/bin/docker pull {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }}
+# NOTE: docker's journald log driver plus this unit relaying the attached
+# `docker run` journaled every line twice. --log-driver=none keeps only the
+# unit's copy (journalctl -u), which also holds pull and startup errors;
+# `docker logs` no longer works for this container.
 ExecStart=docker run --rm \
+    --log-driver=none \
     --name {{ blackbox_exporter_service }} \
     --hostname {{ blackbox_exporter_service }}\
     -e TZ=America/Los_Angeles \
     -p {{ blackbox_exporter_port }}:9115 \
     -v {{ path_home }}/config:/config \
     {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} \
-      --config.file=/config/blackbox.yml
+      --config.file=/config/blackbox.yml \
+      --log.level=warn \
+      --log.prober=warn
 ExecStop=docker rm -f {{ blackbox_exporter_service }}
 
 [Install]

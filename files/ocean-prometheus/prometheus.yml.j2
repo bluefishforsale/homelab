@@ -103,7 +103,12 @@ scrape_configs:
   - job_name: 'smart-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
-    - targets: ['ocean.home:9633']
+{# Every host runs the exporter, but the other VMs only see a QEMU virtual
+   disk with no SMART data. ocean is the one VM with real disks: the data01
+   pool's drives are passed through to it. #}
+{% for host in groups['baremetal'] + ['ocean'] %}
+    - targets: ['{{ host }}.home:9633']
+{% endfor %}
 
   - job_name: 'unpoller'
     relabel_configs: *dropPortNumber
@@ -280,13 +285,11 @@ scrape_configs:
         - https://app.netlify.com
         - https://vercel.com
         - https://digitalocean.com
-        - https://linode.com
         labels:
           probe_type: "http"
           category: "cloud_providers"
       - targets:
         # Development services
-        - https://api.github.com
         - https://registry.npmjs.org
         - https://pypi.org
         - https://hub.docker.com
@@ -309,8 +312,6 @@ scrape_configs:
         # Personal/Project sites
         - https://terrac.com
         - https://blog.saetnere.com
-        - https://quizlet.com
-        - https://el.quizlet.com
         - https://belief-systems.com
         labels:
           probe_type: "http"
@@ -331,22 +332,28 @@ scrape_configs:
       - target_label: __address__
         replacement: ocean.home:9115
 
-  # HTTPS/TLS Certificate Probes
+  # HTTPS/TLS Certificate Probes. A TLS handshake, not an HTTP GET: the cert
+  # and reachability are what this job checks, and an HTTP status (google's
+  # 301, a bot wall's 403) said nothing about either. Sites that bot-wall a
+  # GET (quizlet, linode) live here rather than in blackbox-http for the same
+  # reason.
   - job_name: 'blackbox-tls'
     metrics_path: /probe
     params:
-      module: [http_tls]
+      module: [tcp_tls]
     scrape_interval: 1h
     static_configs:
       - targets:
         # Critical TLS endpoints
-        - https://terrac.com:443
-        - https://github.com:443
-        - https://google.com:443
-        - https://cloudflare.com:443
-        - https://aws.amazon.com:443
-        - https://quizlet.com:443
-        - https://belief-systems.com:443
+        - terrac.com:443
+        - github.com:443
+        - google.com:443
+        - cloudflare.com:443
+        - aws.amazon.com:443
+        - quizlet.com:443
+        - el.quizlet.com:443
+        - linode.com:443
+        - belief-systems.com:443
         labels:
           probe_type: "tls"
           category: "certificate_check"
@@ -401,7 +408,6 @@ scrape_configs:
         # CDN providers
         - 104.16.132.229  # Cloudflare
         - 13.107.42.14    # Microsoft
-        - 172.217.12.142  # Google
         - 151.101.1.140   # Fastly
         labels:
           probe_type: "icmp"
@@ -525,11 +531,12 @@ scrape_configs:
     scrape_interval: 2m
     static_configs:
       - targets:
-        # Public APIs
-        - https://api.github.com/zen
+        # Public APIs. Nothing rate-limited without a token: api.github.com
+        # allows 60 unauthenticated calls an hour and answered 403 most of
+        # the day; githubstatus.com is the unmetered signal for GitHub.
+        - https://www.githubstatus.com/api/v2/status.json
         - https://httpbin.org/json
         - https://jsonplaceholder.typicode.com/posts/1
-        - https://api.coindesk.com/v1/bpi/currentprice.json
         labels:
           probe_type: "http_api"
           category: "public_apis"
@@ -622,17 +629,28 @@ scrape_configs:
     static_configs:
       - targets:
         # Internal homelab services
-        - http://192.168.1.143:32400   # Plex
+        # Each path is one the service answers 2xx without auth.
+        - http://192.168.1.143:32400/identity   # Plex
         - http://192.168.1.143:8910    # Grafana
         - http://192.168.1.143:9090    # Prometheus
-        - http://192.168.1.143:8080    # LlamaCPP
+        - http://192.168.1.143:8080/health      # LlamaCPP
         - http://192.168.1.3:8081      # PowerDNS API
+        labels:
+          probe_type: "http"
+          category: "internal_services"
+      - targets:
+        # Kea's control agent only takes a JSON POST; a GET is a 400.
         - http://192.168.1.3:8000      # Kea Control Agent
-        - http://192.168.1.31:4096/global/health   # agentbox opencode server
         labels:
           probe_type: "http"
           category: "internal_services"
     relabel_configs:
+      # A __param_module target label does not override the job's params;
+      # a relabel rule does.
+      - source_labels: [__address__]
+        regex: 'http://192\.168\.1\.3:8000'
+        target_label: __param_module
+        replacement: kea_version
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]

@@ -16,6 +16,12 @@ commit, pushes them back, and drives the queue.
   tdarr.py requeue --errors             # re-queue everything that errored
   tdarr.py requeue --path <substr>      # re-queue files whose path contains substr
   tdarr.py probe <path>                 # ffprobe a file through the node container
+  tdarr.py nodes                        # pause state, schedule, worker limits, live workers
+  tdarr.py pause|resume [node]          # stop/start a node taking new work (all nodes if omitted)
+  tdarr.py workers <type> <n> [node]    # set a worker limit, e.g. transcodegpu 1
+  tdarr.py schedule on|off [node]       # hourly worker schedule (it overwrites limits on the hour)
+  tdarr.py queue [-n 20]                # next files in the order the queue will take them
+  tdarr.py drive [--newer-than-days 7]  # paused node: fill free slots with recent arrivals only
 
 Env: TDARR_URL (default http://ocean.home:8265).
 """
@@ -25,7 +31,10 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.request
+
+import offsite_proxy  # noqa: F401  (off-LAN: urllib through the offsite.sh tunnel)
 
 URL = os.environ.get("TDARR_URL", "http://ocean.home:8265").rstrip("/")
 # Tables Tdarr keys its queues by. Named here because "table3" at a call site is
@@ -42,7 +51,8 @@ def api(path, payload=None, timeout=120):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         body = r.read()
-    return json.loads(body) if body else {}
+    # The mutating endpoints (update-node, alter-worker-limit) answer a bare "OK".
+    return json.loads(body) if body.startswith((b"{", b"[")) else body.decode()
 
 
 def crud(collection, mode, **kw):
@@ -75,6 +85,18 @@ def node_exec(argv):
     return subprocess.run(["ssh", "-o", "BatchMode=yes", "ocean.home",
                            "sudo -n docker exec tdarr-node " + " ".join(argv)],
                           capture_output=True, text=True, timeout=120)
+
+
+def nodes(name=None):
+    got = [n for n in api("/api/v2/get-nodes", timeout=20).values()
+           if name in (None, n["_id"], n["nodeName"])]
+    if not got:
+        sys.exit(f"no such node: {name}")
+    return got
+
+
+def update_node(n, **updates):
+    api("/api/v2/update-node", {"data": {"nodeID": n["_id"], "nodeUpdates": updates}})
 
 
 def lang_of(stream):
@@ -259,6 +281,100 @@ def cmd_probe(a):
     print(r.stdout or r.stderr)
 
 
+def cmd_nodes(a):
+    for n in nodes(a.node):
+        lim = {k: v for k, v in n["workerLimits"].items() if k != "_id"}
+        print(f"{n['nodeName']} ({n['_id']})  paused={n['nodePaused']}  "
+              f"schedule={'on' if n['scheduleEnabled'] else 'off'}  limits={lim}")
+        for w in n["workers"].values():
+            print(f"  worker {w.get('workerType')} {w.get('percentage')}% "
+                  f"{(w.get('file') or '')[-70:]}")
+
+
+def cmd_pause(a):
+    for n in nodes(a.node):
+        update_node(n, nodePaused=a.paused)
+        print(f"{n['nodeName']} {'paused' if a.paused else 'resumed'}")
+
+
+def cmd_workers(a):
+    for n in nodes(a.node):
+        # NOTE: with the schedule on, the server rewrites workerLimits from the
+        # hourly table on the hour, so a manual limit silently reverts.
+        if n["scheduleEnabled"]:
+            sys.exit(f"{n['nodeName']}: schedule is on and would reset this on the hour; "
+                     f"run `tdarr.py schedule off` first")
+        delta = a.count - n["workerLimits"][a.type]
+        for _ in range(abs(delta)):
+            api("/api/v2/alter-worker-limit",
+                {"data": {"nodeID": n["_id"], "workerType": a.type,
+                          "process": "increase" if delta > 0 else "decrease"}})
+        print(f"{n['nodeName']} {a.type} {n['workerLimits'][a.type]} -> {a.count}")
+
+
+def cmd_schedule(a):
+    for n in nodes(a.node):
+        update_node(n, scheduleEnabled=a.state == "on")
+        print(f"{n['nodeName']} schedule {a.state}")
+
+
+def cmd_queue(a):
+    order = crud("SettingsGlobalJSONDB", "getById", docID="globalsettings").get("queueSortType")
+    queued = list(rows(TABLES["queued"]))
+    if order in ("sortSizeLargest", "sortSizeSmallest"):
+        queued.sort(key=lambda r: r.get("file_size") or 0, reverse=order == "sortSizeLargest")
+    else:
+        print(f"(queue sort {order!r} not modelled; showing table order)")
+    print(f"{len(queued)} queued, sort {order}")
+    for r in queued[:a.limit]:
+        print(f"  {(r.get('file_size') or 0)/1024:6.1f} GB  {r.get('file')}")
+
+
+def transcoding(node):
+    return [w for w in node["workers"].values() if (w.get("workerType") or "").startswith("transcode")]
+
+
+def cmd_drive(a):
+    """Let a paused node take recent arrivals, leaving the backlog alone.
+
+    With the queue newest first, resuming hands the workers the newest files;
+    pausing once they have started stops the node collecting anything after.
+    Fills every free GPU slot the node's (scheduled) limit allows, but never
+    more slots than there are recent files, or a spare worker would pull an old
+    backlog file. A node someone left running is not touched."""
+    for n in nodes(a.node):
+        if not n["nodePaused"]:
+            print(f"{n['nodeName']}: running, not driving it")
+            continue
+        limit = n["workerLimits"].get("transcodegpu", 0) + n["workerLimits"].get("transcodecpu", 0)
+        running = len(transcoding(n))
+        if running >= limit:
+            print(f"{n['nodeName']}: {running}/{limit} transcoding")
+            continue
+        now_ms = time.time() * 1000
+        recent = sum(1 for r in rows(TABLES["queued"])
+                     if (now_ms - (r.get("createdAt") or 0)) / 86_400_000 <= a.newer_than_days)
+        if not recent:
+            print(f"no queued file is under {a.newer_than_days:g} days old; leaving the backlog paused")
+            continue
+        want = running + min(limit - running, recent)
+        busy = []
+        update_node(n, nodePaused=False)
+        try:
+            deadline = time.time() + 120
+            while time.time() < deadline:
+                time.sleep(5)
+                busy = transcoding(nodes(n["_id"])[0])
+                # A worker exists a few seconds before it is given a file; wait
+                # for the files so the log says what started.
+                if len(busy) >= want and all(w.get("file") for w in busy):
+                    break
+        finally:
+            update_node(n, nodePaused=True)
+        print(f"{n['nodeName']}: {len(busy)}/{limit} transcoding "
+              f"{[(w.get('file') or '')[-70:] for w in busy]}")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -298,6 +414,36 @@ def main():
     pr = sub.add_parser("probe")
     pr.add_argument("path")
     pr.set_defaults(fn=cmd_probe)
+
+    nd = sub.add_parser("nodes")
+    nd.add_argument("node", nargs="?")
+    nd.set_defaults(fn=cmd_nodes)
+
+    for name, paused in (("pause", True), ("resume", False)):
+        ps = sub.add_parser(name)
+        ps.add_argument("node", nargs="?")
+        ps.set_defaults(fn=cmd_pause, paused=paused)
+
+    wk = sub.add_parser("workers")
+    wk.add_argument("type", choices=("transcodegpu", "transcodecpu", "healthcheckgpu",
+                                     "healthcheckcpu"))
+    wk.add_argument("count", type=int)
+    wk.add_argument("node", nargs="?")
+    wk.set_defaults(fn=cmd_workers)
+
+    sc = sub.add_parser("schedule")
+    sc.add_argument("state", choices=("on", "off"))
+    sc.add_argument("node", nargs="?")
+    sc.set_defaults(fn=cmd_schedule)
+
+    dr = sub.add_parser("drive")
+    dr.add_argument("--newer-than-days", type=float, default=7)
+    dr.add_argument("node", nargs="?")
+    dr.set_defaults(fn=cmd_drive)
+
+    q = sub.add_parser("queue")
+    q.add_argument("-n", "--limit", type=int, default=20)
+    q.set_defaults(fn=cmd_queue)
 
     a = p.parse_args()
     a.fn(a)

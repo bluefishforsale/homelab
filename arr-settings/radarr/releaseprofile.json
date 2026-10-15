@@ -1,0 +1,22 @@
+[
+  {
+    "enabled": true,
+    "ignored": [
+      "3d",
+      "Cam"
+    ],
+    "indexerId": 0,
+    "required": [],
+    "tags": []
+  },
+  {
+    "enabled": true,
+    "ignored": [
+      "iso",
+      "bdmv"
+    ],
+    "indexerId": 0,
+    "required": [],
+    "tags": []
+  }
+]

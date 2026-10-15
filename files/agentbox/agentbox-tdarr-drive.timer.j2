@@ -1,0 +1,10 @@
+[Unit]
+Description=Let tdarr take recent arrivals every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=5min
+Unit=agentbox-tdarr-drive.service
+
+[Install]
+WantedBy=timers.target

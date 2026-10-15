@@ -5,7 +5,9 @@ hand-rolling `ssh host 'docker ...'` or `curl prometheus | jq`** — they exist 
 one-offs stop getting rewritten every session.
 
 Everything here runs from the dev laptop (or a checkout on the LAN). The query tools need
-the homelab LAN reachable; the Cloudflare tools need the ansible vault
+the homelab LAN reachable, or, off-LAN, `offsite.sh up` and `eval "$(scripts/offsite.sh env)"`
+(curl- and ssh-based tools then work, and so do the Python ones that import
+`offsite_proxy.py`). The Cloudflare tools need the ansible vault
 (`~/.ansible_vault_pass`). **`scripts/` is outside the `main-apply` push filter — changes
 here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 
@@ -13,6 +15,7 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 
 | Script | What | Example |
 |---|---|---|
+| `offsite.sh` | off-LAN access: SOCKS tunnel via the gateway (`up` / `down` / `status`), `env` for `ALL_PROXY`, `ssh-config` for a `Match` block that proxies fleet ssh only while off-LAN | `offsite.sh up && eval "$(scripts/offsite.sh env)"` |
 | `prom.sh` | Prometheus: `q '<promql>'`, `raw`, `names [regex]`, `labels <metric>`, `targets [up\|down]` | `prom.sh q 'up==0'` |
 | `loki.sh` | logs for a service on a host (auto container→unit; `-c`/`-u` to force) | `loki.sh blog_saetnere_com_wp ocean 2h 200 error` |
 | `fleet-systemctl.sh` | systemd across the fleet: `all` / `list [host]` / `<service> [host]` / `host <host>` | `fleet-systemctl.sh all` |
@@ -23,6 +26,8 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 | `dns-parity-check.sh` | compare dns01 vs dns02 HA nodes record-by-record (internal) | `dns-parity-check.sh` |
 | `homelab-health.sh` | fleet health gate by diff: `snapshot <f>` / `verify <f>` (used by the ship flow) | `homelab-health.sh verify /tmp/base.json` |
 | `plex-playback.py` | what actually plays and what it costs, from Tautulli: `summary` / `clients` / `audio` / `video` / `why` / `languages` / `users` | `plex-playback.py audio -s 500` |
+| `media-conformance.py` | which files meet the media standard (HEVC, audio policy, English subs) and whether each needs a tdarr pass or a re-download: summary / `--list <bucket>` / `--json <bucket>` | `media-conformance.py --list refetch` |
+| `media-refetch.py` | re-download non-conforming movies in batches through Radarr, retrying releases without English subs and restoring Plex's added date: `plan` / `run [--yes]` / `status` (dry run by default) | `media-refetch.py plan --movies 25` |
 | `tdarr.py` | Tdarr without the web UI: `status` / `errors` / `survey` / `libraries` / `flows` / `flow-get` / `flow-put` / `library-flow` / `requeue` / `probe` | `tdarr.py errors -n 5` |
 
 ## DNS & mail-auth (external / public domains)

@@ -79,7 +79,26 @@ refresh_checkout "${HOME}/repos/${repo}"
 
 # One launch attempt under a pty, exiting with the child's status so the caller
 # can branch on it. expect exits 0 on a failed child, hence the `catch wait`.
+# NOTE: claude's TUI repaints its status block every second and expect relays
+# it, about 25,000 journal lines an hour per lane; three lanes filled the 100M
+# RAM journal in four hours. Errors come out of the same pty, so the output is
+# filtered rather than dropped: ANSI codes are stripped and each distinct line
+# is printed once, the memory cleared about hourly so a recurring state (a
+# reconnect) shows up again. pipefail keeps expect's exit status for the caller.
+dedupe() {
+  awk '{
+    line = $0
+    gsub(/\033\[[0-9;?]*[A-Za-z]/, "", line)
+    gsub(/\033\][^\007]*\007/, "", line)
+    gsub(/\r/, "", line)
+    if (line ~ /^[[:space:]]*$/) next
+    if (++n > 25000) { delete seen; n = 0 }
+    if (!(line in seen)) { seen[line] = 1; print line; fflush() }
+  }'
+}
+
 rc() {
+  set -o pipefail
   expect -c "
     set timeout -1
     spawn -noecho claude remote-control $1
@@ -89,7 +108,7 @@ rc() {
     }
     catch wait result
     exit [lindex \$result 3]
-  "
+  " | dedupe
 }
 
 # A lane killed by systemd can die before it deregisters with claude.ai, and the

@@ -26,10 +26,15 @@ import sys
 import urllib.parse
 import urllib.request
 
+import offsite_proxy  # noqa: F401  (off-LAN: urllib through the offsite.sh tunnel)
+
 DATA = "/data01/services"
 # Off-host, the on-host config files are unreadable, so the vault is the key
 # source and ocean answers in place of localhost.
-OFF_HOST = not os.path.isdir(DATA)
+# NOTE: tested on the media stack's own config, not on DATA: every fleet VM has
+# a /data01/services (cadvisor, node-exporter), and on agentbox the bare DATA
+# check sent every client to localhost and read keys from files that are not there.
+OFF_HOST = not os.path.isdir(f"{DATA}/plex/config")
 MEDIA_HOST = os.environ.get("MEDIA_HOST", "ocean.home")
 VAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vault.py")
 
@@ -141,8 +146,8 @@ def post(name, path, data, **params):
     return _request(name, path, params, data=data)
 
 
-def put(name, path, **params):
-    return _request(name, path, params, method="PUT")
+def put(name, path, data=None, **params):
+    return _request(name, path, params, data=data, method="PUT")
 
 
 def delete(name, path, **params):

@@ -1,0 +1,25 @@
+[Unit]
+Description=Advance the library re-download batches (media-refetch.py auto)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME={{ home }}
+Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MEDIA_HOST=ocean.home
+WorkingDirectory={{ media_tools }}
+# Runs master's scripts as of this minute: a fix merged to scripts/ (outside
+# the deploy filter) reaches the box on the next run without a redeploy.
+# NOTE: both media timers pull this one clone on the same 5-minute beat, and
+# two concurrent pulls fail ("Cannot fast-forward to multiple branches"),
+# so the pull is serialised on a lock.
+ExecStartPre=/usr/bin/flock {{ media_tools }}/.git/pull.lock /usr/bin/git -C {{ media_tools }} pull --ff-only --quiet
+# --yes because a dry run in a timer would only ever print. The guards live in
+# the script: a release must be found before a file is deleted, a lock keeps
+# runs from overlapping, and no batch starts below the free-space floor.
+ExecStart=/usr/bin/python3 scripts/media-refetch.py auto --yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-media-refetch

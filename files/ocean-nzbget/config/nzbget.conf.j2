@@ -733,7 +733,12 @@ NzbDirFileAge=60
 # manually unpause another duplicate (if any exists in queue).
 #
 # NOTE: For more info on duplicates see http://nzbget.net/rss.
-DupeCheck=yes
+#
+# NOTE: off because Radarr and Sonarr own duplicate handling (they send
+# DupeMode=ALL), and the check still deletes an exact copy of anything
+# downloaded before as DELETED/COPY. Re-fetching a release the library
+# already had (media-refetch.py) then fails in Radarr every time.
+DupeCheck=no
 
 
 ##############################################################################
@@ -1009,7 +1014,10 @@ UrlTimeout=30
 # The download rate can be changed later in web-interface or via remote calls.
 #
 # Value "0" means no speed control.
-DownloadRate=0
+#
+# NOTE: 750 Mbit/s (750e6 / 8 / 1024) on a 1 Gbit line, leaving a quarter of
+# it for everyone else in the house and for Plex.
+DownloadRate=91553
 
 
 # Maximum number of simultaneous connections for nzb URL downloads (0-999).

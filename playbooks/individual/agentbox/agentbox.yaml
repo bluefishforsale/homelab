@@ -33,6 +33,9 @@
     service: agentbox
     user: debian
     home: "/home/debian"
+    # A homelab clone only the media timers use, kept on master by their own
+    # `git pull`. Not repos/homelab: an RC session may have a branch checked out.
+    media_tools: "/home/debian/media-tools"
     # Accounts that get the developer environment on this box.
     #
     # `user` above stays the lane owner: the systemd units, the fleet SSH key
@@ -581,6 +584,37 @@
     loop:
       - agentbox-escalate-to-claude.sh   # -> agentbox-escalate.sh (PR #374)
 
+  # base/logging.yaml keeps every host's journal in RAM, capped at 100M. agentbox
+  # runs three RC lanes plus the media timers, and wants a day of local history;
+  # Loki holds 30 days, this is for `journalctl` on the box itself.
+  - name: Ensure the journald drop-in directory exists
+    ansible.builtin.file:
+      path: /etc/systemd/journald.conf.d
+      state: directory
+      mode: '0755'
+
+  - name: Give agentbox's in-memory journal 256M
+    ansible.builtin.copy:
+      dest: /etc/systemd/journald.conf.d/agentbox.conf
+      mode: '0644'
+      content: |
+        # Managed by playbooks/individual/agentbox/agentbox.yaml
+        [Journal]
+        RuntimeMaxUse=256M
+        RuntimeMaxFileSize=32M
+        RuntimeMaxFiles=8
+    notify: Restart systemd-journald
+
+  # --- Library cleanup (media-refetch.py, tdarr.py drive) ---
+  - name: Clone homelab for the media timers
+    ansible.builtin.git:
+      repo: https://github.com/bluefishforsale/homelab.git
+      dest: "{{ media_tools }}"
+      version: master
+      update: false
+    become: true
+    become_user: "{{ user }}"
+
   # --- systemd units ---
   - name: Install systemd units
     ansible.builtin.template:
@@ -598,6 +632,10 @@
       - agentbox-replace-reconcile.timer
       - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
+      - agentbox-media-refetch.service
+      - agentbox-media-refetch.timer
+      - agentbox-tdarr-drive.service
+      - agentbox-tdarr-drive.timer
     notify: Reload systemd daemon
 
   - name: Flush handlers so units are registered before enabling
@@ -614,6 +652,8 @@
       - agentbox-escalate.timer
       - agentbox-roadmap-reconcile.timer
       - agentbox-replace-reconcile.timer
+      - agentbox-media-refetch.timer
+      - agentbox-tdarr-drive.timer
 
   - name: Enable and start the alert receiver
     ansible.builtin.systemd:
@@ -943,6 +983,11 @@
 
   # try-restart only touches active instances (no-op before first login), so a
   # shared-config change reloads any live RC session without starting new ones.
+  - name: Restart systemd-journald
+    ansible.builtin.systemd:
+      name: systemd-journald
+      state: restarted
+
   - name: Restart RC sessions
     # restart, not try-restart: try-restart skips units that are stopped/failed,
     # leaving a dead lane dead. restart revives them so config changes reconcile

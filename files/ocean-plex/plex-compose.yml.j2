@@ -52,6 +52,12 @@ services:
     shm_size: 2g
     tmpfs:
       - /tmp:size=2G
+    # NOTE: Plex streams take priority over everything else on ocean. 262144
+    # is docker's max and maps to cgroup v2 cpu.weight 10000; every container
+    # left unset sits at 100, so under contention tdarr, jellyfin and the rest
+    # yield. Inside the container, Plex's scanner jobs are already niced below
+    # stream transcodes.
+    cpu_shares: 262144
     deploy:
       resources:
         limits:
