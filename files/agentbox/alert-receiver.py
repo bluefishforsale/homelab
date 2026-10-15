@@ -39,6 +39,7 @@ NTFY_PASS = os.environ.get("ALERT_NTFY_PASS", "")
 FP_MARKER = "alert-fp:"  # embedded in the issue body to dedupe by fingerprint
 COMP_MARKER = "replace-component:"  # dedupe hardware issues by physical drive
 HW_LABEL = "hardware"
+ALERT_LABEL = "alert"
 # Only stable by-id device names earn a [replace] ticket. A kernel name (sdb,
 # nvme0n1) is not stable across reboots, and the zfs exporter emits BOTH forms
 # for the same drive, so accepting kernel names means one disk gets two issues
@@ -160,7 +161,12 @@ def open_issue(alert):
             + f"- **Summary:** {ann.get('summary', '')}\n"
             f"- **Description:** {ann.get('description', '')}\n\n"
             f"<!-- {FP_MARKER}{fp} -->")
-    args = ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--body", body]
+    # The `alert` label keeps the issue watcher's drafter off it until a human
+    # adds `agent-ok`: most alerts want tuning or patience, not a PR.
+    gh("label", "create", ALERT_LABEL, "--repo", ISSUE_REPO,
+       "--color", "FBCA04", "--force")  # idempotent; ignore result
+    args = ["issue", "create", "--repo", ISSUE_REPO, "--title", title, "--body", body,
+            "--label", ALERT_LABEL]
     if sev == "critical":
         gh("label", "create", "needs-escalation", "--repo", ISSUE_REPO,
            "--color", "5319E7", "--force")  # idempotent; ignore result
@@ -395,6 +401,17 @@ def _selftest():
                                           "instance": "ocean.home"},
                                "annotations": {}}) == 42
     assert not any(c[:2] == ("issue", "create") for c in calls), "must reuse, not recreate"
+
+    # 2026-10-15: every alert issue went straight to the drafter, and 19 of 28
+    # alert-born agent PRs were closed unmerged (#588 just raised the threshold
+    # it was paged by). The `alert` label is what keeps the watcher off them.
+    calls.clear()
+    gh = fake_list_empty
+    assert open_issue({"labels": {"alertname": "HighCpuUsage", "instance": "ocean.home"},
+                       "fingerprint": "abc"}) == 42
+    created = [c for c in calls if c[:2] == ("issue", "create")]
+    assert len(created) == 1, created
+    assert created[0][created[0].index("--label") + 1] == ALERT_LABEL, "alert issue must carry the alert label"
 
     # 2026-09-08: DockerRefreshStale pushed "ocean.home / docker image refresh
     # stale on ocean.home" for a host running 31 compose projects, naming none
