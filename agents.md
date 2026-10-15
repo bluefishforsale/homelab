@@ -34,9 +34,12 @@ These bite every agent that doesn't know them up front:
   (fleet-wide diff).
 - **Squash-merge only.** `main-apply` detects impact via `git diff HEAD~1 HEAD`, which
   assumes one commit per merge.
-- **Deploy path filter.** Only `playbooks/**`, `files/**`, `roles/**`,
-  `vars/**/*.yaml`, `.github/workflows/**` trigger CI + `main-apply`. Changes outside
-  those (e.g. `scripts/`, `docs/`, `.claude/`) silently do NOT deploy — no CI, no apply.
+- **Deploy path filter.** `main-apply` runs only on `playbooks/**`, `files/**`,
+  `roles/**`, `vars/**/*.yaml` and `group_vars/**`. CI (`ci-validate.yml`) covers most
+  of those plus `vault/**` and `.github/workflows/**`, but not `group_vars/**`, so a
+  vault-only or workflow-only change runs CI and deploys nothing (dispatch
+  `main-apply` by hand for a vault fix). Changes outside both (e.g. `scripts/`,
+  `docs/`, `.claude/`) silently get no CI and no apply.
 
 ### How a change maps to playbooks (impact detection)
 
