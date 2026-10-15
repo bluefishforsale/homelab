@@ -146,7 +146,7 @@ def post(name, path, data, **params):
     return _request(name, path, params, data=data)
 
 
-def put(name, path, data, **params):
+def put(name, path, data=None, **params):
     return _request(name, path, params, data=data, method="PUT")
 
 
