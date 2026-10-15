@@ -36,7 +36,9 @@ src = open(sys.argv[1]).read()
 # The watcher closes its single quote to interpolate the label names. Do that
 # substitution first, exactly as the shell does, or the extraction stops at the
 # interpolation quote instead of at the end of the jq program.
-for var, val in (("LABEL_WORKING", "agent-working"), ("LABEL_ESCALATE", "needs-escalation")):
+for var, val in (("LABEL_WORKING", "agent-working"), ("LABEL_ESCALATE", "needs-escalation"),
+                 ("LABEL_DECLINED", "agent-declined"), ("LABEL_OPT_IN", "agent-ok"),
+                 ("SKIP_LABELS", '["alert","hardware","needs-human"]')):
     src = src.replace("'" + '"$' + var + '"' + "'", val)
 pat = r"""jq -r --arg allow "\$ISSUE_AUTHOR_ALLOWLIST" '(.*?)'"""
 for prog in re.findall(pat, src, re.S):
@@ -60,6 +62,20 @@ if [[ "${#PROGS[@]}" -eq 2 ]]; then
     {"number":5,"labels":[{"name":"needs-escalation"}],"author":{"login":"mallory"}}
   ]'
   check "free lane drafts only the owner's unclaimed issue" "1" "$(run_prog "${PROGS[0]}" "$issues")"
+
+  # 2026-10-15: alert issues went straight to the drafter, and 19 of 28
+  # alert-born PRs closed unmerged (#588 raised the threshold it was paged by).
+  # An alert reaches the drafter only once a human opts it in, and an issue the
+  # agent already declined is not re-drafted every tick.
+  gated='[
+    {"number":1,"labels":[],"author":{"login":"bluefishforsale"}},
+    {"number":2,"labels":[{"name":"alert"}],"author":{"login":"bluefishforsale"}},
+    {"number":3,"labels":[{"name":"alert"},{"name":"agent-ok"}],"author":{"login":"bluefishforsale"}},
+    {"number":4,"labels":[{"name":"hardware"}],"author":{"login":"bluefishforsale"}},
+    {"number":5,"labels":[{"name":"agent-declined"}],"author":{"login":"bluefishforsale"}},
+    {"number":6,"labels":[{"name":"needs-human"}],"author":{"login":"bluefishforsale"}}
+  ]'
+  check "free lane skips alert issues until a human adds agent-ok" "1 3" "$(run_prog "${PROGS[0]}" "$gated")"
 
   # Red agent PRs: the branch name decides WHICH issue gets escalated, so an
   # outsider who can open a PR named agent/issue-N must not reach this loop.
