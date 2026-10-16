@@ -34,9 +34,9 @@ while IFS='|' read -r name content; do
     ok "catches $name"
   fi
 done <<'CASES'
-a quoted api key|api_key: "eb727e9d30f540d59677e7cc08161da4"
-an unquoted ini apikey|apikey = eb727e9d30f540d59677e7cc08161da4
-a plaintext password|password = dvW0z8Mech&co^&L
+a quoted api key|api_key: "3c9d1f0a7b2e4d6f8a1c5e9b0d2f4a6c"
+an unquoted ini apikey|apikey = 3c9d1f0a7b2e4d6f8a1c5e9b0d2f4a6c
+a plaintext password|password = Xq7#mR2v&pL9^wK4
 a token literal|github_token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 a secret literal|client_secret: 9f8e7d6c5b4a39281706
 CASES
