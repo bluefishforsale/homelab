@@ -211,7 +211,6 @@ PROBES = {
     "media_services.plex.plex_token": plex_local,
     "external_apis.tmdb.api_key": query("https://api.themoviedb.org/3/configuration?api_key={}"),
     "external_apis.brevo.api_key": header("https://api.brevo.com/v3/account", "api-key"),
-    "external_apis.resend.api_key": bearer("https://api.resend.com/api-keys", (400, 401, 403)),
     "external_apis.smtp_relay.password": (WHOLE, lambda v: smtp(
         "smtp-relay.brevo.com", 587, at(v, "external_apis.smtp_relay.login"), at(v, "external_apis.smtp_relay.password"))),
     "smtp.gmail_app_password": (WHOLE, lambda v: smtp(
@@ -223,7 +222,6 @@ PROBES = {
     "ai_services.tavily.api_key": bearer("https://api.tavily.com/usage"),
     "ai_services.openclaw.telegram_bot_token": telegram,
     "ai_services.openclaw.discord_bot_token": discord,
-    "ai_services.openclaw.github_ro": github,
     "financial.polygon_io.api_key": query("https://api.polygon.io/v3/reference/tickers?limit=1&apiKey={}"),
     "financial.finnhub.api_key": query("https://finnhub.io/api/v1/quote?symbol=AAPL&token={}"),
     "financial.alpaca.paper.api_secret": (WHOLE, alpaca),
