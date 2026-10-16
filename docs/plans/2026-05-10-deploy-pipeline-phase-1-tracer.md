@@ -888,7 +888,7 @@ Expected: the three most recent `main-apply` runs (one per tracer) all show `con
 
 - [ ] **Step 2: Confirm Phase 1 "done" criteria from the spec are met**
 
-From `docs/superpowers/specs/2026-05-10-deploy-pipeline-shape-up-design.md`:
+From `docs/specs/2026-05-10-deploy-pipeline-shape-up-design.md`:
 
 > **Phase 1 done when:** both tracer commits land green, the runbook is checked in, and a deliberate "edit homepage routing" tracer (touching only `files/nginx-compose/proxy_hostname_web_proxy.conf` for the homepage block) runs *only* the nginx playbook — not the full orchestrator chain.
 

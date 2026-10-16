@@ -8,7 +8,7 @@
 
 **Tech Stack:** Ansible (existing playbook `playbooks/individual/ocean/monitoring/prometheus.yaml`), Prometheus, blackbox-exporter (existing), `ghcr.io/czerwonk/mtr-exporter` (new), Grafana, systemd units running docker containers.
 
-**Reference spec:** `docs/superpowers/specs/2026-04-29-wan-path-diagnosis-design.md`
+**Reference spec:** `docs/specs/2026-04-29-wan-path-diagnosis-design.md`
 
 **Discovery before planning** (these change the plan vs. spec):
 - `files/ocean-prometheus/blackbox.yml` already defines `icmp`, `tcp_connect`, `tls_connect`, `dns_tcp`, `dns_udp` modules.
