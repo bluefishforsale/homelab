@@ -25,6 +25,16 @@ LOGDIR="{{ home }}/agent-logs"
 LABEL_WORKING="agent-working"
 LABEL_ESCALATE="needs-escalation"
 LABEL_REVIEW="needs-human-merge"
+LABEL_DECLINED="agent-declined"
+LABEL_FLAGGED="agent-review-flagged"
+# Alert and hardware issues are filed by alert-receiver.py, not by a person
+# deciding code is the fix. Drafting every one of them was the single biggest
+# source of low-value PRs: 28 alert-born PRs merged 9 (32%) against 14 of 23
+# for issues a human wrote, and a model told to "resolve" a CPU alert reaches
+# for the threshold (#588). They reach the drafter only once a human adds
+# LABEL_OPT_IN.
+LABEL_OPT_IN="agent-ok"
+SKIP_LABELS='["alert","hardware","needs-human"]'
 
 # The lane ladder, cheapest first. Local is free and unlimited, so it takes
 # every issue; Google's free quota is only spent on what the GPU could not do.
@@ -51,6 +61,16 @@ ensure_labels() {
   gh label create "$LABEL_WORKING" --repo "$slug" --color FBCA04 --description "Agent fleet is drafting a fix" --force >/dev/null 2>&1 || true
   gh label create "$LABEL_ESCALATE" --repo "$slug" --color 5319E7 --description "Both free lanes failed; escalated to the harder model" --force >/dev/null 2>&1 || true
   gh label create "$LABEL_REVIEW"  --repo "$slug" --color D93F0B --description "Agent PR open; a human merges" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_DECLINED" --repo "$slug" --color C5DEF5 --description "Agent judged that no code change is the right fix" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_FLAGGED" --repo "$slug" --color B60205 --description "Independent review did not pass; PR left as draft" --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_OPT_IN" --repo "$slug" --color 0E8A16 --description "Human says an alert/hardware issue is worth an agent draft" --force >/dev/null 2>&1 || true
+}
+
+# The issue can close while a draft is in flight: an alert that clears closes
+# its own issue, and #547 closed 49s after opening yet still got PR #549 six
+# minutes later (#529 -> #530 likewise). Asked right before pushing.
+issue_open() {  # $1 = slug, $2 = issue number
+  [ "$(gh issue view "$2" --repo "$1" --json state --jq .state 2>/dev/null)" = "OPEN" ]
 }
 
 # Paths that, if a diff touches anything outside them, mean the change can
@@ -149,7 +169,8 @@ for repo in ${AGENTBOX_REPOS:-}; do
   issues=$(gh issue list --repo "$slug" --state open --json number,labels,author \
     | jq -r --arg allow "$ISSUE_AUTHOR_ALLOWLIST" '
       .[]
-      | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_ESCALATE"'"])) | not)
+      | select([.labels[].name] | (contains(["'"$LABEL_WORKING"'"]) or contains(["'"$LABEL_ESCALATE"'"]) or contains(["'"$LABEL_DECLINED"'"])) | not)
+      | select([.labels[].name] | (any(.[]; IN('"$SKIP_LABELS"'[])) and (contains(["'"$LABEL_OPT_IN"'"]) | not)) | not)
       | select(.author.login as $a | ($allow | split(" ")) | index($a))
       | .number') || { echo "issue list failed for $slug, skipping" >&2; continue; }
 
@@ -168,24 +189,46 @@ Title: $title
 
 $body
 
-Make the minimal, correct change. Do not touch unrelated code. Keep the build and tests green."
+Make the minimal, correct change. Do not touch unrelated code. Keep the build and tests green.
+
+No change is a valid outcome. If the issue is noise, already fixed, or needs hands-on work
+(ZFS, disks, hardware, a manual migration), change nothing and end your reply with one line:
+NO_CHANGE: <one-sentence reason>
+Never raise, loosen, or disable an alert or its threshold unless the commit message cites the
+metric values you measured that justify it."
 
     # Walk the ladder. Each tier starts from a clean origin/HEAD so a failed
     # attempt's debris is never attributed to the model that follows it.
     log="$LOGDIR/$repo-issue-$num.log"
     : >"$log"
-    drafted=""
+    drafted="" declined=""
     for model in $LANES; do
       git -C "$wt" checkout -q -B "agent/issue-$num" origin/HEAD
       git -C "$wt" clean -qfd
       echo "$slug#$num: drafting on $model" >&2
+      start=$(wc -l <"$log")
       if draft "$wt" "$model" "$prompt" "$log" && has_draft "$wt"; then
         drafted="$model"
         echo "$slug#$num: $model produced a diff" >&2
         break
       fi
+      # A tier that says no change is right is an answer, not a failure; walking
+      # on to the next tier would only buy the diff it chose not to write.
+      declined=$(tail -n +"$((start + 1))" "$log" | grep -m1 -E '^NO_CHANGE:' || true)
+      if [ -n "$declined" ]; then
+        echo "$slug#$num: $model declined: ${declined#NO_CHANGE: }" >&2
+        declined="$model: ${declined#NO_CHANGE: }"
+        break
+      fi
       echo "$slug#$num: $model produced no usable diff" >&2
     done
+
+    if [ -n "$declined" ]; then
+      gh issue comment "$num" --repo "$slug" --body "agentbox made no change. ${declined}" >/dev/null || true
+      gh issue edit "$num" --repo "$slug" \
+        --remove-label "$LABEL_WORKING" --add-label "$LABEL_DECLINED" >/dev/null || true
+      continue
+    fi
 
     withheld=""
     if [ -n "$drafted" ]; then
@@ -206,6 +249,12 @@ Make the minimal, correct change. Do not touch unrelated code. Keep the build an
       continue
     fi
 
+    if ! issue_open "$slug" "$num"; then
+      echo "$slug#$num: issue closed while drafting, dropping the draft" >&2
+      gh issue edit "$num" --repo "$slug" --remove-label "$LABEL_WORKING" >/dev/null || true
+      continue
+    fi
+
     pr_body="Resolves #$num. Drafted by agentbox on \`$drafted\`."
     [ -z "$withheld" ] || pr_body="$pr_body
 
@@ -218,30 +267,46 @@ $withheld
       --title "fix: $title (#$num)" \
       --body "$pr_body") || pr_url=""
 
-    # Independent review by the strongest free model. A human still merges;
-    # this only informs that decision.
+    # Independent review by the strongest free model, and a gate: only a clean
+    # LGTM leaves the PR ready for review or eligible for auto-merge. Anything
+    # else, including no review at all, turns it into a draft. Before this was
+    # a gate, an empty review was dropped silently and 46 of 51 agent PRs
+    # reached a human with no review on them.
     #
     # Runs from LOGDIR, not the worktree, with the diff inline: a reviewer
     # that can edit the branch it is reviewing is not a reviewer. --agent plan
     # is read-only, and the cwd holds no repo, so both belt and braces.
+    passed=""
     if [ -n "$pr_url" ]; then
       diff=$(git -C "$wt" diff origin/HEAD...HEAD); diff=${diff:0:60000}
-      review=$( cd "$LOGDIR" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=review,service=agentbox" \
-        timeout 600 opencode run --agent plan -m "$REVIEW_MODEL" \
-        "Review this agent-drafted diff resolving issue #$num ($title) in $slug. It was written by $drafted. Assess correctness, security, and whether it actually fixes the issue. Be concise: bullet concrete problems, otherwise reply LGTM.
+      review=""
+      for _ in 1 2; do
+        review=$( cd "$LOGDIR" && OTEL_RESOURCE_ATTRIBUTES="repo=$repo,lane=review,service=agentbox" \
+          timeout 600 opencode run --agent plan -m "$REVIEW_MODEL" \
+          "Review this agent-drafted diff resolving issue #$num ($title) in $slug. It was written by $drafted. Assess correctness, security, whether it actually fixes the issue, and whether the issue needed a code change at all (silencing an alert is not a fix). Be concise: bullet concrete problems. If there are none, reply with exactly LGTM and nothing else.
 
 $diff" 2>/dev/null ) || review=""
-      [ -n "$review" ] && gh pr comment "$pr_url" --repo "$slug" \
+        [ -n "$review" ] && break
+      done
+      [ -n "$review" ] || review="(no review: $REVIEW_MODEL returned nothing twice)"
+      gh pr comment "$pr_url" --repo "$slug" \
         --body "Independent review ($REVIEW_MODEL):
 
 $review" >/dev/null 2>&1 || true
+      if printf '%s' "$review" | tr -d '[:space:].!' | grep -qx 'LGTM'; then
+        passed=1
+      else
+        gh pr ready "$pr_url" --repo "$slug" --undo >/dev/null 2>&1 || true
+        gh pr edit "$pr_url" --repo "$slug" --add-label "$LABEL_FLAGGED" >/dev/null 2>&1 || true
+      fi
     fi
 
     # Tiered autonomy (ADR 0001): default is open PR + label + stop, a human
-    # merges from the phone. Auto-merge only when the repo opted in AND the
-    # diff touches no prod-affecting paths.
+    # merges from the phone. Auto-merge only when the repo opted in, the diff
+    # touches no prod-affecting paths, AND the review passed.
     changed=$(git -C "$wt" diff --name-only origin/HEAD...HEAD)
-    if printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
+    if [ -n "$passed" ] \
+       && printf ' %s ' "${AGENTBOX_AUTOMERGE_REPOS:-}" | grep -q " $repo " \
        && no_prod_effect "$changed"; then
       gh pr merge --repo "$slug" --auto --squash "agent/issue-$num" || true
     else

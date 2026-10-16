@@ -28,6 +28,7 @@ LABEL_HUMAN="needs-human"
 # Tier 3: strongest free model. Reached only after local + Flash both failed.
 ESCALATE_MODEL="google/gemini-3.1-pro-preview"
 LABEL_REVIEW="needs-human-merge"
+LABEL_DECLINED="agent-declined"
 # Fail closed if the env file predates this setting: the owner alone, never all.
 ISSUE_AUTHOR_ALLOWLIST="${ISSUE_AUTHOR_ALLOWLIST:-$OWNER}"
 
@@ -41,6 +42,7 @@ ensure_labels() {
   gh label create "$LABEL_ESCALATE" --repo "$slug" --color 5319E7 --force >/dev/null 2>&1 || true
   gh label create "$LABEL_HUMAN"    --repo "$slug" --color 0E8A16 --force >/dev/null 2>&1 || true
   gh label create "$LABEL_REVIEW"  --repo "$slug" --color D93F0B --force >/dev/null 2>&1 || true
+  gh label create "$LABEL_DECLINED" --repo "$slug" --color C5DEF5 --force >/dev/null 2>&1 || true
 }
 
 # Tiered autonomy (ADR 0001) applies regardless of lane: auto-merge only an
@@ -117,7 +119,13 @@ resolve_issue() {  # $1 = repo (short name); $2 = issue number
 
 $body
 
-Make the minimal, correct change; keep the build and tests green."
+Make the minimal, correct change; keep the build and tests green.
+
+No change is a valid outcome. If the issue is noise, already fixed, or needs hands-on work
+(ZFS, disks, hardware, a manual migration), change nothing and end your reply with one line:
+NO_CHANGE: <one-sentence reason>
+Never raise, loosen, or disable an alert or its threshold unless the commit message cites the
+metric values you measured that justify it."
 
   # Log rather than swallow: a silent `|| true` here made a dead lane look like
   # a lane that simply had nothing to say, and hid a month-long outage.
@@ -151,9 +159,26 @@ Make the minimal, correct change; keep the build and tests green."
     #
     # This is the end of the automated ladder, so it goes to a human rather than
     # back into a loop that has now failed it three times.
+    local declined
+    declined=$(grep -m1 -E '^NO_CHANGE:' <<<"$out" || true)
+    if [ -n "$declined" ]; then
+      echo "$slug#$num: $ESCALATE_MODEL declined: ${declined#NO_CHANGE: }" >&2
+      gh issue comment "$num" --repo "$slug" \
+        --body "agentbox made no change. $ESCALATE_MODEL: ${declined#NO_CHANGE: }" >/dev/null 2>&1 || true
+      gh issue edit "$num" --repo "$slug" \
+        --remove-label "$LABEL_WORKING" --add-label "$LABEL_DECLINED" >/dev/null 2>&1 || true
+      return 0
+    fi
     echo "no diff for $slug#$num after $ESCALATE_MODEL, handing to a human" >&2
     gh issue edit "$num" --repo "$slug" \
       --remove-label "$LABEL_WORKING" --add-label "$LABEL_HUMAN" >/dev/null 2>&1 || true
+    return 0
+  fi
+  # A critical alert can clear while this runs, closing its own issue; a PR for
+  # a closed issue is the low-value kind this lane exists to avoid.
+  if [ "$(gh issue view "$num" --repo "$slug" --json state --jq .state 2>/dev/null)" != "OPEN" ]; then
+    echo "$slug#$num: issue closed while drafting, dropping the draft" >&2
+    gh issue edit "$num" --repo "$slug" --remove-label "$LABEL_WORKING" >/dev/null 2>&1 || true
     return 0
   fi
   local pr_body="Resolves #$num. Drafted by the escalation tier (\`$ESCALATE_MODEL\`) after the cheaper lanes failed."
