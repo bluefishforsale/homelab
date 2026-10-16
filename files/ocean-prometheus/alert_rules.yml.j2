@@ -386,9 +386,28 @@ groups:
 
 - name: smart_alerts
   rules:
-  # SMART health alert
+  # SMART health alert. smartctl_exporter exports smartctl_device_smart_status
+  # (1 = PASSED); the rule used to read smart_device_health_ok, which it has never
+  # exported, so this critical alert matched nothing on any host. Joined to
+  # disk_wwn_info like the sector alerts below so the receiver files the
+  # [replace] issue under a stable by-id name.
+  # NOTE: the `or` keeps disks with no wwn link (6 of 18 on 2026-10-15) under
+  # their kernel name. The join alone silently drops them, and a health alert
+  # that skips a third of the disks is the bug this rule just had.
   - alert: SmartDeviceUnhealthy
-    expr: smart_device_health_ok != 1
+    expr: |
+      label_replace(
+        label_replace(
+          (
+            smartctl_device_smart_status
+              * on(instance, device) group_left(wwn, serial) disk_wwn_info
+          ) != 1,
+          "kernel_device", "$1", "device", "(.*)"
+        ),
+        "device", "$1", "wwn", "(.*)"
+      )
+      or
+      (smartctl_device_smart_status unless on(instance, device) disk_wwn_info) != 1
     for: 0m
     labels:
       severity: critical
