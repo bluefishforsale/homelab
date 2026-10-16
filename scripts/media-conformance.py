@@ -55,7 +55,10 @@ def reasons(streams):
              and not (s.get("disposition") or {}).get("attached_pic")]
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     subs = [s for s in streams if s.get("codec_type") == "subtitle"]
-    if len(video) > 1:
+    # NOTE: the old flow's double mux repeats the main video at its own size. A
+    # second video at another size is part of the release (a PIP commentary, a
+    # cover), and a re-download brings it straight back.
+    if len({(s.get("width"), s.get("height")) for s in video}) < len(video):
         out.append("double-muxed")
     if not any((tags(s).get("LANGUAGE") or "").lower() in ENGLISH for s in subs):
         out.append("no-english-subs")

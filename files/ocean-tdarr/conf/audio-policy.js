@@ -44,8 +44,11 @@ module.exports = async (args) => {
   // Files the old flow muxed twice (every stream duplicated) are being
   // re-downloaded. Same-looking audio tracks are not always copies (Bring It On
   // has two "Surround 5.1" tracks that differ), so this does not try to dedupe.
-  if (streams.filter((s) => s.codec_type === 'video').length > 1) {
-    log('more than one video stream (double-muxed by the old flow), leaving it for a re-download');
+  // A second video at another size is part of the release (Chamber of Secrets
+  // carries a 480p commentary picture-in-picture), not a double mux.
+  const video = streams.filter((s) => s.codec_type === 'video');
+  if (new Set(video.map((s) => `${s.width}x${s.height}`)).size < video.length) {
+    log('two video streams at one size (double-muxed by the old flow), leaving it for a re-download');
     return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
   }
   // Idempotent: a file that already has the dialogue track was done by this policy.
