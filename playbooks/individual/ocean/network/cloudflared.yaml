@@ -275,6 +275,9 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
 
+  # NOTE: no run_once on these fetches. run_once picks the first play host
+  # (node005), where the ocean gate skips them, so every app id came back
+  # missing and no Access policy was attached from May to October 2026.
   - name: Get existing Cloudflare Access applications for terrac.com zone
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/apps"
@@ -290,7 +293,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Get existing Cloudflare Access applications for saetnere.com zone
@@ -308,7 +310,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Combine Access apps from both zones
@@ -366,7 +367,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Re-fetch Access applications (saetnere.com) after create
@@ -384,7 +384,6 @@
       - cloudflare.api_key is defined
       - cloudflare.api_key != ''
     delegate_to: localhost
-    run_once: true
     become: false
 
   - name: Re-combine Access apps from both zones (post-create)
