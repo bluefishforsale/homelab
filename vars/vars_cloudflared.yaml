@@ -115,6 +115,14 @@ cloudflared:
         - hostname: "globalview.terrac.com"
           service_type: "http"
           service_url: "http://192.168.1.143:8094"
+
+        # etrading-boy paper-trading bot UI. Direct to the container (no nginx
+        # hop). Admin-only: it shows balances and can pause trading, so it must
+        # stay out of public_services and fully_public_services in
+        # cloudflared.yaml, which is what gives it the Access admin policy.
+        - hostname: "etrading.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8093"
         
         # SSH Access for all hosts (dynamically generated from inventory)
         # This section will be populated by the template from Ansible inventory
