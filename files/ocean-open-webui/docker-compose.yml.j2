@@ -10,7 +10,7 @@ services:
     environment:
       - TZ=America/Los_Angeles
       # Required environment variables
-      - WEBUI_SECRET_KEY=ocean-ai-secret-key-2024
+      - WEBUI_SECRET_KEY={{ ai_services.open_webui.secret_key }}
       - SCARF_NO_ANALYTICS=true
       - DO_NOT_TRACK=true
       # Configure to connect to llama.cpp via host IP
