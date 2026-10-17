@@ -13,7 +13,7 @@
     runner_vm_name: gh-runner-01
     runner_vm_hostname: gh-runner-01
     runner_vm_cores: 16
-    runner_vm_memory_mb: 65536  # 64 GB
+    runner_vm_memory_mb: 12288  # 12 GB; 90d peak used 3.97 GB
     runner_vm_disk_size_increase: "+32G"  # Add storage beyond template default
     runner_vm_template_id: 9999  # Clone from this template (same as k8s VMs)
     runner_vm_onboot: 1  # Start on Proxmox host boot
