@@ -53,6 +53,28 @@ we reclaim memory first. Cheapest options, in order of how much I like them:
    Looks like a leftover. Not in scope here: noted as a backlog item, not
    acted on.
 
+Measured 90-day peaks (node-exporter, `MemTotal - min_over_time(MemAvailable[90d])`,
+no swap use and zero OOM kills on any of them) against what each VM holds:
+
+| VM | Allocated | 90d peak used | Host RSS now | Proposed |
+|---|---|---|---|---|
+| gh-runner-01 (5000) | 64 GiB | 3.97 GiB | 32.5 GiB | 12 GiB |
+| agentbox (8000) | 12 GiB | 3.4 GiB | 11.6 GiB | 8 GiB |
+| dns01 (2000) | 2 GiB | 1.19 GiB | 2.0 GiB | unchanged (DNS) |
+| registry-cache-01 (7000) | 2 GiB | 1.19 GiB | 2.0 GiB | unchanged |
+| pihole (3000) | 1 GiB | 0.85 GiB | 1.0 GiB | unchanged |
+| registry-cache (4000) | 2 GiB | no exporter | 2.0 GiB | backlog; not in repo, IP .40, no SSH key |
+
+node005's ARC hit rate is effectively 100%, but 53 GiB of the 62 GiB is MRU
+(read once), and the hot MFU set is 11 GiB. Most of it double-caches VM disk
+blocks the guests already cache themselves, so a 32 GiB cap keeps the hot set
+three times over.
+
+After ARC 32 GiB, runner 12 GiB and agentbox 8 GiB: available goes from about
+22 GiB to about 77 GiB, and committed worst case (every VM full plus ARC at
+cap) drops to about 59 GiB of 125.8, which leaves room for a harbor of up to
+48 GiB with about 14 GiB of slack.
+
 Decision D1 picks which.
 
 ### 2.2 "Looks like it's on ocean" holds for media, not for service state
@@ -412,8 +434,8 @@ Nothing in this design changes data01 itself, so there's no data01 backout.
 
 Each one changes what gets built. Defaults in brackets are what I'd do.
 
-- **D1 RAM source.** ARC cap, runner shrink, both? [both: ARC to 32 GiB,
-  runner to 16 GiB, harbor at 24 GiB, which leaves headroom.]
+- **D1 RAM source.** ARC cap, runner shrink, agentbox trim? [all three: ARC to 32 GiB,
+  runner to 12 GiB, agentbox to 8 GiB, harbor at up to 48 GiB.]
 - **D2 What is harbor for?** Capacity/CPU offload, a place for non-data01
   services that survive ocean outages, or resilience for media? [the first
   two; resilience for media isn't achievable with NFS from ocean.]
