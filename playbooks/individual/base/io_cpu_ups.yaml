@@ -3,6 +3,11 @@
   become: true
   hosts: baremetal
   strategy: free
+  vars:
+    # NOTE: node005's pool only backs VM disks; uncapped, the ARC holds half of
+    # RAM (63 GiB) that the VMs need, while the hot set is ~11 GiB.
+    zfs_arc_max_bytes:
+      node005: 34359738368  # 32 GiB
   tasks:
     - name: Update apt cache if not done in the last 24 hours
       ansible.builtin.apt:
@@ -238,6 +243,22 @@
           # options zfs l2arc_write_max=50331648
           # options zfs l2arc_write_boost=67108864
       when: has_zfs | bool
+
+    - name: Cap ZFS ARC at boot
+      ansible.builtin.copy:
+        dest: "/etc/modprobe.d/zfs-arc.conf"
+        mode: "0644"
+        content: "options zfs zfs_arc_max={{ zfs_arc_max_bytes[inventory_hostname] }}\n"
+      when: has_zfs | bool and inventory_hostname in zfs_arc_max_bytes
+
+    - name: Cap ZFS ARC live
+      ansible.builtin.shell: |
+        f=/sys/module/zfs/parameters/zfs_arc_max
+        [ "$(cat "$f")" = "{{ zfs_arc_max_bytes[inventory_hostname] }}" ] && exit 0
+        echo "{{ zfs_arc_max_bytes[inventory_hostname] }}" > "$f" && echo changed
+      register: zfs_arc_live
+      changed_when: "'changed' in zfs_arc_live.stdout"
+      when: has_zfs | bool and inventory_hostname in zfs_arc_max_bytes
 
     - name: Apply ZFS sysctl settings
       ansible.builtin.command:

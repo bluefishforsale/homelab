@@ -14,7 +14,7 @@
     agentbox_vm_name: agentbox
     agentbox_vm_hostname: agentbox
     agentbox_vm_cores: 6
-    agentbox_vm_memory_mb: 12288  # 12 GB
+    agentbox_vm_memory_mb: 8192  # 8 GB; 90d peak used 3.4 GB
     agentbox_vm_disk_size_increase: "+48G"  # repos + node toolchain + worktrees
     agentbox_vm_template_id: 9999  # Debian 12 cloud-init template
     agentbox_vm_onboot: 1  # Start on Proxmox host boot
