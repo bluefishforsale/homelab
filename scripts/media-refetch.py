@@ -49,6 +49,8 @@ PLEX_DB = ("/config/Library/Application Support/Plex Media Server/"
            "Plug-in Support/Databases/com.plexapp.plugins.library.db")
 MAX_ATTEMPTS = 3
 GRAB_TIMEOUT = dt.timedelta(hours=12)
+# Inside tdarr.py drive's 7-day horizon, so the flow has had its chance.
+FLOW_TIMEOUT = dt.timedelta(days=3)
 # With a file on disk every release carries one of these; a release whose only
 # rejections are these is one Radarr would take if the file were gone.
 EXISTING_FILE = "Existing file on disk"
@@ -233,11 +235,12 @@ def step(item, yes):
         item["attempts"] += 1
         if any(lang in conformance.ENGLISH for lang in langs):
             note(item, f"imported {mf['relativePath']} with subtitles {sorted(set(langs))}")
-            item.update(state="imported", file="/media" + path, path=path)
+            item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path)
             return True
         if item["attempts"] >= MAX_ATTEMPTS:
             note(item, f"attempt {item['attempts']} still has no English subtitle; keeping it")
-            item.update(state="imported", file="/media" + path, path=path, no_subs=True)
+            item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path,
+                        no_subs=True)
             return True
         note(item, f"attempt {item['attempts']} has no English subtitle; blocklisting and trying the next")
         if not yes:
@@ -252,6 +255,14 @@ def step(item, yes):
     if item["state"] == "imported":
         why = conformance.reasons(probe(item["file"]))
         if "no-dialogue-track" in why or "video-not-hevc" in why:
+            # NOTE: an item waiting here holds off the next batch. Chamber of
+            # Secrets came out of the flow HEVC but with no dialogue track and
+            # stalled every batch from 2026-10-14 until this timeout existed.
+            imported = dt.datetime.fromisoformat(item.get("imported_at", item["grabbed_at"]))
+            if now() - imported > FLOW_TIMEOUT:
+                note(item, f"still {','.join(why)} after {FLOW_TIMEOUT}; check the tdarr flow")
+                item["state"] = "stuck"
+                return True
             return False                               # tdarr has not run the flow yet
         added = dt.datetime.fromtimestamp(item["added_at"]).date()
         note(item, f"conforms ({','.join(why) or 'clean'}); restore Plex added date {added}")
