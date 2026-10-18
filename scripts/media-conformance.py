@@ -7,7 +7,8 @@ from the release itself:
 
   video      one HEVC stream, no stale mkvmerge BPS left from a re-encode; or the
              source codec, when the flow found HEVC came out larger and kept it
-  audio      default "Stereo (dialogue boost)" track; surround only AC3/EAC3;
+  audio      default "Stereo (dialogue boost)" track, English when the file has
+             English audio; surround only AC3/EAC3;
              nothing lossless
   subtitles  at least one English (or untagged) subtitle stream
 
@@ -34,6 +35,7 @@ import tdarr  # noqa: E402
 DIALOGUE_TITLE = "Stereo (dialogue boost)"
 LOSSLESS = {"truehd", "flac", "alac", "mlp"}
 ENGLISH = {"eng", "en", "und", ""}
+ENGLISH_AUDIO = {"eng", "en"}
 # Stats mkvmerge writes; on a stream ffmpeg re-encoded they describe the source.
 STALE = ("BPS", "NUMBER_OF_BYTES")
 
@@ -71,8 +73,15 @@ def reasons(streams):
         out.append("stale-bps")
     if audio:
         default = [s for s in audio if (s.get("disposition") or {}).get("default")]
-        if not any(tags(s).get("TITLE") == DIALOGUE_TITLE for s in default):
+        dialogue = [s for s in default if tags(s).get("TITLE") == DIALOGUE_TITLE]
+        if not dialogue:
             out.append("no-dialogue-track")
+        # English wins over a release's own default, even when that makes a dub
+        # the dialogue track of a foreign film.
+        lang = lambda s: (tags(s).get("LANGUAGE") or "").lower()
+        if (dialogue and lang(dialogue[0]) not in ENGLISH_AUDIO
+                and any(lang(s) in ENGLISH_AUDIO and "COMMENT" not in tags(s).get("TITLE", "").upper() for s in audio)):
+            out.append("dialogue-not-english")
         if any(is_lossless(s) for s in audio):
             out.append("lossless-audio")
         if any((s.get("channels") or 0) > 2 and s.get("codec_name") not in ("ac3", "eac3") for s in audio):
