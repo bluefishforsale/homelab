@@ -74,7 +74,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      # A cold load after a reboot took ~3m07s on 2026-10-18 and tripped 60s+5x30s.
+      # A passing probe ends start_period early, so warm starts still go healthy fast.
+      start_period: 300s
     
     # Note: Running as root for CUDA/GPU access
     # The llama.cpp container requires root for proper GPU memory allocation
