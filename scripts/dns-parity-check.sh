@@ -134,7 +134,6 @@ echo ""
 echo -e "${BOLD}── Zone: home. (A records) ──${NC}"
 check_record "gw.home." A
 check_record "dns01.home." A
-check_record "gitlab.home." A
 check_record "pihole.home." A
 check_record "unifi.home." A
 check_record "apiserver.home." A
