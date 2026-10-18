@@ -12,6 +12,7 @@
         state: present
         update_cache: true
         cache_valid_time: 86400
+      register: qga_install
 
     # NOTE: the unit is static, started by udev when the virtio agent port
     # appears, so it cannot be enabled. A VM without agent: 1 has no port and
@@ -20,3 +21,5 @@
       ansible.builtin.systemd:
         name: qemu-guest-agent
         state: started
+      # --check only simulates the install, so there is no unit to start yet.
+      when: not (ansible_check_mode and qga_install is changed)
