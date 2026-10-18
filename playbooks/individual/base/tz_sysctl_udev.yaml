@@ -6,8 +6,10 @@
   tasks:
   ########### Date and Time
   - name: Set the Host TZ and hwclock to UTC
+    # NOTE: Proxmox hands Linux VMs a UTC RTC; "local" made every VM boot 7h fast
+    # until NTP stepped it back, stranding OnCalendar timers (plex-autoheal) 7h out.
     community.general.timezone:
-      hwclock: local
+      hwclock: UTC
       name: America/Los_Angeles
 
   - name: Install ntpdate
