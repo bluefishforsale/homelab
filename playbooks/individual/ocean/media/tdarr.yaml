@@ -50,14 +50,32 @@
     - server
     - logs
 
-  - name: Create tdarr config files
-    ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/conf/{{ item }}.j2"
-      dest: "{{ path_home }}/conf/{{ item }}"
-      mode: '0644'
-    with_items:
+  # NOTE: tdarr rewrites both files on every start (adds seededApiKey,
+  # serverDualStack and jobReportsPath, sets mode 0664), so a plain template
+  # never matched and every run of this play restarted tdarr and its node,
+  # killing running transcodes and any API caller mid-request (2026-10-17).
+  # Compare as data and write only when a key this repo sets differs.
+  - name: Read live tdarr config files
+    ansible.builtin.slurp:
+      path: "{{ path_home }}/conf/{{ item }}"
+    loop:
     - Tdarr_Server_Config.json
     - Tdarr_Node_Config.json
+    register: tdarr_conf_live
+    failed_when: false
+
+  - name: Create tdarr config files
+    vars:
+      live: "{{ (item.content | b64decode | from_json) if item.content is defined else {} }}"
+      desired: "{{ lookup('ansible.builtin.template', playbook_dir ~ '/../../../../files/ocean-tdarr/conf/' ~ item.item ~ '.j2', convert_data=false) | from_json }}"
+    ansible.builtin.copy:
+      content: "{{ live | combine(desired) | to_nice_json(indent=2) }}"
+      dest: "{{ path_home }}/conf/{{ item.item }}"
+      mode: '0644'
+    loop: "{{ tdarr_conf_live.results }}"
+    loop_control:
+      label: "{{ item.item }}"
+    when: live | combine(desired) != live
     notify:
     - Reload systemd daemon
     - Restart tdarr service
