@@ -38,17 +38,21 @@
       group: root
       mode: '0755'
 
+  # conf and logs belong to the container's PUID: tdarr chowns them on start,
+  # and with no restart after a deploy a root owner here would stick.
   - name: Ensure subdirectory exists with correct ownership and permissions
     ansible.builtin.file:
-      path: "{{ path_home }}/{{ item }}"
+      path: "{{ path_home }}/{{ item.dir }}"
       state: directory
-      owner: root
-      group: root
+      owner: "{{ item.owner }}"
+      group: "{{ item.owner }}"
       mode: '0755'
-    with_items:
-    - conf
-    - server
-    - logs
+    loop:
+    - { dir: conf, owner: media }
+    - { dir: server, owner: root }
+    - { dir: logs, owner: media }
+    loop_control:
+      label: "{{ item.dir }}"
 
   # NOTE: tdarr rewrites both files on every start (adds seededApiKey,
   # serverDualStack and jobReportsPath, sets mode 0664), so a plain template
