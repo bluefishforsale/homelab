@@ -102,8 +102,6 @@ jobs:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
           DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
           DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
-          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
-          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
 
@@ -163,6 +161,8 @@ jobs:
         if: always()
         env:
           DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
+          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
+          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
         run: |
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
