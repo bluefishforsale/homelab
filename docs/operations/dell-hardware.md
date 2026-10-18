@@ -260,7 +260,9 @@ Read from `sudo ipmitool fru` on node006, 2026-10-18:
 | PS1 | PWR SPLY,750WP,RDNT,FLX (Flextronics) | 06W2PW (rev A01) | 2014-02-25 |
 | PS2 | PWR SPLY,750WP,RDNT,DELTA (Delta) | 05NF18 (rev A01) | 2013-04-12 |
 
-Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF.
+Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF (not yet test-fitted
+in node006). Not 0Y26KX: four spare 0Y26KX units (node005's part) were tried in
+node006 and none worked.
 
 Gotchas:
 
@@ -295,8 +297,8 @@ Read from `sudo ipmitool fru` on node005, 2026-10-18:
 
 A matched pair, drawing 179W, both inputs at 120V, and `PS Redundancy` reads
 `Fully Redundant`. That makes node005 the reference for what a healthy node006
-should report after its upgrade. Whether 0Y26KX fits the R720 the same way the
-0CC6WF does is unverified; confirm before buying it as node006's pair.
+should report after its upgrade. 0Y26KX does not work in node006 (R720); four
+units were tried, so it is not a shared spare between the two hosts.
 
 ### Power Profiles
 ```bash
