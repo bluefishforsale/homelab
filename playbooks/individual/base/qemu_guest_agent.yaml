@@ -1,0 +1,22 @@
+---
+# Every VM is created with agent: 1, so Proxmox routes qm shutdown, qm reboot
+# and a UPS-triggered host shutdown through the guest agent. With no agent
+# running in the guest those hang, then fail with "VM quit/powerdown failed".
+- name: QEMU guest agent on Proxmox VMs
+  become: true
+  hosts: vms
+  tasks:
+    - name: Install QEMU guest agent
+      ansible.builtin.apt:
+        name: qemu-guest-agent
+        state: present
+        update_cache: true
+        cache_valid_time: 86400
+
+    # NOTE: the unit is static, started by udev when the virtio agent port
+    # appears, so it cannot be enabled. A VM without agent: 1 has no port and
+    # this start fails, which is the signal that the VM config is missing it.
+    - name: Start QEMU guest agent
+      ansible.builtin.systemd:
+        name: qemu-guest-agent
+        state: started
