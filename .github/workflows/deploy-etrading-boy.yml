@@ -100,6 +100,10 @@ jobs:
       - name: Run deployment playbook
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
+          DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
+          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
+          DEPLOY_COMMIT_SHA: ${{ steps.params.outputs.commit_sha }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
 
@@ -109,8 +113,8 @@ jobs:
           echo "================================================"
           echo "Deploying etrading-boy"
           echo "================================================"
-          echo "Commit: ${{ steps.params.outputs.commit_sha }}"
-          echo "Message: ${{ steps.params.outputs.commit_message }}"
+          echo "Commit: $DEPLOY_COMMIT_SHA"
+          echo "Message: $DEPLOY_COMMIT_MESSAGE"
           echo ""
 
           START_TIME=$(date +%s)
@@ -162,8 +166,8 @@ jobs:
         run: |
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
-          BRANCH="${{ steps.params.outputs.branch }}"
-          COMMIT_SHA="${{ steps.params.outputs.commit_sha }}"
+          BRANCH="$DEPLOY_BRANCH"
+          COMMIT_SHA="$DEPLOY_COMMIT_SHA"
           COMMIT_MESSAGE="$DEPLOY_COMMIT_MESSAGE"
 
           if [ "$STATUS" = "success" ]; then
