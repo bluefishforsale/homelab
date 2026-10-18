@@ -51,17 +51,30 @@ module.exports = async (args) => {
     log('two video streams at one size (double-muxed by the old flow), leaving it for a re-download');
     return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
   }
-  // Idempotent: a file that already has the dialogue track was done by this policy.
-  if (audio.some((s) => title(s) === DIALOGUE_TITLE)) {
+  // English wins over a release's own default, even when that makes a dub the
+  // dialogue track of a foreign film. Kiss of the Spider Woman came as a German
+  // release whose default was German, beside an English AC3 5.1.
+  const isEnglish = (s) => ['eng', 'en'].includes(lang(s));
+  const sources = audio.filter((s) => !isCommentary(s) && title(s) !== DIALOGUE_TITLE);
+  const english = sources.filter(isEnglish);
+  // Idempotent: a file that already has the dialogue track was done by this
+  // policy, unless it was built from another language and English is there.
+  const done = audio.find((s) => title(s) === DIALOGUE_TITLE);
+  if (done && (isEnglish(done) || english.length === 0)) {
     log('dialogue track present, already processed');
     return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
   }
+  if (done) {
+    log(`drop ${lang(done)} ${DIALOGUE_TITLE}, rebuilding it from English`);
+    done.removed = true;
+    audio.splice(audio.indexOf(done), 1);
+  }
 
   // The main track feeds the dialogue downmix: the default-flagged non-commentary
-  // track, else the first. Picked before anything is removed so a lossless
-  // source still feeds it.
-  const main = audio.find((s) => (s.disposition || {}).default === 1 && !isCommentary(s))
-    || audio.find((s) => !isCommentary(s)) || audio[0];
+  // track, else the first, preferring English. Picked before anything is removed
+  // so a lossless source still feeds it.
+  const pool = english.length ? english : sources;
+  const main = pool.find((s) => (s.disposition || {}).default === 1) || pool[0] || audio[0];
 
   const byLang = {};
   audio.filter((s) => !isCommentary(s)).forEach((s) => { (byLang[lang(s)] = byLang[lang(s)] || []).push(s); });

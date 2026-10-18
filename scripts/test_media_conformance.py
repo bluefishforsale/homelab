@@ -28,6 +28,19 @@ def test_second_video_at_the_same_size_is_double_muxed():
     assert "double-muxed" in why, why
 
 
+def audio(lang, title="", default=False):
+    return {"codec_type": "audio", "codec_name": "ac3", "channels": 6, "tags": {"language": lang, "title": title},
+            "disposition": {"default": int(default)}}
+
+
+def test_dialogue_track_from_another_language_when_english_audio_exists():
+    # Kiss of the Spider Woman: a German release whose default track was German,
+    # so the dialogue boost was built from it beside an English AC3 5.1.
+    why = conformance.reasons([video(1920, 1080), audio("ger", "Stereo (dialogue boost)", default=True),
+                               audio("ger", "AC3 5.1"), audio("eng", "AC3 5.1")])
+    assert "dialogue-not-english" in why, why
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
