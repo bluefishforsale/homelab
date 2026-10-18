@@ -276,12 +276,27 @@ Gotchas:
 - Identical PSUs on different input voltages (110V vs 220V) can also trigger the
   mismatch, so feed both from the same circuit or UPS.
 - The `PS Redundancy` sensor reads `No Reading` instead of fully redundant, so
-  redundancy loss may not be detected at all. Check `racadm get System.Power`
+  redundancy loss may not be detected at all, even though both inputs are at
+  120V and sharing load evenly (1.80A each). Check `racadm get System.Power`
   before trusting it.
 - Like-for-like replacement: swap one PSU at a time hot, and wait for the new
   one to report healthy before pulling the second. A 750W to 1100W upgrade
   passes through a mismatched state that way, so do it powered down and swap
   both together. On 110V the 1100W unit derates to roughly 1050W.
+
+### Node005 PSUs
+
+Read from `sudo ipmitool fru` on node005, 2026-10-18:
+
+| Slot | Product | Dell P/N | Mfg date |
+|------|---------|----------|----------|
+| PS1 | PWR SPLY,1100W,RDNT,DELTA | 0Y26KX (rev A02) | 2019-05-17 |
+| PS2 | PWR SPLY,1100W,RDNT,DELTA | 0Y26KX (rev A02) | 2019-05-17 |
+
+A matched pair, drawing 179W, both inputs at 120V, and `PS Redundancy` reads
+`Fully Redundant`. That makes node005 the reference for what a healthy node006
+should report after its upgrade. Whether 0Y26KX fits the R720 the same way the
+0CC6WF does is unverified; confirm before buying it as node006's pair.
 
 ### Power Profiles
 ```bash
