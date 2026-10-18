@@ -64,7 +64,11 @@ services:
           cpus: '16'
           memory: 32G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:32400/web/index.html"]
+      # NOTE: https with -k (the cert is for *.plex.direct). Plex's "Secure
+      # connections: Required" refuses plain http from anything but its own
+      # loopback; probing http would read as unhealthy and plex-autoheal would
+      # restart a healthy server.
+      test: ["CMD", "curl", "-fsk", "https://localhost:32400/web/index.html"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -76,7 +80,7 @@ services:
     hostname: {{ exporter_service }}
     restart: always
     environment:
-      PLEX_ADDR: http://plex:32400
+      PLEX_ADDR: https://plex:32400
       PLEX_TOKEN: "{{ media_services.plex.api_key }}"
       # Keep below Prometheus scrape_timeout (default 10s) so scrapes don't
       # time out while the exporter waits on a hung Plex.
