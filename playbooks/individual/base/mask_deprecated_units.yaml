@@ -3,8 +3,9 @@
 # so they stop firing SystemdUnitFailed. Per-host list via the `masked_units`
 # inventory var (comma-separated string, default empty):
 #   - named.service on dns01/dns02  (replaced by the powerdns container)
-#   - openipmi.service on VMs        (no IPMI hardware)
 #   - nvidia-gpu-exporter on non-GPU hosts
+# openipmi.service is masked on every [vms] host regardless of masked_units:
+# a VM has no BMC, so the unit can only ever fail.
 # ini host vars arrive as strings, so split on comma rather than expecting a list.
 - name: Mask deprecated/absent systemd units
   hosts: all
@@ -13,7 +14,8 @@
   tasks:
     - name: Compute unit list from the masked_units string
       ansible.builtin.set_fact:
-        _masked_units: "{{ (masked_units | default('') | string).split(',') | map('trim') | select | list }}"
+        _masked_units: "{{ ((masked_units | default('') | string).split(',') | map('trim') | select | list
+          + (['openipmi.service'] if inventory_hostname in groups['vms'] else [])) | unique }}"
 
     # Stop/disable first (tolerant): can't stop a unit in the same call that
     # masks it, and the unit may already be inactive, masked, or absent.
