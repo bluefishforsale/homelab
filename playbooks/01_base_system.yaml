@@ -9,6 +9,9 @@
 - name: Install Base System Packages
   ansible.builtin.import_playbook: individual/base/packages.yaml
 
+- name: Install QEMU Guest Agent on VMs
+  ansible.builtin.import_playbook: individual/base/qemu_guest_agent.yaml
+
 - name: Configure I/O, CPU, and UPS Settings
   ansible.builtin.import_playbook: individual/base/io_cpu_ups.yaml
 
