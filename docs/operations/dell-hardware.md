@@ -270,13 +270,18 @@ Gotchas:
   down.
 - Both units are 12-13 years old; capacitor aging is the likely failure mode, so
   fresh units are worth it even at the same wattage.
-- Buy as a matched pair (same wattage and P/N). The current pair is already
-  mixed-vendor; don't add a mixed-wattage pair on top.
+- Never mix 750W and 1100W. Dell requires both PSUs to be the same type and
+  maximum output, and the firmware raises PSU0076 (wattage mismatch). Buy a
+  matched pair; the current pair is already mixed-vendor.
+- Identical PSUs on different input voltages (110V vs 220V) can also trigger the
+  mismatch, so feed both from the same circuit or UPS.
 - The `PS Redundancy` sensor reads `No Reading` instead of fully redundant, so
   redundancy loss may not be detected at all. Check `racadm get System.Power`
   before trusting it.
-- Swap one PSU at a time hot, and wait for the new one to report healthy before
-  pulling the second. On 110V the 1100W unit derates to roughly 1050W.
+- Like-for-like replacement: swap one PSU at a time hot, and wait for the new
+  one to report healthy before pulling the second. A 750W to 1100W upgrade
+  passes through a mismatched state that way, so do it powered down and swap
+  both together. On 110V the 1100W unit derates to roughly 1050W.
 
 ### Power Profiles
 ```bash
