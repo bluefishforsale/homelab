@@ -251,6 +251,33 @@ omreport chassis pwrsupplies
 racadm get System.Power.PSUCapacity
 ```
 
+### Node006 PSUs
+
+Read from `sudo ipmitool fru` on node006, 2026-10-18:
+
+| Slot | Product | Dell P/N | Mfg date |
+|------|---------|----------|----------|
+| PS1 | PWR SPLY,750WP,RDNT,FLX (Flextronics) | 06W2PW (rev A01) | 2014-02-25 |
+| PS2 | PWR SPLY,750WP,RDNT,DELTA (Delta) | 05NF18 (rev A01) | 2013-04-12 |
+
+Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF.
+
+Gotchas:
+
+- Redundancy is thin. `ipmitool dcmi power reading` showed 455W at idle against
+  750W per supply. Under load (3090 passed through to ocean, disks spinning) the
+  draw can exceed 750W, at which point losing either PSU takes node006 and ocean
+  down.
+- Both units are 12-13 years old; capacitor aging is the likely failure mode, so
+  fresh units are worth it even at the same wattage.
+- Buy as a matched pair (same wattage and P/N). The current pair is already
+  mixed-vendor; don't add a mixed-wattage pair on top.
+- The `PS Redundancy` sensor reads `No Reading` instead of fully redundant, so
+  redundancy loss may not be detected at all. Check `racadm get System.Power`
+  before trusting it.
+- Swap one PSU at a time hot, and wait for the new one to report healthy before
+  pulling the second. On 110V the 1100W unit derates to roughly 1050W.
+
 ### Power Profiles
 ```bash
 # Set power profile
