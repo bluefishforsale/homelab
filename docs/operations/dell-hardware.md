@@ -24,14 +24,14 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 - GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, log-ml)
 - 64TB storage pool for media, backups, and service data
 
-### Node005 - Dell PowerEdge R620 (Infrastructure Server)
+### Node005 - Dell PowerEdge R630 (Infrastructure Server)
 
 | Component | Specification |
 |-----------|---------------|
 | **Hostname** | node005.home |
-| **Model** | Dell PowerEdge R620 |
-| **CPU** | 56 cores (2x Intel Xeon E5-2697 v2) |
-| **RAM** | 128 GB DDR3 ECC |
+| **Model** | Dell PowerEdge R630 |
+| **CPU** | 28 cores / 56 threads (2x Intel Xeon E5-2690 v4) |
+| **RAM** | 128 GB DDR4 ECC |
 | **Boot Disk** | 64 GB SSD |
 | **VM Storage** | 256 GB SSD + 1 TB SSD (vm-boot-lvm-thin) |
 | **GPU** | None |
@@ -50,7 +50,7 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 ┌─────────────────────────────────────────────────────────────┐
 │                    192.0.2.0/24 Network                   │
 ├─────────────────────────────────────────────────────────────┤
-│  Node006 (R720)              │  Node005 (R620)              │
+│  Node006 (R720)              │  Node005 (R630)              │
 │  ├─ iDRAC: 192.0.2.16      │  ├─ iDRAC: 192.0.2.15      |
 │  ├─ host: 192.0.2.106      │  ├─ host: 192.0.2.105      |
 │      ├─ ocean 192.0.2.143  │     ├─ dns01: 192.0.2.2    │
@@ -260,7 +260,9 @@ Read from `sudo ipmitool fru` on node006, 2026-10-18:
 | PS1 | PWR SPLY,750WP,RDNT,FLX (Flextronics) | 06W2PW (rev A01) | 2014-02-25 |
 | PS2 | PWR SPLY,750WP,RDNT,DELTA (Delta) | 05NF18 (rev A01) | 2013-04-12 |
 
-Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF.
+Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF (not yet test-fitted
+in node006). Not 0Y26KX: four spare 0Y26KX units (node005's part) were tried in
+node006 and none worked.
 
 Gotchas:
 
@@ -295,8 +297,9 @@ Read from `sudo ipmitool fru` on node005, 2026-10-18:
 
 A matched pair, drawing 179W, both inputs at 120V, and `PS Redundancy` reads
 `Fully Redundant`. That makes node005 the reference for what a healthy node006
-should report after its upgrade. Whether 0Y26KX fits the R720 the same way the
-0CC6WF does is unverified; confirm before buying it as node006's pair.
+should report after its upgrade. 0Y26KX does not work in node006 (R720); four
+units were tried. node005 is an R630, a later Dell server generation than the
+R720, so the two hosts share no PSU part.
 
 ### Power Profiles
 ```bash

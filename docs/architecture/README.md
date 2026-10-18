@@ -55,7 +55,7 @@ See [`deployment-flow.md`](./deployment-flow.md).
 
 ### Physical Servers
 
-- **node005** (Dell R620): 56 cores, 128GB RAM - runs dns01, pihole, gitlab, gh-runner-01
+- **node005** (Dell R630): 56 cores, 128GB RAM - runs dns01, pihole, gitlab, gh-runner-01
 - **node006** (Dell R720): 40 cores, 680GB RAM, RTX 3090 - runs ocean VM
 
 ### Ocean VM

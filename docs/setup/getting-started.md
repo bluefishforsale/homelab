@@ -22,7 +22,7 @@ Complete setup guide for the homelab infrastructure.
 ### Hardware (Current Setup)
 
 - **node006** (Dell R720): 40 cores, 680GB RAM, 64TB ZFS (8x12TB), RTX 3090, bonded 10G
-- **node005** (Dell R620): 56 cores, 128GB RAM, 1TB SSD
+- **node005** (Dell R630): 56 cores, 128GB RAM, 1TB SSD
 
 ### Software Prerequisites
 
