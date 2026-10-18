@@ -15,6 +15,19 @@ modules:
         headers:
             User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
 
+  # HTTP 2xx against a cert that cannot match the probed address (Plex serves
+  # *.plex.direct, probed by LAN IP). Liveness only, not a TLS check.
+  http_2xx_insecure:
+    prober: http
+    timeout: 5s
+    http:
+        preferred_ip_protocol: "ip4"
+        ip_protocol_fallback: false
+        no_follow_redirects: false
+        tls_config:
+            insecure_skip_verify: true
+        method: GET
+
   # TLS Certificate validation and details
   http_tls:
     prober: http
