@@ -17,7 +17,7 @@ Physical server layout and rack diagram.
 │  U5-6   │ Patch Panel                                       │
 ├─────────────────────────────────────────────────────────────┤
 │         │                                                   │
-│  U7-8   │ node005 - Dell R620                               │
+│  U7-8   │ node005 - Dell R630                               │
 │         │ 56 cores, 128GB RAM                               │
 │         │ 192.0.2.105                                     │
 │         │ VMs: dns01, pihole, gitlab, gh-runner-01          │
@@ -38,7 +38,7 @@ Physical server layout and rack diagram.
 
 ## Server Specifications
 
-### node005 (Dell R620)
+### node005 (Dell R630)
 
 | Component | Specification |
 |-----------|---------------|

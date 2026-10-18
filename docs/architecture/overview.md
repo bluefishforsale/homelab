@@ -8,7 +8,7 @@ Homelab infrastructure architecture and design.
 
 | Host | IP | Hardware | Purpose |
 |------|----|----------|---------|
-| node005 | 192.0.2.105 | Dell R620 (56 cores, 128GB) | Proxmox - Control VMs |
+| node005 | 192.0.2.105 | Dell R630 (56 cores, 128GB) | Proxmox - Control VMs |
 | node006 | 192.0.2.106 | Dell R720 (40 cores, 680GB, RTX 3090) | Proxmox - Ocean VM |
 | ocean | 192.0.2.143 | VM on node006 (30 cores, 256GB) | Docker services |
 | dns01 | 192.0.2.2 | VM on node005 | BIND DNS |
