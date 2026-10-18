@@ -251,6 +251,53 @@ omreport chassis pwrsupplies
 racadm get System.Power.PSUCapacity
 ```
 
+### Node006 PSUs
+
+Read from `sudo ipmitool fru` on node006, 2026-10-18:
+
+| Slot | Product | Dell P/N | Mfg date |
+|------|---------|----------|----------|
+| PS1 | PWR SPLY,750WP,RDNT,FLX (Flextronics) | 06W2PW (rev A01) | 2014-02-25 |
+| PS2 | PWR SPLY,750WP,RDNT,DELTA (Delta) | 05NF18 (rev A01) | 2013-04-12 |
+
+Replacement candidate: the R720 1100W PSU, Dell P/N 0CC6WF.
+
+Gotchas:
+
+- Redundancy is thin. `ipmitool dcmi power reading` showed 455W at idle against
+  750W per supply. Under load (3090 passed through to ocean, disks spinning) the
+  draw can exceed 750W, at which point losing either PSU takes node006 and ocean
+  down.
+- Both units are 12-13 years old; capacitor aging is the likely failure mode, so
+  fresh units are worth it even at the same wattage.
+- Never mix 750W and 1100W. Dell requires both PSUs to be the same type and
+  maximum output, and the firmware raises PSU0076 (wattage mismatch). Buy a
+  matched pair; the current pair is already mixed-vendor.
+- Identical PSUs on different input voltages (110V vs 220V) can also trigger the
+  mismatch, so feed both from the same circuit or UPS.
+- The `PS Redundancy` sensor reads `No Reading` instead of fully redundant, so
+  redundancy loss may not be detected at all, even though both inputs are at
+  120V and sharing load evenly (1.80A each). Check `racadm get System.Power`
+  before trusting it.
+- Like-for-like replacement: swap one PSU at a time hot, and wait for the new
+  one to report healthy before pulling the second. A 750W to 1100W upgrade
+  passes through a mismatched state that way, so do it powered down and swap
+  both together. On 110V the 1100W unit derates to roughly 1050W.
+
+### Node005 PSUs
+
+Read from `sudo ipmitool fru` on node005, 2026-10-18:
+
+| Slot | Product | Dell P/N | Mfg date |
+|------|---------|----------|----------|
+| PS1 | PWR SPLY,1100W,RDNT,DELTA | 0Y26KX (rev A02) | 2019-05-17 |
+| PS2 | PWR SPLY,1100W,RDNT,DELTA | 0Y26KX (rev A02) | 2019-05-17 |
+
+A matched pair, drawing 179W, both inputs at 120V, and `PS Redundancy` reads
+`Fully Redundant`. That makes node005 the reference for what a healthy node006
+should report after its upgrade. Whether 0Y26KX fits the R720 the same way the
+0CC6WF does is unverified; confirm before buying it as node006's pair.
+
 ### Power Profiles
 ```bash
 # Set power profile
