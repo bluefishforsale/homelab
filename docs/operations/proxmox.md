@@ -100,11 +100,9 @@ sed -Ezi.bak "s/(Ext.Msg.show\(\{\s+title: gettext\('No valid sub)/void\(\{ \/\/
 
 ### Install QEMU Guest Agent (Ansible)
 
-```bash
-# Install on all VMs
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/infrastructure/proxmox_qemu_agent.yaml
-```
+`playbooks/individual/base/qemu_guest_agent.yaml` installs and starts it on every
+host in `[vms]`; CI applies it on merge. Without it, `qm shutdown` and `qm reboot`
+hang on VMs created with `agent: 1` and fail with `VM quit/powerdown failed`.
 
 ### Network Bonding (Dual 10GbE)
 
