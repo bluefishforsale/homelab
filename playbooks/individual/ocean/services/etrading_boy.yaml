@@ -1,0 +1,128 @@
+---
+# etrading-boy: headless paper-trading bot with its realtime web UI
+# (https://github.com/bluefishforsale/etrading-boy). One container: uvicorn
+# hosts the scheduler, so a deploy is a stop-then-start of the whole bot.
+#
+# NOTE: never run this while another etrading-boy is trading the same Alpaca
+# account (the laptop). Two bots act on the same positions and double every
+# exit. The etrading-boy repo only dispatches here when its DEPLOY_ENABLED
+# variable is true, which is the cutover switch.
+- name: Deploy etrading-boy paper-trading bot using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: etrading_boy
+    image: ghcr.io/bluefishforsale/etrading-boy
+    version: latest
+    port_ext: "{{ service_ports.etrading_boy.port }}"
+    port_int: 8093
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/etrading_boy"
+    home: "{{ data }}/services/{{ service }}"
+    # The image's `bot` user; the data dir must be writable by it.
+    uid: 1000
+    gid: 1000
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull private etrading-boy image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure data directory exists, owned by the container user
+    ansible.builtin.file:
+      path: "{{ home }}/data"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0750'
+
+  # NOTE: booting on an empty data dir creates a fresh state.db, and boot
+  # reconcile then adopts every open Alpaca position as an orphan with no
+  # strategy or entry time, so exits run on the wrong rules. The laptop's
+  # state.db has to be copied here before the first start.
+  - name: Check the bot's state.db was copied over
+    ansible.builtin.stat:
+      path: "{{ home }}/data/.etrading-boy/state.db"
+    register: state_db
+
+  - name: Refuse to start without state.db
+    ansible.builtin.fail:
+      msg: >-
+        {{ home }}/data/.etrading-boy/state.db is missing. Stop the laptop bot,
+        copy its ~/.etrading-boy/state.db and bar_cache.db here, chown
+        {{ uid }}:{{ gid }}, then re-run (etrading-boy docs/homelab-cutover.md).
+    when: not state_db.stat.exists
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: root
+      group: root
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart etrading_boy service
+
+  - name: Create etrading_boy environment file
+    ansible.builtin.template:
+      src: "{{ files }}/etrading_boy.env.j2"
+      dest: "{{ home }}/.env"
+      owner: root
+      group: root
+      mode: '0600'
+    no_log: true
+    notify:
+    - Reload systemd daemon
+    - Restart etrading_boy service
+
+  - name: Create etrading_boy systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - etrading_boy.service
+    notify:
+    - Reload systemd daemon
+    - Restart etrading_boy service
+
+  - name: Enable etrading_boy service
+    ansible.builtin.systemd:
+      name: etrading_boy.service
+      enabled: yes
+      daemon_reload: yes
+
+  # Always restart so a new :latest image is pulled and the container is
+  # recreated even when every template was byte-identical. The bot catches
+  # up on any cron window the restart straddled.
+  - name: Restart etrading_boy service to pick up latest image
+    ansible.builtin.systemd:
+      name: etrading_boy.service
+      state: restarted
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart etrading_boy service
+    ansible.builtin.systemd:
+      name: etrading_boy.service
+      state: restarted
