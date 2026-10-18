@@ -23,7 +23,6 @@
       - htop
       - iotop
       - iperf3
-      - ipmitool
       - iproute2
       - ipset
       - iptraf-ng
@@ -69,6 +68,14 @@
       retries: "{{ total_retries }}"
       with_items: "{{ packages }}"
       ignore_errors: true
+
+    # NOTE: ipmitool Recommends openipmi, whose service can only fail on a VM
+    # (no BMC), so recommends stay off there and openipmi is never installed.
+    - name: Install ipmitool
+      ansible.builtin.apt:
+        name: ipmitool
+        state: latest
+        install_recommends: "{{ inventory_hostname not in groups['vms'] }}"
 
     - name: Ensure dpkg is not in a broken state
       ansible.builtin.shell: dpkg --configure -a
