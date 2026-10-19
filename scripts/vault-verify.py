@@ -33,7 +33,9 @@ import offsite_proxy  # noqa: E402,F401  (off-LAN: urllib through the offsite.sh
 import vault  # noqa: E402
 
 OCEAN = os.environ.get("MEDIA_HOST", "ocean.home")
-CF = "https://api.cloudflare.com/client/v4"
+# Plex requires secure connections and its cert only covers this name.
+PLEX = "https://192-168-1-143.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct:32400"
+CF ="https://api.cloudflare.com/client/v4"
 TIMEOUT = 15
 
 
@@ -116,7 +118,7 @@ def plex_tv(tok):
 
 def plex_local(tok):
     # /identity answers without auth; /library/sections is the cheapest call that checks
-    http(f"http://{OCEAN}:32400/library/sections?X-Plex-Token={tok}")
+    http(f"{PLEX}/library/sections?X-Plex-Token={tok}")
     return "local server ok"
 
 
