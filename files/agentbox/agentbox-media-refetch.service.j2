@@ -21,7 +21,7 @@ ExecStartPre=/usr/bin/flock {{ media_tools }}/.git/pull.lock /usr/bin/git -C {{ 
 # runs from overlapping, and no batch starts below the free-space floor.
 # 50 a batch: one batch starts a day, and batch 2 (25 remuxes, ~700 GB) was
 # through NZBGet in under a day, so the batch size was the whole limit.
-ExecStart=/usr/bin/python3 scripts/media-refetch.py auto --yes --movies 50
+ExecStart=/usr/bin/python3 scripts/media-refetch.py auto --yes --movies 50 --tv-gb 1000
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agentbox-media-refetch
