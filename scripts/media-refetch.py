@@ -166,19 +166,26 @@ def acceptable(rel, allowed=()):
         x.startswith("Existing file") or x in allowed for x in rel.get("rejections", []))
 
 
-def pack_rejection():
+def pack_rejection(profiles):
     """The rejection PACK_PROFILE puts on every season pack; empty if the profile is gone."""
-    p = next((p for p in mc.get("sonarr", "/api/v3/releaseprofile") if p.get("name") == PACK_PROFILE), None)
+    # The UI shows "No season packs"; the API has it as "no season packs".
+    p = next((p for p in profiles if (p.get("name") or "").lower() == PACK_PROFILE.lower()), None)
     return {f"Contains these ignored terms: {', '.join(p['ignored'])}"} if p else set()
+
+
+# A season search goes to every indexer live and comes back with thousands of
+# releases; Young Sheldon S01 took longer than the client's default 120s.
+SEARCH_TIMEOUT = 600
 
 
 def best_tv_release(item):
     if item["pack"]:
-        rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"])
-        allowed = pack_rejection()
+        rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"],
+                      timeout=SEARCH_TIMEOUT)
+        allowed = pack_rejection(mc.get("sonarr", "/api/v3/releaseprofile"))
         ok = [r for r in rels if r.get("fullSeason") and acceptable(r, allowed)]
     else:
-        rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0])
+        rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
         ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 

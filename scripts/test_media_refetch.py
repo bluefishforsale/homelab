@@ -46,6 +46,13 @@ def test_no_packs_term_is_not_waved_through_for_a_single_episode():
     assert not refetch.acceptable(rel)
 
 
+def test_no_packs_profile_is_found_whatever_its_case():
+    # Sonarr's API returns the profile as "no season packs"; an exact match found
+    # nothing, so every pack looked unacceptable and every season fell to episodes.
+    profiles = [{"name": "no season packs", "ignored": [r"/\bS\d+\b(?!E\d+\b)/i"]}]
+    assert refetch.pack_rejection(profiles) == {PACK_TERM}
+
+
 def test_release_sonarr_cannot_download_is_not_acceptable():
     assert not refetch.acceptable({"downloadAllowed": False, "rejections": []})
 

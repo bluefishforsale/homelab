@@ -116,7 +116,7 @@ def _url(name):
     return url.replace("localhost", MEDIA_HOST) if OFF_HOST else url
 
 
-def _request(name, path, params, data=None, method=None):
+def _request(name, path, params, data=None, method=None, timeout=120):
     s = SERVICES[name]
     params = dict(params or {})
     headers = {"Accept": "application/json"}
@@ -137,13 +137,13 @@ def _request(name, path, params, data=None, method=None):
     if method is None:
         method = "POST" if body else "GET"
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         txt = r.read()
         return json.loads(txt) if txt else None
 
 
-def get(name, path, **params):
-    return _request(name, path, params)
+def get(name, path, timeout=120, **params):
+    return _request(name, path, params, timeout=timeout)
 
 
 def post(name, path, data, **params):
