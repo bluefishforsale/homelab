@@ -387,3 +387,43 @@
       (kometa_compose_result is defined and kometa_compose_result is changed) or
       (kometa_service_result is defined and kometa_service_result is changed)
     tags: [restart, kometa]
+
+  # NOTE: these two prefs are the hardening against the in-the-wild old-Plex
+  # exploitation. allowedNetworks lets a listed subnet skip auth entirely, and
+  # secureConnections 0 (Required) refuses plain http. Plex keeps them only in
+  # Preferences.xml, which this play never rewrites after bootstrap, so a rebuilt
+  # or reset server would come back open without this. Both apply live; no restart.
+  - name: Wait for Plex to answer before reading its prefs
+    ansible.builtin.uri:
+      url: "https://localhost:{{ service_ports.plex.port }}/identity"
+      validate_certs: false
+    register: plex_identity
+    until: plex_identity.status == 200
+    retries: 30
+    delay: 10
+    tags: [config, plex]
+
+  - name: Read Plex security prefs
+    ansible.builtin.uri:
+      url: "https://localhost:{{ service_ports.plex.port }}/:/prefs"
+      validate_certs: false
+      headers:
+        X-Plex-Token: "{{ plex_api_key }}"
+        Accept: application/json
+    register: plex_prefs
+    no_log: true
+    tags: [config, plex]
+
+  - name: Enforce Plex security prefs
+    ansible.builtin.uri:
+      url: "https://localhost:{{ service_ports.plex.port }}/:/prefs?allowedNetworks=&secureConnections=0"
+      method: PUT
+      validate_certs: false
+      headers:
+        X-Plex-Token: "{{ plex_api_key }}"
+    vars:
+      current: "{{ plex_prefs.json.MediaContainer.Setting | items2dict(key_name='id', value_name='value') }}"
+    when: current.allowedNetworks != '' or (current.secureConnections | int) != 0
+    changed_when: true
+    no_log: true
+    tags: [config, plex]
