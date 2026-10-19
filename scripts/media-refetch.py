@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Re-download non-conforming movies in batches, keeping Plex's "date added".
+"""Re-download non-conforming movies and TV in batches, keeping Plex's "date added".
 
 About half the library has no English subtitle (the old tdarr flow stripped
 them with -sn) or was muxed twice, and only a fresh download fixes that. This
@@ -8,23 +8,29 @@ item goes through a ledger, so a run can stop anywhere and resume:
 
   planned   Plex rating key and original added date recorded
   grabbed   the old file deleted and the best acceptable release grabbed
-  imported  Radarr imported a file that has an English subtitle; a release
+  imported  Radarr/Sonarr imported files that have an English subtitle; a release
             without one is blocklisted and the next is tried, up to 3, after
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
 The old file is only deleted once a search has found a release to replace it.
 
-  media-refetch.py plan --movies 25 --max-gb 2000   # pick the next batch (no changes)
+  media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do
   media-refetch.py run --yes                        # do it; re-run until all done
   media-refetch.py status
   media-refetch.py auto --yes                       # unattended: plan when idle, then run
 
 Order: double-muxed files first (they are broken today), then most played in
-Tautulli, then the rest. Movies only for now; TV comes as season packs.
+Tautulli, then the rest.
+
+TV goes a season at a time. A season at least half bad comes back as one season
+pack, which replaces every episode in it; otherwise, or when the season is
+still airing or no pack is acceptable, each bad episode is searched on its own.
+Specials are left alone.
 """
 import argparse
+import collections
 import datetime as dt
 import fcntl
 import importlib.util
@@ -56,6 +62,15 @@ FLOW_TIMEOUT = dt.timedelta(days=3)
 EXISTING_FILE = "Existing file on disk"
 # Not library content; re-downloading would not fix it and nothing should.
 JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso$|/VIDEO_TS/)", re.I)
+TV_SEASON = re.compile(r"^/tv/([^/]+)/Season (\d+)/")
+# NOTE: this Sonarr release profile keeps Sonarr's own searches off season
+# packs. Packs are grabbed past it on purpose, a season at a time; Sonarr puts
+# its ignored-term rejection on every pack, and only that rejection is let by.
+PACK_PROFILE = "No season packs"
+# A season at least this bad comes back as a pack. Below it only the bad
+# episodes are searched, since a pack also replaces the good ones.
+PACK_SHARE = 0.5
+PLEX_MOVIE, PLEX_EPISODE = 1, 4
 
 
 def now():
@@ -84,25 +99,33 @@ def ssh(cmd, stdin=None):
 
 
 def plex_items():
-    """Plex path -> (rating key, added_at) for every media part."""
-    sql = ("SELECT mp.file, md.id, md.added_at FROM media_parts mp "
+    """Plex path -> (rating key, added_at, show rating key or None) for every media part."""
+    sql = ("SELECT mp.file, md.id, md.added_at, IFNULL(season.parent_id, '') FROM media_parts mp "
            "JOIN media_items mi ON mi.id = mp.media_item_id "
-           "JOIN metadata_items md ON md.id = mi.metadata_item_id;")
+           "JOIN metadata_items md ON md.id = mi.metadata_item_id "
+           "LEFT JOIN metadata_items season ON season.id = md.parent_id;")
     out = ssh("sudo -n docker exec -i plex '/usr/lib/plexmediaserver/Plex SQLite' -readonly "
               + shlex.quote(PLEX_DB), stdin=sql)
     items = {}
     for line in out.splitlines():
-        path, rk, added = line.rsplit("|", 2)
-        items[path] = (int(rk), int(added))
+        path, rk, added, show = line.rsplit("|", 3)
+        items[path] = (int(rk), int(added), int(show) if show else None)
     return items
 
 
+def restore_added(rk, added_at, plex_type):
+    """Put a Plex item's added date back and lock it."""
+    md = mc.get("plex", f"/library/metadata/{rk}")["MediaContainer"]["Metadata"][0]
+    mc._request("plex", f"/library/sections/{md['librarySectionID']}/all",
+                {"type": plex_type, "id": rk, "addedAt.value": added_at, "addedAt.locked": 1}, method="PUT")
+
+
 def plays():
-    """Plex rating key -> play count, from Tautulli."""
+    """Plex rating key -> play count, from Tautulli; a show counts every episode's plays."""
     counts = {}
     libs = mc.get("tautulli", "/api/v2", cmd="get_libraries")["response"]["data"]
     for lib in libs:
-        if lib.get("section_type") != "movie":
+        if lib.get("section_type") not in ("movie", "show"):
             continue
         rows = mc.get("tautulli", "/api/v2", cmd="get_library_media_info",
                       section_id=lib["section_id"], length=100000)["response"]["data"]["data"]
@@ -129,6 +152,135 @@ def best_release(movie_id):
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
+def season_mode(bad, have, airing):
+    """'pack' or 'episodes', for a season with `bad` of its `have` episode files failing."""
+    if airing:
+        return "episodes"      # a pack for a season still airing is usually missing episodes
+    return "pack" if bad >= PACK_SHARE * have else "episodes"
+
+
+def acceptable(rel, allowed=()):
+    """A release Sonarr turned down only for the file on disk, or for a reason in `allowed`."""
+    # Sonarr: "Existing file meets cutoff", "Existing file on disk is of equal or higher preference".
+    return bool(rel.get("downloadAllowed")) and all(
+        x.startswith("Existing file") or x in allowed for x in rel.get("rejections", []))
+
+
+def pack_rejection(profiles):
+    """The rejection PACK_PROFILE puts on every season pack; empty if the profile is gone."""
+    # The UI shows "No season packs"; the API has it as "no season packs".
+    p = next((p for p in profiles if (p.get("name") or "").lower() == PACK_PROFILE.lower()), None)
+    return {f"Contains these ignored terms: {', '.join(p['ignored'])}"} if p else set()
+
+
+# A season search goes to every indexer live and comes back with thousands of
+# releases; Young Sheldon S01 took longer than the client's default 120s.
+SEARCH_TIMEOUT = 600
+
+
+def best_tv_release(item):
+    if item["pack"]:
+        rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"],
+                      timeout=SEARCH_TIMEOUT)
+        allowed = pack_rejection(mc.get("sonarr", "/api/v3/releaseprofile"))
+        ok = [r for r in rels if r.get("fullSeason") and acceptable(r, allowed)]
+    else:
+        rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
+        ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
+    return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
+
+
+def tv_files(sid, eps):
+    """Episode id -> its Sonarr episode file, for those of `eps` that have one."""
+    files = {f["id"]: f for f in mc.get("sonarr", "/api/v3/episodefile", seriesId=sid)}
+    return {e["id"]: files[e["episodeFileId"]] for e in mc.get("sonarr", "/api/v3/episode", seriesId=sid)
+            if e["id"] in eps and e.get("episodeFileId") in files}
+
+
+def when(stamp):
+    return dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
+def plan_tv(a, refetch, ledger, plex, count):
+    series = {os.path.basename(s["path"].rstrip("/")): s for s in mc.get("sonarr", "/api/v3/series")}
+    held = {e for i in ledger.values() if i.get("kind") == "tv" for e in i["episode_ids"]}
+    groups, skipped = {}, collections.Counter()
+    for f in refetch:
+        if f["library"] != "tv":
+            continue
+        path = f["file"].removeprefix("/media")      # tdarr /media/tv/... -> /tv/...
+        m = TV_SEASON.match(path)
+        if JUNK.search(path):
+            skipped["junk"] += 1
+        elif not m or int(m.group(2)) == 0:
+            skipped["specials, or not in a season folder"] += 1
+        elif m.group(1) not in series:
+            skipped["not in Sonarr"] += 1
+        elif f"tv:{series[m.group(1)]['id']}:{m.group(2)}" in ledger:
+            pass                                       # the season is already in a batch
+        else:
+            groups.setdefault((m.group(1), int(m.group(2))), []).append({**f, "path": path})
+    seasons = []
+    for (folder, sn), files in groups.items():
+        s = series[folder]
+        stats = next((x["statistics"] for x in s["seasons"] if x["seasonNumber"] == sn), {})
+        airing = s["status"] == "continuing" and sn == max(x["seasonNumber"] for x in s["seasons"])
+        pack = season_mode(len(files), stats.get("episodeFileCount", len(files)), airing) == "pack"
+        show = next((plex[f["path"]][2] for f in files if f["path"] in plex), None)
+        seasons.append({"series": s, "season": sn, "files": files, "pack": pack, "plays": count.get(show, 0),
+                        "double": any("double-muxed" in f["reasons"] for f in files),
+                        "size_gb": stats.get("sizeOnDisk", 0) / 2**30 if pack else sum(f["size_gb"] for f in files)})
+    seasons.sort(key=lambda t: (not t["double"], -t["plays"], t["series"]["title"], t["season"]))
+
+    gb = 0.0
+    for t in seasons:
+        if gb + t["size_gb"] > a.tv_gb:
+            break
+        s, sn = t["series"], t["season"]
+        eps = [e for e in mc.get("sonarr", "/api/v3/episode", seriesId=s["id"]) if e["seasonNumber"] == sn]
+        ids = {}
+        for e in eps:
+            ids.setdefault(e.get("episodeFileId"), []).append(e)
+        by_path = {f["path"]: sorted(ids[f["id"]], key=lambda e: e["episodeNumber"])
+                   for f in mc.get("sonarr", "/api/v3/episodefile", seriesId=s["id"]) if f["id"] in ids}
+
+        def label(es):
+            return f"{s['title']} S{sn:02d}" + "-".join(f"E{e['episodeNumber']:02d}" for e in es)
+
+        bad = []
+        for f in t["files"]:
+            es = by_path.get(f["path"])
+            if not es or f["path"] not in plex:
+                skipped["not matched to a Sonarr episode and a Plex item"] += 1
+            elif any(e["id"] in held for e in es):
+                pass
+            else:
+                bad.append({"file": f["file"], "path": f["path"], "reasons": f["reasons"], "size_gb": f["size_gb"],
+                            "episode_ids": [e["id"] for e in es], "title": label(es),
+                            "added": {str(e["id"]): plex[f["path"]][1] for e in es}})
+        if not bad:
+            continue
+        common = {"kind": "tv", "series_id": s["id"], "season": sn, "plays": t["plays"],
+                  "state": "planned", "attempts": 0, "log": []}
+        if t["pack"]:
+            # The pack replaces every episode in the season, so every one gets its date back.
+            added = {str(e["id"]): plex[p][1] for p, es in by_path.items() if p in plex for e in es}
+            ledger[f"tv:{s['id']}:{sn}"] = {
+                **common, "pack": True, "title": f"{s['title']} S{sn:02d}", "bad": bad,
+                "episode_ids": sorted(e["id"] for es in by_path.values() for e in es), "added": added,
+                "reasons": sorted({r for b in bad for r in b["reasons"]}), "size_gb": round(t["size_gb"], 1)}
+            print(f"plan   {s['title']} S{sn:02d}: pack, {len(bad)} of {len(by_path)} files bad, "
+                  f"{t['plays']} plays, {t['size_gb']:.0f} GB")
+        else:
+            for b in bad:
+                ledger[b["file"]] = {**common, **b, "pack": False}
+            print(f"plan   {s['title']} S{sn:02d}: {len(bad)} episodes one at a time, {t['plays']} plays")
+        gb += t["size_gb"]
+    for why, n in sorted(skipped.items()):
+        print(f"skip   {n:4}  tv: {why}")
+    print(f"tv: {gb:.0f} GB planned, of {len(seasons)} seasons still to re-download")
+
+
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
@@ -136,9 +288,13 @@ def cmd_plan(a):
     folders = {m["path"].rstrip("/") for m in movies}
     plex = plex_items()
     count = plays()
+    refetch = [f for f in conformance.sweep() if f["bucket"] == "refetch"]
+    # NOTE: by id, not path: a replacement lands at a new path (the name carries
+    # the quality), so a movie kept without subtitles would be planned again.
+    held = {i["movie_id"] for i in ledger.values() if "movie_id" in i}
     todo, skipped = [], {}
-    for f in conformance.sweep():
-        if f["library"] != "movies" or f["bucket"] != "refetch" or f["file"] in ledger:
+    for f in refetch:
+        if f["library"] != "movies" or f["file"] in ledger:
             continue
         path = f["file"].removeprefix("/media")      # tdarr /media/movies/... -> /movies/...
         movie = radarr.get(path)
@@ -155,7 +311,9 @@ def cmd_plan(a):
         if why:
             skipped.setdefault(why, []).append(path)
             continue
-        rk, added = plex[path]
+        if movie["id"] in held:
+            continue
+        rk, added, _ = plex[path]
         todo.append({"file": f["file"], "path": path, "reasons": f["reasons"], "size_gb": f["size_gb"],
                      "movie_id": movie["id"], "title": f"{movie['title']} ({movie['year']})",
                      "rating_key": rk, "added_at": added, "plays": count.get(rk, 0)})
@@ -174,8 +332,10 @@ def cmd_plan(a):
         added = dt.datetime.fromtimestamp(t["added_at"]).date()
         print(f"plan   {t['title']}: {','.join(t['reasons'])}, {t['plays']} plays, added {added}")
         ledger[t["file"]] = {**t, "state": "planned", "attempts": 0, "log": []}
-    save(ledger)
     print(f"{len(batch)} planned ({gb:.0f} GB on disk now), {len(todo) - len(batch)} more waiting")
+    if a.tv_gb:
+        plan_tv(a, refetch, ledger, plex, count)
+    save(ledger)
 
 
 def note(item, msg):
@@ -274,11 +434,123 @@ def step(item, yes):
         current = plex_items().get(item["path"])
         if not current:
             return False                               # Plex has not scanned the new file yet
-        rk = current[0]
-        plex_md = mc.get("plex", f"/library/metadata/{rk}")["MediaContainer"]["Metadata"][0]
-        mc._request("plex", f"/library/sections/{plex_md['librarySectionID']}/all",
-                    {"type": 1, "id": rk, "addedAt.value": item["added_at"],
-                     "addedAt.locked": 1}, method="PUT")
+        restore_added(current[0], item["added_at"], PLEX_MOVIE)
+        item["state"] = "done"
+        return True
+    return False
+
+
+def step_tv(item, yes, ledger):
+    """step() for a season pack or a single episode file, through Sonarr."""
+    sid, sn, eps = item["series_id"], item["season"], item["episode_ids"]
+
+    def queue():
+        return [q for q in mc.get("sonarr", "/api/v3/queue/details", seriesId=sid) if q.get("episodeId") in eps]
+
+    if item["state"] == "planned":
+        queued = queue()
+        if queued:
+            note(item, f"already downloading {queued[0]['title']}; following it")
+            if yes:
+                item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
+            return yes
+        rel = best_tv_release(item)
+        if not rel and item["pack"]:
+            note(item, f"no acceptable season pack; searching its {len(item['bad'])} bad episodes one at a time")
+            if not yes:
+                return False
+            for b in item["bad"]:
+                ledger.setdefault(b["file"], {**b, "kind": "tv", "pack": False, "series_id": sid, "season": sn,
+                                              "plays": item["plays"], "state": "planned", "attempts": 0, "log": []})
+            item["state"] = "split"
+            return True
+        if not rel:
+            note(item, "no acceptable release found; left as is")
+            item["state"] = "no-release"
+            return True
+        note(item, f"grab {rel['title']} ({rel['size'] / 1e9:.1f} GB, {rel['indexer']})")
+        if not yes:
+            return False
+        # NOTE: a pack covers every episode in the season, and Sonarr will not
+        # import over a file that already meets the cutoff, so all of them go.
+        for fid in {f["id"] for f in tv_files(sid, eps).values()}:
+            mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
+        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
+        item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
+        return True
+
+    if item["state"] == "grabbed":
+        grabbed = when(item["grabbed_at"])
+        new = {e: f for e, f in tv_files(sid, eps).items() if when(f["dateAdded"]) > grabbed}
+        if len(new) < len(eps):
+            downloading = queue()
+            failed = [h for h in mc.get("sonarr", "/api/v3/history/series", seriesId=sid, seasonNumber=sn,
+                                        eventType=4)                    # 4 = downloadFailed
+                      if h.get("episodeId") in eps and when(h["date"]) > grabbed]
+            if failed and not new and not downloading:
+                note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
+                if yes:
+                    item["state"] = "planned"
+                return yes
+            if not new or downloading:
+                if now() - grabbed > GRAB_TIMEOUT:
+                    note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
+                    item["state"] = "stuck"
+                    return True
+                return False
+            # The download is through and some episodes were not in it.
+            missing = [e for e in eps if e not in new]
+            note(item, f"the release had {len(new)} of {len(eps)} episodes; Sonarr searches the other {len(missing)}")
+            if not yes:
+                return False
+            mc.post("sonarr", "/api/v3/command", {"name": "EpisodeSearch", "episodeIds": missing})
+            item["episode_ids"] = eps = sorted(new)
+        paths = sorted({f["path"] for f in new.values()})
+        bare = [p for p in paths if not any(lang in conformance.ENGLISH for lang in subs("/media" + p))]
+        item["attempts"] += 1
+        files = ["/media" + p for p in paths]
+        if not bare:
+            note(item, f"imported {len(paths)} files with English subtitles")
+            item.update(state="imported", imported_at=now().isoformat(), files=files)
+            return True
+        if item["attempts"] >= MAX_ATTEMPTS:
+            note(item, f"attempt {item['attempts']} still has {len(bare)} files with no English subtitle; keeping it")
+            item.update(state="imported", imported_at=now().isoformat(), files=files, no_subs=len(bare))
+            return True
+        note(item, f"attempt {item['attempts']} has {len(bare)} files with no English subtitle; "
+                   "blocklisting and trying the next")
+        if not yes:
+            return False
+        hist = [h for h in mc.get("sonarr", "/api/v3/history/series", seriesId=sid, seasonNumber=sn,
+                                  eventType=1)                          # 1 = grabbed
+                if h.get("episodeId") in eps]
+        latest = max(hist, key=lambda h: h["date"])
+        for fid in {f["id"] for f in new.values()}:
+            mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
+        mc.post("sonarr", f"/api/v3/history/failed/{latest['id']}", {})
+        item["state"] = "planned"
+        return True
+
+    if item["state"] == "imported":
+        whys = [conformance.reasons(probe(f)) for f in item["files"]]
+        waiting = [w for w in whys if "no-dialogue-track" in w or "video-not-hevc" in w]
+        if waiting:
+            if now() - when(item["imported_at"]) > FLOW_TIMEOUT:
+                note(item, f"{len(waiting)} files still {','.join(waiting[0])} after {FLOW_TIMEOUT}; "
+                           "check the tdarr flow")
+                item["state"] = "stuck"
+                return True
+            return False                               # tdarr has not run the flow over all of them yet
+        note(item, f"{len(whys)} files through the flow; restore their Plex added dates")
+        if not yes:
+            return False
+        plex = plex_items()
+        current = {e: plex.get(f["path"]) for e, f in tv_files(sid, eps).items()}
+        if not all(current.values()):
+            return False                               # Plex has not scanned every new file yet
+        for e, (rk, _, _) in current.items():
+            if str(e) in item["added"]:
+                restore_added(rk, item["added"][str(e)], PLEX_EPISODE)
         item["state"] = "done"
         return True
     return False
@@ -286,9 +558,9 @@ def step(item, yes):
 
 def cmd_run(a):
     ledger = load()
-    for item in ledger.values():
+    for item in list(ledger.values()):                 # a season with no pack adds its episodes
         try:
-            while step(item, a.yes):
+            while (step_tv(item, a.yes, ledger) if item.get("kind") == "tv" else step(item, a.yes)):
                 save(ledger)
                 if not a.yes:
                     break
@@ -350,6 +622,7 @@ def main():
     p = sub.add_parser("plan")
     p.add_argument("--movies", type=int, default=25)
     p.add_argument("--max-gb", type=float, default=2000)
+    p.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
     p.add_argument("--show-skipped", action="store_true", help="list every skipped path")
     p.set_defaults(fn=cmd_plan)
     r = sub.add_parser("run")
@@ -358,6 +631,7 @@ def main():
     au = sub.add_parser("auto")
     au.add_argument("--movies", type=int, default=25)
     au.add_argument("--max-gb", type=float, default=2000)
+    au.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
     au.add_argument("--window", default="2-12",
                     help="local hours START-END in which a new batch may start; NZBGet downloads 02-18")
     au.add_argument("--min-free-tb", type=float, default=3.0,
