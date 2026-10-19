@@ -21,6 +21,7 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name {{ service }} \
     --hostname {{ service }} \
+    --add-host=home.terrac.com:{{ ansible_default_ipv4.address }} \
     -e TZ=America/Los_Angeles \
     -p {{ port }}:5055 \
     -v {{ home }}/config:/app/config \

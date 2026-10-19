@@ -18,6 +18,11 @@ services:
       - PUID={{ uid }}
       - PGID={{ uid }}
       - VERSION={{ kometa_version }}
+    # NOTE: Plex is reached as https://home.terrac.com:32400 because that is the
+    # only Plex cert every client trusts; pinning the name to ocean keeps the
+    # traffic on the LAN instead of hairpinning through the router's WAN address.
+    extra_hosts:
+      - "home.terrac.com:{{ ansible_default_ipv4.address }}"
     volumes:
       - {{ kometa_home }}/config:/config:rw
     healthcheck:
