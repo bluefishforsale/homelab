@@ -83,7 +83,7 @@ SERVICES = {
     # NOTE: Plex requires secure connections and its cert only covers its own
     # plex.direct name (which resolves to ocean), so localhost or a bare IP fails
     # verification. A re-issued cert changes the hash and breaks this URL.
-    "plex":      {"url": "https://192-168-1-143.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct:32400",
+    "plex":      {"url": "https://192-168-1-143.7555e7a3628447aca5250df93291d979.plex.direct:32400",
                   "auth": ("query", "X-Plex-Token"),
                   "key_env": "PLEX_TOKEN", "vault": "media_services.plex.api_key",
                   "key": _plex_token},

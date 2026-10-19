@@ -34,7 +34,7 @@ import vault  # noqa: E402
 
 OCEAN = os.environ.get("MEDIA_HOST", "ocean.home")
 # Plex requires secure connections and its cert only covers this name.
-PLEX = "https://192-168-1-143.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct:32400"
+PLEX = "https://192-168-1-143.7555e7a3628447aca5250df93291d979.plex.direct:32400"
 CF ="https://api.cloudflare.com/client/v4"
 TIMEOUT = 15
 
