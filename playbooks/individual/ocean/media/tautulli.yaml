@@ -24,6 +24,11 @@
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
     plex_logs: "{{ data }}/services/plex/Library/Application Support/Plex Media Server/Logs"
+    # NOTE: Plex requires secure connections and its cert only covers
+    # *.<hash>.plex.direct, so a bare-IP https URL fails verification. This name
+    # resolves to the LAN address via public DNS; if Plex re-issues its cert
+    # under a new hash, Tautulli loses Plex until this is updated.
+    plex_direct_host: "{{ media_services.plex.pms_ip | replace('.', '-') }}.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct"
     user: media
     uid: "{{ system_users.media.uid }}"
     gid: "{{ system_users.media.gid }}"
