@@ -1,0 +1,10 @@
+# One CPU budget for tdarr's server and node together. On 2026-10-19 their
+# ffmpeg jobs drove ocean to load 54 and starved Plex. The quota is a hard cap;
+# the minimum weight means tdarr only gets cycles nothing else on the host wants.
+[Unit]
+Description=tdarr CPU budget
+Before=slices.target
+
+[Slice]
+CPUQuota={{ tdarr_cpu_quota_pct }}%
+CPUWeight=1

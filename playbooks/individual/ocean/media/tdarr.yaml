@@ -22,6 +22,11 @@
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
     transcode: /transcode
+    # A quarter of the host's cores, shared by the server and node containers.
+    tdarr_cpu_quota_pct: "{{ ansible_processor_vcpus * 25 }}"
+    # 3 GPU transcodes plus their CPU-side decode and loudnorm pushed ocean to
+    # load 54 on 2026-10-19.
+    tdarr_transcode_gpu_workers: 2
     repo: "bluefishforsale_tdarr_plugins"
     # SSH, not anonymous HTTPS: the plugins repo is private, so an unauthenticated
     # HTTPS clone prompts for a username and fails on ocean ("could not read
@@ -97,6 +102,14 @@
     # GitHub's "too many authentication failures".
     environment:
       GIT_SSH_COMMAND: "ssh -i /home/terrac/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
+
+  - name: Create tdarr CPU slice
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/tdarr.slice.j2"
+      dest: /etc/systemd/system/tdarr.slice
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
 
   - name: Create tdarr service
     ansible.builtin.template:
@@ -193,6 +206,33 @@
           obj:
             queueSortType: sortDateNewest
     changed_when: false
+
+  # Worker limits live in tdarr's DB, not the node config, and the API only
+  # steps them one at a time, so step toward the committed count.
+  - name: Read tdarr node worker limits
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/get-nodes"
+      method: GET
+    register: tdarr_nodes
+    retries: 12
+    delay: 10
+    until: tdarr_nodes.status == 200 and (tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', inventory_hostname ~ '.home') | list | length) > 0
+
+  - name: Step tdarr GPU transcode workers to the committed count
+    vars:
+      node: "{{ tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', inventory_hostname ~ '.home') | first }}"
+      delta: "{{ tdarr_transcode_gpu_workers - (node.value.workerLimits.transcodegpu | int) }}"
+    ansible.builtin.uri:
+      url: "http://localhost:{{ tdarr_port_web }}/api/v2/alter-worker-limit"
+      method: POST
+      body_format: json
+      body:
+        data:
+          nodeID: "{{ node.key }}"
+          process: "{{ 'increase' if (delta | int) > 0 else 'decrease' }}"
+          workerType: transcodegpu
+    loop: "{{ range(delta | int | abs) | list }}"
+    changed_when: true
 
   handlers:
   - name: Reload systemd daemon

@@ -20,6 +20,7 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm\
     --name {{ service }} \
     --hostname {{ service }} \
+    --cgroup-parent=tdarr.slice \
     -e TZ="America/Los_Angeles" \
     -e THREADS_WORKER_INIT_TIMEOUT=200000 \
     -e "webUIPort={{ tdarr_port_web }}" \
