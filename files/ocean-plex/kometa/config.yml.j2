@@ -91,7 +91,7 @@ webhooks:                                       # Can be individually specified 
   delete:
 plex:                                           # Can be individually specified per library as well; REQUIRED for the script to run
   # Plex requires secure connections and its cert only covers its plex.direct name.
-  url: https://192-168-1-143.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct:{{ service_ports.plex.port }}
+  url: https://192-168-1-143.7555e7a3628447aca5250df93291d979.plex.direct:{{ service_ports.plex.port }}
   # api_key, not plex_token. media_services.plex.plex_token is 19 chars and
   # plex.tv rejects it with a 401; api_key is 20 and authenticates as
   # terracnosaur. Every other consumer (plex-exporter, tautulli, gethomepage)
