@@ -28,13 +28,15 @@ grouping_charts = 0
 
 [PMS]
 pms_identifier = {{ media_services.plex.pms_identifier }}
-pms_ip = {{ media_services.plex.pms_ip }}
+# NOTE: with pms_url_manual, Tautulli rebuilds pms_url from pms_ip, so this must
+# be the hostname: by bare IP Plex serves its plex.direct cert, which chains to a
+# root nothing here trusts yet. Without manual, it swaps in the plex.direct URL
+# from plex.tv instead. extra_hosts pins the name to ocean.
+pms_ip = home.terrac.com
 pms_port = 32400
 pms_is_remote = 0
 pms_ssl = 1
 pms_url = https://home.terrac.com:32400
-# NOTE: without manual, Tautulli replaces pms_url with the plex.direct address it
-# gets from plex.tv, whose cert chains to a root nothing here trusts yet.
 pms_url_manual = 1
 pms_token = {{ media_services.plex.api_key }}
 pms_name = Plex Media Server
