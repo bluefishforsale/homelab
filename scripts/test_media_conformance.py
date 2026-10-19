@@ -41,6 +41,18 @@ def test_dialogue_track_from_another_language_when_english_audio_exists():
     assert "dialogue-not-english" in why, why
 
 
+def cover(w, h):
+    return {**video(w, h), "tags": {"FILENAME": "cover.jpg", "MIMETYPE": "image/jpeg"}}
+
+
+def test_cover_encoded_as_video_is_flagged_and_not_counted_as_video():
+    # Blade Runner 2049: the old flow encoded two cover images as HEVC video
+    # at 30000 fps, so ffmpeg reports time=N/A and tdarr's stall detector
+    # cancels every job on the file. Two covers at one size are not a double mux.
+    why = conformance.reasons([video(1920, 1080), cover(640, 360), cover(640, 360)])
+    assert "cover-as-video" in why and "double-muxed" not in why, why
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
