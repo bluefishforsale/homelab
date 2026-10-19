@@ -19,7 +19,9 @@ ExecStartPre=/usr/bin/flock {{ media_tools }}/.git/pull.lock /usr/bin/git -C {{ 
 # --yes because a dry run in a timer would only ever print. The guards live in
 # the script: a release must be found before a file is deleted, a lock keeps
 # runs from overlapping, and no batch starts below the free-space floor.
-ExecStart=/usr/bin/python3 scripts/media-refetch.py auto --yes
+# 50 a batch: one batch starts a day, and batch 2 (25 remuxes, ~700 GB) was
+# through NZBGet in under a day, so the batch size was the whole limit.
+ExecStart=/usr/bin/python3 scripts/media-refetch.py auto --yes --movies 50
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agentbox-media-refetch
