@@ -21,7 +21,8 @@
         href: http://plex.home
         widget:
           type: plex
-          url: http://192.168.1.143:{{ service_ports.plex.port }}
+          # Plex requires secure connections and its cert only covers its plex.direct name.
+          url: https://192-168-1-143.3ba1f56f51d84784ba27b49fae8a7ce8.plex.direct:{{ service_ports.plex.port }}
           key: "{{ media_services.plex.api_key }}"
 
     - Jellyfin:
