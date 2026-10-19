@@ -33,8 +33,8 @@ import offsite_proxy  # noqa: E402,F401  (off-LAN: urllib through the offsite.sh
 import vault  # noqa: E402
 
 OCEAN = os.environ.get("MEDIA_HOST", "ocean.home")
-# Plex requires secure connections and its cert only covers this name.
-PLEX = "https://192-168-1-143.7555e7a3628447aca5250df93291d979.plex.direct:32400"
+# Plex requires https; only its home.terrac.com cert chains to a trusted root.
+PLEX = "https://home.terrac.com:32400"
 CF ="https://api.cloudflare.com/client/v4"
 TIMEOUT = 15
 

@@ -13,6 +13,11 @@ services:
       - TZ=America/Los_Angeles
       - HOMEPAGE_ALLOWED_HOSTS=homepage.home,homepage.terrac.com,192.168.1.143,192.168.1.143:8089,localhost,127.0.0.1
 
+    # NOTE: Plex is reached as https://home.terrac.com:32400 because that is the
+    # only Plex cert every client trusts; pinning the name to ocean keeps the
+    # traffic on the LAN instead of hairpinning through the router's WAN address.
+    extra_hosts:
+      - "home.terrac.com:{{ ansible_default_ipv4.address }}"
     ports:
       - "{{ port_ext }}:{{ port_int }}"
 

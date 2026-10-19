@@ -20,6 +20,7 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name={{ service }} \
     --hostname={{ service }} \
+    --add-host=home.terrac.com:{{ ansible_default_ipv4.address }} \
     --cpus=4 \
     -e TZ="America/Los_Angeles" \
     -e PUID=1001 -e PGID=1001 \

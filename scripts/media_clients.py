@@ -80,10 +80,10 @@ SERVICES = {
                   "key": lambda: _xml_key(f"{DATA}/sonarr/config.xml")},
     "tdarr":     {"url": "http://localhost:8265", "auth": None,
                   "key_env": None, "key": lambda: None},
-    # NOTE: Plex requires secure connections and its cert only covers its own
-    # plex.direct name (which resolves to ocean), so localhost or a bare IP fails
-    # verification. A re-issued cert changes the hash and breaks this URL.
-    "plex":      {"url": "https://192-168-1-143.7555e7a3628447aca5250df93291d979.plex.direct:32400",
+    # NOTE: Plex requires https. Its plex.direct cert chains to ISRG Root YR,
+    # which no client here trusts yet, and it changes hash on every reclaim; the
+    # certbot home.terrac.com cert Plex also serves chains to ISRG Root X1.
+    "plex":      {"url": "https://home.terrac.com:32400",
                   "auth": ("query", "X-Plex-Token"),
                   "key_env": "PLEX_TOKEN", "vault": "media_services.plex.api_key",
                   "key": _plex_token},
