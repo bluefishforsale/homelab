@@ -19,6 +19,7 @@ ExecStartPre=-/usr/bin/docker pull {{ node_image }}:{{ node_version }}
 ExecStart=docker run --rm\
     --name={{ service_node }} \
     --hostname={{ service_node }} \
+    --cgroup-parent=tdarr.slice \
     --runtime nvidia \
     --gpus='all,"capabilities=compute,utility,video"' \
     -e NVIDIA_VISIBLE_DEVICES=all \
