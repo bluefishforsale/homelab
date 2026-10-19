@@ -1,7 +1,7 @@
 {
   "_id": "MinimalHEVC",
   "name": "HEVC NVenc - Minimal Single-Plugin",
-  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC NVENC encode for non-HEVC video",
+  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC NVENC encode for non-HEVC video, on a GPU worker only (CPU workers take the audio-only passes)",
   "tags": "",
   "flowPlugins": [
     {
@@ -56,6 +56,21 @@
       "position": {
         "x": 600,
         "y": 0
+      }
+    },
+    {
+      "name": "Require NVENC Worker",
+      "sourceRepo": "Community",
+      "pluginName": "tagsWorkerType",
+      "version": "1.0.0",
+      "inputsDB": {
+        "requiredWorkerType": "GPU:nvenc"
+      },
+      "fpEnabled": true,
+      "id": "requireNvenc",
+      "position": {
+        "x": 700,
+        "y": 100
       }
     },
     {
@@ -261,9 +276,16 @@
     {
       "source": "checkCodec",
       "sourceHandle": "2",
-      "target": "encodeAll",
+      "target": "requireNvenc",
       "targetHandle": null,
       "id": "e5"
+    },
+    {
+      "source": "requireNvenc",
+      "sourceHandle": "1",
+      "target": "encodeAll",
+      "targetHandle": null,
+      "id": "e23"
     },
     {
       "source": "encodeAll",
