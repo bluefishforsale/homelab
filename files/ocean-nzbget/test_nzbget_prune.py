@@ -31,6 +31,14 @@ def test_intermediate_of_queued_job_is_never_pruned():
     assert got == [], got
 
 
+def test_failed_job_files_pruned_after_7_days():
+    # Gladiator II remux, FAILURE/PAR, 34 GiB held in intermediate. The history
+    # entry stays (Sonarr/Radarr already reacted); only the files go.
+    entries = [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", NOW - 8 * DAY)]
+    got = prune.targets(entries, queue_ids=set(), history={84080: "FAILURE/PAR"}, now=NOW)
+    assert got == [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", "failed")], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

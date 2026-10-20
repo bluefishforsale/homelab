@@ -8,7 +8,9 @@ of intermediates and 1.25 TiB of incoming.
 """
 import re
 
-ORPHAN_AGE = 86400
+DAY = 86400
+ORPHAN_AGE = 1 * DAY
+FAILED_AGE = 7 * DAY
 
 _NZBID = re.compile(r"\.#(\d+)$")
 
@@ -21,8 +23,12 @@ def targets(entries, queue_ids, history, now):
         if area != "intermediate" or not m:
             continue
         nzbid = int(m.group(1))
-        if nzbid in queue_ids or nzbid in history:
+        if nzbid in queue_ids:
             continue
-        if now - mtime > ORPHAN_AGE:
+        age = now - mtime
+        status = history.get(nzbid)
+        if status is None and age > ORPHAN_AGE:
             out.append((area, name, "orphan"))
+        elif status is not None and status.startswith("FAILURE") and age > FAILED_AGE:
+            out.append((area, name, "failed"))
     return out
