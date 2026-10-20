@@ -149,6 +149,24 @@ def needs_bump(record):
     return bool(record) and record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
 
 
+def tdarr_files(mode, **kw):
+    return mc.post("tdarr", "/api/v2/cruddb", {"data": {"collection": "FileJSONDB", "mode": mode, **kw}})
+
+
+def bump(item, files, yes):
+    """Put an item's files at the front of tdarr's queue, ahead of the library backlog."""
+    todo = [f for f in files if needs_bump(tdarr_files("getById", docID=f))]
+    if not todo:
+        return False
+    note(item, f"bump {len(todo)} file(s) to the front of the tdarr queue")
+    if not yes:
+        return False
+    for f in todo:
+        # The value tdarr's own per-file bump button writes.
+        tdarr_files("update", docID=f, obj={"bumped": int(dt.datetime.now().timestamp() * 1000)})
+    return True
+
+
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
@@ -427,7 +445,7 @@ def step(item, yes):
                 note(item, f"still {','.join(why)} after {FLOW_TIMEOUT}; check the tdarr flow")
                 item["state"] = "stuck"
                 return True
-            return False                               # tdarr has not run the flow yet
+            return bump(item, [item["file"]], yes)       # tdarr has not run the flow yet
         added = dt.datetime.fromtimestamp(item["added_at"]).date()
         note(item, f"conforms ({','.join(why) or 'clean'}); restore Plex added date {added}")
         if not yes:
@@ -544,7 +562,7 @@ def step_tv(item, yes, ledger):
                            "check the tdarr flow")
                 item["state"] = "stuck"
                 return True
-            return False                               # tdarr has not run the flow over all of them yet
+            return bump(item, item["files"], yes)      # tdarr has not run the flow over all of them yet
         note(item, f"{len(whys)} files through the flow; restore their Plex added dates")
         if not yes:
             return False
