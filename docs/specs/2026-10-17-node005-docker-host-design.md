@@ -1,9 +1,9 @@
 # node005 docker host with /data01 over NFS (design)
 
-Status: draft for review, 2026-10-17. Nothing here is built yet.
+Status: decisions closed 2026-10-20 (section 10). Memory reclaim (#623) is
+landed; nothing else is built yet.
 
-Working name for the VM is `harbor` (open decision D3). Everything below says
-"harbor" so the spec reads concretely; swap the name once picked.
+The first worker is `harbor` (D3).
 
 ## 1. Goal
 
@@ -20,9 +20,8 @@ would do: the export list, the sentinel, the alerts and the inventory group all
 key on membership, not on one name or IP.
 
 What the workers are for (D2, answered 2026-10-19): **CPU and I/O offload for
-transcoding and downloading.** tdarr CPU workers first, nzbget later (section
-5.1), then other services that can move, or that can run as more than one
-instance.
+transcoding.** tdarr CPU workers first. Downloading (nzbget) is deferred to
+its own spec (D10).
 
 ## 2. Sanity check (read this first)
 
@@ -86,7 +85,8 @@ After ARC 32 GiB, runner 12 GiB and agentbox 8 GiB: available goes from about
 cap) drops to about 59 GiB of 125.8, which leaves room for a harbor of up to
 48 GiB with about 14 GiB of slack.
 
-Decision D1 picks which.
+Done in #623: all three applied. Measured 2026-10-20 on node005: `free -g`
+available 69 GiB, `zfs_arc_max` 34359738368. harbor gets 32 GiB (D1).
 
 ### 2.2 "Looks like it's on ocean" holds for media, not for service state
 
@@ -139,7 +139,9 @@ is real for data01 work:
   example of this shape).
 
 Anything whose job is reading or writing `/data01` is exactly as available as
-ocean, however many copies of it run. D11 picks which of the two is in scope.
+ocean, however many copies of it run. Only redundant workers are in scope (D11);
+surviving an ocean outage is not a goal, and D7 routes `.home` names through
+ocean's nginx anyway.
 
 ### 2.4 ocean is hard-coded all over the repo
 
@@ -177,8 +179,9 @@ first-class variable.
 
 These are out of scope. If a later step needs one, it's a new spec.
 
-- No automatic failover. A worker does not take over when ocean dies; any
-  redundancy is a second instance named per service (D11).
+- No automatic failover, and no goal of surviving an ocean outage. Redundancy
+  means several workers of one kind across hosts, and it ends at ocean (D11).
+- No nzbget or other download work in this spec (D10).
 - No GPU work on harbor: no Plex/Jellyfin hardware transcode, no llamacpp,
   no comfyui, no frigate.
 - No ZFS changes of any kind on data01. No `zfs set sharenfs`, no new
@@ -211,11 +214,11 @@ cloned from `create_agentbox_vm.yaml` with these values:
 | Template | 9999 (Debian 12 cloud-init) | same as every other VM |
 | CPU | `host` | AVX2 passthrough, see kvm64 note in the agentbox play |
 | Cores | 16 | node005 has 56 threads, existing VMs hold about 28 |
-| Memory | 24 GiB (D1) | fits only after memory is reclaimed |
+| Memory | 32 GiB (D1) | fits after #623's reclaim; about 37 GiB left |
 | Root disk | grow to about 64G | OS + `/var/lib/docker` |
 | Second disk | 200G on `vmpool-storage`, ext4, mounted at `/data01/services` | local service state (2.2) |
 | `onboot` | 1 | |
-| IP | 192.168.1.32 static (D3) | next to agentbox .31; verify free |
+| IP | 192.168.1.32 static (D3) | next to agentbox .31; no ping, no PTR 2026-10-20; check DHCP leases before step 2 |
 | NIC | virtio on `vmbr0`, `queues=8` | same bridge as everything else |
 
 Two disks rather than one, so service state can be snapshotted, resized,
@@ -355,9 +358,10 @@ Two pieces:
 
 - `harbor.home` A 192.168.1.32 and PTR, in `files/dns-stack/import-zones.sh.j2`
   (both DNS servers, per the DNS rollout rules).
-- The `*.home` wildcard stays on ocean. A service that moves to harbor gets an
-  explicit record, or is reached through ocean's nginx proxying to harbor.
-  Explicit records are simpler; D7.
+- The `*.home` wildcard stays on ocean, and a service that moves to a worker
+  keeps its `<svc>.home` name: ocean's nginx proxies it to the worker (D7). No
+  per-service DNS records. The tdarr canary has no web UI of its own, so phase 1
+  adds no proxy entries.
 - cloudflared ingress for a moved service points at `192.168.1.32:<port>`.
 
 ### 4.9 How a playbook targets harbor
@@ -380,34 +384,14 @@ server keeps that on ocean), is designed to run remotely with shared paths, and
 puts node005's idle 56 threads to work, which is a real benefit rather than a
 demo. Failure costs nothing: the server just stops handing it jobs.
 
-Fallback canary if you'd rather start without NFS writes: `ntfy` or `karma`
-(local state only, no `/data01` traffic). That proves the host and monitoring
-but not the NFS path. D6.
 
-### 5.1 nzbget (after the canary, not phase 1)
+### 5.1 nzbget (deferred)
 
-nzbget is the second named workload, and it fits the overmount design better
-than it first looks. Measured on ocean 2026-10-19:
-
-- Its heavy I/O (article writes, par2 repair, unrar) happens in
-  `InterDir=/scratch/intermediate` and `TempDir=/scratch/tmp`, and `/scratch` is
-  `/data01/services/nzbget/scratch`. On a worker that path is the local disk,
-  so the random-write work stays local and only the finished move to
-  `DestDir` (`/data01/incoming/...`) crosses NFS, as one sequential copy.
-- Its queue and config are under `/data01/services/nzbget` too, so they stay
-  local, which they must.
-
-Three things block moving it:
-
-1. It is a bare `docker run` systemd unit (`files/ocean-nzbget/nzbget.service.j2`),
-   not a compose project, so it has no `docker-refresh@` timer today. Converting
-   it to compose is a prerequisite on ocean, its own PR, before any move.
-2. `scratch/intermediate` holds 724G, 633 GiB of it in 109 of 115 dirs older
-   than 7 days: failed or abandoned downloads that nothing cleans up. node005's
-   `vmpool-storage` is 942 GB in total, so the worker's local disk can't hold
-   that. Retention (or a cleanup of what's there) has to land first. D10.
-3. sonarr and radarr talk to nzbget by URL, so its address moves with it
-   (placement registry, section 7).
+Out of this spec (D10). The facts gathered 2026-10-19 still hold for whoever
+picks it up: its heavy I/O is in `/data01/services/nzbget/scratch`, so on a
+worker it would stay local; retention landed in #670; it is still a bare
+`docker run` unit rather than a compose project; and sonarr/radarr reach it by
+URL.
 
 ## 6. Acceptance criteria (phase 1)
 
@@ -472,13 +456,15 @@ Each step is its own PR (one change per PR, squash merge).
 2. `create_harbor_vm.yaml` + inventory entry + DNS record. Merge auto-runs
    the create play on node005.
 3. Base system + docker on harbor (`--limit harbor` dispatch).
-4. NFS export on ocean. Additive: new package, new export file, no restart of
+4. Fence or delete the old `playbooks/individual/infrastructure/nfs_server.yaml`
+   (D9), so two NFS server plays never coexist in the repo.
+5. NFS export on ocean. Additive: new package, new export file, no restart of
    any running service.
-5. NFS client, local disk, sentinel and docker ordering on harbor; acceptance
+6. NFS client, local disk, sentinel and docker ordering on harbor; acceptance
    criteria 2 through 7.
-6. Monitoring and alert rules; criterion 8.
-7. Backups (db-backup on `docker_hosts`, rsync timer); criterion 10.
-8. Canary service; criteria 9 and the rest.
+7. Monitoring and alert rules; criterion 8.
+8. Backups (db-backup on `docker_hosts`, rsync timer); criterion 10.
+9. Canary service; criteria 9 and the rest.
 
 ## 9. Backout
 
@@ -496,36 +482,27 @@ Harbor is additive, so backing out is removal in reverse:
 
 Nothing in this design changes data01 itself, so there's no data01 backout.
 
-## 10. Open decisions (the grill list)
+## 10. Decisions
 
-Each one changes what gets built. Defaults in brackets are what I'd do.
+Grilled and closed 2026-10-20.
 
-- **D1 RAM source.** ARC cap, runner shrink, agentbox trim? [all three: ARC to 32 GiB,
-  runner to 12 GiB, agentbox to 8 GiB, harbor at up to 48 GiB.]
-- **D2 What is harbor for?** Answered 2026-10-19: CPU and I/O offload for
-  transcoding and downloading, as the first of several data01 workers.
-- **D3 Name, VMID, IP, and the convention for the next ones.** [harbor, 6000,
-  192.168.1.32 after confirming it's free in DHCP and DNS; later workers get
-  the next free VMID on their node and an IP from a reserved block.]
-- **D4 Export scope.** Whole `/data01` (hardlinks work, ocean's
-  `/data01/services` visible but overmounted) or subtrees only (safer, but
-  breaks *arr hardlinking). [whole, with the sentinel guard.]
-- **D5 Squash policy.** `root_squash` (forces explicit PUID/PGID) or
-  `no_root_squash` (fewer surprises, root on harbor is root on data01).
-  [root_squash.]
-- **D6 Canary.** tdarr node or a no-NFS service first. [tdarr node.]
-- **D7 Reaching moved services on .home.** Explicit DNS records or proxy
-  through ocean's nginx. [explicit records.]
-- **D8 Read-only mounts.** Should harbor get `/data01` read-write, or
-  read-only plus specific read-write subtrees? Read-only shrinks the blast
-  radius of a bad container a lot but conflicts with D4's single mount.
-  [read-write, revisit if anything other than media workers moves.]
-- **D9 The old `nfs_server.yaml`.** Fence it now in this work, or backlog it.
-  [backlog it, separate PR.]
-- **D10 nzbget intermediate retention.** 633 GiB of stale intermediate dirs:
-  clean once by hand and add a retention timer, or move `InterDir` to NFS on
-  the worker and give up the local-I/O win. [clean plus retention; the local
-  scratch is most of the point of moving nzbget.]
-- **D11 What "HA" means here.** Redundant workers across hosts (ends at ocean),
-  second instances of services that never touch data01 (survives ocean), or
-  both. [both, named per service, never for anything whose job is data01.]
+- **D1 RAM source.** ARC to 32 GiB, runner to 12 GiB, agentbox to 8 GiB, all
+  landed in #623. harbor gets 32 GiB.
+- **D2 Purpose.** CPU and I/O offload for transcoding, as the first of several
+  data01 workers (answered 2026-10-19).
+- **D3 Name, VMID, IP.** harbor, 6000, 192.168.1.32. Later workers take the
+  next free VMID on their node and an IP from a reserved block next to it,
+  checked free in DHCP and DNS first.
+- **D4 Export scope.** The whole `/data01` as one mount, so hardlinks work,
+  with the `.worker-local` sentinel guarding the overmount.
+- **D5 Squash.** `root_squash`.
+- **D6 Canary.** A tdarr CPU node.
+- **D7 Reaching moved services.** Through ocean's nginx; the `*.home` wildcard
+  keeps pointing at ocean and no per-service records are added.
+- **D8 Mount mode.** Read-write. Revisit if anything other than media workers
+  moves.
+- **D9 Old `nfs_server.yaml`.** Its own PR, landing before the NFS export
+  (rollout step 4).
+- **D10 nzbget.** Deferred to its own spec.
+- **D11 HA.** Redundant workers across hosts only. Surviving an ocean outage
+  is out of scope.
