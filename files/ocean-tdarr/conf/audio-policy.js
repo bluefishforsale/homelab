@@ -124,6 +124,10 @@ module.exports = async (args) => {
   // undershoots over a whole film, so it aims at -16: full films measured
   // -17.8 (Amistad) and -19.2 (The Tree of Life), against -20.1 and -21.3 when
   // aimed at -18. loudnorm resamples to 192 kHz, hence the aresample to 48k.
+  // NOTE: loudnorm can emit NaN when the source's audio parameters change
+  // mid-stream, and AAC then fails the encode at its last frame (Last Cab to
+  // Darwin, 2:01:38, twice). The aeval zeroes non-finite samples; at 192 kHz,
+  // ahead of the aresample, it slowed the chain from 1.9x to 1.1x realtime.
   // Some encoders leave the layout unset; 6 and 8 channels are 5.1 and 7.1.
   const layout = main.channel_layout || { 6: '5.1', 8: '7.1' }[main.channels] || '';
   const surr = (side) => (/7\.1/.test(layout) ? `0.3*B${side}+0.3*S${side}`
@@ -144,7 +148,8 @@ module.exports = async (args) => {
   };
   clearStats(dialogue);
   dialogue.outputArgs.push('-c:{outputIndex}', 'aac', '-b:{outputIndex}', '192k',
-      '-filter:{outputIndex}', `${downmix},loudnorm=I=-16:LRA=7:TP=-1.5,aresample=48000`,
+      '-filter:{outputIndex}', `${downmix},loudnorm=I=-16:LRA=7:TP=-1.5,aresample=48000,`
+        + 'aeval=if(isnan(val(ch))+isinf(val(ch))\\,0\\,val(ch)):c=same',
       '-metadata:s:{outputIndex}', `title=${DIALOGUE_TITLE}`,
       '-metadata:s:{outputIndex}', `language=${lang(main)}`,
       '-disposition:{outputIndex}', 'default');
