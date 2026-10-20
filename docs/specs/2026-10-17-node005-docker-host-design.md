@@ -434,7 +434,7 @@ Three things block moving it:
 11. CI: `make validate`, Validate Deploy Mapping (ownership coverage for the
     new playbooks and vars), and `check-no-zfs-mutations.sh` all green.
 12. No change on ocean except the `nfs-kernel-server` package, `/etc/nfs.conf`
-    and `/etc/exports.d/harbor.exports`.
+    and `/etc/exports.d/data01-workers.exports`.
 
 ## 7. Phase 2 (not built now, written down so phase 1 doesn't paint into a corner)
 
@@ -482,7 +482,7 @@ Harbor is additive, so backing out is removal in reverse:
 
 - Stop the canary on harbor, revert its `service_host` (it redeploys to
   ocean with its state copied back from `/data01/backups/harbor/services/`).
-- Remove `/etc/exports.d/harbor.exports`, `exportfs -ra`. ocean's services
+- Remove `/etc/exports.d/data01-workers.exports`, `exportfs -ra`. ocean's services
   never depended on the NFS server, so this is invisible to them. Removing
   the package is optional.
 - `qm stop 6000`; destroying it is a destructive step I'd confirm with you
