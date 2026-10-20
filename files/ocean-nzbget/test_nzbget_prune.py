@@ -73,6 +73,16 @@ def test_nzbget_unreachable_prunes_nothing():
     assert got == [], got
 
 
+def test_name_with_slash_or_leading_dot_is_never_a_target():
+    # Every target becomes rm -rf <area>/<name>. A name that is not exactly one
+    # path component ("..", "../services", "a/b", "") could reach outside the area.
+    old = NOW - 400 * DAY
+    entries = [("incoming/movies", n, old) for n in ("..", ".", "../services", "a/b", ".hidden", "")]
+    entries += [("intermediate", "../x.#81234", old), ("intermediate", ".x.#81234", old)]
+    got = prune.targets(entries, queue_ids=set(), history={}, now=NOW)
+    assert got == [], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

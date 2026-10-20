@@ -20,6 +20,8 @@ def targets(entries, queue_ids, history, now):
     """(area, name, rule) for every entry that may be deleted; everything else is kept."""
     out = []
     for area, name, mtime in entries:
+        if not name or name.startswith(".") or "/" in name:
+            continue
         if area.startswith("incoming/"):
             if now - mtime > INCOMING_AGE:
                 out.append((area, name, "stale-incoming"))
