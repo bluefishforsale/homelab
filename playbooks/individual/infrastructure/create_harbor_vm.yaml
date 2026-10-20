@@ -1,0 +1,114 @@
+---
+# Proxmox VM creation for harbor, the first data01 worker
+# A CPU docker host on node005 that mounts ocean's /data01 over NFS and keeps
+# service state on its own local disk (spec:
+# docs/specs/2026-10-17-node005-docker-host-design.md). Pattern mirrors
+# create_agentbox_vm.yaml.
+
+- name: Create harbor VM on Proxmox
+  hosts: node005
+  become: true
+  gather_facts: true
+  vars:
+    harbor_vm_id: 6000
+    harbor_vm_name: harbor
+    harbor_vm_cores: 16
+    harbor_vm_memory_mb: 32768  # 32 GB; fits after the #623 reclaim
+    harbor_vm_disk_size_increase: "+61G"  # template is 3G; OS + /var/lib/docker
+    # Local service state, mounted over /data01/services so nothing with a WAL
+    # lands on NFS.
+    harbor_vm_state_disk: "vmpool-storage:200"
+    harbor_vm_template_id: 9999  # Debian 12 cloud-init template
+    harbor_vm_onboot: 1
+    # Passthrough host CPU features; kvm64 masks AVX2.
+    harbor_vm_cpu: host
+    harbor_vm_net_queues: 8
+
+    # NOTE: static, not a dig lookup like agentbox. *.home is a wildcard to
+    # ocean, so a lookup before harbor's own record exists returns
+    # 192.168.1.143 and the VM would come up on ocean's address.
+    harbor_vm_ip: 192.168.1.32
+    harbor_vm_netmask: 24
+    harbor_vm_gateway: 192.168.1.1
+    harbor_vm_nameserver: 192.168.1.2
+
+  tasks:
+    - name: Download SSH keys for harbor VM
+      ansible.builtin.get_url:
+        url: "https://github.com/bluefishforsale.keys"
+        dest: "/root/ssh.keys"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Check harbor VM status
+      ansible.builtin.command: "qm status {{ harbor_vm_id }}"
+      register: harbor_vm_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Clone template for harbor VM
+      ansible.builtin.command: "qm clone {{ harbor_vm_template_id }} {{ harbor_vm_id }}"
+      when: harbor_vm_status.rc != 0
+      register: clone_result
+
+    - name: Set harbor VM name and network configuration
+      ansible.builtin.shell: |
+        qm set {{ harbor_vm_id }} --name {{ harbor_vm_name }}
+        qm set {{ harbor_vm_id }} --ipconfig0 ip={{ harbor_vm_ip }}/{{ harbor_vm_netmask }},gw={{ harbor_vm_gateway }}
+        qm set {{ harbor_vm_id }} --nameserver {{ harbor_vm_nameserver }}
+        qm set {{ harbor_vm_id }} --onboot {{ harbor_vm_onboot }}
+        qm set {{ harbor_vm_id }} --cpu {{ harbor_vm_cpu }}
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set harbor VM NIC queues
+      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --net0 virtio,bridge=vmbr0,queues={{ harbor_vm_net_queues }}"
+      when: harbor_vm_status.rc != 0
+      changed_when: true
+
+    - name: Set SSH keys for harbor VM
+      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --sshkeys /root/ssh.keys"
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Resize harbor VM disk
+      ansible.builtin.shell: "qm resize {{ harbor_vm_id }} scsi0 {{ harbor_vm_disk_size_increase }}"
+      when: harbor_vm_status.rc != 0
+      changed_when: true
+
+    - name: Add harbor VM service state disk
+      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --scsi1 {{ harbor_vm_state_disk }}"
+      when: harbor_vm_status.rc != 0
+      changed_when: true
+
+    - name: Set harbor VM CPU cores
+      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --cores {{ harbor_vm_cores }}"
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set harbor VM memory
+      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --memory {{ harbor_vm_memory_mb }}"
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set harbor VM description
+      ansible.builtin.shell: |
+        qm set {{ harbor_vm_id }} --description "harbor - data01 worker (docker, /data01 over NFS from ocean)"
+      when: harbor_vm_status.rc != 0
+      changed_when: true
+
+    - name: Start harbor VM
+      ansible.builtin.command: "qm start {{ harbor_vm_id }}"
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Wait for harbor VM to boot and accept SSH connections (max 5 minutes)
+      ansible.builtin.wait_for:
+        host: "{{ harbor_vm_ip }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+        msg: "Waiting for {{ harbor_vm_ip }}:22 to become available..."
+      when: harbor_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
