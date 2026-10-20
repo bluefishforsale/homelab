@@ -62,6 +62,17 @@ def test_incoming_younger_than_30_days_is_kept():
     assert got == [], got
 
 
+def test_nzbget_unreachable_prunes_nothing():
+    # With no queue to check against, every intermediate dir looks orphaned,
+    # including the live download. A failed read must delete nothing at all.
+    def down():
+        raise OSError("connection refused")
+    entries = [("intermediate", "Black.Box.2026.1080p.Remux.#84131", NOW - 40 * DAY),
+               ("incoming/movies", "Dog.Man.2025.1080p.WEB.h264-ETHEL", NOW - 31 * DAY)]
+    got = prune.plan(down, entries, now=NOW)
+    assert got == [], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

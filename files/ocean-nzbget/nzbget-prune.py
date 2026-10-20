@@ -37,3 +37,14 @@ def targets(entries, queue_ids, history, now):
         elif status is not None and status.startswith("FAILURE") and age > FAILED_AGE:
             out.append((area, name, "failed"))
     return out
+
+
+def plan(read_nzbget, entries, now):
+    """targets() against nzbget's live state; nothing at all if that state can't be read."""
+    # NOTE: without the queue every intermediate dir reads as an orphan,
+    # including the download in progress, so a failed read must delete nothing.
+    try:
+        queue_ids, history = read_nzbget()
+    except Exception:
+        return []
+    return targets(entries, queue_ids, history, now)
