@@ -53,7 +53,13 @@ def is_lossless(s):
 def reasons(streams):
     """Every way a file misses the standard; empty when it conforms."""
     out = []
-    video = [s for s in streams if s.get("codec_type") == "video"
+    # The flow before -c:V encoded mkv cover attachments as 30000 fps HEVC video;
+    # ffmpeg then reports time=N/A and tdarr cancels every job on the file as stalled.
+    covers = [s for s in streams if s.get("codec_type") == "video"
+              and (tags(s).get("MIMETYPE") or "").startswith("image/")]
+    if covers:
+        out.append("cover-as-video")
+    video = [s for s in streams if s.get("codec_type") == "video" and s not in covers
              and not (s.get("disposition") or {}).get("attached_pic")]
     audio = [s for s in streams if s.get("codec_type") == "audio"]
     subs = [s for s in streams if s.get("codec_type") == "subtitle"]

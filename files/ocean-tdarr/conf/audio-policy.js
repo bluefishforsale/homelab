@@ -36,6 +36,17 @@ module.exports = async (args) => {
   const toAac = (s) => clearStats(s) || s.outputArgs.push('-c:{outputIndex}', 'aac', '-b:{outputIndex}', '192k',
     '-ac:{outputIndex}', String(Math.min(s.channels || 2, 2)));
 
+  // The flow before -c:V encoded mkv cover attachments as 30000 fps HEVC video.
+  // With one in the output ffmpeg reports time=N/A, tdarr sees no progress, and
+  // its stall detector cancels the job (Kiss of the Spider Woman, 2026-10-18).
+  // Plex shows its own poster, so the cover goes, even from a finished file.
+  const isCover = (s) => s.codec_type === 'video' && /^image\//.test(tags(s).MIMETYPE || '');
+  streams.filter(isCover).forEach((s) => {
+    log(`drop cover ${tags(s).FILENAME || ''} encoded as ${s.codec_name} video`);
+    s.removed = true;
+    cmd.shouldProcess = true;
+  });
+
   const audio = streams.filter((s) => s.codec_type === 'audio');
   if (audio.length === 0) {
     log('no audio streams, nothing to do');
@@ -46,7 +57,7 @@ module.exports = async (args) => {
   // has two "Surround 5.1" tracks that differ), so this does not try to dedupe.
   // A second video at another size is part of the release (Chamber of Secrets
   // carries a 480p commentary picture-in-picture), not a double mux.
-  const video = streams.filter((s) => s.codec_type === 'video');
+  const video = streams.filter((s) => s.codec_type === 'video' && !isCover(s));
   if (new Set(video.map((s) => `${s.width}x${s.height}`)).size < video.length) {
     log('two video streams at one size (double-muxed by the old flow), leaving it for a re-download');
     return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
@@ -144,7 +155,7 @@ module.exports = async (args) => {
   const firstAudio = streams.indexOf(audio[0]);
   streams.splice(firstAudio, 0, dialogue);
 
-  streams.filter((s) => s.codec_type === 'video').forEach(clearStats);
+  video.forEach(clearStats);
 
   cmd.shouldProcess = true;
   return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
