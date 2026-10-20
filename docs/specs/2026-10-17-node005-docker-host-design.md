@@ -96,11 +96,14 @@ SQLite or database files right now (sonarr, radarr, prowlarr, overseerr,
 bazarr, homeassistant, grafana, jellyfin, ntfy, open-webui, mem0, mysql and
 more).
 
-SQLite over NFS is the classic way to corrupt a database: its locking relies
-on POSIX byte-range locks behaving like a local filesystem, and over NFS they
-mostly do, until a lease expires or a client hangs mid-write. The *arr apps
-and Plex all document "don't put the config dir on a network share" for this
-reason.
+Anything with a write-ahead log or journal over NFS is the classic way to
+corrupt a database, and SQLite is only the most common case. These stores rely
+on POSIX byte-range locks and `fsync` ordering behaving like a local
+filesystem, and SQLite's WAL mode also mmaps a `-shm` index that only works on
+one host. Over NFS the locks mostly hold, until a lease expires or a client
+hangs mid-write. The same goes for InnoDB, Postgres, the Prometheus TSDB, Loki,
+etcd and Kafka logs. The *arr apps and Plex all document "don't put the config
+dir on a network share" for this reason.
 
 So harbor cannot take `/data01/services` over NFS. The design keeps the paths
 identical anyway: NFS-mount ocean's `/data01` at `/data01`, then mount a local
@@ -181,7 +184,8 @@ These are out of scope. If a later step needs one, it's a new spec.
 - No ZFS changes of any kind on data01. No `zfs set sharenfs`, no new
   datasets, no property changes. The export is `/etc/exports` on ocean's
   kernel NFS server.
-- No SQLite, MySQL, Postgres, Prometheus TSDB or Loki chunks on NFS. Ever.
+- Nothing with a write-ahead log or journal on NFS, ever: SQLite, MySQL,
+  Postgres, Prometheus TSDB, Loki, etcd, Kafka. See agents.md.
 - No moving the monitoring stack (Prometheus, Loki, Grafana, Alertmanager).
   Monitoring that depends on NFS can't report the NFS outage.
 - No Kubernetes, Swarm, Nomad or any scheduler. Placement is a variable in
