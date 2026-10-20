@@ -218,7 +218,7 @@ cloned from `create_agentbox_vm.yaml` with these values:
 | Root disk | grow to about 64G | OS + `/var/lib/docker` |
 | Second disk | 200G on `vmpool-storage`, ext4, mounted at `/data01/services` | local service state (2.2) |
 | `onboot` | 1 | |
-| IP | 192.168.1.32 static (D3) | next to agentbox .31; no ping, no PTR 2026-10-20; check DHCP leases before step 2 |
+| IP | 192.168.1.32 static (D3) | next to agentbox .31; free 2026-10-20 (no ping, no PTR); outside the Kea pool `.150-.239` |
 | NIC | virtio on `vmbr0`, `queues=8` | same bridge as everything else |
 
 Two disks rather than one, so service state can be snapshotted, resized,
