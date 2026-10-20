@@ -54,6 +54,14 @@ def test_incoming_older_than_30_days_is_pruned():
     assert got == [("incoming/movies", "Dog.Man.2025.1080p.WEB.h264-ETHEL", "stale-incoming")], got
 
 
+def test_incoming_younger_than_30_days_is_kept():
+    # A download Sonarr hasn't imported yet (a blocked import waiting on a manual
+    # match) has the month to get picked up.
+    entries = [("incoming/tv", "One.Piece.S23E25.720p.WEB-DL.AAC2.0.H.264-SubsPlease", NOW - 10 * DAY)]
+    got = prune.targets(entries, queue_ids=set(), history={}, now=NOW)
+    assert got == [], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
