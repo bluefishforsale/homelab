@@ -145,6 +145,10 @@ def probe(file):
     return json.loads(out)["streams"]
 
 
+def needs_bump(record):
+    return record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
+
+
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))

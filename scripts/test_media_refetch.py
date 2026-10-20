@@ -57,6 +57,11 @@ def test_release_sonarr_cannot_download_is_not_acceptable():
     assert not refetch.acceptable({"downloadAllowed": False, "rejections": []})
 
 
+def test_refetched_file_queued_but_not_bumped_is_bumped():
+    # Behind the library backlog, a refetched file outlasts FLOW_TIMEOUT and its batch stalls.
+    assert refetch.needs_bump({"TranscodeDecisionMaker": "Queued", "bumped": False})
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
