@@ -270,6 +270,14 @@ out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="
 assert_eq "edited host line still replays the orchestrators" \
   '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
 
+# 42. An existing host joining a group runs that group's plays against a host
+#     that never had them, so it is not treated as a new-host add.
+BASE_JOIN="$(mktemp)"
+grep -vxF 'agentbox ansible_user=debian ansible_ssh_host=192.168.1.31 bare_metal_host="node005"' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_JOIN"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_JOIN" bash "$SCRIPT")
+assert_eq "existing host joining a group still replays the orchestrators" \
+  '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
