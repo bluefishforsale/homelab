@@ -24,6 +24,13 @@ def test_orphan_intermediate_older_than_a_day_is_pruned():
     assert got == [("intermediate", "Some.Movie.2024.1080p.#81234", "orphan")], got
 
 
+def test_intermediate_of_queued_job_is_never_pruned():
+    # A paused or slow job can sit in the queue for weeks; its dir is the live download.
+    entries = [("intermediate", "Black.Box.2026.1080p.Remux.#84131", NOW - 40 * DAY)]
+    got = prune.targets(entries, queue_ids={84131}, history={}, now=NOW)
+    assert got == [], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
