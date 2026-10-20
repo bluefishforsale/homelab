@@ -30,6 +30,35 @@ add_record() {
     echo "  WARN: failed to add ${name}.${zone} ${type} ${content}"
 }
 
+# NOTE: deleting and recreating a zone restarts its SOA serial from a fresh
+# date-based value, which is usually BELOW what the zone had reached through
+# DDNS bumps. The secondary only transfers when the primary's serial is higher
+# than its own, so a backwards serial freezes dns01 on its old copy for good
+# (2026-10-20: dns01 sat at 2026200583 while dns02 restarted at 2026102002, and
+# harbor's records never reached it). So record the highest serial either
+# server holds before the rebuild, and leave the new zone one above it.
+serial_floor() {
+  local zone="$1" mine theirs
+  mine=$($PDNSUTIL list-zone "$zone" 2>/dev/null | awk '$4=="SOA"{print $7}')
+  theirs=$(sdig {{ ha_peer_ip }} 5300 "$zone" SOA 2>/dev/null | awk '$5=="SOA"{print $8}')
+  mine=${mine:-0}; theirs=${theirs:-0}
+  echo $(( mine > theirs ? mine : theirs ))
+}
+
+keep_serial_ahead() {
+  local zone="$1" floor="$2" soa serial
+  soa=$($PDNSUTIL list-zone "$zone" | awk '$4=="SOA"')
+  serial=$(echo "$soa" | awk '{print $7}')
+  (( serial > floor )) && return 0
+  $PDNSUTIL replace-rrset "$zone" @ SOA "$(echo "$soa" | awk '{print $2}')" \
+    "$(echo "$soa" | awk -v s=$((floor + 1)) '{print $5, $6, s, $8, $9, $10, $11}')"
+  echo "  $zone serial raised to $((floor + 1)) (was $serial)"
+}
+
+HOME_FLOOR=$(serial_floor home.)
+CLUSTER_FLOOR=$(serial_floor cluster.local.)
+REVERSE_FLOOR=$(serial_floor 1.168.192.in-addr.arpa.)
+
 # ── Zone: home. ────────────────────────────────────────────────────────────
 echo ""
 echo "--- Creating zone: home. ---"
@@ -174,6 +203,15 @@ $PDNSUTIL set-meta 1.168.192.in-addr.arpa. TSIG-ALLOW-AXFR ddns-key
 $PDNSUTIL set-meta 1.168.192.in-addr.arpa. ALLOW-DNSUPDATE-FROM "127.0.0.0/8,192.168.1.0/24"
 
 echo "  1.168.192.in-addr.arpa. zone: OK"
+
+echo ""
+echo "--- Keeping serials ahead of the secondary ---"
+keep_serial_ahead home. "$HOME_FLOOR"
+keep_serial_ahead cluster.local. "$CLUSTER_FLOOR"
+keep_serial_ahead 1.168.192.in-addr.arpa. "$REVERSE_FLOOR"
+for zone in home. cluster.local. 1.168.192.in-addr.arpa.; do
+  pdns_control notify "$zone" >/dev/null 2>&1 || true
+done
 
 {% else %}
 echo "Role: SECONDARY (slave) - Configuring slave zones"
