@@ -62,6 +62,22 @@ def test_refetched_file_queued_but_not_bumped_is_bumped():
     assert refetch.needs_bump({"TranscodeDecisionMaker": "Queued", "bumped": False})
 
 
+def test_bumped_file_is_not_bumped_again():
+    # The timer ticks every 5 minutes; a fresh stamp each tick would reorder the bumped files.
+    assert not refetch.needs_bump({"TranscodeDecisionMaker": "Queued", "bumped": 1792459953286})
+
+
+def test_file_tdarr_has_finished_or_failed_is_not_bumped():
+    # Bumping does not requeue; an errored file waits out FLOW_TIMEOUT and goes stuck.
+    for state in ("Transcode success", "Transcode error", "Not required"):
+        assert not refetch.needs_bump({"TranscodeDecisionMaker": state, "bumped": False})
+
+
+def test_file_tdarr_has_not_scanned_yet_is_left_for_the_next_tick():
+    # Radarr imports before tdarr's watcher records the file; cruddb getById answers None.
+    assert not refetch.needs_bump(None)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

@@ -146,7 +146,7 @@ def probe(file):
 
 
 def needs_bump(record):
-    return record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
+    return bool(record) and record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
 
 
 def best_release(movie_id):
