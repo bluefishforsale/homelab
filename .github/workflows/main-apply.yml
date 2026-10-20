@@ -24,6 +24,11 @@ on:
         required: false
         type: string
         default: ""
+      limit:
+        description: "Optional ansible --limit (e.g. 'harbor'). Bootstraps a new host with the fleet-wide plays (01_base_system, docker_ce) without touching any other host."
+        required: false
+        type: string
+        default: ""
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
@@ -154,6 +159,7 @@ jobs:
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
           EXTRA_VARS: ${{ inputs.extra_vars || '' }}
+          LIMIT: ${{ inputs.limit || '' }}
           # Pass untrusted commit fields via env, never inline ${{ }} in run: —
           # a commit message with quotes/backticks/$() would otherwise break the
           # script or inject shell. (PR #43 did this for the per-project deploys.)
@@ -169,6 +175,10 @@ jobs:
           EXTRA_VARS_FLAG=()
           if [ -n "$EXTRA_VARS" ]; then
             EXTRA_VARS_FLAG=(--extra-vars "$EXTRA_VARS")
+          fi
+          LIMIT_FLAG=()
+          if [ -n "$LIMIT" ]; then
+            LIMIT_FLAG=(--limit "$LIMIT")
           fi
 
           echo "================================================"
@@ -200,6 +210,7 @@ jobs:
               -i "$INVENTORY" \
               --vault-password-file=/tmp/.vault_pass \
               "${EXTRA_VARS_FLAG[@]}" \
+              "${LIMIT_FLAG[@]}" \
               "$PLAYBOOK" 2>&1 | tee /tmp/playbook-${TOTAL}.log
             ANSIBLE_EXIT=${PIPESTATUS[0]}
             if [ "$ANSIBLE_EXIT" -eq 0 ]; then

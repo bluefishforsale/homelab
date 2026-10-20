@@ -68,8 +68,9 @@ out=$(printf 'vars/vars_cloudflared.yaml\n' | bash "$SCRIPT")
 assert_eq "vars_cloudflared" \
   '["playbooks/individual/ocean/network/cloudflared.yaml"]' "$out"
 
-# 6. inventories → fallback
-out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+# 6. inventories → fallback. Pinned to a missing base, because the real HEAD~1
+#    decides the answer otherwise: on a commit that adds a host it is not a replay.
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE=/nonexistent bash "$SCRIPT")
 assert_eq "inventories fallback" \
   '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
 
@@ -156,7 +157,7 @@ out=$(printf 'files/deleted-orphan-xyz/gone.j2\n' | bash "$SCRIPT")
 assert_eq "deleted unmapped path is a no-op, not a hard fail" "[]" "$out"
 
 # 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
-out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE=/nonexistent bash "$SCRIPT")
 assert_eq "inventory change is the site-wide fallback" "$FALLBACK" "$out"
 
 # 22-25. vars_service_ports.yaml maps by WHICH port key changed, not the filename.
@@ -252,6 +253,31 @@ assert_eq "decommission role edit deploys nothing" "[]" "$out"
 out=$(printf 'files/node-exporter/smart-exporter-compose.yml.j2\n' | bash "$SCRIPT")
 assert_eq "files/<svc> named only in a comment does not map" \
   '["playbooks/individual/infrastructure/node_exporter.yaml"]' "$out"
+
+# 40. Adding a new host to the inventory deploys only that host's own playbook.
+#     Any inventories/** change used to replay all three orchestrators, so adding
+#     harbor would have run 40+ minutes of applies across every existing host.
+BASE_NO_AGENTBOX="$(mktemp)"
+grep -v '^agentbox ' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_NO_AGENTBOX"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_NO_AGENTBOX" bash "$SCRIPT")
+assert_eq "new host maps to its dedicated group's playbook only" \
+  '["playbooks/individual/agentbox/agentbox.yaml"]' "$out"
+
+# 41. Editing an existing host's line is not an addition: it can change every play
+#     that host is in, so it still replays the orchestrators.
+BASE_EDITED="$(mktemp)"
+sed 's/^pihole ansible_user=debian /pihole ansible_user=root /' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_EDITED"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_EDITED" bash "$SCRIPT")
+assert_eq "edited host line still replays the orchestrators" \
+  '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
+
+# 42. An existing host joining a group runs that group's plays against a host
+#     that never had them, so it is not treated as a new-host add.
+BASE_JOIN="$(mktemp)"
+grep -vxF 'agentbox ansible_user=debian ansible_ssh_host=192.168.1.31 bare_metal_host="node005"' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_JOIN"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_JOIN" bash "$SCRIPT")
+assert_eq "existing host joining a group still replays the orchestrators" \
+  '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

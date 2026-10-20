@@ -20,6 +20,7 @@
 #   roles/<role>/**                      -> playbooks referencing the role name
 #   vars/vars_<name>.yaml                -> playbooks that load it by name
 #                                           (shared file -> its real consumers)
+#   inventories/*.ini adding only hosts  -> playbooks for groups made only of them
 #   inventories/**, group_vars/all*      -> orchestrator replay (truly global)
 #   anything ending in .md               -> ignored
 #   any other owned input that resolves  -> UNMAPPED -> exit 3 (hard error)
@@ -168,6 +169,32 @@ is_known_unowned() {
   # for an input genuinely deployed by nothing (dead-but-kept), and treat any
   # entry as debt to clear.
   return 1
+}
+
+# An inventory diff that only adds hosts deploys the playbooks owning the groups
+# made up solely of those hosts (`hosts: <group>`), not the orchestrators. Base
+# version comes from git (override for tests via DETECT_INVENTORY_BASE_FILE).
+# Returns 1 when the diff is anything else, so the caller replays the fleet.
+map_new_hosts() {
+  local path="$1" head base groups group rc=0
+  head="$REPO_ROOT/$path"
+  local base_tmp=""
+  if [[ -n "${DETECT_INVENTORY_BASE_FILE:-}" ]]; then
+    base="$DETECT_INVENTORY_BASE_FILE"
+  else
+    base_tmp="$(mktemp)"; base="$base_tmp"
+    (cd "$REPO_ROOT" && git show "${DETECT_BASE:-HEAD~1}:$path") >"$base" 2>/dev/null || { rm -f "$base_tmp"; return 1; }
+  fi
+  groups="$(python3 "$REPO_ROOT/.github/workflows/lib/new-host-groups.py" "$base" "$head" 2>/dev/null)" || rc=$?
+  [[ -n "$base_tmp" ]] && rm -f "$base_tmp"
+  [[ $rc -eq 0 ]] || return 1
+
+  while IFS= read -r group; do
+    [[ -z "$group" ]] && continue
+    while IFS= read -r pb; do [[ -n "$pb" ]] && emit "$pb"; done \
+      < <(cd "$REPO_ROOT" && grep -rlE "^[[:space:]]*hosts:[[:space:]]*['\"]?${group}['\"]?[[:space:]]*$" playbooks/ 2>/dev/null | grep -E '\.ya?ml$' | grep -v '/tasks/' || true)
+  done <<< "$groups"
+  return 0
 }
 
 # vars_service_ports.yaml is the one shared vars file every service reads, so a
@@ -334,6 +361,9 @@ while IFS= read -r path; do
 
   # Genuinely site-wide inputs: inventory and global group_vars really do affect
   # every host, so the orchestrator replay is the correct mapping, not a guess.
+  if [[ "$path" == inventories/*.ini ]] && map_new_hosts "$path"; then
+    continue
+  fi
   if [[ "$path" == inventories/* ]] \
      || [[ "$path" =~ ^group_vars/all ]]; then
     need_global=1
