@@ -12,8 +12,8 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 |-----------|---------------|
 | **Hostname** | node006.home |
 | **Model** | Dell PowerEdge R720 |
-| **CPU** | 40 cores (2x Intel Xeon E5-2670 v2) |
-| **RAM** | 680 GB DDR3 ECC |
+| **CPU** | 40 threads (2x Intel Xeon E5-2690 v2) |
+| **RAM** | 672 GB DDR3 ECC LRDIMM (21x 32 GB) |
 | **Storage** | 64 TB ZFS RAIDZ2 |
 | **GPU** | NVIDIA RTX 3090 24GB |
 | **Hypervisor** | Proxmox VE |
@@ -23,6 +23,27 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 - **ocean VM** (192.0.2.143): Main service host for media stack, AI/ML services, monitoring
 - GPU passthrough for transcoding (Plex) and AI workloads (llama.cpp, log-ml)
 - 64TB storage pool for media, backups, and service data
+
+#### Node006 memory: installed parts
+
+Recorded 2026-10-20 from `sudo dmidecode -t 16,17` (BIOS 2.7.0). RAM is not a
+constraint here (290 GB available), so this is for replacing a failed stick,
+not an upgrade plan.
+
+| Part | Count | Spec |
+|------|-------|------|
+| SK Hynix `HMT84GL7AMR4A-PB` | 9 | 32 GB DDR3-1600 LRDIMM, ECC, 4Rx4 |
+| Samsung `M386B4G70BM0-YH90` | 11 | 32 GB DDR3-1333 LRDIMM, ECC, 4Rx4 |
+| SK Hynix `HMT84GL7AMR4C-RD` | 1 | 32 GB DDR3-1866 LRDIMM, ECC, 4Rx4 (slot A9) |
+
+21 of 24 slots are filled; B4, B8 and B12 are empty. The board takes up to
+1.5 TB. Everything runs at 1333 regardless of the stick's rated speed, because
+the board runs all memory at the speed of the slowest stick and the R720
+slows down further with 3 sticks per channel.
+
+What to buy for a replacement or to fill the empty slots: any 32 GB 4Rx4 DDR3
+LRDIMM (PC3L-10600L or PC3L-12800L). It must be an LRDIMM to match the rest;
+mixing RDIMMs in won't POST.
 
 ### Node005 - Dell PowerEdge R630 (Infrastructure Server)
 
@@ -43,6 +64,39 @@ This guide covers management, monitoring, and maintenance of Dell PowerEdge serv
 - **pihole**: DNS filtering and ad blocking
 - **GitHub Runner VMs**: CI/CD automation
 - **Kubernetes cluster nodes**: Container orchestration
+
+#### Node005 memory: installed parts and upgrade path
+
+Recorded 2026-10-20 from `sudo dmidecode -t 16,17` (BIOS 2.13.0), so the next
+purchase doesn't start with a research pass.
+
+| Slot | Part | Spec |
+|------|------|------|
+| A1, A2, B1, B2 | SK Hynix `HMA84GR7MFR4N-UH` | 32 GB DDR4-2400 (PC4-2400T-R), registered ECC, 2Rx4 |
+
+The board takes 24 slots (A1-A12 on CPU1, B1-B12 on CPU2) and up to 3 TB.
+Each E5-2690 v4 has 4 memory channels. Dell's fill order is the white slots
+first (A1-A4), then black (A5-A8), then green (A9-A12). With only A1/A2 and
+B1/B2 filled, each socket uses 2 of its 4 channels, so the box runs at half
+its memory bandwidth today.
+
+What to buy: more of the same part, or any 32 GB 2Rx4 PC4-2400T-R RDIMM
+(Hynix, Samsung, Micron). PC4-2666V-R also works and runs at 2400. Never mix
+in LRDIMMs (`-L` parts); the R630 won't boot with LRDIMMs and RDIMMs together.
+
+| Add | Slots | Total | Notes |
+|-----|-------|-------|-------|
+| 4 sticks | A3, A4, B3, B4 | 256 GB | All 8 channels, 1 stick each. Doubles bandwidth. Best value step. |
+| 12 sticks | A3-A8, B3-B8 | 512 GB | 2 sticks per channel, balanced, still 2400. The clean big upgrade. |
+| 20 sticks | all 24 | 768 GB | 3 sticks per channel; RDIMMs likely drop to 1866 (check Dell's R630 memory table first). |
+
+Avoid buying 8 or 16 more: some channels end up with more sticks than others,
+and any channel with 3 sticks slows the whole system to 1866.
+
+Why it hasn't been bought: in October 2026 this part cost about $6.50/GB
+(about $208 per stick, about $830 for the 4-stick step) because of the AI-driven
+DRAM shortage, and node005 had 69 GB available (VMs about 25 GB, ZFS ARC
+capped at 32 GB). Buy when a workload actually needs it or prices fall.
 
 ### Network Architecture
 
