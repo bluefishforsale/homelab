@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -61,8 +62,8 @@ def plan(read_nzbget, entries, now):
 
 def _rpc(method):
     url = f"{os.environ['NZBGET_URL']}/jsonrpc/{method}"
-    auth = base64.b64encode(f"{os.environ['NZBGET_USER']}:{os.environ['NZBGET_PASS']}".encode()).decode()
-    req = urllib.request.Request(url, headers={"Authorization": f"Basic {auth}"})
+    basic = base64.b64encode(f"{os.environ['NZBGET_USER']}:{os.environ['NZBGET_PASS']}".encode()).decode()
+    req = urllib.request.Request(url, headers={"Authorization": f"Basic {basic}"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)["result"]
 
@@ -107,9 +108,11 @@ def _write_metrics(path, deleted, now):
         items, size = deleted.get(rule, (0, 0))
         lines += [f'nzbget_prune_deleted_bytes{{rule="{rule}"}} {size}',
                   f'nzbget_prune_deleted_items{{rule="{rule}"}} {items}']
-    tmp = f"{path}.tmp"
-    with open(tmp, "w") as f:
+    # Root writes here; a fixed tmp name would follow a planted symlink.
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+    with os.fdopen(fd, "w") as f:
         f.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o644)
     os.rename(tmp, path)
 
 
