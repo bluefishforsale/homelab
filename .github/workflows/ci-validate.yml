@@ -305,6 +305,12 @@ jobs:
       - name: Alert receiver selftest
         run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
 
+      # Dispatch payloads are attacker-set and the steps consuming them hold the
+      # vault password. Fixed on the instance three times and it came back twice,
+      # so the pattern gets the guard rather than the file that last broke.
+      - name: "No attacker-reachable values in run: script text"
+        run: bash .github/workflows/lib/workflow-run-injection.test.sh
+
       # A drafting agent may commit its own work. Deciding "did it produce
       # anything?" from a dirty tree alone threw a correct fix away.
       - name: Agent draft detection

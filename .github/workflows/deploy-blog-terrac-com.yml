@@ -72,13 +72,14 @@ jobs:
 
       - name: Run deployment playbook
         env:
+          DEPLOY_BRANCH: ${{ steps.params.outputs.branch }}
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           ansible-playbook \
             -i inventories/production/hosts.ini \
             --vault-password-file=/tmp/.vault_pass \
-            -e git_branch=${{ steps.params.outputs.branch }} \
+            -e git_branch="$DEPLOY_BRANCH" \
             playbooks/individual/ocean/services/blog_terrac_com_static.yaml
 
       - name: Cleanup vault password

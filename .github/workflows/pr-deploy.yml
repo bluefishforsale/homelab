@@ -38,12 +38,17 @@ jobs:
 
       - name: Detect changed playbooks
         id: detect
+        # Branch names are attacker-chosen and git permits shell metacharacters
+        # in them, so they arrive as env values rather than as script text.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          echo "Base ref: ${{ github.base_ref }}"
-          echo "Head ref: ${{ github.head_ref }}"
+          echo "Base ref: $BASE_REF"
+          echo "Head ref: $HEAD_REF"
 
           # Get changed files
-          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CHANGED_FILES=$(git diff --name-only "origin/$BASE_REF...HEAD")
           echo "Changed files:"
           echo "$CHANGED_FILES"
 

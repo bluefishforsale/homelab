@@ -93,12 +93,14 @@ jobs:
           echo "  Image tag: ${VERSION:-<playbook pin>}"
 
       - name: Run deployment playbook
+        env:
+          DEPLOY_VERSION: ${{ steps.params.outputs.version }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
 
           INVENTORY="inventories/production/hosts.ini"
           PLAYBOOK="playbooks/individual/ocean/ai/mem0.yaml"
-          VERSION="${{ steps.params.outputs.version }}"
+          VERSION="$DEPLOY_VERSION"
 
           EXTRA=()
           if [ -n "$VERSION" ]; then
@@ -178,11 +180,12 @@ jobs:
       - name: Generate deployment summary
         if: always()
         env:
+          DEPLOY_VERSION: ${{ steps.params.outputs.version }}
           DEPLOY_COMMIT_MESSAGE: ${{ steps.params.outputs.commit_message }}
         run: |
           STATUS="${{ env.deployment_status || 'unknown' }}"
           DURATION="${{ env.deployment_duration || 'N/A' }}"
-          VERSION="${{ steps.params.outputs.version }}"
+          VERSION="$DEPLOY_VERSION"
 
           if [ "$STATUS" = "success" ]; then
             STATUS_EMOJI="✅"; STATUS_TEXT="DEPLOYMENT SUCCESSFUL"
