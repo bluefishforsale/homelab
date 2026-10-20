@@ -39,6 +39,13 @@ def test_failed_job_files_pruned_after_7_days():
     assert got == [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", "failed")], got
 
 
+def test_failed_job_younger_than_7_days_is_kept():
+    # The week is the window for a manual "post-process again" from nzbget.
+    entries = [("intermediate", "The.Madison.S01E06.1080p.BluRay.#84110", NOW - 1 * DAY)]
+    got = prune.targets(entries, queue_ids=set(), history={84110: "FAILURE/UNPACK"}, now=NOW)
+    assert got == [], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
