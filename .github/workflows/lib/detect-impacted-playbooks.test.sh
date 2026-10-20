@@ -68,8 +68,9 @@ out=$(printf 'vars/vars_cloudflared.yaml\n' | bash "$SCRIPT")
 assert_eq "vars_cloudflared" \
   '["playbooks/individual/ocean/network/cloudflared.yaml"]' "$out"
 
-# 6. inventories → fallback
-out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+# 6. inventories → fallback. Pinned to a missing base, because the real HEAD~1
+#    decides the answer otherwise: on a commit that adds a host it is not a replay.
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE=/nonexistent bash "$SCRIPT")
 assert_eq "inventories fallback" \
   '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
 
@@ -156,7 +157,7 @@ out=$(printf 'files/deleted-orphan-xyz/gone.j2\n' | bash "$SCRIPT")
 assert_eq "deleted unmapped path is a no-op, not a hard fail" "[]" "$out"
 
 # 21. Global inputs still replay the orchestrators (this is the ONLY fallback now).
-out=$(printf 'inventories/production/hosts.ini\n' | bash "$SCRIPT")
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE=/nonexistent bash "$SCRIPT")
 assert_eq "inventory change is the site-wide fallback" "$FALLBACK" "$out"
 
 # 22-25. vars_service_ports.yaml maps by WHICH port key changed, not the filename.
