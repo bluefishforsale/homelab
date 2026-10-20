@@ -562,6 +562,17 @@ groups:
       summary: "Homelab DB backup completed with {{ "{{ $value }}" }} failed database(s)"
       description: "The last backup run on {{ "{{ $labels.instance }}" }} failed to dump {{ "{{ $value }}" }} in-scope database(s); the tarball is incomplete. Check the db-backup.service journal for which."
 
+  # nzbget-prune writes its success time only on a run that read nzbget and
+  # finished, so a dead timer or an nzbget it can't reach both show as age.
+  - alert: NzbgetPruneStale
+    expr: time() - nzbget_prune_last_success_timestamp_seconds > 172800
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget-prune has not succeeded in 2 days ({{ "{{ $labels.instance }}" }})"
+      description: "Failed and stale downloads are piling up on data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
+
 - name: sas_phy_alerts
   rules:
   # SAS transport counters are cumulative, so alert on the RATE of increase (a

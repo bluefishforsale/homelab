@@ -113,6 +113,42 @@
       name: nzbget-exporter.service
       enabled: true
 
+  # nzbget keeps failed jobs' intermediate files forever and nothing imports
+  # stale incoming downloads; this prunes both daily. Rules and their tests:
+  # files/ocean-nzbget/nzbget-prune.py, test_nzbget_prune.py.
+  - name: Install nzbget-prune
+    ansible.builtin.copy:
+      src: "{{ files }}/nzbget-prune.py"
+      dest: /usr/local/bin/nzbget-prune
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create nzbget-prune environment
+    ansible.builtin.template:
+      src: "{{ files }}/nzbget-prune.env.j2"
+      dest: /etc/nzbget-prune.env
+      owner: root
+      group: root
+      mode: '0600'
+
+  - name: Create nzbget-prune systemd units
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - nzbget-prune.service
+    - nzbget-prune.timer
+    register: nzbget_prune_units
+
+  - name: Enable and start nzbget-prune timer
+    ansible.builtin.systemd:
+      name: nzbget-prune.timer
+      state: started
+      enabled: true
+      daemon_reload: "{{ nzbget_prune_units is changed }}"
+
   handlers:
   - name: Reload nzbget systemd daemon
     ansible.builtin.systemd:

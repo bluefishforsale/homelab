@@ -1,0 +1,11 @@
+[Unit]
+Description=Prune failed, orphaned and stale nzbget downloads on data01
+After={{ service }}.service
+Wants={{ service }}.service
+RequiresMountsFor={{ data }}
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/nzbget-prune.env
+ExecStart=/usr/bin/python3 /usr/local/bin/nzbget-prune
+TimeoutStartSec=2h
