@@ -262,6 +262,14 @@ out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="
 assert_eq "new host maps to its dedicated group's playbook only" \
   '["playbooks/individual/agentbox/agentbox.yaml"]' "$out"
 
+# 41. Editing an existing host's line is not an addition: it can change every play
+#     that host is in, so it still replays the orchestrators.
+BASE_EDITED="$(mktemp)"
+sed 's/^pihole ansible_user=debian /pihole ansible_user=root /' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_EDITED"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_EDITED" bash "$SCRIPT")
+assert_eq "edited host line still replays the orchestrators" \
+  '["playbooks/01_base_system.yaml","playbooks/02_core_infrastructure.yaml","playbooks/03_ocean_services.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
