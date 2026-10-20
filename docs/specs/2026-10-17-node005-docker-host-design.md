@@ -7,11 +7,22 @@ Working name for the VM is `harbor` (open decision D3). Everything below says
 
 ## 1. Goal
 
-A second Docker host on node005 that runs compose services the same way ocean
-does: same `/data01/...` paths, same compose-project layout under
-`/data01/services/<svc>`, same image refresh, same monitoring, same deploy
-path through CI. The differences are meant to be only these: less RAM, no GPU,
-and `/data01` arrives over NFS from ocean instead of from local disks.
+A repeatable pattern for **data01 worker hosts**: Docker VMs that run compose
+services the same way ocean does (same `/data01/...` paths, same compose-project
+layout under `/data01/services/<svc>`, same image refresh, same monitoring, same
+deploy path through CI), with `/data01` arriving over NFS from ocean instead of
+from local disks. The disk array stays on ocean; ocean is the storage server and
+the workers operate on it.
+
+harbor on node005 is the first instance. More hosts get the same shape as they
+are added, so nothing in this spec may be harbor-specific where a host group
+would do: the export list, the sentinel, the alerts and the inventory group all
+key on membership, not on one name or IP.
+
+What the workers are for (D2, answered 2026-10-19): **CPU and I/O offload for
+transcoding and downloading.** tdarr CPU workers first, nzbget later (section
+5.1), then other services that can move, or that can run as more than one
+instance.
 
 ## 2. Sanity check (read this first)
 
@@ -111,8 +122,21 @@ own local state dir.
 
 That's fine if the goal is capacity, CPU offload, or a second place to run
 stateless or local-state services. It's the wrong tool if the goal is
-"media keeps working when ocean is down." Decision D2 states which goal this
-is, because it decides which services are candidates.
+"media keeps working when ocean is down." D2 is answered as offload (section
+1), which this fits.
+
+"HA instances" therefore means two different things here, and only one of them
+is real for data01 work:
+
+- **Redundant workers.** Several tdarr nodes across hosts, any one of which can
+  die while the rest keep pulling jobs. That is real redundancy, but it ends at
+  ocean: the tdarr server and the export both live there.
+- **Services that never touch data01.** These can run a second instance on a
+  worker and genuinely survive an ocean outage (the DNS pair is the existing
+  example of this shape).
+
+Anything whose job is reading or writing `/data01` is exactly as available as
+ocean, however many copies of it run. D11 picks which of the two is in scope.
 
 ### 2.4 ocean is hard-coded all over the repo
 
@@ -150,8 +174,8 @@ first-class variable.
 
 These are out of scope. If a later step needs one, it's a new spec.
 
-- No HA or failover for ocean services. Harbor does not take over when ocean
-  dies.
+- No automatic failover. A worker does not take over when ocean dies; any
+  redundancy is a second instance named per service (D11).
 - No GPU work on harbor: no Plex/Jellyfin hardware transcode, no llamacpp,
   no comfyui, no frigate.
 - No ZFS changes of any kind on data01. No `zfs set sharenfs`, no new
@@ -162,7 +186,8 @@ These are out of scope. If a later step needs one, it's a new spec.
   Monitoring that depends on NFS can't report the NFS outage.
 - No Kubernetes, Swarm, Nomad or any scheduler. Placement is a variable in
   the repo, decided by a human.
-- No exporting data01 to anything but harbor's IP.
+- No exporting data01 to anything outside the `[data01_workers]` inventory
+  group. Adding a host to the group is the only way it gets the export.
 - No bulk migration in phase 1. Exactly one canary service moves.
 - No changes to ocean's existing paths, compose files, or service layout.
 - No decommissioning of anything on node005 (VM 4000 stays a backlog item).
@@ -199,11 +224,15 @@ New playbook `playbooks/individual/ocean/nfs_export_data01.yaml`, `hosts: ocean`
 
 - Installs `nfs-kernel-server` (not present today; `exportfs: command not
   found` on ocean).
-- Manages one file, `/etc/exports.d/harbor.exports`:
+- Manages one file, `/etc/exports.d/data01-workers.exports`, templated with
+  one client entry per host in `[data01_workers]`, so a new worker gets the
+  export from an inventory change and nothing else:
 
   ```
   /data01  192.168.1.32(rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1)
   ```
+
+  (one such client spec per worker on the same line).
 
 - One export of the whole `/data01`, not separate exports for `media`,
   `complete`, `incoming`. The *arr apps import by hardlink from
@@ -247,10 +276,11 @@ service dirs, into ocean's live sonarr DB, over NFS. That's the worst case
 in this whole design, so it's guarded three ways:
 
 1. `docker.service` drop-in: `RequiresMountsFor=/data01 /data01/services`.
-2. A sentinel: the local disk carries `/data01/services/.harbor-local`
+2. A sentinel: the local disk carries `/data01/services/.worker-local`
    (written once by the playbook on the raw filesystem). A docker
-   `ExecStartPre=/usr/bin/test -f /data01/services/.harbor-local` refuses to
-   start dockerd if the path resolves to ocean's dir instead.
+   `ExecStartPre=/usr/bin/test -f /data01/services/.worker-local` refuses to
+   start dockerd if the path resolves to ocean's dir instead. Same file name
+   on every worker, so the guard is part of the pattern, not of harbor.
 3. ocean's `/data01/services` never gets that file (asserted by the NFS
    playbook on ocean: fail if it exists).
 
@@ -289,7 +319,9 @@ Same as ocean, via the existing plays with `--limit harbor`:
 
 - Inventory: add harbor to `[vms]` (picks up node-exporter, cadvisor,
   promtail) and a new `[docker_hosts]` group containing ocean and harbor, for
-  plays that should target "anywhere compose runs."
+  plays that should target "anywhere compose runs." `[data01_workers]` is the
+  subset that mounts the export (harbor now, every later worker), and the
+  alerts below match on it rather than on `harbor` by name.
 - node-exporter on harbor gets `--collector.mountstats` and `--collector.nfs`
   so NFS latency and retransmits are visible.
 - Alerts (in `files/ocean-prometheus/alert_rules.yml.j2`):
@@ -348,6 +380,31 @@ Fallback canary if you'd rather start without NFS writes: `ntfy` or `karma`
 (local state only, no `/data01` traffic). That proves the host and monitoring
 but not the NFS path. D6.
 
+### 5.1 nzbget (after the canary, not phase 1)
+
+nzbget is the second named workload, and it fits the overmount design better
+than it first looks. Measured on ocean 2026-10-19:
+
+- Its heavy I/O (article writes, par2 repair, unrar) happens in
+  `InterDir=/scratch/intermediate` and `TempDir=/scratch/tmp`, and `/scratch` is
+  `/data01/services/nzbget/scratch`. On a worker that path is the local disk,
+  so the random-write work stays local and only the finished move to
+  `DestDir` (`/data01/incoming/...`) crosses NFS, as one sequential copy.
+- Its queue and config are under `/data01/services/nzbget` too, so they stay
+  local, which they must.
+
+Three things block moving it:
+
+1. It is a bare `docker run` systemd unit (`files/ocean-nzbget/nzbget.service.j2`),
+   not a compose project, so it has no `docker-refresh@` timer today. Converting
+   it to compose is a prerequisite on ocean, its own PR, before any move.
+2. `scratch/intermediate` holds 724G, 633 GiB of it in 109 of 115 dirs older
+   than 7 days: failed or abandoned downloads that nothing cleans up. node005's
+   `vmpool-storage` is 942 GB in total, so the worker's local disk can't hold
+   that. Retention (or a cleanup of what's there) has to land first. D10.
+3. sonarr and radarr talk to nzbget by URL, so its address moves with it
+   (placement registry, section 7).
+
 ## 6. Acceptance criteria (phase 1)
 
 1. `qm config 6000` on node005 shows `cpu: host`, the agreed memory, two
@@ -380,6 +437,11 @@ but not the NFS path. D6.
     and `/etc/exports.d/harbor.exports`.
 
 ## 7. Phase 2 (not built now, written down so phase 1 doesn't paint into a corner)
+
+With more than one worker coming, phase 2 is the expected next step, not a
+maybe: phase 1's `service_host` one-liner is fine for one canary, but a third
+host makes hand-edited addresses in cloudflared, Prometheus and DNS the thing
+that breaks.
 
 - `vars/vars_service_hosts.yaml`: a placement registry next to
   `vars_service_ports.yaml`, mapping service to host. cloudflared ingress,
@@ -436,11 +498,11 @@ Each one changes what gets built. Defaults in brackets are what I'd do.
 
 - **D1 RAM source.** ARC cap, runner shrink, agentbox trim? [all three: ARC to 32 GiB,
   runner to 12 GiB, agentbox to 8 GiB, harbor at up to 48 GiB.]
-- **D2 What is harbor for?** Capacity/CPU offload, a place for non-data01
-  services that survive ocean outages, or resilience for media? [the first
-  two; resilience for media isn't achievable with NFS from ocean.]
-- **D3 Name, VMID, IP.** [harbor, 6000, 192.168.1.32 after confirming it's
-  free in DHCP and DNS.]
+- **D2 What is harbor for?** Answered 2026-10-19: CPU and I/O offload for
+  transcoding and downloading, as the first of several data01 workers.
+- **D3 Name, VMID, IP, and the convention for the next ones.** [harbor, 6000,
+  192.168.1.32 after confirming it's free in DHCP and DNS; later workers get
+  the next free VMID on their node and an IP from a reserved block.]
 - **D4 Export scope.** Whole `/data01` (hardlinks work, ocean's
   `/data01/services` visible but overmounted) or subtrees only (safer, but
   breaks *arr hardlinking). [whole, with the sentinel guard.]
@@ -456,3 +518,10 @@ Each one changes what gets built. Defaults in brackets are what I'd do.
   [read-write, revisit if anything other than media workers moves.]
 - **D9 The old `nfs_server.yaml`.** Fence it now in this work, or backlog it.
   [backlog it, separate PR.]
+- **D10 nzbget intermediate retention.** 633 GiB of stale intermediate dirs:
+  clean once by hand and add a retention timer, or move `InterDir` to NFS on
+  the worker and give up the local-I/O win. [clean plus retention; the local
+  scratch is most of the point of moving nzbget.]
+- **D11 What "HA" means here.** Redundant workers across hosts (ends at ocean),
+  second instances of services that never touch data01 (survives ocean), or
+  both. [both, named per service, never for anything whose job is data01.]
