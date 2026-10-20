@@ -11,6 +11,7 @@ import re
 DAY = 86400
 ORPHAN_AGE = 1 * DAY
 FAILED_AGE = 7 * DAY
+INCOMING_AGE = 30 * DAY
 
 _NZBID = re.compile(r"\.#(\d+)$")
 
@@ -19,6 +20,10 @@ def targets(entries, queue_ids, history, now):
     """(area, name, rule) for every entry that may be deleted; everything else is kept."""
     out = []
     for area, name, mtime in entries:
+        if area.startswith("incoming/"):
+            if now - mtime > INCOMING_AGE:
+                out.append((area, name, "stale-incoming"))
+            continue
         m = _NZBID.search(name)
         if area != "intermediate" or not m:
             continue

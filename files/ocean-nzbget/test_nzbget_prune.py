@@ -46,6 +46,14 @@ def test_failed_job_younger_than_7_days_is_kept():
     assert got == [], got
 
 
+def test_incoming_older_than_30_days_is_pruned():
+    # 470 finished downloads Sonarr/Radarr never imported, back to 2024-07.
+    # Past 30 days nothing is going to import them, so they go unchecked.
+    entries = [("incoming/movies", "Dog.Man.2025.1080p.WEB.h264-ETHEL", NOW - 31 * DAY)]
+    got = prune.targets(entries, queue_ids=set(), history={}, now=NOW)
+    assert got == [("incoming/movies", "Dog.Man.2025.1080p.WEB.h264-ETHEL", "stale-incoming")], got
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
