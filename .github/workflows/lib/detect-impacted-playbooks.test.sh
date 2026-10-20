@@ -253,6 +253,15 @@ out=$(printf 'files/node-exporter/smart-exporter-compose.yml.j2\n' | bash "$SCRI
 assert_eq "files/<svc> named only in a comment does not map" \
   '["playbooks/individual/infrastructure/node_exporter.yaml"]' "$out"
 
+# 40. Adding a new host to the inventory deploys only that host's own playbook.
+#     Any inventories/** change used to replay all three orchestrators, so adding
+#     harbor would have run 40+ minutes of applies across every existing host.
+BASE_NO_AGENTBOX="$(mktemp)"
+grep -v '^agentbox ' "$(dirname "$0")/../../../inventories/production/hosts.ini" > "$BASE_NO_AGENTBOX"
+out=$(printf 'inventories/production/hosts.ini\n' | DETECT_INVENTORY_BASE_FILE="$BASE_NO_AGENTBOX" bash "$SCRIPT")
+assert_eq "new host maps to its dedicated group's playbook only" \
+  '["playbooks/individual/agentbox/agentbox.yaml"]' "$out"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
