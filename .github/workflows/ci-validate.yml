@@ -305,6 +305,10 @@ jobs:
       - name: Alert receiver selftest
         run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
 
+      # nzbget-prune runs rm -rf on data01 daily; its keep rules are the defect ledger.
+      - name: nzbget-prune rules
+        run: python3 files/ocean-nzbget/test_nzbget_prune.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.
