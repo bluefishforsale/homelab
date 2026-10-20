@@ -37,6 +37,7 @@ on:
           - terrac_com
           - gethomepage
           - my_ta_jose
+          - etrading_boy
           # Monitoring
           - prometheus
           - grafana
@@ -102,6 +103,7 @@ jobs:
             terrac_com) PLAYBOOK="playbooks/individual/ocean/services/terrac_com.yaml" ;;
             gethomepage) PLAYBOOK="playbooks/individual/ocean/services/gethomepage.yaml" ;;
             my_ta_jose) PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml" ;;
+            etrading_boy) PLAYBOOK="playbooks/individual/ocean/services/etrading_boy.yaml" ;;
 
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;

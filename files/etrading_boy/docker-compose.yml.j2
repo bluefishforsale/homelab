@@ -1,0 +1,30 @@
+services:
+  etrading_boy:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/New_York
+
+    ports:
+      - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
+
+    # The image runs as uid 1000 with HOME=/data, so state.db, bar_cache.db
+    # and logs all land under {{ home }}/data/.etrading-boy on the host.
+    volumes:
+      - {{ home }}/data:/data
+
+    # The bot stops its scheduler and lets in-flight jobs finish on SIGTERM.
+    # NOTE: too short a grace period kills it mid-order-submit, and the next
+    # boot's reconcile has to sort out whatever was half placed.
+    stop_grace_period: 60s
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
