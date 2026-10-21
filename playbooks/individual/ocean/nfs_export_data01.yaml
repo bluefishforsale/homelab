@@ -1,0 +1,115 @@
+---
+# Export ocean's /data01 over NFSv4.2 to the data01 workers (spec:
+# docs/specs/2026-10-17-node005-docker-host-design.md, 4.2). Workers mount the
+# media and download payloads from here; their service state stays on their own
+# local disk, because nothing with a WAL goes over NFS.
+#
+# Additive only: it installs the NFS server and manages two drop-in files. It
+# never restarts anything on ocean except nfs-server itself, and it never
+# touches ZFS (the export is plain /etc/exports.d, sharenfs stays off).
+
+- name: Export /data01 to data01 workers
+  hosts: ocean
+  become: true
+  gather_facts: false
+  vars:
+    # NOTE: one export of the whole pool, not media/complete/incoming apart.
+    # The *arr apps import by hardlink from /data01/complete into
+    # /data01/media, and a hardlink across two NFS mounts fails with EXDEV
+    # even when the server side is one filesystem.
+    nfs_export_path: /data01
+    # No crossmnt, so the data01/docker child dataset is never traversed.
+    nfs_export_options: rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1
+
+  tasks:
+    - name: Assert every data01 worker has a static address
+      ansible.builtin.assert:
+        that: hostvars[item].ansible_ssh_host is defined
+        fail_msg: "{{ item }} has no ansible_ssh_host; the export is keyed on its IP"
+      loop: "{{ groups['data01_workers'] }}"
+
+    - name: Install NFS server
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure NFS drop-in directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/nfs.conf.d
+        - /etc/exports.d
+
+    # NFSv4 only means one TCP port (2049) and no rpcbind/mountd exposure.
+    - name: Disable NFSv3
+      ansible.builtin.copy:
+        dest: /etc/nfs.conf.d/data01-workers.conf
+        content: |
+          # Managed by Ansible (nfs_export_data01.yaml)
+          [nfsd]
+          vers3=n
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart nfs-server
+
+    # ocean's INPUT policy is ACCEPT, so this host list is the only access
+    # control on the export.
+    - name: Export /data01 to the workers
+      ansible.builtin.copy:
+        dest: /etc/exports.d/data01-workers.exports
+        content: |
+          # Managed by Ansible (nfs_export_data01.yaml)
+          {{ nfs_export_path }} {% for host in groups['data01_workers'] %}{{ hostvars[host].ansible_ssh_host }}({{ nfs_export_options }}){{ ' ' if not loop.last }}{% endfor %}
+
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload exports
+
+    - name: Enable and start nfs-server
+      ansible.builtin.systemd:
+        name: nfs-server
+        state: started
+        enabled: true
+
+    - name: Apply pending NFS config before verifying
+      ansible.builtin.meta: flush_handlers
+
+    # nfs.conf.d support depends on the nfs-utils version; a drop-in it never
+    # reads would leave v3 on while the play reports success.
+    - name: Read the NFS versions nfsd is serving
+      ansible.builtin.command: cat /proc/fs/nfsd/versions
+      register: nfsd_versions
+      changed_when: false
+      check_mode: false
+
+    - name: Read the live export table
+      ansible.builtin.command: exportfs -v
+      register: live_exports
+      changed_when: false
+      check_mode: false
+
+    - name: Assert v3 is off and /data01 is exported to every worker
+      ansible.builtin.assert:
+        that:
+          - "'-3' in nfsd_versions.stdout.split()"
+          - "'+4.2' in nfsd_versions.stdout.split()"
+          - live_exports.stdout is search(nfs_export_path ~ '\\s')
+        fail_msg: "versions: {{ nfsd_versions.stdout }} / exports: {{ live_exports.stdout }}"
+
+  handlers:
+    - name: Restart nfs-server
+      ansible.builtin.systemd:
+        name: nfs-server
+        state: restarted
+
+    - name: Reload exports
+      ansible.builtin.command: exportfs -ra
+      changed_when: true
