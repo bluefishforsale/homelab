@@ -13,7 +13,7 @@ item goes through a ledger, so a run can stop anywhere and resume:
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
-The old file is only deleted once a search has found a release to replace it.
+The old file is only deleted once Radarr or Sonarr has accepted a grab to replace it.
 
   media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do

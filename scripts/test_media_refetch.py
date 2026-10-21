@@ -2,7 +2,7 @@
 """Pins media-refetch's choices: run `python3 scripts/test_media_refetch.py` (no pytest).
 
 These decide what gets deleted: a pack replaces a whole season, and an
-acceptable release is grabbed right after the old files go.
+acceptable release is grabbed and the old files go right after.
 """
 import importlib.util
 import os
