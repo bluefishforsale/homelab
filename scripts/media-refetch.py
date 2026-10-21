@@ -502,10 +502,11 @@ def step_tv(item, yes, ledger):
         if not yes:
             return False
         # NOTE: a pack covers every episode in the season, and Sonarr will not
-        # import over a file that already meets the cutoff, so all of them go.
+        # import over a file that already meets the cutoff, so all of them go,
+        # but only once the grab is accepted.
+        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         for fid in {f["id"] for f in tv_files(sid, eps).values()}:
             mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
-        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 

@@ -118,6 +118,20 @@ def test_refused_movie_grab_keeps_the_old_file():
     assert fake.deleted == [] and item["state"] == "planned"
 
 
+def test_refused_season_grab_keeps_the_old_episodes():
+    fake = FakeArr([])
+    refetch.mc = fake
+    refetch.best_tv_release = lambda item: {"title": "x", "size": 1e9, "indexer": "i", "guid": "g", "indexerId": 1}
+    refetch.tv_files = lambda sid, eps: {e: {"id": 100 + e} for e in eps}
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "planned",
+            "title": "t", "log": []}
+    try:
+        refetch.step_tv(item, True, {})
+    except urllib.error.HTTPError:
+        pass
+    assert fake.deleted == [] and item["state"] == "planned"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
