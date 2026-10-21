@@ -392,9 +392,11 @@ def step(item, yes):
         if not yes:
             return False
         movie = mc.get("radarr", f"/api/v3/movie/{mid}")
+        # Grab first: a refused grab must leave the old file, and the download
+        # takes minutes, long before Radarr would import over it.
+        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         if movie.get("hasFile"):
             mc.delete("radarr", f"/api/v3/moviefile/{movie['movieFile']['id']}")
-        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
