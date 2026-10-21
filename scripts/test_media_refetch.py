@@ -132,6 +132,13 @@ def test_refused_season_grab_keeps_the_old_episodes():
     assert fake.deleted == [] and item["state"] == "planned"
 
 
+def test_earlier_bump_is_transcoded_first():
+    # tdarr takes the highest bumped value first. A timestamp made the newest import
+    # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
+    t = refetch.dt.datetime(2026, 10, 20, 20, 0)
+    assert refetch.bump_value(t) > refetch.bump_value(t + refetch.dt.timedelta(minutes=1))
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

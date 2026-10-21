@@ -153,6 +153,16 @@ def tdarr_files(mode, **kw):
     return mc.post("tdarr", "/api/v2/cruddb", {"data": {"collection": "FileJSONDB", "mode": mode, **kw}})
 
 
+# 2100-01-01 in ms. tdarr takes the highest bumped value first, so counting down
+# from here keeps refetches first-in-first-out and ahead of the UI's bump
+# button, which writes the current time.
+BUMP_CEILING = 4102444800000
+
+
+def bump_value(t):
+    return BUMP_CEILING - int(t.timestamp() * 1000)
+
+
 def bump(item, files, yes):
     """Put an item's files at the front of tdarr's queue, ahead of the library backlog."""
     todo = [f for f in files if needs_bump(tdarr_files("getById", docID=f))]
@@ -162,8 +172,7 @@ def bump(item, files, yes):
     if not yes:
         return False
     for f in todo:
-        # The value tdarr's own per-file bump button writes.
-        tdarr_files("update", docID=f, obj={"bumped": int(dt.datetime.now().timestamp() * 1000)})
+        tdarr_files("update", docID=f, obj={"bumped": bump_value(dt.datetime.now())})
     return True
 
 
