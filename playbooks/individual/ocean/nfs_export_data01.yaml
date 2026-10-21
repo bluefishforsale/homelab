@@ -22,6 +22,13 @@
     nfs_export_options: rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1
 
   tasks:
+    # NOTE: an empty client list renders a bare "/data01", which exportfs
+    # reads as an export to every host.
+    - name: Assert there is at least one data01 worker
+      ansible.builtin.assert:
+        that: groups['data01_workers'] | default([]) | length > 0
+        fail_msg: "[data01_workers] is empty; refusing to write an export with no clients"
+
     - name: Assert every data01 worker has a static address
       ansible.builtin.assert:
         that: hostvars[item].ansible_ssh_host is defined
@@ -96,13 +103,19 @@
       changed_when: false
       check_mode: false
 
-    - name: Assert v3 is off and /data01 is exported to every worker
+    - name: Assert v3 is off and /data01 is exported to the workers only
       ansible.builtin.assert:
         that:
           - "'-3' in nfsd_versions.stdout.split()"
           - "'+4.2' in nfsd_versions.stdout.split()"
-          - live_exports.stdout is search(nfs_export_path ~ '\\s')
+          - live_exports.stdout is not search('<world>|\\*\\(')
         fail_msg: "versions: {{ nfsd_versions.stdout }} / exports: {{ live_exports.stdout }}"
+
+    - name: Assert each worker is in the live export
+      ansible.builtin.assert:
+        that: live_exports.stdout is search(hostvars[item].ansible_ssh_host | regex_escape ~ '\\(')
+        fail_msg: "{{ item }} missing from exportfs -v: {{ live_exports.stdout }}"
+      loop: "{{ groups['data01_workers'] }}"
 
   handlers:
     - name: Restart nfs-server
