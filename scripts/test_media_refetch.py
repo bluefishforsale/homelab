@@ -2,10 +2,11 @@
 """Pins media-refetch's choices: run `python3 scripts/test_media_refetch.py` (no pytest).
 
 These decide what gets deleted: a pack replaces a whole season, and an
-acceptable release is grabbed right after the old files go.
+acceptable release is grabbed and the old files go right after.
 """
 import importlib.util
 import os
+import urllib.error
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("refetch", os.path.join(HERE, "media-refetch.py"))
@@ -76,6 +77,59 @@ def test_file_tdarr_has_finished_or_failed_is_not_bumped():
 def test_file_tdarr_has_not_scanned_yet_is_left_for_the_next_tick():
     # Radarr imports before tdarr's watcher records the file; cruddb getById answers None.
     assert not refetch.needs_bump(None)
+
+
+def test_download_still_in_the_queue_after_grab_timeout_is_not_given_up():
+    # The 2026-10-20 batch queued 1.5 TB behind NZBGet's 18:00-02:00 pause; 37 items
+    # went stuck while still downloading and stuck never restores the added date.
+    grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
+    assert not refetch.gave_up(grabbed, downloading=True)
+
+
+class FakeArr:
+    """Stands in for media_clients: nothing queued, the grab POST refused."""
+
+    def __init__(self, files):
+        self.files, self.deleted = files, []
+
+    def get(self, app, path, **kw):
+        if path.endswith("/queue/details"):
+            return []
+        return {"hasFile": True, "movieFile": {"id": self.files[0]}}
+
+    def delete(self, app, path):
+        self.deleted.append(path)
+
+    def post(self, app, path, data):
+        raise urllib.error.HTTPError(path, 409, "Conflict", {}, None)
+
+
+def test_refused_movie_grab_keeps_the_old_file():
+    # DAN DA DAN S02 lost all 12 episodes on 2026-10-21: files deleted, then Sonarr
+    # answered the grab with 409 and nothing downloaded.
+    fake = FakeArr([7])
+    refetch.mc, refetch.best_release = fake, lambda mid: {"title": "x", "size": 1e9, "indexer": "i",
+                                                         "guid": "g", "indexerId": 1}
+    item = {"movie_id": 1, "state": "planned", "title": "t", "log": []}
+    try:
+        refetch.step(item, yes=True)
+    except urllib.error.HTTPError:
+        pass
+    assert fake.deleted == [] and item["state"] == "planned"
+
+
+def test_refused_season_grab_keeps_the_old_episodes():
+    fake = FakeArr([])
+    refetch.mc = fake
+    refetch.best_tv_release = lambda item: {"title": "x", "size": 1e9, "indexer": "i", "guid": "g", "indexerId": 1}
+    refetch.tv_files = lambda sid, eps: {e: {"id": 100 + e} for e in eps}
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "planned",
+            "title": "t", "log": []}
+    try:
+        refetch.step_tv(item, True, {})
+    except urllib.error.HTTPError:
+        pass
+    assert fake.deleted == [] and item["state"] == "planned"
 
 
 if __name__ == "__main__":

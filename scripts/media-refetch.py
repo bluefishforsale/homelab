@@ -13,7 +13,7 @@ item goes through a ledger, so a run can stop anywhere and resume:
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
-The old file is only deleted once a search has found a release to replace it.
+The old file is only deleted once Radarr or Sonarr has accepted a grab to replace it.
 
   media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do
@@ -365,6 +365,11 @@ def note(item, msg):
     print(f"{item['state']:8} {item['title']}: {msg}")
 
 
+def gave_up(grabbed, downloading):
+    """A download still in the client's queue is waited on however long it takes."""
+    return not downloading and now() - grabbed > GRAB_TIMEOUT
+
+
 def step(item, yes):
     """Advance one item by one state. Returns True when something changed."""
     mid = item["movie_id"]
@@ -387,9 +392,11 @@ def step(item, yes):
         if not yes:
             return False
         movie = mc.get("radarr", f"/api/v3/movie/{mid}")
+        # Grab first: a refused grab must leave the old file, and the download
+        # takes minutes, long before Radarr would import over it.
+        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         if movie.get("hasFile"):
             mc.delete("radarr", f"/api/v3/moviefile/{movie['movieFile']['id']}")
-        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -402,12 +409,13 @@ def step(item, yes):
             # its own re-search may find nothing it will take; search again here.
             failed = [h for h in mc.get("radarr", "/api/v3/history/movie", movieId=mid, eventType=4)  # 4 = downloadFailed
                       if dt.datetime.fromisoformat(h["date"].replace("Z", "+00:00")) > grabbed]
-            if failed and not mc.get("radarr", "/api/v3/queue/details", movieId=mid):
+            downloading = mc.get("radarr", "/api/v3/queue/details", movieId=mid)
+            if failed and not downloading:
                 note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
                 if yes:
                     item["state"] = "planned"
                 return yes
-            if now() - grabbed > GRAB_TIMEOUT:
+            if gave_up(grabbed, downloading):
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
                 return True
@@ -494,10 +502,11 @@ def step_tv(item, yes, ledger):
         if not yes:
             return False
         # NOTE: a pack covers every episode in the season, and Sonarr will not
-        # import over a file that already meets the cutoff, so all of them go.
+        # import over a file that already meets the cutoff, so all of them go,
+        # but only once the grab is accepted.
+        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         for fid in {f["id"] for f in tv_files(sid, eps).values()}:
             mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
-        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -515,7 +524,7 @@ def step_tv(item, yes, ledger):
                     item["state"] = "planned"
                 return yes
             if not new or downloading:
-                if now() - grabbed > GRAB_TIMEOUT:
+                if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
                     item["state"] = "stuck"
                     return True
