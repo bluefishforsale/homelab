@@ -78,6 +78,13 @@ def test_file_tdarr_has_not_scanned_yet_is_left_for_the_next_tick():
     assert not refetch.needs_bump(None)
 
 
+def test_download_still_in_the_queue_after_grab_timeout_is_not_given_up():
+    # The 2026-10-20 batch queued 1.5 TB behind NZBGet's 18:00-02:00 pause; 37 items
+    # went stuck while still downloading and stuck never restores the added date.
+    grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
+    assert not refetch.gave_up(grabbed, downloading=True)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

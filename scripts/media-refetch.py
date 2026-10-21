@@ -365,6 +365,11 @@ def note(item, msg):
     print(f"{item['state']:8} {item['title']}: {msg}")
 
 
+def gave_up(grabbed, downloading):
+    """A download still in the client's queue is waited on however long it takes."""
+    return not downloading and now() - grabbed > GRAB_TIMEOUT
+
+
 def step(item, yes):
     """Advance one item by one state. Returns True when something changed."""
     mid = item["movie_id"]
@@ -402,12 +407,13 @@ def step(item, yes):
             # its own re-search may find nothing it will take; search again here.
             failed = [h for h in mc.get("radarr", "/api/v3/history/movie", movieId=mid, eventType=4)  # 4 = downloadFailed
                       if dt.datetime.fromisoformat(h["date"].replace("Z", "+00:00")) > grabbed]
-            if failed and not mc.get("radarr", "/api/v3/queue/details", movieId=mid):
+            downloading = mc.get("radarr", "/api/v3/queue/details", movieId=mid)
+            if failed and not downloading:
                 note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
                 if yes:
                     item["state"] = "planned"
                 return yes
-            if now() - grabbed > GRAB_TIMEOUT:
+            if gave_up(grabbed, downloading):
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
                 return True
@@ -515,7 +521,7 @@ def step_tv(item, yes, ledger):
                     item["state"] = "planned"
                 return yes
             if not new or downloading:
-                if now() - grabbed > GRAB_TIMEOUT:
+                if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
                     item["state"] = "stuck"
                     return True
