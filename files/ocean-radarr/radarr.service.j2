@@ -23,7 +23,7 @@ ExecStart=docker run --rm \
     --add-host=home.terrac.com:{{ ansible_default_ipv4.address }} \
     --cpus=4 \
     -e TZ="America/Los_Angeles" \
-    -e PUID=1001 -e PGID=1001 \
+    -e PUID={{ system_users.media.uid }} -e PGID={{ system_users.media.gid }} \
     -v /etc/localtime:/etc/localtime:ro \
     -p {{ radarr_port }}:7878 \
     -v {{ home }}:/config \

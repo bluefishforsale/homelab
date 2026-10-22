@@ -19,7 +19,7 @@ ExecStart=docker run --rm \
     --name {{ service }} \
     --hostname {{ service }} \
     -e TZ="America/Los_Angeles" \
-    -e PUID=1001 -e PGID=1001 \
+    -e PUID={{ system_users.media.uid }} -e PGID={{ system_users.media.gid }} \
     -p {{ prowlarr_port }}:9696 \
     -v {{ home }}/config:/config \
   {{ image }}:{{ version }}

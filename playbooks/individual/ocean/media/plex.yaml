@@ -65,7 +65,7 @@
     kometa_home: "{{ data }}/services/{{ kometa_service }}"
     ramdisk: /mnt/ramdisk
     user: media
-    uid: 1001
+    uid: "{{ system_users.media.uid }}"
 
   tasks:
 

@@ -26,7 +26,7 @@ ExecStart=docker run --rm\
     -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility \
     -e THREADS_WORKER_INIT_TIMEOUT=200000 \
     -e TZ="America/Los_Angeles" \
-    -e PGID=1001 -e PUID=1001 \
+    -e PGID={{ system_users.media.gid }} -e PUID={{ system_users.media.uid }} \
     -e "serverIP={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}" \
     -e "serverPort={{tdarr_port_api}}" \
     -e "nodePort={{node_port}}" \

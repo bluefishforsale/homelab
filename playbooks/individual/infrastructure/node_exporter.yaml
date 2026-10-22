@@ -6,6 +6,7 @@
 
   vars_files:
     - ../../../vars/vars_service_ports.yaml
+    - ../../../vault/secrets.yaml
 
   vars:
     cadvisor_service: cadvisor
@@ -66,8 +67,8 @@
     # SystemdUnitFailed pages until someone resets it.
     smart_exporter_exclude_by_id:
       - ata-SATADOM-ML_3SE_TW00T4M44829386L0022
-    uid: 1001  # Ocean user ID
-    gid: 1001  # Users group ID
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
 

@@ -36,8 +36,8 @@
     git_clone_path: "{{ home }}/repo"
     web_root: "{{ home }}"
     user: media
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
     # Accept GitHub's host key automatically for git operations
     accept_hostkey: yes
 
