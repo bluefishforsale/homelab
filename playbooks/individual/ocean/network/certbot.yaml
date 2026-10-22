@@ -34,7 +34,7 @@
     # reloading Plex breaks certificate loading. Rotating it is a deliberate
     # task, not a side effect of moving it out of the repo.
     plex_cert_pfx_password: "{{ media_services.plex.cert_pfx_password }}"
-    uid: 1001
+    uid: "{{ system_users.media.uid }}"
 
   tasks:
 

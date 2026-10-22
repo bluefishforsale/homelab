@@ -22,7 +22,7 @@ ExecStart=docker run --rm \
     --hostname={{ service }} \
     --cpus=6 \
     -e TZ="America/Los_Angeles" \
-    -e PUID=1001 -e PGID=1001 \
+    -e PUID={{ system_users.media.uid }} -e PGID={{ system_users.media.gid }} \
     -v /etc/localtime:/etc/localtime:ro \
     -p {{ nzbget_port }}:{{ nzbget_port }} \
     -v {{ home }}/scripts:/scripts \

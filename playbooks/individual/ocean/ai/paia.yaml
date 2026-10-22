@@ -17,8 +17,8 @@
     files: "{{ playbook_dir }}/../../../../files/paia"
     home: "{{ data }}/services/{{ service }}"
     user: media
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
 

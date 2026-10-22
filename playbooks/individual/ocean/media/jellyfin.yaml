@@ -29,7 +29,7 @@
     jellyfin_home: "{{ data }}/services/{{ service }}"
     ramdisk: /mnt/ramdisk
     user: media
-    uid: 1001
+    uid: "{{ system_users.media.uid }}"
 
     jellyfin_ports_tcp: "{{ service_ports.jellyfin.tcp }}"
     jellyfin_ports_udp: "{{ service_ports.jellyfin.udp }}"
