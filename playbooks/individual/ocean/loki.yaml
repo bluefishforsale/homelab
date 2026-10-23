@@ -3,6 +3,7 @@
   hosts: ocean
   vars_files:
     - ../../../vars/vars_service_ports.yaml
+    - ../../../vault/secrets.yaml
 
   vars:
     service_name: loki
