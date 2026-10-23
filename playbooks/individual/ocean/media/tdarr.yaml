@@ -123,6 +123,13 @@
     - Reload systemd daemon
     - Restart tdarr service
 
+  # NOTE: the unit edits above only reach systemd through handlers. Without this
+  # flush, a stopped unit starts on the stale definition (2026-10-23: PUID 1001
+  # after the renumber, readonly DB) and the API tasks below fail before any
+  # handler runs.
+  - name: Apply unit changes before starting
+    ansible.builtin.meta: flush_handlers
+
   - name: Enable and start tdarr service
     ansible.builtin.systemd:
       name: tdarr.service
