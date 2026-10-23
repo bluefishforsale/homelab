@@ -95,8 +95,9 @@
   - name: Enable open-webui service
     ansible.builtin.systemd:
       name: open-webui.service
-      enabled: yes
-      daemon_reload: yes
+      enabled: true
+      state: started
+      daemon_reload: true
 
   - name: Wait for open-webui service to start
     ansible.builtin.wait_for:
