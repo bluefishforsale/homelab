@@ -110,8 +110,9 @@
   - name: Enable Home Assistant service
     ansible.builtin.systemd:
       name: homeassistant.service
-      enabled: yes
-      daemon_reload: yes
+      enabled: true
+      state: started
+      daemon_reload: true
 
   handlers:
   - name: Reload systemd daemon

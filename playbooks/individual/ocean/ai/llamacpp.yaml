@@ -156,6 +156,7 @@
     ansible.builtin.systemd:
       name: llamacpp.service
       enabled: true
+      state: started
       daemon_reload: true
 
   handlers:
