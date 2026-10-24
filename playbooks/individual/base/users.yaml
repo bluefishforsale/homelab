@@ -251,13 +251,13 @@
     # without a TTY. Runs last so oh-my-zsh and powerlevel10k are already in
     # place; chezmoi writes into ~/.oh-my-zsh/custom, and the installer above
     # skips any home where ~/.oh-my-zsh already exists.
+    # NOTE: only the two commands below become the user. Fleet hosts have no
+    # setfacl, so any task that transfers a file to an unprivileged user (copy)
+    # fails; file writes run as root with owner set instead.
     - name: Bootstrap chezmoi dotfiles for {{ chezmoi_user }}
       when:
         - chezmoi_user in users | map(attribute='user_name')
         - ansible_architecture == 'x86_64'
-      become_user: "{{ chezmoi_user }}"
-      environment:
-        HOME: "{{ chezmoi_home }}"
       block:
         - name: Check for an existing chezmoi source
           ansible.builtin.stat:
@@ -280,12 +280,16 @@
               ansible.builtin.file:
                 path: "{{ chezmoi_home }}/.ssh"
                 state: directory
+                owner: "{{ chezmoi_user }}"
+                group: "{{ chezmoi_user }}"
                 mode: "0700"
 
             - name: Pin github.com host keys
               ansible.builtin.copy:
                 content: "{% for key in github_meta.json.ssh_keys %}github.com {{ key }}\n{% endfor %}"
                 dest: "{{ chezmoi_home }}/.ssh/known_hosts.github"
+                owner: "{{ chezmoi_user }}"
+                group: "{{ chezmoi_user }}"
                 mode: "0644"
 
             # Hosts where the user has no GitHub-registered key skip the
@@ -295,6 +299,9 @@
                 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
                 -o UserKnownHostsFile={{ chezmoi_home }}/.ssh/known_hosts.github
                 -T git@github.com
+              become_user: "{{ chezmoi_user }}"
+              environment:
+                HOME: "{{ chezmoi_home }}"
               register: github_probe
               changed_when: false
               failed_when: false
@@ -311,6 +318,8 @@
                   ansible.builtin.file:
                     path: "{{ chezmoi_home }}/.local/bin"
                     state: directory
+                    owner: "{{ chezmoi_user }}"
+                    group: "{{ chezmoi_user }}"
                     mode: "0755"
 
                 - name: Download the chezmoi binary
@@ -318,13 +327,17 @@
                     url: "https://github.com/twpayne/chezmoi/releases/download/v{{ chezmoi_version }}/chezmoi-linux-amd64"
                     checksum: "sha256:https://github.com/twpayne/chezmoi/releases/download/v{{ chezmoi_version }}/chezmoi_{{ chezmoi_version }}_checksums.txt"
                     dest: "{{ chezmoi_home }}/.local/bin/chezmoi"
+                    owner: "{{ chezmoi_user }}"
+                    group: "{{ chezmoi_user }}"
                     mode: "0755"
 
                 - name: Clone and apply the dotfiles
                   ansible.builtin.command: >-
                     {{ chezmoi_home }}/.local/bin/chezmoi init --apply
                     git@github.com:bluefishforsale/chezmoi.git
+                  become_user: "{{ chezmoi_user }}"
                   environment:
+                    HOME: "{{ chezmoi_home }}"
                     GIT_SSH_COMMAND: >-
                       ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
                       -o UserKnownHostsFile={{ chezmoi_home }}/.ssh/known_hosts.github
