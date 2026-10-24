@@ -38,6 +38,30 @@
           - { user_name: "media", user_home: "/home/media", uid: "{{ system_users.media.uid }}", gid: "{{ system_users.media.gid }}" }
           - { user_name: "terrac", user_home: "/home/terrac", uid: "{{ system_users.terrac.uid }}", gid: "{{ system_users.terrac.gid }}" }
 
+    - name: Read existing accounts
+      ansible.builtin.getent:
+        database: passwd
+
+    # NOTE: an existing account on the wrong id must fail here, before the
+    # group and user tasks below groupmod/usermod it into place. That moves the
+    # account but not its files, and NFS and rsync share by number.
+    # Renumbering is a hand-run job.
+    - name: Existing managed accounts already carry the vault's uid/gid
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.getent_passwd[user.user_name][1] == user.uid | string
+          - ansible_facts.getent_passwd[user.user_name][2] == user.gid | string
+        fail_msg: >-
+          {{ user.user_name }} is {{ ansible_facts.getent_passwd[user.user_name][1] }}:{{ ansible_facts.getent_passwd[user.user_name][2] }}
+          on {{ inventory_hostname }}, vault says {{ user.uid }}:{{ user.gid }}
+        quiet: true
+      loop: "{{ users }}"
+      loop_control:
+        loop_var: user
+      when:
+        - user.uid is defined
+        - user.user_name in ansible_facts.getent_passwd
+
     - name: Ensure user groups exist with specified GIDs
       ansible.builtin.group:
         name: "{{ user.user_name }}"
@@ -69,13 +93,6 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
-      register: user_result
-      # A managed user that is also the account Ansible logged in as (e.g.
-      # terrac on ocean, uid 1000 vs the vault's 1002) can't be usermod'd while
-      # in use. Tolerate only that case; its uid keeps its existing value.
-      failed_when:
-        - user_result.failed | default(false)
-        - "'is currently used by process' not in (user_result.msg | default(''))"
 
     - name: Add user to sudoers with no password
       ansible.builtin.lineinfile:
