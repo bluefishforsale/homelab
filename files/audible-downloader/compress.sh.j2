@@ -13,10 +13,18 @@ TARGET='/data01/complete/audiobooks'
 
 cd "${TARGET}"
 test -d "${TARGET}/mp3" || mkdir  "${TARGET}/mp3"
+# AAXtoMP3 reads and validates a whole AAX before its noclobber check skips it,
+# ~22 minutes a night across the library, so files it has finished are recorded
+# here and never reopened. Delete the manifest to force a full recheck.
+DONE="${TARGET}/mp3/.converted"
+touch "${DONE}"
+
 echo "Exporting audible library"
 audible library export
 
 find ./aax -type f -name '*.aax*' | sed 's|^\./||' |   while read file ; do
+    grep -qxF "${file}" "${DONE}" && continue
+    # stdin is the file list; ffmpeg inside AAXtoMP3 would otherwise eat it.
     echo "Compressing ${TARGET}/${file}"
     ${BASEDIR}/AAXtoMP3 \
         --no-clobber \
@@ -25,5 +33,6 @@ find ./aax -type f -name '*.aax*' | sed 's|^\./||' |   while read file ; do
         -D '$artist - $title' \
         -e:mp3 \
         --chaptered \
-        "${TARGET}/${file}"
+        "${TARGET}/${file}" < /dev/null \
+      && echo "${file}" >> "${DONE}"
 done
