@@ -172,7 +172,10 @@ def test_download_sonarr_cannot_import_is_blocklisted_not_waited_on():
     item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "grabbed",
             "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
     refetch.step_tv(item, True, {})
-    assert deleted == [("/api/v3/queue/501", {"removeFromClient": "true", "blocklist": "true"})], deleted
+    # Without skipRedownload Sonarr searches too: on 2026-10-24 its own grab of the
+    # same [DB] pack raced ours, and the next one queued single episodes beside our pack.
+    assert deleted == [("/api/v3/queue/501", {"removeFromClient": "true", "blocklist": "true",
+                                              "skipRedownload": "true"})], deleted
     assert item["state"] == "planned"
 
 
@@ -194,7 +197,8 @@ def test_movie_download_radarr_cannot_import_is_blocklisted_not_waited_on():
     refetch.mc = Fake()
     item = {"movie_id": 1, "state": "grabbed", "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
     refetch.step(item, yes=True)
-    assert deleted == [("/api/v3/queue/900", {"removeFromClient": "true", "blocklist": "true"})], deleted
+    assert deleted == [("/api/v3/queue/900", {"removeFromClient": "true", "blocklist": "true",
+                                              "skipRedownload": "true"})], deleted
     assert item["state"] == "planned"
 
 
