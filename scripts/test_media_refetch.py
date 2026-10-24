@@ -176,6 +176,28 @@ def test_download_sonarr_cannot_import_is_blocklisted_not_waited_on():
     assert item["state"] == "planned"
 
 
+def test_movie_download_radarr_cannot_import_is_blocklisted_not_waited_on():
+    # The TV path waited forever on a finished, import-blocked download (#866);
+    # Radarr's queue reports the same shape.
+    deleted = []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            if path.endswith("/queue/details"):
+                return [{"id": 900, "downloadId": "D", "title": "x", "status": "completed",
+                         "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"}]
+            return {"hasFile": False} if "/movie/" in path else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+    refetch.mc = Fake()
+    item = {"movie_id": 1, "state": "grabbed", "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    refetch.step(item, yes=True)
+    assert deleted == [("/api/v3/queue/900", {"removeFromClient": "true", "blocklist": "true"})], deleted
+    assert item["state"] == "planned"
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
