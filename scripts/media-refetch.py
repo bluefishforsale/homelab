@@ -535,6 +535,17 @@ def step_tv(item, yes, ledger):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            # Finished but Sonarr will not import it (a misparsed "pack" holding one
+            # episode): it stays in the queue, so it would read as downloading forever.
+            if downloading and not new and all(q.get("status") == "completed"
+                                               and q.get("trackedDownloadStatus") == "warning" for q in downloading):
+                note(item, f"Sonarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+                    mc.delete("sonarr", f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true")
+                item["state"] = "planned"
+                return True
             if not new or downloading:
                 if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")

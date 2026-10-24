@@ -150,6 +150,32 @@ def test_anime_season_search_gets_time_for_every_episode():
     assert timeouts[0] > 656, timeouts
 
 
+def test_download_sonarr_cannot_import_is_blocklisted_not_waited_on():
+    # DAN DA DAN S02 (2026-10-24): Sonarr took "[Moozzi2] Dan Da Dan S2-08" for a
+    # pack, but it held one episode. Finished and stuck at importPending, it read
+    # as still downloading, so the item would have waited forever (South Park
+    # S13E06 had since 10-21).
+    rows = [{"id": 500 + e, "episodeId": e, "downloadId": "D", "title": "[Moozzi2] Dan Da Dan S2-08",
+             "status": "completed", "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"}
+            for e in (1, 2)]
+    deleted = []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return rows if path.endswith("/queue/details") else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+    refetch.mc = Fake()
+    refetch.tv_files = lambda sid, eps: {}
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "grabbed",
+            "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    assert deleted == [("/api/v3/queue/501", {"removeFromClient": "true", "blocklist": "true"})], deleted
+    assert item["state"] == "planned"
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
