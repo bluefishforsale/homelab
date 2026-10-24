@@ -390,7 +390,8 @@ def import_blocked(downloading):
 
 def blocklist(app, downloading):
     for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
-        mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true")
+        mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true",
+                  skipRedownload="true")
 
 
 def step(item, yes):
