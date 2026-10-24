@@ -382,6 +382,17 @@ def gave_up(grabbed, downloading):
     return not downloading and now() - grabbed > GRAB_TIMEOUT
 
 
+def import_blocked(downloading):
+    """Finished, but the *arr will not import it, so it stays queued and reads as downloading forever."""
+    return bool(downloading) and all(q.get("status") == "completed" and q.get("trackedDownloadStatus") == "warning"
+                                     for q in downloading)
+
+
+def blocklist(app, downloading):
+    for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+        mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true")
+
+
 def step(item, yes):
     """Advance one item by one state. Returns True when something changed."""
     mid = item["movie_id"]
@@ -427,6 +438,13 @@ def step(item, yes):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            if import_blocked(downloading):
+                note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                blocklist("radarr", downloading)
+                item["state"] = "planned"
+                return True
             if gave_up(grabbed, downloading):
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
@@ -537,13 +555,11 @@ def step_tv(item, yes, ledger):
                 return yes
             # Finished but Sonarr will not import it (a misparsed "pack" holding one
             # episode): it stays in the queue, so it would read as downloading forever.
-            if downloading and not new and all(q.get("status") == "completed"
-                                               and q.get("trackedDownloadStatus") == "warning" for q in downloading):
+            if import_blocked(downloading) and not new:
                 note(item, f"Sonarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
                 if not yes:
                     return False
-                for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
-                    mc.delete("sonarr", f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true")
+                blocklist("sonarr", downloading)
                 item["state"] = "planned"
                 return True
             if not new or downloading:
