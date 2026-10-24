@@ -1,4 +1,6 @@
-version: '3.8'
+# NOTE: the unit and the play's recreate task must land on one project, or
+# the play's containers block the unit's `up` on container_name and it crash-loops.
+name: {{ service }}
 
 services:
   wordpress:
