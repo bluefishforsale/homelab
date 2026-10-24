@@ -3,6 +3,13 @@
   become: true
   vars_files:
     - ../../../vault/secrets.yaml
+  vars:
+    # NOTE: this user's dotfiles belong to bluefishforsale/chezmoi. The shell
+    # tasks below skip them, because writing .zshrc/.tmux.conf or wiping
+    # ~/.oh-my-zsh here reverts chezmoi on every base run.
+    chezmoi_user: terrac
+    chezmoi_home: /home/terrac
+    chezmoi_version: "2.73.3"
 
   tasks:
     - name: Handle dpkg locks and repair
@@ -136,6 +143,7 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
 
     - name: Change user shell to zsh
       ansible.builtin.shell: chsh -s /usr/bin/zsh {{ user.user_name }}
@@ -159,6 +167,7 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
       ignore_errors: yes
 
     - name: Install oh-my-zsh
@@ -179,6 +188,7 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
       ignore_errors: yes
 
     - name: Install Powerlevel10k theme for Oh My Zsh
@@ -202,6 +212,7 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
       ignore_errors: yes
 
     - name: Disable powerlevel10k configuration wizard
@@ -212,6 +223,7 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
       ignore_errors: yes
 
     - name: Copy p10k config file
@@ -231,4 +243,88 @@
       loop: "{{ users }}"
       loop_control:
         loop_var: user
+      when: user.user_name != chezmoi_user
       ignore_errors: yes
+
+    # Bootstrap only: once the source exists the user runs `chezmoi update`
+    # themselves, since an unattended apply over a hand-edited file fails
+    # without a TTY. Runs last so oh-my-zsh and powerlevel10k are already in
+    # place; chezmoi writes into ~/.oh-my-zsh/custom, and the installer above
+    # skips any home where ~/.oh-my-zsh already exists.
+    - name: Bootstrap chezmoi dotfiles for {{ chezmoi_user }}
+      when:
+        - chezmoi_user in users | map(attribute='user_name')
+        - ansible_architecture == 'x86_64'
+      become_user: "{{ chezmoi_user }}"
+      environment:
+        HOME: "{{ chezmoi_home }}"
+      block:
+        - name: Check for an existing chezmoi source
+          ansible.builtin.stat:
+            path: "{{ chezmoi_home }}/.local/share/chezmoi"
+          register: chezmoi_source
+
+        - name: Install chezmoi on first bootstrap
+          when: not chezmoi_source.stat.exists
+          block:
+            # The private repos are cloned over ssh, and the fleet's ssh config
+            # turns host-key checking off. Pin github.com to its published keys
+            # (fetched over TLS) in the same file chezmoi's ssh config uses.
+            - name: Fetch GitHub's published SSH host keys
+              ansible.builtin.uri:
+                url: https://api.github.com/meta
+                return_content: true
+              register: github_meta
+
+            - name: Ensure ~/.ssh exists
+              ansible.builtin.file:
+                path: "{{ chezmoi_home }}/.ssh"
+                state: directory
+                mode: "0700"
+
+            - name: Pin github.com host keys
+              ansible.builtin.copy:
+                content: "{% for key in github_meta.json.ssh_keys %}github.com {{ key }}\n{% endfor %}"
+                dest: "{{ chezmoi_home }}/.ssh/known_hosts.github"
+                mode: "0644"
+
+            # Hosts where the user has no GitHub-registered key skip the
+            # bootstrap instead of failing the base run.
+            - name: Probe GitHub access with the user's own key
+              ansible.builtin.command: >-
+                ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
+                -o UserKnownHostsFile={{ chezmoi_home }}/.ssh/known_hosts.github
+                -T git@github.com
+              register: github_probe
+              changed_when: false
+              failed_when: false
+
+            - name: Report hosts skipped for lack of GitHub access
+              ansible.builtin.debug:
+                msg: "{{ chezmoi_user }} on {{ inventory_hostname }} cannot reach GitHub over ssh; skipping chezmoi bootstrap"
+              when: "'successfully authenticated' not in github_probe.stderr"
+
+            - name: Install chezmoi {{ chezmoi_version }}
+              when: "'successfully authenticated' in github_probe.stderr"
+              block:
+                - name: Ensure ~/.local/bin exists
+                  ansible.builtin.file:
+                    path: "{{ chezmoi_home }}/.local/bin"
+                    state: directory
+                    mode: "0755"
+
+                - name: Download the chezmoi binary
+                  ansible.builtin.get_url:
+                    url: "https://github.com/twpayne/chezmoi/releases/download/v{{ chezmoi_version }}/chezmoi-linux-amd64"
+                    checksum: "sha256:https://github.com/twpayne/chezmoi/releases/download/v{{ chezmoi_version }}/chezmoi_{{ chezmoi_version }}_checksums.txt"
+                    dest: "{{ chezmoi_home }}/.local/bin/chezmoi"
+                    mode: "0755"
+
+                - name: Clone and apply the dotfiles
+                  ansible.builtin.command: >-
+                    {{ chezmoi_home }}/.local/bin/chezmoi init --apply
+                    git@github.com:bluefishforsale/chezmoi.git
+                  environment:
+                    GIT_SSH_COMMAND: >-
+                      ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
+                      -o UserKnownHostsFile={{ chezmoi_home }}/.ssh/known_hosts.github
