@@ -40,7 +40,11 @@ module.exports = async (args) => {
   // With one in the output ffmpeg reports time=N/A, tdarr sees no progress, and
   // its stall detector cancels the job (Kiss of the Spider Woman, 2026-10-18).
   // Plex shows its own poster, so the cover goes, even from a finished file.
-  const isCover = (s) => s.codec_type === 'video' && /^image\//.test(tags(s).MIMETYPE || '');
+  // tdarr's stored probe can drop a cover's tags, disposition and frame rate
+  // (Bound, 2026-10-23), so the image codec is the signal that survives.
+  const IMAGE_CODECS = new Set(['mjpeg', 'png', 'bmp', 'gif', 'webp']);
+  const isCover = (s) => s.codec_type === 'video'
+    && (IMAGE_CODECS.has(s.codec_name) || /^image\//.test(tags(s).MIMETYPE || ''));
   streams.filter(isCover).forEach((s) => {
     log(`drop cover ${tags(s).FILENAME || ''} encoded as ${s.codec_name} video`);
     s.removed = true;

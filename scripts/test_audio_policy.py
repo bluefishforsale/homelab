@@ -52,6 +52,19 @@ def test_dialogue_track_scrubs_nan_after_loudnorm():
     assert "isnan(" in after and "isinf(" in after, f
 
 
+def test_cover_dropped_when_stored_probe_lost_its_tags():
+    # Bound (1996): tdarr's stored ffProbeData keeps codec_name for its 8 MJPEG
+    # covers but drops tags, disposition and frame rate, so the mimetype match
+    # missed them and hevc_nvenc stalled on time=N/A (2026-10-20, 10-23).
+    out = run([
+        stream(0, "video", "h264", width=1920, height=1080),
+        stream(1, "audio", "ac3", channels=6, tags={"language": "eng"}),
+        stream(7, "video", "mjpeg", width=1288, height=1600, tags={}, disposition=None),
+        stream(9, "video", "mjpeg", width=0, height=0, tags={}, disposition=None),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [7, 9], out
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
