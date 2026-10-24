@@ -207,12 +207,15 @@ def pack_rejection(profiles):
 # A season search goes to every indexer live and comes back with thousands of
 # releases; Young Sheldon S01 took longer than the client's default 120s.
 SEARCH_TIMEOUT = 600
+# An anime season search is the pack query plus one search per episode, each
+# about 50-75s (DAN DA DAN S02: 13 searches, 656s on 2026-10-24).
+EPISODE_SEARCH = 90
 
 
 def best_tv_release(item):
     if item["pack"]:
         rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"],
-                      timeout=SEARCH_TIMEOUT)
+                      timeout=SEARCH_TIMEOUT + EPISODE_SEARCH * len(item["episode_ids"]))
         allowed = pack_rejection(mc.get("sonarr", "/api/v3/releaseprofile"))
         ok = [r for r in rels if r.get("fullSeason") and acceptable(r, allowed)]
     else:

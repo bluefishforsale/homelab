@@ -132,6 +132,24 @@ def test_refused_season_grab_keeps_the_old_episodes():
     assert fake.deleted == [] and item["state"] == "planned"
 
 
+BEST_TV_RELEASE = refetch.best_tv_release
+
+
+def test_anime_season_search_gets_time_for_every_episode():
+    # Sonarr runs an anime season search as the pack query plus one search per
+    # episode. DAN DA DAN S02 (12 episodes) took 656s, past a flat 600s, every tick.
+    timeouts = []
+
+    class Fake:
+        def get(self, svc, path, timeout=None, **params):
+            timeouts.append(timeout)
+            return []
+
+    refetch.mc = Fake()
+    BEST_TV_RELEASE({"pack": True, "series_id": 1, "season": 2, "episode_ids": list(range(12))})
+    assert timeouts[0] > 656, timeouts
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
