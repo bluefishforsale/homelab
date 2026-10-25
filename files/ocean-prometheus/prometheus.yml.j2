@@ -180,6 +180,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9199']
 
+  # Emporia smart plugs via the cloud API; the exporter polls once a minute.
+  - job_name: 'emporia-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    static_configs:
+    - targets: ['ocean.home:9198']
+
   - job_name: 'mtr-exporter'
     relabel_configs: *dropPortNumber
     scrape_interval: 60s

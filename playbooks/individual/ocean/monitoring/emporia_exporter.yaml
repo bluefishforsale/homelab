@@ -1,0 +1,104 @@
+---
+# Emporia smart-plug power -> Prometheus exporter.
+#
+# The plugs have no local API, so this polls Emporia's cloud (pyemvue) once a
+# minute; Prometheus scrapes :{{ emporia_port }}. Feeds the Power dashboard next
+# to the IPMI readings from node005/node006. The homelab plug feeds both nodes.
+- name: Emporia exporter
+  hosts: ocean
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: emporia-exporter
+    image: "emporia-exporter:local"
+    files: "{{ playbook_dir }}/../../../../files/emporia-exporter"
+    home: "/data01/services/emporia-exporter"
+    # Hardcoded (not vars_service_ports) so this deploy does not fan out to every
+    # playbook referencing that shared file. Matches the prometheus scrape job.
+    emporia_port: 9198
+    emporia_internal_port: 8080
+    emporia_poll_seconds: 60
+    # gid=label; gids from the account's device list, labels are the metric's
+    # device label. Cloud display names ("#1 (lab)") are not used.
+    emporia_devices: "144698=homelab,144699=desk"
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    # The container runs as nobody and writes its Cognito tokens here.
+    - name: Ensure token state dir exists
+      ansible.builtin.file:
+        path: "{{ home }}/state"
+        state: directory
+        owner: '65534'
+        group: '65534'
+        mode: '0700'
+
+    - name: Copy build context (exporter, deps, Dockerfile)
+      ansible.builtin.copy:
+        src: "{{ files }}/{{ item }}"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - exporter.py
+        - requirements.txt
+        - Dockerfile
+      register: emporia_build_context
+
+    - name: Build exporter image
+      ansible.builtin.command:
+        cmd: "docker build -t {{ image }} ."
+        chdir: "{{ home }}"
+      when: emporia_build_context is changed
+
+    - name: Template env file (holds the Emporia login)
+      ansible.builtin.template:
+        src: "{{ files }}/emporia-exporter.env.j2"
+        dest: "{{ home }}/emporia-exporter.env"
+        mode: '0600'
+      register: emporia_env
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: emporia_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/emporia-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: emporia_unit
+
+    - name: Enable and start the exporter (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (emporia_env is changed or emporia_unit is changed or emporia_build_context is changed or emporia_compose is changed) else 'started' }}"
+        daemon_reload: true
+
+    # Built on this host, so docker-refresh skips it; this weekly restart is the
+    # only thing that recycles the container between applies.
+    - name: Enable the weekly container restart
+      ansible.builtin.systemd:
+        name: "docker-restart@{{ service }}.timer"
+        state: started
+        enabled: true
+
+    - name: Wait for the exporter to serve metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ emporia_port }}/metrics"
+        return_content: true
+      register: emporia_metrics
+      until: emporia_metrics.status == 200 and 'emporia_power_watts{' in emporia_metrics.content
+      retries: 12
+      delay: 10

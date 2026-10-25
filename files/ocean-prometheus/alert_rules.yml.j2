@@ -331,6 +331,20 @@ groups:
       summary: "mem0 metrics are stale on {{ "{{ $labels.instance }}" }}"
       description: "mem0-metrics.timer has not published in 15m; the mem0 dashboard is showing the past."
 
+  # Emporia's cloud API is unofficial, so an auth or schema change breaks it
+  # quietly. The gauge starts at 0, so a container that never logs in fires too;
+  # absent() covers the exporter being down entirely.
+  - alert: EmporiaExporterStale
+    expr: >
+      absent(emporia_exporter_last_success_timestamp_seconds)
+      or (time() - emporia_exporter_last_success_timestamp_seconds > 900)
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Emporia plug power has not updated in 15m"
+      description: "No poll where every plug returned a reading. emporia_up shows which plug; `docker logs emporia-exporter` on ocean shows login or API errors. The Power dashboard is missing desk/homelab draw."
+
   # A homelab service that exposes no metrics failed its blackbox probe. Keyed
   # on the category label, not a hostname, so anything added to that target
   # group inherits the alert instead of shipping unwatched.
