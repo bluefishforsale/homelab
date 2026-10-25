@@ -156,6 +156,12 @@ def test_release_of_another_years_film_is_not_grabbed():
     assert "1996" in BEST_RELEASE(1)["title"]
 
 
+def test_release_a_year_off_the_movie_is_the_same_film():
+    # Festival year against release year: Nine Days (2021) comes out as Nine.Days.2020.
+    refetch.mc = fake_movie_search(2021, ["Nine.Days.2020.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-TRiToN"])
+    assert BEST_RELEASE(1)
+
+
 
 def test_anime_season_search_gets_time_for_every_episode():
     # Sonarr runs an anime season search as the pack query plus one search per

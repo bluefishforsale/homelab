@@ -179,7 +179,7 @@ def bump(item, files, yes):
 def same_film(title, year):
     """False when the release names only other years: Radarr maps a remake's release onto the original."""
     years = {int(y) for y in re.findall(r"\b(19\d\d|20\d\d)\b", title)}
-    return not years or year in years
+    return not years or any(abs(y - year) <= 1 for y in years)    # festival vs release year
 
 
 def best_release(movie_id):
