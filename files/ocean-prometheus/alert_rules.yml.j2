@@ -29,9 +29,10 @@ groups:
 
   # High memory usage alert. The Proxmox hypervisors (node005/node006) run VMs
   # that pre-allocate RAM, so they sit near-full by design; they get a higher
-  # 95% bar in the companion rule below. All other hosts alert at 85%.
+  # 95% bar in the companion rule below, and pihole gets its own 95% rule too.
+  # All other hosts alert at 85%.
   - alert: HighMemoryUsage
-    expr: (node_memory_MemTotal_bytes{instance!~"node00[56].home"} - node_memory_MemAvailable_bytes{instance!~"node00[56].home"}) / node_memory_MemTotal_bytes{instance!~"node00[56].home"} * 100 > 85
+    expr: (node_memory_MemTotal_bytes{instance!~"node00[56].home|pihole.home"} - node_memory_MemAvailable_bytes{instance!~"node00[56].home|pihole.home"}) / node_memory_MemTotal_bytes{instance!~"node00[56].home|pihole.home"} * 100 > 85
     for: 5m
     labels:
       severity: warning
@@ -49,6 +50,18 @@ groups:
     annotations:
       summary: "High memory usage on hypervisor {{ "{{ $labels.instance }}" }}"
       description: "Memory usage is above 95% for more than 5 minutes on hypervisor {{ "{{ $labels.instance }}" }}"
+
+  # pihole: ~925 MiB with no swap, and it averages ~84% non-reclaimable use
+  # (peak 88.5%, 7d to 2026-10-25), so 85% fired constantly. NOTE: with no swap,
+  # 95% leaves little warning before the OOM killer takes FTL.
+  - alert: HighMemoryUsagePihole
+    expr: (node_memory_MemTotal_bytes{instance="pihole.home"} - node_memory_MemAvailable_bytes{instance="pihole.home"}) / node_memory_MemTotal_bytes{instance="pihole.home"} * 100 > 95
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ "{{ $labels.instance }}" }}"
+      description: "Memory usage is above 95% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
 
   # Disk space: critical near-full, plus a rate-based warning for steady fills.
   # There is deliberately no static warning tier below 90: a fixed percentage on
