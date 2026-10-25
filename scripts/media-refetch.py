@@ -176,10 +176,17 @@ def bump(item, files, yes):
     return True
 
 
+def same_film(title, year):
+    """False when the release names only other years: Radarr maps a remake's release onto the original."""
+    years = {int(y) for y in re.findall(r"\b(19\d\d|20\d\d)\b", title)}
+    return not years or year in years
+
+
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
+    year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
-          and r.get("downloadAllowed")]
+          and r.get("downloadAllowed") and same_film(r["title"], year)]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 

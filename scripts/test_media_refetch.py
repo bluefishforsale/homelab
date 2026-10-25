@@ -133,6 +133,28 @@ def test_refused_season_grab_keeps_the_old_episodes():
 
 
 BEST_TV_RELEASE = refetch.best_tv_release
+BEST_RELEASE = refetch.best_release
+
+EXISTING = "Existing file on disk has a equal or higher Custom Format score: 98"
+
+
+def fake_movie_search(year, titles):
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/release":
+                return [{"title": t, "downloadAllowed": True, "rejections": [EXISTING], "releaseWeight": w}
+                        for w, t in enumerate(titles)]
+            return {"year": year}
+    return Fake()
+
+
+def test_release_of_another_years_film_is_not_grabbed():
+    # Radarr maps a same-titled release onto the movie: The Island of Dr. Moreau
+    # (1996) was replaced by the 1977 film on 2026-10-25, its old file deleted at grab.
+    refetch.mc = fake_movie_search(1996, ["The.Island.Of.Dr.Moreau.1977.1080p.BluRay.REMUX.AVC.FLAC.2.0-EPSiLON",
+                                          "The.Island.of.Dr.Moreau.1996.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-EPSiLON"])
+    assert "1996" in BEST_RELEASE(1)["title"]
+
 
 
 def test_anime_season_search_gets_time_for_every_episode():
