@@ -1,0 +1,27 @@
+# Rendered by playbooks/individual/ocean/monitoring/emporia_exporter.yaml.
+#
+# Built here from repo source like the Cloudflare exporter: `build:` makes
+# docker-refresh skip it instead of failing on a tag no registry has.
+services:
+  emporia-exporter:
+    build: .
+    image: "{{ image }}"
+    container_name: "{{ service }}"
+    hostname: "{{ service }}"
+    env_file:
+      - emporia-exporter.env
+    volumes:
+      - ./state:/state
+    ports:
+      - "{{ emporia_port }}:{{ emporia_internal_port }}"
+    # Unhealthy when no full poll has landed in 10 minutes. CMD-SHELL, not CMD:
+    # the exec form would pass `||` to python as a literal argument.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import time,urllib.request,re; b=urllib.request.urlopen('http://127.0.0.1:{{ emporia_internal_port }}/metrics',timeout=5).read().decode(); m=re.search(r'^emporia_exporter_last_success_timestamp_seconds (\\S+)', b, re.M); raise SystemExit(0 if m and time.time()-float(m.group(1)) < 600 else 1)\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
