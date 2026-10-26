@@ -34,7 +34,11 @@
     # Parity with the apcupsd MINUTES 7 this replaces.
     nut_low_runtime_seconds: 420
     nut_files: "{{ playbook_dir }}/../../../files/nut"
-    nut_ups_host: "{{ 'localhost' if inventory_hostname == nut_server else nut_server ~ '.home' }}"
+    # NOTE: the server's static IP, not node005.home. Names on this LAN have
+    # flapped under DDNS collisions; one that resolves to the wrong box can feed
+    # a secondary a fake OB+LB, and upsmon acts on that by shutting down.
+    nut_server_ip: "{{ hostvars[nut_server].ansible_ssh_host }}"
+    nut_ups_host: "{{ 'localhost' if inventory_hostname == nut_server else nut_server_ip }}"
 
   tasks:
     - name: Install NUT
@@ -119,6 +123,21 @@
               changed_when: false
               loop: "{{ nut_ups_serials }}"
 
+            # Inside the block so a failure here also restores apcupsd. With
+            # ignorelb, a UPS whose full-charge runtime is already under
+            # nut_low_runtime_seconds reads OL LB and would fail this.
+            - name: Every UPS reads on-line, not on battery, not low
+              ansible.builtin.assert:
+                that:
+                  - "'OL' in item.stdout.split()"
+                  - "'OB' not in item.stdout.split()"
+                  - "'LB' not in item.stdout.split()"
+                fail_msg: "ups-{{ item.item }} status is '{{ item.stdout }}'"
+                quiet: true
+              loop: "{{ nut_status.results }}"
+              loop_control:
+                label: "ups-{{ item.item }}"
+
           rescue:
             - name: Stop NUT so apcupsd can take the USB devices back
               ansible.builtin.systemd:
@@ -137,7 +156,7 @@
 
             - name: Fail with the reason
               ansible.builtin.fail:
-                msg: "NUT could not read every UPS; apcupsd restored on {{ inventory_hostname }}. Check `journalctl -u 'nut-driver@*'`."
+                msg: "NUT could not read every UPS as on-line; apcupsd restored on {{ inventory_hostname }}. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
 
     - name: Read each UPS from this host
       ansible.builtin.command: "upsc ups-{{ item }}@{{ nut_ups_host }}"

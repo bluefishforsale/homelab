@@ -1,7 +1,7 @@
 # Rendered by playbooks/individual/base/nut_ups.yaml.
 {% set primary = inventory_hostname == nut_server %}
 {% for serial in nut_ups_serials %}
-MONITOR ups-{{ serial }}@{{ 'localhost' if primary else nut_server ~ '.home' }} 1 {{ 'upsmon_primary' if primary else 'upsmon_secondary' }} {{ infrastructure.nut.primary_password if primary else infrastructure.nut.secondary_password }} {{ 'primary' if primary else 'secondary' }}
+MONITOR ups-{{ serial }}@{{ nut_ups_host }} 1 {{ 'upsmon_primary' if primary else 'upsmon_secondary' }} {{ infrastructure.nut.primary_password if primary else infrastructure.nut.secondary_password }} {{ 'primary' if primary else 'secondary' }}
 {% endfor %}
 
 # NOTE: shut down when ANY UPS is critical (on battery + low battery). Which UPS
