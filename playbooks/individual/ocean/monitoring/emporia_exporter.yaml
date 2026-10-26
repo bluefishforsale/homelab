@@ -24,6 +24,20 @@
     # gid=label; gids from the account's device list, labels are the metric's
     # device label. Cloud display names ("#1 (lab)") are not used.
     emporia_devices: "144698=homelab,144699=desk"
+    # PG&E E-TOU-C (Ava generation nets out), USD/kWh all-in incl. 7.5% Oakland
+    # utility tax, above-baseline. Summer is from the 2026-08/09 bill. Winter is
+    # PG&E's published 2026-03-01 rate (37c off-peak, 40c peak) x 1.075, an
+    # estimate until a winter bill confirms it. Under NEM2 every kWh costs the
+    # TOU rate for its hour, solar or not. The baseline credit (-$0.081 on the
+    # first 6.5 kWh/day of house net usage) is not marginal to the lab and is
+    # left out, as is the fixed $25.59/month.
+    electricity_rates:
+      timezone: America/Los_Angeles
+      summer_months: [6, 7, 8, 9]
+      peak_hours: [16, 21]
+      rates:
+        summer: { peak: 0.56, off_peak: 0.43 }
+        winter: { peak: 0.43, off_peak: 0.40 }
 
   tasks:
     - name: Ensure basedir exists

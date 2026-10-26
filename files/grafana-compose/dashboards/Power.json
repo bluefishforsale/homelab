@@ -6,7 +6,8 @@
   "tags": [
     "power",
     "ipmi",
-    "emporia"
+    "emporia",
+    "cost"
   ],
   "time": {
     "from": "now-24h",
@@ -319,6 +320,263 @@
     {
       "id": 5,
       "type": "stat",
+      "title": "Rate now",
+      "description": "PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 4,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "electricity_rate_usd_per_kwh",
+          "legendFormat": "$/kWh",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Cost over selected range",
+      "description": "PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 28,
+        "w": 10,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Monthly at last 7 days' pace",
+      "description": "Last 7 days of priced usage scaled to a 730-hour month. PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 28,
+        "w": 10,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Daily cost",
+      "description": "Trailing 24h cost, sampled once a day. PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "{{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "timeFrom": "30d",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
       "title": "Emporia plug reporting",
       "description": "1 when the last cloud poll returned a reading for this plug.",
       "datasource": {
@@ -327,7 +585,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 42,
         "w": 12,
         "h": 4
       },
@@ -364,7 +622,7 @@
       }
     },
     {
-      "id": 6,
+      "id": 10,
       "type": "stat",
       "title": "Since last full Emporia poll",
       "description": "",
@@ -374,7 +632,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 28,
+        "y": 42,
         "w": 12,
         "h": 4
       },

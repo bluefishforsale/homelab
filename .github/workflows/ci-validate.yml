@@ -309,6 +309,10 @@ jobs:
       - name: nzbget-prune rules
         run: python3 files/ocean-nzbget/test_nzbget_prune.py
 
+      # A wrong TOU boundary misprices every minute on the Power dashboard.
+      - name: emporia-exporter rate schedule
+        run: python3 files/emporia-exporter/test_rates.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.
