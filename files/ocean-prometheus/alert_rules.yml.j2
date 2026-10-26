@@ -677,3 +677,52 @@ groups:
     annotations:
       summary: "IPMI sensor warning: {{ "{{ $labels.name }}" }} ({{ "{{ $labels.type }}" }}) on {{ "{{ $labels.instance }}" }}"
       description: "BMC reports sensor '{{ "{{ $labels.name }}" }}' (type {{ "{{ $labels.type }}" }}) in a non-critical warning state on {{ "{{ $labels.instance }}" }} for 15m. Approaching a threshold; check the Dell Hardware (IPMI) dashboard before it escalates."
+
+- name: ups_alerts
+  rules:
+  # The three Back-UPS on node005's NUT server (nut_ups.yaml). upsmon on
+  # node005/node006 does the shutting down; these only make it visible. All
+  # three hang off one wall socket, so a real outage fires for all three.
+  - alert: UpsOnBattery
+    expr: network_ups_tools_ups_status{flag="OB"} == 1
+    for: 30s
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} is on battery"
+      description: "{{ "{{ $labels.ups }}" }} lost input power. upsmon shuts node005 and node006 down when any UPS reaches low battery (420s runtime). Check the wall socket and breaker."
+
+  - alert: UpsLowBattery
+    expr: network_ups_tools_ups_status{flag="LB"} == 1
+    for: 0m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} is at low battery"
+      description: "{{ "{{ $labels.ups }}" }} reports LB (runtime under 420s). If it is also on battery, upsmon is shutting the hypervisors down now. If it is on-line, its battery is too weak to cover a shutdown: replace it."
+
+  # Full-charge runtime creeping toward the shutdown threshold means an aging
+  # battery: an outage would trigger shutdown within moments of starting.
+  - alert: UpsRuntimeNearShutdownThreshold
+    expr: network_ups_tools_battery_runtime < 600 and network_ups_tools_ups_status{flag="OL"} == 1
+    for: 1h
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} has under 10 min runtime on-line"
+      description: "{{ "{{ $labels.ups }}" }} would last {{ "{{ $value }}" }}s at current load and upsmon shuts down at 420s, so an outage starts the shutdown almost at once. Shed load from it or replace its battery."
+
+  # Absence is the alertable state: if the exporter or NUT server is down, every
+  # rule above goes quiet at the moment it matters.
+  - alert: UpsMonitoringDown
+    expr: up{job="nut"} == 0 or absent(up{job="nut"})
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "UPS monitoring down for {{ "{{ $labels.ups }}" }}"
+      description: "Prometheus cannot read {{ "{{ $labels.ups }}" }} via nut-exporter on ocean:9197 -> node005:3493. Check `upsc -l` on node005, the nut-driver@ units, and the nut-exporter container. upsmon shutdown may still work; visibility does not."
