@@ -26,7 +26,7 @@ services:
     
     # Tmpfs mounts for runtime directories
     tmpfs:
-      - /var/run/mysqld:uid=1001,gid=1001
+      - /var/run/mysqld:uid={{ mysql_uid }},gid={{ mysql_gid }}
       - /tmp
     
     # Health check - check if MySQL is ready to accept connections
@@ -37,8 +37,7 @@ services:
       retries: 5
       start_period: 60s
     
-    # Run as standard homelab user for proper file permissions
-    # user: "{{ uid }}:{{ gid }}"  # Temporarily disabled - may prevent MySQL startup
+    user: "{{ mysql_uid }}:{{ mysql_gid }}"
     
     # Security options
     security_opt:
