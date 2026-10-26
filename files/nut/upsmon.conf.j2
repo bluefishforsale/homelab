@@ -1,0 +1,20 @@
+# Rendered by playbooks/individual/base/nut_ups.yaml.
+{% set primary = inventory_hostname == nut_server %}
+{% for serial in nut_ups_serials %}
+MONITOR ups-{{ serial }}@{{ 'localhost' if primary else nut_server ~ '.home' }} 1 {{ 'upsmon_primary' if primary else 'upsmon_secondary' }} {{ infrastructure.nut.primary_password if primary else infrastructure.nut.secondary_password }} {{ 'primary' if primary else 'secondary' }}
+{% endfor %}
+
+# NOTE: shut down when ANY UPS is critical (on battery + low battery). Which UPS
+# feeds which PSU is unknown, and all three hang off one wall socket, so an
+# outage puts all three on battery at once; the first to run low decides. A UPS
+# that is unreachable but was last seen online still counts as powering us, so
+# losing node005 (or USB) alone never shuts node006 down.
+MINSUPPLIES {{ nut_ups_serials | length }}
+
+SHUTDOWNCMD "/sbin/shutdown -h +0"
+POWERDOWNFLAG /etc/killpower
+POLLFREQ 5
+POLLFREQALERT 5
+HOSTSYNC 15
+DEADTIME 15
+FINALDELAY 5
