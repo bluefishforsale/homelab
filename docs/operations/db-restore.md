@@ -138,7 +138,7 @@ Service names are exactly these. A name that is not listed is rejected with
 | `navidrome` | sqlite | `navidrome/navidrome.db.gz` | `navidrome` | `/data01/services/navidrome/data/navidrome.db` |
 | `tautulli` | sqlite | `tautulli/tautulli.db.gz` | `tautulli` | `/data01/services/tautulli/config/tautulli.db` |
 | `overseerr` | sqlite | `overseerr/overseerr.db.gz` | `overseerr` | `/data01/services/overseerr/config/db/db.sqlite3` |
-| `homeassistant` | sqlite | `homeassistant/homeassistant.db.gz` | `homeassistant` | `/data01/services/homeassistant/home-assistant_v2.db` |
+| `homeassistant` | sqlite | `homeassistant/homeassistant.db.gz` | `homeassistant` | `/data01/services/homeassistant/config/home-assistant_v2.db` |
 | `open-webui` | sqlite | `open-webui/open-webui.db.gz` | `open-webui` | `/data01/services/open-webui/data/webui.db` |
 | `paia` | sqlite | `paia/paia.db.gz` | `paia` | `/data01/services/paia/data/paia.db` |
 | `photonic_inventory` | sqlite | `photonic_inventory/photonic_inventory.db.gz` | `photonic_inventory` | `/data01/services/photonic_inventory/data/photonic.db` |
