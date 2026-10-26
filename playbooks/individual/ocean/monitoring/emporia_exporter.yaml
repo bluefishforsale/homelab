@@ -38,6 +38,9 @@
       rates:
         summer: { peak: 0.56, off_peak: 0.43 }
         winter: { peak: 0.43, off_peak: 0.40 }
+    # Serialized here, not in the template: CI's template check is plain Jinja2
+    # and has no Ansible filters.
+    electricity_rates_json: "{{ electricity_rates | to_json }}"
 
   tasks:
     - name: Ensure basedir exists
