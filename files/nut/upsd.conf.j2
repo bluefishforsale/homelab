@@ -1,0 +1,8 @@
+# Rendered by playbooks/individual/base/nut_ups.yaml (nut server only).
+# node006's upsmon and the exporter on ocean read from here.
+# NOTE: all addresses, not 192.168.1.105: binding a specific IP fails if upsd
+# starts before vmbr0 is up, which would silently cost both hosts their
+# shutdown signal. Reads are LAN-only data apcupsd's NIS already served; the
+# primary credential (the one that can force a shutdown) only travels over
+# localhost.
+LISTEN 0.0.0.0 3493
