@@ -705,8 +705,10 @@ groups:
 
   # Full-charge runtime creeping toward the shutdown threshold means an aging
   # battery: an outage would trigger shutdown within moments of starting.
+  # NOTE: `on(ups)` is required. The status series carries a `flag` label the
+  # runtime series lacks, so a bare `and` matches nothing and the rule is mute.
   - alert: UpsRuntimeNearShutdownThreshold
-    expr: network_ups_tools_battery_runtime < 600 and network_ups_tools_ups_status{flag="OL"} == 1
+    expr: network_ups_tools_battery_runtime < 600 and on(ups) network_ups_tools_ups_status{flag="OL"} == 1
     for: 1h
     labels:
       severity: warning
