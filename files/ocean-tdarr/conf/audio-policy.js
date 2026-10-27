@@ -41,10 +41,24 @@ module.exports = async (args) => {
   // its stall detector cancels the job (Kiss of the Spider Woman, 2026-10-18).
   // Plex shows its own poster, so the cover goes, even from a finished file.
   // The flow can hand a cover over as codec_type "attachment" (Bound, 2026-10-24).
-  // Font attachments stay: the subtitles need them.
-  const isCover = (s) => ['video', 'attachment'].includes(s.codec_type) && /^image\//.test(tags(s).MIMETYPE || '');
+  // Font attachments stay: the subtitles need them. An mp4 cover carries no
+  // mimetype, only the attached_pic disposition (Tenzing, 2026-10-24).
+  const isCover = (s) => ['video', 'attachment'].includes(s.codec_type)
+    && (/^image\//.test(tags(s).MIMETYPE || '') || (s.disposition || {}).attached_pic === 1);
   streams.filter(isCover).forEach((s) => {
     log(`drop cover ${tags(s).FILENAME || ''} encoded as ${s.codec_name} video`);
+    s.removed = true;
+    cmd.shouldProcess = true;
+  });
+
+  // mp4 text subtitles (Tenzing, 2026-10-24): matroska cannot hold mov_text.
+  streams.filter((s) => s.codec_name === 'mov_text').forEach((s) => {
+    s.outputArgs.push('-c:{outputIndex}', 'srt');
+    cmd.shouldProcess = true;
+  });
+  // Nor any data stream (Tenzing's bin_data text track).
+  streams.filter((s) => s.codec_type === 'data').forEach((s) => {
+    log(`drop data stream ${s.codec_name}`);
     s.removed = true;
     cmd.shouldProcess = true;
   });
