@@ -62,6 +62,16 @@ module.exports = async (args) => {
     s.removed = true;
     cmd.shouldProcess = true;
   });
+  // ffmpeg's progress time waits on the sparsest output stream. A foreign
+  // forced track can go half an hour between cues, and tdarr's stall detector
+  // cancels the job (Blade Runner 2049, 2026-10-28). English forced subs stay.
+  const isForced = (s) => (s.disposition || {}).forced === 1 || /forced/i.test(title(s));
+  streams.filter((s) => s.codec_type === 'subtitle' && isForced(s) && !['eng', 'en'].includes(lang(s)))
+    .forEach((s) => {
+      log(`drop ${lang(s)} forced subtitle ${title(s)}`);
+      s.removed = true;
+      cmd.shouldProcess = true;
+    });
 
   const audio = streams.filter((s) => s.codec_type === 'audio');
   if (audio.length === 0) {

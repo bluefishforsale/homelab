@@ -101,6 +101,22 @@ def test_mp4_data_stream_is_dropped():
     assert [s["index"] for s in out if s["removed"]] == [43], out
 
 
+def test_foreign_forced_subtitles_are_dropped():
+    # Blade Runner 2049 and Once Upon a Time in the West (2026-10-28): a German
+    # forced track has a cue every half hour or so, ffmpeg's progress time waits
+    # on it, and tdarr's stall detector cancels a job that is copying at 2.8x.
+    # English forced subtitles are the ones anyone here reads; they stay.
+    out = run([
+        stream(0, "video", "hevc", width=1920, height=1080),
+        stream(1, "audio", "ac3", channels=6, tags={"language": "eng"}),
+        stream(2, "subtitle", "subrip", tags={"language": "ger", "title": "forced"}),
+        stream(3, "subtitle", "hdmv_pgs_subtitle", tags={"language": "ger", "title": "Deutsch (PGS)"}),
+        stream(4, "subtitle", "hdmv_pgs_subtitle", tags={"language": "ger"}, disposition={"forced": 1}),
+        stream(5, "subtitle", "subrip", tags={"language": "eng", "title": "English Forced"}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [2, 4], out
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
