@@ -33,6 +33,11 @@
       - 3B2116X60175
     # Parity with the apcupsd MINUTES 7 this replaces.
     nut_low_runtime_seconds: 420
+    # How long the primary holds itself up for the secondaries to power off.
+    # Budget: this + the primary's own guest stop + the 20s UPS off delay must
+    # fit inside nut_low_runtime_seconds.
+    nut_shutdown_wait_seconds: 240
+    nut_secondary_ips: "{{ groups['baremetal'] | difference([nut_server]) | map('extract', hostvars, 'ansible_ssh_host') | list }}"
     nut_files: "{{ playbook_dir }}/../../../files/nut"
     # NOTE: the server's static IP, not node005.home. Names on this LAN have
     # flapped under DDNS collisions; one that resolves to the wrong box can feed
@@ -46,6 +51,17 @@
         name: "{{ ['nut-client', 'nut-server'] if inventory_hostname == nut_server else ['nut-client'] }}"
         update_cache: true
         cache_valid_time: 86400
+
+    # Before upsmon.conf, which points SHUTDOWNCMD at it on the primary.
+    - name: Install the primary's shutdown wait
+      ansible.builtin.template:
+        src: "{{ nut_files }}/shutdown-wait.sh.j2"
+        dest: /usr/local/sbin/nut-shutdown-wait
+        owner: root
+        group: root
+        mode: '0755'
+      when: inventory_hostname == nut_server
+      register: nut_shutdown_wait
 
     - name: Template client config
       ansible.builtin.template:
@@ -193,7 +209,7 @@
     - name: Start upsmon
       ansible.builtin.systemd:
         name: nut-monitor.service
-        state: "{{ 'restarted' if nut_client_conf is changed else 'started' }}"
+        state: "{{ 'restarted' if (nut_client_conf is changed or nut_shutdown_wait is changed) else 'started' }}"
         enabled: true
 
     # Gate before the next host: upsd must list THIS host as a logged-in
