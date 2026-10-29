@@ -223,6 +223,29 @@
         daemon_reload: true
       loop: [docker.service, data01-worker-retry.timer]
 
+    # The compose services on a worker are oneshot units with
+    # Requires=docker.service: stopping docker for the migration stops them and
+    # nothing starts them again. Converge to what a reboot would do: every
+    # enabled unit that depends on docker is running.
+    - name: Find enabled docker-dependent units that are not running
+      ansible.builtin.shell: |
+        systemctl list-dependencies --reverse --plain --no-legend docker.service \
+          | awk '{print $1}' | grep -vx docker.service \
+          | while read -r u; do
+              [ "$(systemctl is-enabled "$u" 2>/dev/null)" = enabled ] || continue
+              systemctl is-active -q "$u" || echo "$u"
+            done
+      args:
+        executable: /bin/bash
+      register: docker_units_down
+      changed_when: false
+
+    - name: Start them
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+      loop: "{{ docker_units_down.stdout_lines }}"
+
     - name: Containers came back
       ansible.builtin.command: docker ps --filter name=node-exporter --filter status=running -q
       register: worker_containers
