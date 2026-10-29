@@ -161,9 +161,41 @@ Both halves have to be edited or the service is silently half-covered:
 2. `files/db-backup/db-restore.sh` — add a `meta()` arm **and** the name to
    `ALL`. A name in `ALL` with no `meta()` arm is skipped with `unknown service`
    during `restore_service=all`, which looks like a pass unless you read the log.
+3. `files/db-backup/db-restore.sh` again: add a `probe()` arm. Without one the
+   nightly restore test fails that service with `no probe registered`.
 
-Then dispatch `db_backup.yaml` to land the script. Neither file deploys on
-merge.
+Then dispatch `db_backup.yaml` to land the backup script. `db-restore.sh` also
+deploys on merge to harbor through `db_restore_test.yaml`.
+
+## The nightly restore test
+
+`db-restore-test.timer` on harbor runs `db-restore.sh` with `MODE=verify` at
+06:00, after the 03:30 backup on ocean. For every service it downloads the
+current object with a read-only key (`backup_storage.gcs.restore_test_key`),
+loads it into a throwaway `--network none` container (or runs `PRAGMA
+integrity_check` for SQLite), and runs that service's `probe()` query for the
+epoch of its newest record. Containers carry the `db-restore-test` label and
+are swept at the start and end of every run, and payloads are deleted as each
+service finishes. It never touches a live database, and `CONFIRM=RESTORE` with
+`MODE=verify` refuses to run.
+
+A probe fails on an empty result, and services with a third `probe()` field
+(hours) also fail when the newest record is older than that. Only services that
+write on their own schedule get one (the *arr task tables, homeassistant
+states, grafana's `server_lock`, jellystat's `jf_logging`, mem0's
+`request_logs`), because a quiet app's newest row is legitimately old.
+
+Results go to `homelab_db_restore_test_*` in harbor's textfile collector, and
+`DbRestoreTestFailing` / `DbRestoreTestStale` alert on them. To run one service
+by hand on harbor:
+
+```bash
+sudo env DB_BACKUP_ENV=/nonexistent $(sudo cat /var/lib/db-restore-test/db-restore-test.env | xargs) \
+  SERVICE=sonarr TEXTFILE_DIR=/tmp /var/lib/db-restore-test/db-restore.sh
+```
+
+Metrics are only written for `SERVICE=all`, so a hand run never overwrites the
+nightly result.
 
 ## Things that will bite you
 
@@ -184,6 +216,9 @@ merge.
 
 - Backup job: `playbooks/operations/backup/db_backup.yaml`,
   `files/db-backup/db-backup.sh`
-- Alerts: `DbBackupStale` and `DbBackupFailing` in
+- Restore test: `playbooks/individual/infrastructure/db_restore_test.yaml`,
+  `files/db-restore-test/`
+- Alerts: `DbBackupStale`, `DbBackupFailing`, `DbRestoreTestFailing` and
+  `DbRestoreTestStale` in
   `files/ocean-prometheus/alert_rules.yml.j2`
 - Metrics: `homelab_db_backup_*` via the node-exporter textfile collector
