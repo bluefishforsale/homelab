@@ -184,6 +184,15 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9199']
 
+  # Tdarr via its API; each scrape reads the whole job history (~30 MB), so
+  # the interval is relaxed and the timeout covers a busy server.
+  - job_name: 'tdarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 2m
+    scrape_timeout: 60s
+    static_configs:
+    - targets: ['ocean.home:9196']
+
   # Emporia smart plugs via the cloud API; the exporter polls once a minute.
   - job_name: 'emporia-exporter'
     relabel_configs: *dropPortNumber

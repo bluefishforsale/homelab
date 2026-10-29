@@ -345,6 +345,18 @@ groups:
       summary: "Emporia plug power has not updated in 15m"
       description: "No poll where every plug returned a reading. emporia_up shows which plug; `docker logs emporia-exporter` on ocean shows login or API errors. The Power dashboard is missing desk/homelab draw."
 
+  # tdarr_up is 0 when the exporter runs but cannot read Tdarr; absent()
+  # covers the exporter itself being down.
+  - alert: TdarrExporterDown
+    expr: >
+      absent(tdarr_up) or tdarr_up == 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tdarr metrics have not been readable for 15m"
+      description: "tdarr-exporter on ocean cannot read Tdarr's API (or is down). `journalctl -u tdarr-exporter` and `docker logs tdarr-exporter` on ocean show why; the Tdarr dashboard is showing the past."
+
   # A homelab service that exposes no metrics failed its blackbox probe. Keyed
   # on the category label, not a hostname, so anything added to that target
   # group inherits the alert instead of shipping unwatched.

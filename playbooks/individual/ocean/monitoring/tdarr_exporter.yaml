@@ -1,0 +1,88 @@
+---
+# Tdarr -> Prometheus exporter.
+#
+# Tdarr has no metrics endpoint, so this reads its API (status, nodes, queue
+# stats, job history) on every scrape. Feeds the Tdarr dashboard, which breaks
+# throughput, job time and savings down per worker node.
+- name: Tdarr exporter
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: tdarr-exporter
+    image: "tdarr-exporter:local"
+    files: "{{ playbook_dir }}/../../../../files/tdarr-exporter"
+    home: "/data01/services/tdarr-exporter"
+    # Hardcoded (not vars_service_ports) so this deploy does not fan out to every
+    # playbook referencing that shared file. Matches the prometheus scrape job.
+    tdarr_exporter_port: 9196
+    # The host address, not localhost: the exporter runs on a compose bridge.
+    tdarr_url: "http://{{ ansible_default_ipv4.address }}:{{ service_ports.tdarr.port }}"
+    tdarr_duration_window_hours: 24
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy build context (exporter, deps, Dockerfile)
+      ansible.builtin.copy:
+        src: "{{ files }}/{{ item }}"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - exporter.py
+        - requirements.txt
+        - Dockerfile
+      register: tdarr_exporter_build_context
+
+    - name: Build exporter image
+      ansible.builtin.command:
+        cmd: "docker build -t {{ image }} ."
+        chdir: "{{ home }}"
+      when: tdarr_exporter_build_context is changed
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: tdarr_exporter_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/tdarr-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: tdarr_exporter_unit
+
+    - name: Enable and start the exporter (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (tdarr_exporter_unit is changed or tdarr_exporter_build_context is changed or tdarr_exporter_compose is changed) else 'started' }}"
+        daemon_reload: true
+
+    # Built on this host, so docker-refresh skips it; this weekly restart is the
+    # only thing that recycles the container between applies.
+    - name: Enable the weekly container restart
+      ansible.builtin.systemd:
+        name: "docker-restart@{{ service }}.timer"
+        state: started
+        enabled: true
+
+    - name: Wait for the exporter to read Tdarr
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ tdarr_exporter_port }}/metrics"
+        return_content: true
+        timeout: 60
+      register: tdarr_exporter_metrics
+      until: tdarr_exporter_metrics.status == 200 and '\ntdarr_up 1.0' in tdarr_exporter_metrics.content
+      retries: 12
+      delay: 10
