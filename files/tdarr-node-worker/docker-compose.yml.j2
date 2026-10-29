@@ -1,9 +1,8 @@
 # Rendered by playbooks/individual/workers/tdarr_node.yaml.
 #
 # A CPU-only tdarr node on a data01 worker. The server and its database stay on
-# ocean; this node takes the flow's CPU work (audio-only passes on files that
-# are already HEVC) and the flow's requireNvenc step hands video encodes back to
-# ocean's GPU workers.
+# ocean; this node runs the whole flow on CPU, encoding non-HEVC video with
+# libx265 (the flow's routeEncoder step picks it for any non-NVENC worker).
 #
 # NOTE: the image tag is pinned to the server's version at deploy time. A node
 # refuses a server of another version, and :latest refreshed on its own

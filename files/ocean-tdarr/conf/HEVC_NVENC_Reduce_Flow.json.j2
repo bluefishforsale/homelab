@@ -1,7 +1,7 @@
 {
   "_id": "MinimalHEVC",
   "name": "HEVC NVenc - Minimal Single-Plugin",
-  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC NVENC encode for non-HEVC video, on a GPU worker only (CPU workers take the audio-only passes)",
+  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC encode for non-HEVC video: hevc_nvenc on an NVENC GPU worker, libx265 CRF 18 on a CPU worker (harbor), matched on SSIM",
   "tags": "",
   "flowPlugins": [
     {
@@ -59,18 +59,33 @@
       }
     },
     {
-      "name": "Require NVENC Worker",
+      "name": "Route Encoder By Worker",
       "sourceRepo": "Community",
-      "pluginName": "tagsWorkerType",
+      "pluginName": "customFunction",
       "version": "1.0.0",
       "inputsDB": {
-        "requiredWorkerType": "GPU:nvenc"
+        "code": "// Pick the encoder for the worker running this file. Before this, CPU workers\n// requeued every encode for NVENC, and the requeued files filled tdarr's\n// 100-file staging limit, so harbor sat idle behind ocean's two GPU slots.\nmodule.exports = async (args) => {\n  const nvenc = args.workerType === 'transcodegpu' && args.nodeHardwareType === 'nvenc';\n  args.jobLog(`encoder: ${nvenc ? 'hevc_nvenc' : 'libx265'} (worker ${args.workerType}, hardware ${args.nodeHardwareType})`);\n  return { outputFileObj: args.inputFileObj, outputNumber: nvenc ? 1 : 2, variables: args.variables };\n};\n"
       },
       "fpEnabled": true,
-      "id": "requireNvenc",
+      "id": "routeEncoder",
       "position": {
         "x": 700,
         "y": 100
+      }
+    },
+    {
+      "name": "Encode Video Only (CPU)",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandCustomArguments",
+      "version": "1.0.0",
+      "inputsDB": {
+        "outputArguments": "-c:V libx265 -preset:V medium -crf:V 18 -maxrate:V 40M -bufsize:V 50M -x265-params:V log-level=error -disposition:V:0 +default -dn"
+      },
+      "fpEnabled": true,
+      "id": "encodeCpu",
+      "position": {
+        "x": 800,
+        "y": 200
       }
     },
     {
@@ -276,16 +291,30 @@
     {
       "source": "checkCodec",
       "sourceHandle": "2",
-      "target": "requireNvenc",
+      "target": "routeEncoder",
       "targetHandle": null,
       "id": "e5"
     },
     {
-      "source": "requireNvenc",
+      "source": "routeEncoder",
       "sourceHandle": "1",
       "target": "encodeAll",
       "targetHandle": null,
       "id": "e23"
+    },
+    {
+      "source": "routeEncoder",
+      "sourceHandle": "2",
+      "target": "encodeCpu",
+      "targetHandle": null,
+      "id": "e24"
+    },
+    {
+      "source": "encodeCpu",
+      "sourceHandle": "1",
+      "target": "setContainer",
+      "targetHandle": null,
+      "id": "e25"
     },
     {
       "source": "encodeAll",
