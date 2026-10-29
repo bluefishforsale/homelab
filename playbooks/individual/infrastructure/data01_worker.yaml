@@ -1,0 +1,232 @@
+---
+# Turn a [data01_workers] host into a worker that sees ocean's /data01 over NFS
+# while keeping every service's state on its own local disk.
+#
+# Spec: docs/specs/2026-10-17-node005-docker-host-design.md (4.3, 4.4), rollout
+# step 6. ocean's export is nfs_export_data01.yaml (step 5).
+#
+# NOTE: the local state disk mounts OVER /data01/services, a directory that also
+# exists on the NFS side as ocean's live service dirs. If the local mount is
+# missing, a worker's containers write straight into ocean's databases over
+# NFS. Three guards, all required:
+#   1. docker.service RequiresMountsFor=/data01 /data01/services
+#   2. docker ExecStartPre refuses to start unless /data01/services/.worker-local
+#      exists; only the local disk carries that file
+#   3. ocean must never have that file (asserted in the first play)
+# Nothing with a write-ahead log crosses NFS (agents.md): state lives on the
+# local disk, NFS carries media and downloads only.
+
+- name: ocean is a clean NFS source for workers
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  tasks:
+    - name: Read ocean's /data01/services sentinel
+      ansible.builtin.stat:
+        path: /data01/services/.worker-local
+      register: ocean_sentinel
+
+    - name: ocean must not carry the worker sentinel
+      ansible.builtin.assert:
+        that: not ocean_sentinel.stat.exists
+        fail_msg: "/data01/services/.worker-local exists on ocean; a worker with a failed local mount would pass its docker guard and write into ocean's live service dirs. Remove it."
+
+    - name: Read ocean's ids
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: ocean ids match system_users
+      ansible.builtin.assert:
+        that:
+          - "ansible_facts.getent_passwd[item][1] | int == system_users[item].uid | int"
+          - "ansible_facts.getent_passwd[item][2] | int == system_users[item].gid | int"
+        fail_msg: "{{ item }} on ocean is {{ ansible_facts.getent_passwd[item][1] }}:{{ ansible_facts.getent_passwd[item][2] }}, expected {{ system_users[item].uid }}:{{ system_users[item].gid }}"
+        quiet: true
+      loop: [terrac, media]
+
+- name: data01 worker (NFS media, local state)
+  hosts: data01_workers
+  become: true
+  serial: 1
+  any_errors_fatal: true
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  vars:
+    # Static IP, not ocean.home: names on this LAN have flapped under DDNS
+    # collisions, and this mount is where every worker's media comes from.
+    data01_nfs_server: "{{ hostvars['ocean'].ansible_ssh_host }}"
+    data01_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime,_netdev,x-systemd.mount-timeout=30"
+    # By stable id, same reason drives go by WWN: sdX can reorder.
+    worker_state_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
+    worker_state_init: /mnt/worker-state-init
+
+  tasks:
+    - name: Install the NFS client
+      ansible.builtin.apt:
+        name: [nfs-common, rsync]
+        update_cache: true
+        cache_valid_time: 86400
+
+    # NFS sec=sys shares by number, so a mismatch writes files as someone else.
+    - name: Read this worker's ids
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: Worker ids match ocean (system_users)
+      ansible.builtin.assert:
+        that:
+          - "ansible_facts.getent_passwd[item][1] | int == system_users[item].uid | int"
+          - "ansible_facts.getent_passwd[item][2] | int == system_users[item].gid | int"
+        fail_msg: "{{ item }} on {{ inventory_hostname }} is {{ ansible_facts.getent_passwd[item][1] }}:{{ ansible_facts.getent_passwd[item][2] }}, expected {{ system_users[item].uid }}:{{ system_users[item].gid }}"
+        quiet: true
+      loop: [terrac, media]
+
+    - name: Read the state disk's filesystem
+      ansible.builtin.command: "blkid -o value -s TYPE {{ worker_state_disk }}"
+      register: state_fs
+      changed_when: false
+      failed_when: state_fs.rc not in [0, 2]
+
+    # blkid exits 2 when the device has no filesystem at all; anything else
+    # already on it is left alone.
+    - name: Make the state disk ext4 (blank disk only)
+      ansible.builtin.command: "mkfs.ext4 -L worker-state {{ worker_state_disk }}"
+      when: state_fs.rc == 2
+
+    - name: Read current mounts
+      ansible.builtin.command: "findmnt -n -o FSTYPE {{ item }}"
+      register: mounts_before
+      changed_when: false
+      failed_when: false
+      loop: [/data01, /data01/services]
+
+    - name: First mount, moving existing state onto the local disk
+      when: mounts_before.results[1].stdout != 'ext4'
+      block:
+        # Past this point /data01/services on the root disk is the only copy of
+        # the exporters' state; if NFS is already mounted, that path is ocean's
+        # and copying it would pull ocean's service dirs onto the worker.
+        - name: Refuse to migrate through an NFS-mounted /data01
+          ansible.builtin.assert:
+            that: mounts_before.results[0].stdout == ''
+            fail_msg: "/data01 is already mounted ({{ mounts_before.results[0].stdout }}) but the local state disk is not; fix by hand, the migration would copy ocean's /data01/services."
+
+        - name: Stop docker while state moves
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop: [docker.socket, docker.service]
+
+        - name: Mount the state disk somewhere temporary
+          ansible.builtin.shell: |
+            set -e
+            mkdir -p {{ worker_state_init }}
+            mount {{ worker_state_disk }} {{ worker_state_init }}
+            mkdir -p /data01/services
+            rsync -aHAX /data01/services/ {{ worker_state_init }}/
+            touch {{ worker_state_init }}/.worker-local
+            umount {{ worker_state_init }}
+          args:
+            executable: /bin/bash
+
+    - name: Mount ocean's /data01 over NFS
+      ansible.builtin.mount:
+        path: /data01
+        src: "{{ data01_nfs_server }}:/data01"
+        fstype: nfs4
+        opts: "{{ data01_nfs_opts }}"
+        state: mounted
+
+    - name: Mount the local state disk over /data01/services
+      ansible.builtin.mount:
+        path: /data01/services
+        src: "{{ worker_state_disk }}"
+        fstype: ext4
+        opts: "defaults,noatime,x-systemd.requires=data01.mount"
+        state: mounted
+
+    - name: Read mounts after
+      ansible.builtin.command: "findmnt -n -o FSTYPE {{ item }}"
+      register: mounts_after
+      changed_when: false
+      loop: [/data01, /data01/services]
+
+    - name: Read the sentinel through the final mount
+      ansible.builtin.stat:
+        path: /data01/services/.worker-local
+      register: worker_sentinel
+
+    - name: /data01 is NFS, /data01/services is the local disk carrying the sentinel
+      ansible.builtin.assert:
+        that:
+          - mounts_after.results[0].stdout == 'nfs4'
+          - mounts_after.results[1].stdout == 'ext4'
+          - worker_sentinel.stat.exists
+        fail_msg: "mounts are {{ mounts_after.results | map(attribute='stdout') | list }}, sentinel={{ worker_sentinel.stat.exists }}; docker stays stopped"
+
+    - name: Ensure the docker drop-in dir exists
+      ansible.builtin.file:
+        path: /etc/systemd/system/docker.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Gate docker on both mounts and the sentinel
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/docker.service.d/data01-worker.conf
+        mode: '0644'
+        content: |
+          # Managed by playbooks/individual/infrastructure/data01_worker.yaml.
+          # NOTE: without the sentinel check, a failed local mount points this
+          # worker's containers at ocean's live service dirs over NFS.
+          [Unit]
+          RequiresMountsFor=/data01 /data01/services
+          [Service]
+          ExecStartPre=/usr/bin/test -f /data01/services/.worker-local
+
+    # If the worker boots while ocean is down, the NFS mount times out and
+    # docker fails its dependency; Restart= does not cover that, so retry.
+    - name: Install the docker retry unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/data01-worker-retry.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Start docker once /data01 is reachable
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/sh -c 'systemctl is-active -q docker || systemctl start docker'
+
+    - name: Install the docker retry timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/data01-worker-retry.timer
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Retry docker on a data01 worker every 5 minutes
+          [Timer]
+          OnBootSec=3min
+          OnUnitActiveSec=5min
+          [Install]
+          WantedBy=timers.target
+
+    - name: Start docker and the retry timer
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+      loop: [docker.service, data01-worker-retry.timer]
+
+    - name: Containers came back
+      ansible.builtin.command: docker ps --filter name=node-exporter --filter status=running -q
+      register: worker_containers
+      until: worker_containers.stdout != ''
+      retries: 12
+      delay: 5
+      changed_when: false
