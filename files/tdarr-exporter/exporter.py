@@ -34,10 +34,12 @@ GIB = 1024 ** 3
 
 
 def node_of(job, live):
-    if job.get("nodeID") in live:
-        return live[job["nodeID"]]
+    # nodeID is the node that staged the job; nodeNames grows as the job is
+    # requeued to another node, so its last entry is the node that ran it.
     names = job.get("nodeNames") or []
-    return names[0] if len(names) == 1 else "unknown"
+    if names:
+        return names[-1]
+    return live.get(job.get("nodeID"), "unknown")
 
 
 def outcome(status):
