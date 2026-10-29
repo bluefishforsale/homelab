@@ -11,8 +11,8 @@
 # NOTE: serial + any_errors_fatal + the gates below are what make this safe.
 # A wrong upsmon config shuts a hypervisor down, so node005 must prove all three
 # UPSes read on-line before upsmon starts, and node006 is not touched unless
-# node005 finished clean. If the drivers cannot read the UPSes, the rescue puts
-# apcupsd back rather than leaving node005 with no UPS software at all.
+# node005 finished clean. If a UPS does not read clean, the rescue leaves NUT
+# serving and fails before upsmon restarts, so the hosts keep the config they had.
 
 - name: NUT UPS monitoring and shutdown
   hosts: baremetal
@@ -130,18 +130,22 @@
                 state: "{{ 'restarted' if (nut_server_conf is changed or nut_client_conf is changed) else 'started' }}"
                 enabled: true
 
-            - name: Wait for every UPS to report status
+            # ups-3B2116X60966 sits within seconds of the LB line at its load and
+            # flaps OL LB for minutes a day (10-29 deploy failed on one), so wait
+            # for a clean reading instead of failing on the first sample.
+            - name: Wait for every UPS to report on-line and not low
               ansible.builtin.command: "upsc ups-{{ item }}@localhost ups.status"
               register: nut_status
-              until: nut_status.rc == 0
+              until: >-
+                nut_status.rc == 0 and 'OL' in nut_status.stdout.split()
+                and 'OB' not in nut_status.stdout.split() and 'LB' not in nut_status.stdout.split()
               retries: 12
               delay: 5
               changed_when: false
               loop: "{{ nut_ups_serials }}"
 
-            # Inside the block so a failure here also restores apcupsd. With
-            # ignorelb, a UPS whose full-charge runtime is already under
-            # nut_low_runtime_seconds reads OL LB and would fail this.
+            # With ignorelb, a UPS whose runtime is under nut_low_runtime_seconds
+            # reads OL LB on mains and fails this.
             - name: Every UPS reads on-line, not on battery, not low
               ansible.builtin.assert:
                 that:
@@ -154,29 +158,31 @@
               loop_control:
                 label: "ups-{{ item.item }}"
 
+          # NOTE: leave NUT serving on failure. The rescue used to stop it for
+          # apcupsd to take back, but apcupsd is purged now, so stopping NUT left
+          # both hypervisors with no shutdown signal at all (10-29).
           rescue:
-            - name: Stop NUT so apcupsd can take the USB devices back
+            - name: Keep NUT serving
               ansible.builtin.systemd:
                 name: "{{ item }}"
-                state: stopped
-              loop:
-                - nut-server.service
-                - nut-driver.target
-              failed_when: false
-
-            - name: Restore apcupsd
-              ansible.builtin.systemd:
-                name: apcupsd
                 state: started
-              when: "'apcupsd.service' in ansible_facts.services"
+              loop:
+                - nut-driver.target
+                - nut-server.service
+              failed_when: false
 
             - name: Fail with the reason
               ansible.builtin.fail:
-                msg: "NUT could not read every UPS as on-line; apcupsd restored on {{ inventory_hostname }}. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
+                msg: "NUT could not read every UPS as on-line on {{ inventory_hostname }}; left running, upsmon not restarted. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
 
     - name: Read each UPS from this host
       ansible.builtin.command: "upsc ups-{{ item }}@{{ nut_ups_host }}"
       register: nut_vars
+      until: >-
+        nut_vars.rc == 0 and 'ups.status: OL' in nut_vars.stdout
+        and 'LB' not in (nut_vars.stdout | regex_search('ups.status: .*') | default(''))
+      retries: 12
+      delay: 5
       changed_when: false
       loop: "{{ nut_ups_serials }}"
 
