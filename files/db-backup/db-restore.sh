@@ -94,13 +94,13 @@ probe(){
     mysql-atrest)  echo "percona/percona-server:5.7|SELECT UNIX_TIMESTAMP(MAX(last_update)) FROM mysql.innodb_table_stats|" ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
     lidarr)        echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|" ;;
-    bazarr)        echo "|SELECT MAX(timestamp) FROM table_history|" ;;
+    bazarr)        echo "|SELECT strftime('%s',MAX(timestamp)) FROM table_history|" ;;
     jellyfin)      echo "|SELECT strftime('%s',substr(MAX(DateCreated),1,19)) FROM ActivityLogs|" ;;
     navidrome)     echo "|SELECT strftime('%s',substr(MAX(last_scan_at),1,19)) FROM library|" ;;
     tautulli)      echo "|SELECT MAX(started) FROM session_history|" ;;
     overseerr)     echo "|SELECT strftime('%s',substr(MAX(updatedAt),1,19)) FROM media|" ;;
     homeassistant) echo "|SELECT CAST(MAX(last_updated_ts) AS INTEGER) FROM states|48" ;;
-    open-webui)    echo "|SELECT MAX(updated_at) FROM message|" ;;
+    open-webui)    echo "|SELECT MAX(updated_at) FROM chat|" ;;
     paia)          echo "|SELECT strftime('%s',substr(MAX(started_at),1,19)) FROM turn|" ;;
     photonic_inventory) echo "|SELECT strftime('%s',substr(MAX(updated_at),1,19)) FROM reservation|" ;;
     ntfy)          echo "|SELECT MAX(created) FROM user|" ;;
