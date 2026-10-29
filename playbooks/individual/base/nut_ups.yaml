@@ -119,9 +119,13 @@
                 udevadm settle
               changed_when: false
 
+            # rc 42 is "sections and services differed, but now match up"
+            # (nut-driver-enumerator.sh), i.e. success with changes.
             - name: Regenerate per-UPS driver units from ups.conf
               ansible.builtin.command: /sbin/upsdrvsvcctl resync
-              changed_when: false
+              register: nut_resync
+              changed_when: nut_resync.rc == 42
+              failed_when: nut_resync.rc not in [0, 42]
 
             - name: Start drivers
               ansible.builtin.systemd:
@@ -217,10 +221,21 @@
         state: absent
         purge: true
 
+    # A run that templates upsmon.conf and then fails a gate never restarts
+    # upsmon, and the next run sees the file unchanged. Compare the file to the
+    # running process instead, so a config written by a failed run still loads.
+    - name: Check whether upsmon predates its config
+      ansible.builtin.shell: |
+        started=$(systemctl show nut-monitor.service -p ActiveEnterTimestamp --value)
+        [ -n "$started" ] && [ "$(stat -c %Y /etc/nut/upsmon.conf)" -gt "$(date -d "$started" +%s)" ]
+      register: nut_upsmon_stale
+      changed_when: false
+      failed_when: false
+
     - name: Start upsmon
       ansible.builtin.systemd:
         name: nut-monitor.service
-        state: "{{ 'restarted' if (nut_client_conf is changed or nut_shutdown_wait is changed) else 'started' }}"
+        state: "{{ 'restarted' if (nut_client_conf is changed or nut_shutdown_wait is changed or nut_upsmon_stale.rc == 0) else 'started' }}"
         enabled: true
 
     # Gate before the next host: upsd must list THIS host as a logged-in
