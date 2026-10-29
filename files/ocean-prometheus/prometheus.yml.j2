@@ -180,6 +180,30 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9199']
 
+  # Emporia smart plugs via the cloud API; the exporter polls once a minute.
+  - job_name: 'emporia-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    static_configs:
+    - targets: ['ocean.home:9198']
+
+  # The three UPSes on node005's NUT server, one scrape per UPS (the exporter
+  # reads one UPS per request, chosen by ?ups=). Target = NUT UPS name.
+  - job_name: 'nut'
+    metrics_path: /ups_metrics
+    scrape_interval: 30s
+    static_configs:
+    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-3B2116X60175']
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_ups
+    - source_labels: [__address__]
+      target_label: ups
+    - source_labels: [__address__]
+      target_label: instance
+    - target_label: __address__
+      replacement: ocean.home:9197
+
   - job_name: 'mtr-exporter'
     relabel_configs: *dropPortNumber
     scrape_interval: 60s

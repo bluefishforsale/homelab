@@ -31,14 +31,54 @@
     ansible.builtin.shell: /usr/sbin/ntpdate time.nist.gov
 
   ########### Sysctl, modules, swap
+  # NOTE: pihole keeps a 1G swapfile: ~925 MiB RAM at ~84% non-reclaimable, and
+  # without swap a spike OOM-kills FTL (DNS). Dropping it from these whens
+  # turns that swap back off on the next base run.
   - name: Disable swap in /etc/fstab
     ansible.builtin.replace:
       path: /etc/fstab
       regexp: '^(\/swap.*)$'
       replace: '#\1'
+    when: inventory_hostname != 'pihole'
 
   - name: Disable swap for current boot
     ansible.builtin.shell: swapoff -a
+    when: inventory_hostname != 'pihole'
+
+  - name: Swapfile on pihole
+    when: inventory_hostname == 'pihole'
+    block:
+      - name: Allocate /swapfile
+        ansible.builtin.command: fallocate -l 1G /swapfile
+        args:
+          creates: /swapfile
+        register: swapfile_alloc
+
+      - name: Restrict /swapfile to root
+        ansible.builtin.file:
+          path: /swapfile
+          owner: root
+          group: root
+          mode: "0600"
+
+      - name: Format /swapfile
+        ansible.builtin.command: mkswap /swapfile
+        when: swapfile_alloc is changed
+
+      - name: Mount /swapfile at boot
+        ansible.builtin.lineinfile:
+          path: /etc/fstab
+          regexp: '^#?/swapfile\s'
+          line: "/swapfile none swap sw 0 0"
+
+      - name: Check active swap
+        ansible.builtin.command: swapon --noheadings --show=NAME
+        register: swap_active
+        changed_when: false
+
+      - name: Enable /swapfile now
+        ansible.builtin.command: swapon /swapfile
+        when: "'/swapfile' not in swap_active.stdout"
 
   - name: Apply custom sysctl tunings
     ansible.builtin.copy:

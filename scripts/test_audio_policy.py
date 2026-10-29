@@ -66,6 +66,57 @@ def test_cover_the_flow_calls_an_attachment_is_dropped():
     assert [s["index"] for s in out if s["removed"]] == [7], out
 
 
+def test_mp4_text_subtitles_are_converted_for_matroska():
+    # Tenzing (2026), Rosemead (2025): mp4 WEBDLs carry mov_text subtitles, which
+    # matroska cannot hold, so copying them failed the mux ("Subtitle codec 94213
+    # is not supported", 2026-10-24).
+    out = run([
+        stream(0, "video", "h264", width=1920, height=1080),
+        stream(1, "audio", "eac3", channels=6, tags={"language": "eng"}),
+        stream(2, "subtitle", "mov_text", tags={"language": "eng"}),
+    ])
+    sub = next(s for s in out if s["index"] == 2)
+    assert not sub["removed"] and sub["outputArgs"][-2:] == ["-c:{outputIndex}", "srt"], sub
+
+
+def test_mp4_cover_without_a_mimetype_is_dropped():
+    # Tenzing (2026): an mp4 cover reaches the flow with no tags at all, only the
+    # attached_pic disposition, so a mimetype match sent it to hevc_nvenc.
+    out = run([
+        stream(0, "video", "h264", width=1920, height=1080),
+        stream(1, "audio", "eac3", channels=6, tags={"language": "eng"}),
+        stream(44, "attachment", "mjpeg", tags=None, disposition={"attached_pic": 1}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [44], out
+
+
+def test_mp4_data_stream_is_dropped():
+    # Tenzing (2026) carries a bin_data text track beside its subtitles; matroska
+    # takes no data streams, so copying it fails the mux once mov_text is fixed.
+    out = run([
+        stream(0, "video", "h264", width=1920, height=1080),
+        stream(1, "audio", "eac3", channels=6, tags={"language": "eng"}),
+        stream(43, "data", "bin_data", tags={"handler_name": "SubtitleHandler"}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [43], out
+
+
+def test_foreign_forced_subtitles_are_dropped():
+    # Blade Runner 2049 and Once Upon a Time in the West (2026-10-28): a German
+    # forced track has a cue every half hour or so, ffmpeg's progress time waits
+    # on it, and tdarr's stall detector cancels a job that is copying at 2.8x.
+    # English forced subtitles are the ones anyone here reads; they stay.
+    out = run([
+        stream(0, "video", "hevc", width=1920, height=1080),
+        stream(1, "audio", "ac3", channels=6, tags={"language": "eng"}),
+        stream(2, "subtitle", "subrip", tags={"language": "ger", "title": "forced"}),
+        stream(3, "subtitle", "hdmv_pgs_subtitle", tags={"language": "ger", "title": "Deutsch (PGS)"}),
+        stream(4, "subtitle", "hdmv_pgs_subtitle", tags={"language": "ger"}, disposition={"forced": 1}),
+        stream(5, "subtitle", "subrip", tags={"language": "eng", "title": "English Forced"}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [2, 4], out
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):

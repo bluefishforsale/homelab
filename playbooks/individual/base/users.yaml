@@ -10,6 +10,9 @@
     chezmoi_user: terrac
     chezmoi_home: /home/terrac
     chezmoi_version: "2.73.3"
+    # agentbox runs headless Claude and remote control from its own playbook;
+    # personal dotfiles stay off it even if terrac gains a GitHub key there.
+    chezmoi_skip_hosts: [agentbox]
 
   tasks:
     - name: Handle dpkg locks and repair
@@ -258,6 +261,7 @@
       when:
         - chezmoi_user in users | map(attribute='user_name')
         - ansible_architecture == 'x86_64'
+        - inventory_hostname not in chezmoi_skip_hosts
       block:
         - name: Check for an existing chezmoi source
           ansible.builtin.stat:

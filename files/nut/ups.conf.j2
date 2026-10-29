@@ -1,0 +1,21 @@
+# Rendered by playbooks/individual/base/nut_ups.yaml (nut server only).
+# Three identical Back-UPS XS 1500M on one USB hub; serial is the only thing
+# that tells them apart, and hiddevN/bus numbers reorder on every re-enumeration.
+maxretry = 3
+
+{% for serial in nut_ups_serials %}
+[ups-{{ serial }}]
+  driver = usbhid-ups
+  port = auto
+  vendorid = 051d
+  productid = 0002
+  # NOTE: NUT full-matches this regex; the UPS pads its serial with spaces, so
+  # an exact string would match no device and the driver would never start.
+  serial = "{{ serial }}.*"
+  desc = "APC Back-UPS XS 1500M {{ serial }}"
+  # Raise LB at {{ nut_low_runtime_seconds }}s of runtime instead of the UPS's own
+  # 2 minutes, which is too little for Proxmox to stop every VM.
+  ignorelb
+  override.battery.runtime.low = {{ nut_low_runtime_seconds }}
+
+{% endfor %}

@@ -60,7 +60,7 @@ meta(){
     navidrome)  echo "sqlite|navidrome.db.gz|navidrome|$SERVICES_DIR/navidrome/data/navidrome.db" ;;
     tautulli)   echo "sqlite|tautulli.db.gz|tautulli|$SERVICES_DIR/tautulli/config/tautulli.db" ;;
     overseerr)  echo "sqlite|overseerr.db.gz|overseerr|$SERVICES_DIR/overseerr/config/db/db.sqlite3" ;;
-    homeassistant) echo "sqlite|homeassistant.db.gz|homeassistant|$SERVICES_DIR/homeassistant/home-assistant_v2.db" ;;
+    homeassistant) echo "sqlite|homeassistant.db.gz|homeassistant|$SERVICES_DIR/homeassistant/config/home-assistant_v2.db" ;;
     open-webui) echo "sqlite|open-webui.db.gz|open-webui|$SERVICES_DIR/open-webui/data/webui.db" ;;
     paia)       echo "sqlite|paia.db.gz|paia|$SERVICES_DIR/paia/data/paia.db" ;;
     photonic_inventory) echo "sqlite|photonic_inventory.db.gz|photonic_inventory|$SERVICES_DIR/photonic_inventory/data/photonic.db" ;;

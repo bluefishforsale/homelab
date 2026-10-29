@@ -176,10 +176,17 @@ def bump(item, files, yes):
     return True
 
 
+def same_film(title, year):
+    """False when the release names only other years: Radarr maps a remake's release onto the original."""
+    years = {int(y) for y in re.findall(r"\b(19\d\d|20\d\d)\b", title)}
+    return not years or any(abs(y - year) <= 1 for y in years)    # festival vs release year
+
+
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
+    year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
-          and r.get("downloadAllowed")]
+          and r.get("downloadAllowed") and same_film(r["title"], year)]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
@@ -382,6 +389,18 @@ def gave_up(grabbed, downloading):
     return not downloading and now() - grabbed > GRAB_TIMEOUT
 
 
+def import_blocked(downloading):
+    """Finished, but the *arr will not import it, so it stays queued and reads as downloading forever."""
+    return bool(downloading) and all(q.get("status") == "completed" and q.get("trackedDownloadStatus") == "warning"
+                                     for q in downloading)
+
+
+def blocklist(app, downloading):
+    for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+        mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true",
+                  skipRedownload="true")
+
+
 def step(item, yes):
     """Advance one item by one state. Returns True when something changed."""
     mid = item["movie_id"]
@@ -427,6 +446,13 @@ def step(item, yes):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            if import_blocked(downloading):
+                note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                blocklist("radarr", downloading)
+                item["state"] = "planned"
+                return True
             if gave_up(grabbed, downloading):
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
@@ -535,6 +561,15 @@ def step_tv(item, yes, ledger):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            # Finished but Sonarr will not import it (a misparsed "pack" holding one
+            # episode): it stays in the queue, so it would read as downloading forever.
+            if import_blocked(downloading) and not new:
+                note(item, f"Sonarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                blocklist("sonarr", downloading)
+                item["state"] = "planned"
+                return True
             if not new or downloading:
                 if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")

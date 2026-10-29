@@ -1,0 +1,913 @@
+{
+  "title": "Power",
+  "uid": "power",
+  "schemaVersion": 40,
+  "editable": true,
+  "tags": [
+    "power",
+    "ipmi",
+    "emporia",
+    "cost",
+    "ups"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "timezone": "browser",
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Draw now",
+      "description": "IPMI DCMI is PSU input power. The homelab plug feeds both nodes, so homelab minus IPMI is the network gear plus anything else on that plug. PoE is only what UniFi switches deliver to PoE devices, not the switches' own draw.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "emporia_power_watts",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        },
+        {
+          "expr": "sum(unifi_device_port_poe_watts)",
+          "legendFormat": "PoE delivered (UniFi)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "D"
+        },
+        {
+          "expr": "sum(network_ups_tools_ups_load * network_ups_tools_ups_realpower_nominal / 100)",
+          "legendFormat": "UPS total output (NUT)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "E"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Power draw",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")",
+          "legendFormat": "{{device}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "emporia_power_watts",
+          "legendFormat": "plug: {{device}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        },
+        {
+          "expr": "sum(unifi_device_port_poe_watts)",
+          "legendFormat": "PoE delivered (UniFi)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "D"
+        },
+        {
+          "expr": "sum(network_ups_tools_ups_load * network_ups_tools_ups_realpower_nominal / 100)",
+          "legendFormat": "UPS total output (NUT)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "E"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Energy over selected range",
+      "description": "Mean watts over the dashboard range times its length. Gaps are averaged over rather than counted as zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\"))[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time((emporia_power_watts)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts))[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Daily energy",
+      "description": "Trailing 24h energy, sampled once a day.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\"))[1d:1m]) * 24 / 1000",
+          "legendFormat": "{{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time((emporia_power_watts)[1d:1m]) * 24 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts))[1d:1m]) * 24 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "timeFrom": "30d",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Rate now",
+      "description": "PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 4,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "electricity_rate_usd_per_kwh",
+          "legendFormat": "$/kWh",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Cost over selected range",
+      "description": "PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 28,
+        "w": 10,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[$__range:1m]) * $__range_s / 3600 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Monthly at last 7 days' pace",
+      "description": "Last 7 days of priced usage scaled to a 730-hour month. PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 28,
+        "w": 10,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[7d:1m]) * 730 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Daily cost",
+      "description": "Trailing 24h cost, sampled once a day. PG&E E-TOU-C all-in incl. 7.5% utility tax: peak 16:00-21:00 daily. Summer from the Aug/Sep 2026 bill; winter is PG&E's published rate x 1.075, an estimate until a winter bill confirms it. NEM2 means solar-hour kWh still cost the TOU rate. Baseline credit and the fixed monthly charge are excluded.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(((label_replace(ipmi_dcmi_power_consumption_watts, \"device\", \"$1\", \"instance\", \"([^.]+).*\")) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "{{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "avg_over_time(((emporia_power_watts) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "plug: {{device}}",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "avg_over_time(((sum(emporia_power_watts{device=\"homelab\"}) - sum(ipmi_dcmi_power_consumption_watts)) * on() group_left() electricity_rate_usd_per_kwh)[1d:1m]) * 24 / 1000",
+          "legendFormat": "network + other (homelab plug - IPMI)",
+          "interval": "1d",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "timeFrom": "30d",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "UPS output by unit",
+      "description": "Three APC Back-UPS XS 1500M on node005 (NUT), labelled by serial. Watts = load % x 900 W nominal, so it is coarse (1% = 9 W). upsmon shuts node005 and node006 down when any UPS on battery drops under 420 s runtime.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "network_ups_tools_ups_load * network_ups_tools_ups_realpower_nominal / 100",
+          "legendFormat": "{{ups}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "UPS runtime at current load",
+      "description": "Red under 420 s means an outage starts the shutdown at once. Three APC Back-UPS XS 1500M on node005 (NUT), labelled by serial. Watts = load % x 900 W nominal, so it is coarse (1% = 9 W). upsmon shuts node005 and node006 down when any UPS on battery drops under 420 s runtime.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 42,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 420
+              },
+              {
+                "color": "green",
+                "value": 900
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "network_ups_tools_battery_runtime",
+          "legendFormat": "{{ups}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "UPS on battery",
+      "description": "Three APC Back-UPS XS 1500M on node005 (NUT), labelled by serial. Watts = load % x 900 W nominal, so it is coarse (1% = 9 W). upsmon shuts node005 and node006 down when any UPS on battery drops under 420 s runtime.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 46,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "on-line",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "ON BATTERY",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "network_ups_tools_ups_status{flag=\"OB\"}",
+          "legendFormat": "{{ups}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "UPS battery charge",
+      "description": "Three APC Back-UPS XS 1500M on node005 (NUT), labelled by serial. Watts = load % x 900 W nominal, so it is coarse (1% = 9 W). upsmon shuts node005 and node006 down when any UPS on battery drops under 420 s runtime.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 46,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "network_ups_tools_battery_charge",
+          "legendFormat": "{{ups}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Emporia plug reporting",
+      "description": "1 when the last cloud poll returned a reading for this plug.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "emporia_up",
+          "legendFormat": "{{device}}",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Since last full Emporia poll",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 50,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "time() - emporia_exporter_last_success_timestamp_seconds",
+          "legendFormat": "age",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    }
+  ]
+}

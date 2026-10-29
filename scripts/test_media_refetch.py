@@ -133,6 +133,34 @@ def test_refused_season_grab_keeps_the_old_episodes():
 
 
 BEST_TV_RELEASE = refetch.best_tv_release
+BEST_RELEASE = refetch.best_release
+
+EXISTING = "Existing file on disk has a equal or higher Custom Format score: 98"
+
+
+def fake_movie_search(year, titles):
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/release":
+                return [{"title": t, "downloadAllowed": True, "rejections": [EXISTING], "releaseWeight": w}
+                        for w, t in enumerate(titles)]
+            return {"year": year}
+    return Fake()
+
+
+def test_release_of_another_years_film_is_not_grabbed():
+    # Radarr maps a same-titled release onto the movie: The Island of Dr. Moreau
+    # (1996) was replaced by the 1977 film on 2026-10-25, its old file deleted at grab.
+    refetch.mc = fake_movie_search(1996, ["The.Island.Of.Dr.Moreau.1977.1080p.BluRay.REMUX.AVC.FLAC.2.0-EPSiLON",
+                                          "The.Island.of.Dr.Moreau.1996.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-EPSiLON"])
+    assert "1996" in BEST_RELEASE(1)["title"]
+
+
+def test_release_a_year_off_the_movie_is_the_same_film():
+    # Festival year against release year: Nine Days (2021) comes out as Nine.Days.2020.
+    refetch.mc = fake_movie_search(2021, ["Nine.Days.2020.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-TRiToN"])
+    assert BEST_RELEASE(1)
+
 
 
 def test_anime_season_search_gets_time_for_every_episode():
@@ -148,6 +176,58 @@ def test_anime_season_search_gets_time_for_every_episode():
     refetch.mc = Fake()
     BEST_TV_RELEASE({"pack": True, "series_id": 1, "season": 2, "episode_ids": list(range(12))})
     assert timeouts[0] > 656, timeouts
+
+
+def test_download_sonarr_cannot_import_is_blocklisted_not_waited_on():
+    # DAN DA DAN S02 (2026-10-24): Sonarr took "[Moozzi2] Dan Da Dan S2-08" for a
+    # pack, but it held one episode. Finished and stuck at importPending, it read
+    # as still downloading, so the item would have waited forever (South Park
+    # S13E06 had since 10-21).
+    rows = [{"id": 500 + e, "episodeId": e, "downloadId": "D", "title": "[Moozzi2] Dan Da Dan S2-08",
+             "status": "completed", "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"}
+            for e in (1, 2)]
+    deleted = []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return rows if path.endswith("/queue/details") else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+    refetch.mc = Fake()
+    refetch.tv_files = lambda sid, eps: {}
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "grabbed",
+            "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    # Without skipRedownload Sonarr searches too: on 2026-10-24 its own grab of the
+    # same [DB] pack raced ours, and the next one queued single episodes beside our pack.
+    assert deleted == [("/api/v3/queue/501", {"removeFromClient": "true", "blocklist": "true",
+                                              "skipRedownload": "true"})], deleted
+    assert item["state"] == "planned"
+
+
+def test_movie_download_radarr_cannot_import_is_blocklisted_not_waited_on():
+    # The TV path waited forever on a finished, import-blocked download (#866);
+    # Radarr's queue reports the same shape.
+    deleted = []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            if path.endswith("/queue/details"):
+                return [{"id": 900, "downloadId": "D", "title": "x", "status": "completed",
+                         "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"}]
+            return {"hasFile": False} if "/movie/" in path else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+    refetch.mc = Fake()
+    item = {"movie_id": 1, "state": "grabbed", "grabbed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    refetch.step(item, yes=True)
+    assert deleted == [("/api/v3/queue/900", {"removeFromClient": "true", "blocklist": "true",
+                                              "skipRedownload": "true"})], deleted
+    assert item["state"] == "planned"
 
 
 def test_earlier_bump_is_transcoded_first():

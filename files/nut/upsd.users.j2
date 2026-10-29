@@ -1,0 +1,8 @@
+# Rendered by playbooks/individual/base/nut_ups.yaml (nut server only).
+[upsmon_primary]
+  password = {{ infrastructure.nut.primary_password }}
+  upsmon primary
+
+[upsmon_secondary]
+  password = {{ infrastructure.nut.secondary_password }}
+  upsmon secondary
