@@ -728,3 +728,44 @@ groups:
     annotations:
       summary: "UPS monitoring down for {{ "{{ $labels.ups }}" }}"
       description: "Prometheus cannot read {{ "{{ $labels.ups }}" }} via nut-exporter on ocean:9197 -> node005:3493. Check `upsc -l` on node005, the nut-driver@ units, and the nut-exporter container. upsmon shutdown may still work; visibility does not."
+
+- name: data01_worker_alerts
+  rules:
+  # [data01_workers] mount ocean's /data01 over NFS and keep service state on a
+  # local disk over /data01/services (data01_worker.yaml). Worker list comes
+  # from the inventory, so a new worker is covered by being in the group.
+{% set data01_worker_re = groups['data01_workers'] | map('regex_replace', '$', '.home') | join('|') %}
+  # Exporter up but no NFS /data01: the worker's media jobs have nothing to read.
+  - alert: Data01WorkerNfsMissing
+    expr: up{job="node_exporter",instance=~"{{ data01_worker_re }}"} == 1 unless on(instance) node_filesystem_size_bytes{mountpoint="/data01",fstype="nfs4"}
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} has no NFS /data01"
+      description: "{{ "{{ $labels.instance }}" }} is up but ocean's /data01 is not mounted (nfs4). Check nfs-server on ocean and `findmnt /data01` on the worker; docker on the worker will not start without it."
+
+  # The local state disk is gone: docker's sentinel guard keeps containers from
+  # writing into ocean's /data01/services, so the worker's services are down.
+  - alert: Data01WorkerStateDiskMissing
+    expr: up{job="node_exporter",instance=~"{{ data01_worker_re }}"} == 1 unless on(instance) node_filesystem_size_bytes{mountpoint="/data01/services",fstype="ext4"}
+    for: 5m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} lost its local /data01/services disk"
+      description: "The local ext4 state disk is not mounted on {{ "{{ $labels.instance }}" }}. docker refuses to start (no .worker-local sentinel), so its services are down. Do NOT remove the guard; remount the disk."
+
+  # A hard NFS mount waits instead of failing, so a sick export shows up as
+  # retransmissions and stalled jobs, not errors.
+  - alert: Data01WorkerNfsRetransmits
+    expr: rate(node_nfs_rpc_retransmissions_total{instance=~"{{ data01_worker_re }}"}[10m]) > 0
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "NFS retransmits on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.instance }}" }} has been retransmitting NFS RPCs to ocean for 10m ({{ "{{ $value | humanize }}" }}/s). Processes on the mount stall rather than fail; check ocean's load and nfsd."
