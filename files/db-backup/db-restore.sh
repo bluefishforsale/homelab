@@ -87,13 +87,11 @@ ALL="grafana-mysql wordpress jellystat-db mem0-postgres mysql-atrest sonarr rada
 # own schedule, since a quiet app's newest row is legitimately old.
 probe(){
   case "$1" in
-    grafana-mysql) echo "percona/percona-server:5.7|SELECT UNIX_TIMESTAMP(MAX(updated)) FROM grafana.dashboard|" ;;
-    wordpress)     echo "mariadb:10.11|SELECT 1|" ;;
-    jellystat-db)  echo "postgres:15.2|\\connect jfstat
-SELECT 1|" ;;
-    mem0-postgres) echo "ankane/pgvector:v0.5.1|\\connect mem0_app
-SELECT 1|" ;;
-    mysql-atrest)  echo "percona/percona-server:5.7|SELECT UNIX_TIMESTAMP(MAX(create_time)) FROM information_schema.tables|" ;;
+    grafana-mysql) echo "percona/percona-server:5.7|SELECT MAX(last_execution) FROM grafana.server_lock|48" ;;
+    wordpress)     echo "mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
+    jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|48' ;;
+    mem0-postgres) echo 'ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
+    mysql-atrest)  echo "percona/percona-server:5.7|SELECT UNIX_TIMESTAMP(MAX(last_update)) FROM mysql.innodb_table_stats|" ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
     lidarr)        echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|" ;;
     bazarr)        echo "|SELECT MAX(timestamp) FROM table_history|" ;;
