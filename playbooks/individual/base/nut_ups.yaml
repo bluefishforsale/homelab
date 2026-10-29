@@ -155,6 +155,10 @@
                 label: "ups-{{ item.item }}"
 
           rescue:
+            # NOTE: only hand the USB devices back when apcupsd is there to take
+            # them. Once a clean run has purged it, stopping NUT here leaves both
+            # hypervisors with no shutdown signal at all (2026-10-29, OL LB on one
+            # UPS stopped upsd for hours). A NUT that reads LB still protects us.
             - name: Stop NUT so apcupsd can take the USB devices back
               ansible.builtin.systemd:
                 name: "{{ item }}"
@@ -163,6 +167,7 @@
                 - nut-server.service
                 - nut-driver.target
               failed_when: false
+              when: "'apcupsd.service' in ansible_facts.services"
 
             - name: Restore apcupsd
               ansible.builtin.systemd:
@@ -172,7 +177,7 @@
 
             - name: Fail with the reason
               ansible.builtin.fail:
-                msg: "NUT could not read every UPS as on-line; apcupsd restored on {{ inventory_hostname }}. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
+                msg: "NUT could not read every UPS as on-line; {{ 'apcupsd restored' if 'apcupsd.service' in ansible_facts.services else 'NUT left running (no apcupsd to fall back to)' }} on {{ inventory_hostname }}. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
 
     - name: Read each UPS from this host
       ansible.builtin.command: "upsc ups-{{ item }}@{{ nut_ups_host }}"
