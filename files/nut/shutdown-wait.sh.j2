@@ -1,0 +1,22 @@
+#!/bin/sh
+# Rendered by playbooks/individual/base/nut_ups.yaml (nut server only).
+# upsmon's SHUTDOWNCMD on the primary. The primary's own shutdown ends in
+# nutshutdown -> `upsdrvctl shutdown`, which cuts all three UPSes, and HOSTSYNC
+# only waits for the secondaries' upsmon to log out (early in their shutdown),
+# not for them to power off. So hold the primary up until every secondary
+# stops answering ping, or the UPS kill lands mid-shutdown on node006.
+#
+# NOTE: the cap is the battery budget. LB fires at {{ nut_low_runtime_seconds }}s of
+# runtime; this wait plus the primary's own guest stop plus the UPS off delay
+# must fit inside it. Past the cap the batteries would die anyway.
+deadline=$(( $(date +%s) + {{ nut_shutdown_wait_seconds }} ))
+for host in {{ nut_secondary_ips | join(' ') }}; do
+  misses=0
+  # Three misses in a row, so one dropped echo does not read as powered off.
+  while [ "$misses" -lt 3 ] && [ "$(date +%s)" -lt "$deadline" ]; do
+    if ping -c 1 -W 1 "$host" >/dev/null 2>&1; then misses=0; else misses=$((misses + 1)); fi
+    sleep 2
+  done
+  logger -t nut-shutdown-wait "$host: $([ "$misses" -ge 3 ] && echo 'powered off' || echo 'still up at the cap')"
+done
+exec /sbin/shutdown -h +0

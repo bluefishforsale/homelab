@@ -11,7 +11,10 @@ MONITOR ups-{{ serial }}@{{ nut_ups_host }} 1 {{ 'upsmon_primary' if primary els
 # losing node005 (or USB) alone never shuts node006 down.
 MINSUPPLIES {{ nut_ups_serials | length }}
 
-SHUTDOWNCMD "/sbin/shutdown -h +0"
+# The primary waits for the secondaries to power off first: its own shutdown
+# ends by cutting every UPS (POWERDOWNFLAG), and that must not land on a
+# secondary still stopping its VMs.
+SHUTDOWNCMD "{{ '/usr/local/sbin/nut-shutdown-wait' if primary else '/sbin/shutdown -h +0' }}"
 POWERDOWNFLAG /etc/killpower
 POLLFREQ 5
 POLLFREQALERT 5
