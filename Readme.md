@@ -2,45 +2,76 @@
 
 This is the Ansible repo that runs my house: two Dell servers in a rack, a handful
 of VMs, one big ZFS pool, one RTX 3090, and the forty-some services that live on
-top of them. It started as a way to stop setting up machines by hand. It has
+top of them. It didn't start out as anything like that. It started as notes to
+myself about how I'd set a machine up by hand, and somewhere along the way it
 turned into a small production environment, with CI, monitoring, alerting,
 backups, and a couple of AI agents that open pull requests against it.
 
 ## How it got here
 
 The first commit is from March 2020, and it's a week of trying to get Packer to
-build an Ubuntu image under QEMU. The commit messages tell the story honestly
-("still trying to get a packer build", "continued dev, still not working"). It
-never really worked, and the repo went quiet for most of a year.
+build an Ubuntu image under QEMU. The commit messages are honest about how that
+went ("still trying to get a packer build", "continued dev, still not working").
+It never really worked, and the repo went quiet for most of a year.
 
-It came back in January 2021 with a simpler goal: a few playbooks for users,
-packages, and shell config, so a fresh machine came up the same way every time and
-I didn't have to remember what I'd done to the last one. Consistency was the whole
-point. Then, because it was 2021, it turned into Kubernetes. First KIND clusters,
-then Kubernetes the hard way on bare metal with etcd, kube-apiserver, haproxy and
-keepalived, all templated by hand, plus a ceph-ansible experiment that got pulled
-out a few months later. Most of 2021 and 2022 went to that cluster: containerd,
-flannel ("I broke the ability to schedule flannel"), node labels, haproxy tuning.
+When it came back in January 2021 it was mostly a readme and a 320-line
+`install.sh`, the manual setup steps written down so I wouldn't have to remember
+what I'd done to the last machine. Within a month the shell script was gone,
+replaced by playbooks for users, packages and shell config. Consistency was the
+whole point: a fresh box should come up the same way every time.
 
-In 2023 the hardware got rebuilt around Proxmox. node006 was reinstalled, the
-Kubernetes nodes became VMs, and DNS, DHCP and PXE moved into the repo. 2024 was
-one more lap of the cluster with kubeadm, three workers and Kubernetes 1.29.
+Then, because it was 2021, it turned into Kubernetes, and this is where the three
+Dell T640s come in. Big towers with PERC controllers and room for a lot of disks,
+two of them carrying NVIDIA GPUs, sitting next to three UP Squared boards that
+ran the first control plane. I did Kubernetes the hard way on that pile: etcd,
+kube-apiserver, haproxy and keepalived, all templated by hand, containerd, flannel
+("I broke the ability to schedule flannel"), a GPU operator, 10G networking for
+the Dells, and in March 2022 the Dells joined the control plane and etcd
+themselves. It was a lot of machine for a home cluster, and I loved every loud,
+power-hungry minute of it, including the ones where I was rebuilding it from
+scratch again. One commit from that era is just titled "spaaareeee chaaaaaange".
 
-2025 is where it changed shape. The actual workload was a media server, not a
-cluster, and the cluster was mostly maintaining itself. So the work moved to one
-large VM, ocean, running Docker Compose services with the GPU passed through:
-the ZFS pool and Prometheus in January, Plex and the Cloudflare tunnel in
-February, local LLM inference with llama.cpp in May, self-hosted GitHub Actions
-runners in October, and in November the `main-apply` workflow, which made merging
-to master a deploy. That year had more commits than the four before it
-put together.
+Storage has its own arc running underneath all of that. It started as a plain NFS
+playbook in August 2021, then a ceph-ansible experiment that came back out a few
+months later, then Ceph again on Proxmox, ending with a crush map whose failure
+domain was a single host, which tells you most of what you need to know about
+running Ceph at home. In January 2025 it settled on ZFS: `data01`, raidz2 over
+eight 12 TB disks, about 87 TB raw, sitting on ocean. That wasn't the end of the
+story either. In August 2026 the pool went DEGRADED with two faulted disks, and
+four drives got replaced in twelve days. Out of that came the replacement runbook,
+pool and drive-wear dashboards, SAS error counters, and a hard rule that nothing
+committed to this repo is allowed to touch the pool. Now it's exported over NFS to
+worker VMs, so the NAS that started as one playbook is shared storage for more
+than one host.
 
-2026 is the year it became a production system with real habits. PowerDNS and Kea
-replaced the old DNS and DHCP. Every service got a health check and a scrape job.
-agentbox arrived in June: a VM where coding
-agents watch the issue queue and open PRs, so most changes now begin as an issue
-and land as a reviewed squash-merge. The Kubernetes nodes were finally switched off in the inventory in May.
-About 1,250 commits so far, more than half of them this year.
+In 2023 the hardware got rebuilt around Proxmox, and the Kubernetes nodes became
+VMs. 2024 was one more lap of the cluster with kubeadm and Kubernetes 1.29. 2025
+is where it changed shape: the actual workload was a media server, not a cluster,
+so the work moved to one large VM, ocean, running Docker Compose services with the
+GPU passed through. Plex and the Cloudflare tunnel landed in February, local LLM
+inference in May, self-hosted GitHub Actions runners in October, and in November
+the `main-apply` workflow, which made merging to master a deploy. That year had
+more commits than the four before it put together.
+
+2026 is the year it picked up real production habits. PowerDNS and Kea replaced
+the old DNS and DHCP. Every service got a health check and a scrape job.
+agentbox arrived in June, a VM where coding agents watch the issue queue and open
+PRs, so most changes now begin as an issue and land as a reviewed squash-merge.
+The Kubernetes nodes were finally switched off in the inventory in May. About
+1,250 commits so far, more than half of them this year.
+
+It hasn't been a straight line. There was a DNS change that blinded everything on
+ocean because seven of nine hosts only knew about one resolver, a fleet-wide uid
+renumber that meant shutting ocean down and re-owning every file on `data01`, a
+Plex token rotation that broke playback on the desktop apps, UPSes that would have shut
+the lab down a minute into an outage, and plenty of nights where the fix for one
+thing broke another. Every one of those left something behind, a runbook, an
+alert, a CI check, a line in [`agents.md`](agents.md), and the lab is better for
+each of them. It keeps getting better, and it's still the most fun I have with a
+computer.
+
+There's a lot of hard-won experience in this repo, mostly in the form of mistakes I've already made so you don't have to.
+If you're building something similar, I hope some of it saves you an afternoon.
 
 ## What runs where
 
