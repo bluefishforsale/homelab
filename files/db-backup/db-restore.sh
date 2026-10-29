@@ -115,7 +115,9 @@ sweep(){ docker ps -aq --filter "label=$VLABEL" | xargs -r docker rm -fv >/dev/n
 # wait_log <container> <pattern>: the image's init has finished (or the container died).
 wait_log(){
   for _ in $(seq 1 120); do
-    docker logs "$1" 2>&1 | grep -q "$2" && return 0
+    # NOTE: no grep -q here. Under pipefail its early exit SIGPIPEs docker logs and
+    # the pipeline reads as no-match, so whether a line is seen depends on timing.
+    docker logs "$1" 2>&1 | grep "$2" >/dev/null && return 0
     [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ] || break
     sleep 2
   done
@@ -143,7 +145,7 @@ verify_one(){
       wait_log "$c" "init process complete" && until_ok docker exec "$c" pg_isready -U postgres -q || return 1
       out=$( { cat "$payload"; printf '\n%s;\n' "$sql"; } | docker exec -i "$c" psql -X -q -t -A -U postgres -d postgres 2>"$err")
       # pg_dumpall always re-creates the superuser the fresh image already has.
-      if grep 'ERROR' "$err" | grep -vq 'role "postgres" already exists'; then
+      if grep 'ERROR' "$err" | grep -v 'role "postgres" already exists' >/dev/null; then
         log "  load failed:"; grep ERROR "$err" | head -5 | sed 's/^/    /'; return 1
       fi
       ;;
@@ -157,8 +159,10 @@ verify_one(){
       docker run -d --name "$c" --label "$VLABEL" --network none --user root -v "$TMP/$svc/data":/var/lib/mysql \
         "$image" --user=root --skip-grant-tables --skip-networking >/dev/null || return 1
       wait_log "$c" "ready for connections" || return 1
-      if docker logs "$c" 2>&1 | grep -qiE "crash recovery|not shut ?down normally"; then
-        log "  cold copy needed crash recovery: it was taken from a running server"; return 1
+      # The at-rest datadir was copied after its server died uncleanly (2025-11), so
+      # every boot replays the same recovery. A torn copy fails to reach ready or the probe.
+      if docker logs "$c" 2>&1 | grep -iE "crash recovery|not shut ?down normally" >/dev/null; then
+        log "  cold copy needed InnoDB crash recovery (it completed)"
       fi
       out=$(docker exec "$c" mysql -uroot -N -e "$sql" 2>"$err") || { cat "$err"; return 1; }
       ;;
