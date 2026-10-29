@@ -601,6 +601,27 @@ groups:
       summary: "Homelab DB backup completed with {{ "{{ $value }}" }} failed database(s)"
       description: "The last backup run on {{ "{{ $labels.instance }}" }} failed to dump {{ "{{ $value }}" }} in-scope database(s); the tarball is incomplete. Check the db-backup.service journal for which."
 
+  # The nightly restore test on harbor loads every backup into a throwaway
+  # container. A 0 means that service's backup would not restore, or restored
+  # an empty or (for the self-writing services) stale database.
+  - alert: DbRestoreTestFailing
+    expr: homelab_db_restore_test_ok == 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "DB backup for {{ "{{ $labels.service }}" }} failed its restore test"
+      description: "The latest {{ "{{ $labels.service }}" }} backup did not restore cleanly into a throwaway container, or its newest record is missing or too old. Check `journalctl -u db-restore-test.service` on harbor for the FAIL line."
+
+  - alert: DbRestoreTestStale
+    expr: time() - homelab_db_restore_test_last_success_timestamp_seconds > 129600
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "DB restore test has not passed in 36h ({{ "{{ $labels.instance }}" }})"
+      description: "No restore-test run has passed every backup in over 36h. The timer may be dead, harbor down at 06:00, or one service failing every night. Check `systemctl status db-restore-test.service` on harbor."
+
   # nzbget-prune writes its success time only on a run that read nzbget and
   # finished, so a dead timer or an nzbget it can't reach both show as age.
   - alert: NzbgetPruneStale
