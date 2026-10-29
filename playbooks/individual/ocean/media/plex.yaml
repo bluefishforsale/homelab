@@ -271,6 +271,15 @@
     register: kometa_config_result
     tags: [config, kometa]
 
+  - name: Copy repo-managed kometa collection files
+    ansible.builtin.copy:
+      src: "{{ files }}/kometa/curated.yml"
+      dest: "{{ kometa_home }}/config/curated.yml"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
+    tags: [config, kometa]
+
   - name: Create kometa docker-compose files
     ansible.builtin.template:
       src: "{{ files }}/{{ item.src }}"
