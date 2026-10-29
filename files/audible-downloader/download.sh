@@ -11,9 +11,7 @@ TARGET='/data01/complete/audiobooks'
 echo "Checking download dir, create if not exist"
 test -d "${TARGET}/aax" || mkdir  "${TARGET}/aax"
 
-echo "Gathering all ISNs to download"
-ISNS=$(audible library  list | awk -F: '{print $1}')
-for ISN in $ISNS ; do
-    echo "Downloading $ISN"
-    audible download -a "${ISN}" --annotation --aax-fallback --no-confirm --chapter --pdf --cover --output-dir "${TARGET}/aax"
-done
+# One call for the whole library: per-ASIN calls re-authenticated and re-fetched
+# the library for every book, ~8 minutes a night to skip files already on disk.
+echo "Downloading new library items"
+audible download --all --ignore-errors --ignore-podcasts --annotation --aax-fallback --no-confirm --chapter --pdf --cover --output-dir "${TARGET}/aax"
