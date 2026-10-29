@@ -1,0 +1,44 @@
+# Rendered by playbooks/individual/workers/tdarr_node.yaml.
+#
+# A CPU-only tdarr node on a data01 worker. The server and its database stay on
+# ocean; this node takes the flow's CPU work (audio-only passes on files that
+# are already HEVC) and the flow's requireNvenc step hands video encodes back to
+# ocean's GPU workers.
+#
+# NOTE: the image tag is pinned to the server's version at deploy time. A node
+# refuses a server of another version, and :latest refreshed on its own
+# schedule would split them (it did on ocean, 2026-10-12, 3.00.00 vs 2.94.03).
+services:
+  tdarr-node:
+    image: "ghcr.io/haveagitgat/tdarr_node:{{ tdarr_node_version }}"
+    container_name: tdarr-node
+    hostname: "tdarr-node-{{ inventory_hostname }}"
+    environment:
+      TZ: America/Los_Angeles
+      PUID: "{{ system_users.media.uid }}"
+      PGID: "{{ system_users.media.gid }}"
+      inContainer: "true"
+      serverIP: "{{ tdarr_server_ip }}"
+      serverPort: "{{ tdarr_server_api_port }}"
+      nodeName: "{{ inventory_hostname }}.home"
+      nodeIP: "{{ ansible_default_ipv4.address }}"
+      nodePort: "8267"
+    volumes:
+      # Same in-container paths as ocean's node, so no path translation.
+      - /data01/complete:/media
+      # Transcode cache on the worker's local disk, not over NFS.
+      - "{{ home }}/cache:/temp"
+      - "{{ home }}/configs:/app/configs"
+      - "{{ home }}/logs:/app/logs"
+    ports:
+      - "8267:8267"
+    cpus: {{ tdarr_node_cpus }}
+    # The node serves nothing locally (it dials the server), so health here is
+    # the node process being alive; the play gates on the server listing it.
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qas Tdarr_Node /proc/[0-9]*/cmdline"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped

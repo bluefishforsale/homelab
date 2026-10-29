@@ -1,0 +1,130 @@
+---
+# CPU tdarr node on each data01 worker, joined to ocean's tdarr server.
+#
+# Spec rollout step 9 (docs/specs/2026-10-17-node005-docker-host-design.md, the
+# canary). Needs data01_worker.yaml first: /data01 over NFS for the library,
+# local /data01/services for the cache and config.
+- name: tdarr CPU node on data01 workers
+  hosts: data01_workers
+  become: true
+  serial: 1
+  any_errors_fatal: true
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: tdarr-node
+    files: "{{ playbook_dir }}/../../../files/tdarr-node-worker"
+    home: /data01/services/tdarr-node
+    tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
+    tdarr_server_api_port: 8266
+    tdarr_server_url: "http://{{ tdarr_server_ip }}:{{ service_ports.tdarr.port }}"
+    tdarr_node_cpus: 12
+    # Committed worker counts; the server stores them, the API steps them by one.
+    tdarr_node_worker_limits:
+      transcodecpu: 4
+      healthcheckcpu: 1
+      transcodegpu: 0
+      healthcheckgpu: 0
+
+  tasks:
+    # Defense in depth: docker's own guard already refuses to start without it.
+    - name: Read the state mount
+      ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+      register: state_mount
+      changed_when: false
+
+    - name: Cache and config land on the local disk, not ocean's NFS
+      ansible.builtin.assert:
+        that: state_mount.stdout == 'ext4'
+        fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+    - name: Read the tdarr server's version
+      ansible.builtin.uri:
+        url: "{{ tdarr_server_url }}/api/v2/status"
+        return_content: true
+      register: tdarr_server_status
+
+    # The version goes into an image tag in a YAML file; accept only tdarr's
+    # tag shape (3.01.00) so a bad response cannot inject compose content.
+    - name: Server version looks like a tdarr release tag
+      ansible.builtin.assert:
+        that: tdarr_server_status.json.version is match('^[0-9]+\.[0-9]{2}\.[0-9]{2}$')
+        fail_msg: "tdarr server reported version '{{ tdarr_server_status.json.version }}', not a release tag"
+
+    - name: Pin the node to the server's version
+      ansible.builtin.set_fact:
+        tdarr_node_version: "{{ tdarr_server_status.json.version }}"
+
+    - name: Ensure node dirs exist, owned by media
+      ansible.builtin.file:
+        path: "{{ home }}/{{ item }}"
+        state: directory
+        owner: "{{ system_users.media.uid }}"
+        group: "{{ system_users.media.gid }}"
+        mode: '0755'
+      loop: ["", cache, configs, logs]
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: tdarr_node_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/tdarr-node.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: tdarr_node_unit
+
+    - name: Enable and start the node (restart only on compose/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (tdarr_node_compose is changed or tdarr_node_unit is changed) else 'started' }}"
+        daemon_reload: true
+
+    - name: Wait for the server to list this node
+      ansible.builtin.uri:
+        url: "{{ tdarr_server_url }}/api/v2/get-nodes"
+        return_content: true
+      register: tdarr_nodes
+      until: >-
+        tdarr_nodes.status == 200 and
+        (tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', inventory_hostname ~ '.home') | list | length) > 0
+      retries: 18
+      delay: 10
+
+    - name: Plan worker-limit steps toward the committed counts
+      vars:
+        node: "{{ tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', inventory_hostname ~ '.home') | first }}"
+      ansible.builtin.set_fact:
+        tdarr_node_id: "{{ node.key }}"
+        tdarr_worker_steps: >-
+          {%- set steps = [] -%}
+          {%- for type, want in tdarr_node_worker_limits.items() -%}
+          {%- set have = node.value.workerLimits[type] | default(0) | int -%}
+          {%- for _ in range((want - have) | abs) -%}
+          {%- set _ = steps.append({'type': type, 'process': 'increase' if want > have else 'decrease'}) -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ steps }}
+
+    - name: Step worker limits
+      ansible.builtin.uri:
+        url: "{{ tdarr_server_url }}/api/v2/alter-worker-limit"
+        method: POST
+        body_format: json
+        body:
+          data:
+            nodeID: "{{ tdarr_node_id }}"
+            process: "{{ item.process }}"
+            workerType: "{{ item.type }}"
+      loop: "{{ tdarr_worker_steps }}"
+      loop_control:
+        label: "{{ item.process }} {{ item.type }}"
+      changed_when: true
