@@ -21,9 +21,14 @@ _spec.loader.exec_module(exporter)
 LIVE = {"0a4XIvK": "harbor.home", "BxMHaIf": "ocean.home"}
 
 
-def test_job_is_attributed_to_the_live_node_that_ran_it():
+def test_handed_off_job_belongs_to_the_last_node_that_ran_it_not_its_nodeID():
+    # nodeID is the node that staged the job. When a harbor CPU worker requeued
+    # a file for NVENC, nodeID stayed harbor and nodeNames grew to
+    # [harbor, ocean]: the encode ran on ocean. Keying on a live nodeID credited
+    # 89 ocean encodes to harbor, then to "unknown" once harbor re-registered.
     job = {"nodeID": "0a4XIvK", "nodeNames": ["harbor.home", "ocean.home"]}
-    assert exporter.node_of(job, LIVE) == "harbor.home"
+    assert exporter.node_of(job, LIVE) == "ocean.home"
+    assert exporter.node_of({**job, "nodeID": "retired"}, LIVE) == "ocean.home"
 
 
 def test_retired_node_id_falls_back_to_its_only_recorded_name():
@@ -31,12 +36,10 @@ def test_retired_node_id_falls_back_to_its_only_recorded_name():
     assert exporter.node_of({"nodeID": "8lq5ivu", "nodeNames": ["ocean.home"]}, LIVE) == "ocean.home"
 
 
-def test_retired_node_id_with_no_single_name_is_unknown_not_dropped():
-    # Pre-3.x records carry no nodeNames, and a flow that hopped nodes names
-    # both; guessing would credit one node with the other's work.
+def test_record_without_node_names_uses_the_live_id_else_unknown():
+    # Records before 2025-06 carry no nodeNames; their ids are long retired.
+    assert exporter.node_of({"nodeID": "BxMHaIf"}, LIVE) == "ocean.home"
     assert exporter.node_of({"nodeID": "MLIZTIQul"}, LIVE) == "unknown"
-    assert exporter.node_of({"nodeID": "x", "nodeNames": ["harbor.home", "ocean.home"]}, LIVE) == "unknown"
-
 
 
 def test_tdarr_status_strings_fold_into_one_outcome_vocabulary():
