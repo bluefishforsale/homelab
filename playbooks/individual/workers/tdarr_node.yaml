@@ -47,6 +47,13 @@
         return_content: true
       register: tdarr_server_status
 
+    # The version goes into an image tag in a YAML file; accept only tdarr's
+    # tag shape (3.01.00) so a bad response cannot inject compose content.
+    - name: Server version looks like a tdarr release tag
+      ansible.builtin.assert:
+        that: tdarr_server_status.json.version is match('^[0-9]+\.[0-9]{2}\.[0-9]{2}$')
+        fail_msg: "tdarr server reported version '{{ tdarr_server_status.json.version }}', not a release tag"
+
     - name: Pin the node to the server's version
       ansible.builtin.set_fact:
         tdarr_node_version: "{{ tdarr_server_status.json.version }}"
