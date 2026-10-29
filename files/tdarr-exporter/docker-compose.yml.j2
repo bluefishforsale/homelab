@@ -1,0 +1,27 @@
+# Rendered by playbooks/individual/ocean/monitoring/tdarr_exporter.yaml.
+#
+# Built here from repo source like the emporia exporter: `build:` makes
+# docker-refresh skip it instead of failing on a tag no registry has.
+services:
+  tdarr-exporter:
+    build: .
+    image: "{{ image }}"
+    container_name: "{{ service }}"
+    hostname: "{{ service }}"
+    environment:
+      TDARR_URL: "{{ tdarr_url }}"
+      TDARR_EXPORTER_PORT: "{{ tdarr_exporter_port }}"
+      TDARR_DURATION_WINDOW_HOURS: "{{ tdarr_duration_window_hours }}"
+    ports:
+      - "{{ tdarr_exporter_port }}:{{ tdarr_exporter_port }}"
+    # Unhealthy when a scrape cannot read Tdarr. CMD-SHELL, not CMD: the exec
+    # form would pass `||` to python as a literal argument.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; b=urllib.request.urlopen('http://127.0.0.1:{{ tdarr_exporter_port }}/metrics',timeout=50).read().decode(); raise SystemExit(0 if '\\ntdarr_up 1.0' in b else 1)\""]
+      interval: 5m
+      timeout: 60s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

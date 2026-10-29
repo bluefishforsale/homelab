@@ -313,6 +313,11 @@ jobs:
       - name: emporia-exporter rate schedule
         run: python3 files/emporia-exporter/test_rates.py
 
+      # Every per-node Tdarr panel is an aggregate of job records whose shape
+      # changed across Tdarr versions.
+      - name: tdarr-exporter job math
+        run: python3 files/tdarr-exporter/test_exporter.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.
