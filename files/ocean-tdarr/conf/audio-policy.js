@@ -72,6 +72,14 @@ module.exports = async (args) => {
       s.removed = true;
       cmd.shouldProcess = true;
     });
+  // This ffmpeg probes a WebVTT track in matroska as codec "unknown", and the
+  // matroska muxer then refuses the whole output (The Mongoose, 2026-10-29).
+  streams.filter((s) => s.codec_type === 'subtitle' && ['unknown', 'none'].includes(s.codec_name))
+    .forEach((s) => {
+      log(`drop ${lang(s)} subtitle ffmpeg cannot identify`);
+      s.removed = true;
+      cmd.shouldProcess = true;
+    });
 
   const audio = streams.filter((s) => s.codec_type === 'audio');
   if (audio.length === 0) {
