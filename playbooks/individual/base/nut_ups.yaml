@@ -31,12 +31,18 @@
       - 3B2116X60966
       - 3B2037X27090
       - 3B2116X60175
-    # Parity with the apcupsd MINUTES 7 this replaces.
-    nut_low_runtime_seconds: 420
+    # NOTE: must stay under every UPS's full-charge runtime at its real load, or
+    # that UPS reads OL LB on mains, the on-line gates below fail, and any outage
+    # is an instant fleet shutdown. Was 420 (apcupsd MINUTES 7) until a node006
+    # PSU came back on 2026-10-29 and put ups-3B2116X60966 at 36% load, where it
+    # reads 387-465s on full charge. Recheck with `upsc` after moving any plug.
+    nut_low_runtime_seconds: 300
     # How long the primary holds itself up for the secondaries to power off.
-    # Budget: this + the primary's own guest stop + the 20s UPS off delay must
-    # fit inside nut_low_runtime_seconds.
-    nut_shutdown_wait_seconds: 240
+    # Budget: node006 has to stop ocean inside this, since it is node006's load
+    # that drains the batteries fastest. Once node006 is off its UPSes drop back
+    # to node005's own ~11% and the primary's guest stop plus the 20s UPS off
+    # delay run on far more than the remaining nut_low_runtime_seconds.
+    nut_shutdown_wait_seconds: 200
     nut_secondary_ips: "{{ groups['baremetal'] | difference([nut_server]) | map('extract', hostvars, 'ansible_ssh_host') | list }}"
     nut_files: "{{ playbook_dir }}/../../../files/nut"
     # NOTE: the server's static IP, not node005.home. Names on this LAN have

@@ -7,8 +7,9 @@
 # stops answering ping, or the UPS kill lands mid-shutdown on node006.
 #
 # NOTE: the cap is the battery budget. LB fires at {{ nut_low_runtime_seconds }}s of
-# runtime; this wait plus the primary's own guest stop plus the UPS off delay
-# must fit inside it. Past the cap the batteries would die anyway.
+# runtime at full fleet load; the secondaries have to be off inside this wait.
+# After that the primary's own guest stop and the UPS off delay run on a much
+# lighter load (see nut_shutdown_wait_seconds in the playbook).
 deadline=$(( $(date +%s) + {{ nut_shutdown_wait_seconds }} ))
 for host in {{ nut_secondary_ips | join(' ') }}; do
   misses=0
