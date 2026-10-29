@@ -143,8 +143,12 @@ scrape_configs:
 
   - job_name: 'sonarr-exporter'
     relabel_configs: *dropPortNumber
-    scrape_interval: 3m
-    scrape_timeout: 2m
+    # NOTE: ENABLE_ADDITIONAL_METRICS makes exportarr v2 walk every series
+    # serially (~1,150 API calls at 574 series), so a scrape runs 65-105s and
+    # flapped at a 2m timeout. Keep the interval under the 5m staleness lookback
+    # or the series go absent between scrapes.
+    scrape_interval: 4m
+    scrape_timeout: 3m50s
     static_configs:
     - targets: ['ocean.home:9708']
 
