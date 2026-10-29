@@ -1,0 +1,58 @@
+# Hand-picked, so the list is pinned by TMDB ID rather than a search that
+# could drift to a different film with the same title.
+#
+# NOTE: unlike the franchise defaults, these lists are wishlists, so missing
+# entries go to Radarr monitored and searched. Drop the radarr_* lines from a
+# collection to make it a view of what is already on disk.
+collections:
+  Band Movies with Heart:
+    summary: Kids, misfits and grown-ups forming bands, finding their sound, and each other.
+    tmdb_movie:
+      - 369557   # Sing Street (2016)
+      - 887870   # Blue Giant (2023)
+      - 191294   # We Are the Best! (2013)
+      - 9591     # That Thing You Do! (1996)
+      - 11663    # The Commitments (1991)
+      - 27337    # Linda Linda Linda (2005)
+      - 1129610  # Bocchi the Rock! Recap Part 1 (2024), the series lives in Sonarr
+      - 1201387  # Bocchi the Rock! Recap Part 2 (2024)
+      - 120811   # K-On! The Movie (2011)
+      - 36592    # Swing Girls (2004)
+      - 525      # The Blues Brothers (1980)
+      - 198277   # Begin Again (2013)
+      - 5723     # Once (2007)
+      - 534259   # Blinded by the Light (2019)
+      - 482981   # Wild Rose (2018)
+      - 776503   # CODA (2021)
+      - 515195   # Yesterday (2019)
+      - 22538    # Scott Pilgrim vs. the World (2010)
+      - 501979   # Bill & Ted Face the Music (2020)
+      - 335797   # Sing (2016)
+      - 114150   # Pitch Perfect (2012)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  Heavy, Sincere Movies:
+    summary: Grief, first love and growing up, told without flinching.
+    tmdb_movie:
+      - 378064   # A Silent Voice (2016)
+      - 372058   # Your Name (2016)
+      - 64246    # Colorful (2010)
+      - 15080    # Only Yesterday (1991)
+      - 441130   # Wolfwalkers (2020)
+      - 110416   # Song of the Sea (2014)
+      - 100271   # A Letter to Momo (2011)
+      - 504253   # I Want to Eat Your Pancreas (2018)
+      - 149870   # The Wind Rises (2013)
+      - 33320    # Millennium Actress (2001)
+      - 568160   # Weathering With You (2019)
+      - 916224   # Suzume (2022)
+      - 12477    # Grave of the Fireflies (1988)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
