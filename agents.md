@@ -125,6 +125,30 @@ is the worst possible outcome. So storage is exempt from "merge = deploy":
   kernel name -> wwn -> serial for every disk, so monitoring is no longer blind to it.
   Full record and the rename options: [`docs/operations/zfs-disk-replacement.md`](docs/operations/zfs-disk-replacement.md).
 
+### Nothing with a write-ahead log goes over NFS
+
+`/data01` is exported over NFS to worker hosts (spec:
+[`docs/specs/2026-10-17-node005-docker-host-design.md`](docs/specs/2026-10-17-node005-docker-host-design.md)),
+and every service on ocean keeps its config and database under `/data01/services/<svc>`.
+Those two facts together are a trap: run a service on a worker with its config dir on the
+NFS mount and its database corrupts.
+
+The rule is anything that keeps a WAL or journal, not just SQLite. These stores rely on
+local-filesystem guarantees NFS doesn't give: POSIX byte-range locks that hold, `fsync`
+ordering, and (for SQLite WAL mode) a shared-memory `-shm` index that is mmapped and only
+works on one host. Over NFS the locks hold until a lease expires or a client stalls
+mid-write, and then two writers share the file. SQLite (every *arr app, Plex, Jellyfin,
+Grafana, ntfy), MySQL InnoDB, Postgres, Prometheus TSDB, Loki, etcd and Kafka logs are all
+in scope. The *arr apps, Plex and Jellyfin document "no config on a network share" for
+this reason.
+
+- A service's state dir (anything with a database, WAL or journal) is always on a
+  **local** disk on the host that runs it. On a worker that is the local disk mounted over
+  `/data01/services`, never the NFS view of ocean's.
+- Bulk media and download payloads are what NFS is for.
+- Moving a service to a worker means copying its state to the worker's local disk, not
+  pointing the container at ocean's copy over NFS. Two hosts never open one DB.
+
 ---
 
 ## Multi-agent coordination

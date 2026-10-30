@@ -21,6 +21,10 @@
     user: grafana
     uid: "{{ system_users.media.uid }}"
     gid: "{{ system_users.media.gid }}"
+    # NOTE: percona runs as this id and owns its datadir. Sharing media's id is what
+    # locked mysqld out of its own socket when media was renumbered.
+    mysql_uid: "{{ system_users.grafana_mysql.uid }}"
+    mysql_gid: "{{ system_users.grafana_mysql.gid }}"
 
   tasks:
 
@@ -43,8 +47,6 @@
     - logs
     - plugins
     - data
-    - mysql-data
-    - mysql-logs
     - mysql-conf
     - provisioning
     - provisioning/users
@@ -74,6 +76,16 @@
     - data
     - plugins
     - logs
+
+  - name: Ensure MySQL directories are owned by the MySQL identity
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item }}"
+      state: directory
+      owner: "{{ mysql_uid }}"
+      group: "{{ mysql_gid }}"
+      mode: '0755'
+      recurse: true
+    with_items:
     - mysql-data
     - mysql-logs
 

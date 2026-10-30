@@ -29,9 +29,10 @@ groups:
 
   # High memory usage alert. The Proxmox hypervisors (node005/node006) run VMs
   # that pre-allocate RAM, so they sit near-full by design; they get a higher
-  # 95% bar in the companion rule below. All other hosts alert at 85%.
+  # 95% bar in the companion rule below, and pihole gets its own 95% rule too.
+  # All other hosts alert at 85%.
   - alert: HighMemoryUsage
-    expr: (node_memory_MemTotal_bytes{instance!~"node00[56].home"} - node_memory_MemAvailable_bytes{instance!~"node00[56].home"}) / node_memory_MemTotal_bytes{instance!~"node00[56].home"} * 100 > 85
+    expr: (node_memory_MemTotal_bytes{instance!~"node00[56].home|pihole.home"} - node_memory_MemAvailable_bytes{instance!~"node00[56].home|pihole.home"}) / node_memory_MemTotal_bytes{instance!~"node00[56].home|pihole.home"} * 100 > 85
     for: 5m
     labels:
       severity: warning
@@ -49,6 +50,18 @@ groups:
     annotations:
       summary: "High memory usage on hypervisor {{ "{{ $labels.instance }}" }}"
       description: "Memory usage is above 95% for more than 5 minutes on hypervisor {{ "{{ $labels.instance }}" }}"
+
+  # pihole: ~925 MiB with no swap, and it averages ~84% non-reclaimable use
+  # (peak 88.5%, 7d to 2026-10-25), so 85% fired constantly. NOTE: with no swap,
+  # 95% leaves little warning before the OOM killer takes FTL.
+  - alert: HighMemoryUsagePihole
+    expr: (node_memory_MemTotal_bytes{instance="pihole.home"} - node_memory_MemAvailable_bytes{instance="pihole.home"}) / node_memory_MemTotal_bytes{instance="pihole.home"} * 100 > 95
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ "{{ $labels.instance }}" }}"
+      description: "Memory usage is above 95% for more than 5 minutes on {{ "{{ $labels.instance }}" }}"
 
   # Disk space: critical near-full, plus a rate-based warning for steady fills.
   # There is deliberately no static warning tier below 90: a fixed percentage on
@@ -78,9 +91,10 @@ groups:
       summary: "Disk filling on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
       description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is projected to run out of space within 24h at the current rate."
 
-  # Service down alert (excluding all blackbox probes)
+  # Service down alert (excluding all blackbox probes). netboot-hosts is out
+  # too: a diskless netboot machine being off is normal, see netboot_alerts.
   - alert: ServiceDown
-    expr: up{job!~"blackbox-.*"} == 0
+    expr: up{job!~"blackbox-.*|netboot-hosts"} == 0
     for: 5m
     labels:
       severity: critical
@@ -317,6 +331,32 @@ groups:
     annotations:
       summary: "mem0 metrics are stale on {{ "{{ $labels.instance }}" }}"
       description: "mem0-metrics.timer has not published in 15m; the mem0 dashboard is showing the past."
+
+  # Emporia's cloud API is unofficial, so an auth or schema change breaks it
+  # quietly. The gauge starts at 0, so a container that never logs in fires too;
+  # absent() covers the exporter being down entirely.
+  - alert: EmporiaExporterStale
+    expr: >
+      absent(emporia_exporter_last_success_timestamp_seconds)
+      or (time() - emporia_exporter_last_success_timestamp_seconds > 900)
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Emporia plug power has not updated in 15m"
+      description: "No poll where every plug returned a reading. emporia_up shows which plug; `docker logs emporia-exporter` on ocean shows login or API errors. The Power dashboard is missing desk/homelab draw."
+
+  # tdarr_up is 0 when the exporter runs but cannot read Tdarr; absent()
+  # covers the exporter itself being down.
+  - alert: TdarrExporterDown
+    expr: >
+      absent(tdarr_up) or tdarr_up == 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tdarr metrics have not been readable for 15m"
+      description: "tdarr-exporter on ocean cannot read Tdarr's API (or is down). `journalctl -u tdarr-exporter` and `docker logs tdarr-exporter` on ocean show why; the Tdarr dashboard is showing the past."
 
   # A homelab service that exposes no metrics failed its blackbox probe. Keyed
   # on the category label, not a hostname, so anything added to that target
@@ -562,6 +602,67 @@ groups:
       summary: "Homelab DB backup completed with {{ "{{ $value }}" }} failed database(s)"
       description: "The last backup run on {{ "{{ $labels.instance }}" }} failed to dump {{ "{{ $value }}" }} in-scope database(s); the tarball is incomplete. Check the db-backup.service journal for which."
 
+  # The nightly restore test on harbor loads every backup into a throwaway
+  # container. A 0 means that service's backup would not restore, or restored
+  # an empty or (for the self-writing services) stale database.
+  - alert: DbRestoreTestFailing
+    expr: homelab_db_restore_test_ok == 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "DB backup for {{ "{{ $labels.service }}" }} failed its restore test"
+      description: "The latest {{ "{{ $labels.service }}" }} backup did not restore cleanly into a throwaway container, or its newest record is missing or too old. Check `journalctl -u db-restore-test.service` on harbor for the FAIL line."
+
+  - alert: DbRestoreTestStale
+    expr: time() - homelab_db_restore_test_last_success_timestamp_seconds > 129600
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "DB restore test has not passed in 36h ({{ "{{ $labels.instance }}" }})"
+      description: "No restore-test run has passed every backup in over 36h. The timer may be dead, harbor down at 06:00, or one service failing every night. Check `systemctl status db-restore-test.service` on harbor."
+
+  # nzbget-prune writes its success time only on a run that read nzbget and
+  # finished, so a dead timer or an nzbget it can't reach both show as age.
+  - alert: NzbgetPruneStale
+    expr: time() - nzbget_prune_last_success_timestamp_seconds > 172800
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget-prune has not succeeded in 2 days ({{ "{{ $labels.instance }}" }})"
+      description: "Failed and stale downloads are piling up on harbor's scratch SSD and data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
+
+  # Normal running holds the active jobs and a week of failed ones, well under
+  # half the 1.8T SSD. Past 85% something is wrong even if the guard copes.
+  - alert: NzbgetScratchHigh
+    expr: (1 - node_filesystem_avail_bytes{instance="harbor.home",mountpoint="/srv/nzbget"} / node_filesystem_size_bytes{instance="harbor.home",mountpoint="/srv/nzbget"}) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget scratch SSD over 85% on {{ "{{ $labels.instance }}" }}"
+      description: "/srv/nzbget is {{ "{{ $value }}" }}% used. nzbget-guard prunes failed and orphaned jobs and pauses downloads past 85%; check `journalctl -u nzbget-guard` and `du -sh /srv/nzbget/intermediate/*` for what is holding the space."
+
+  - alert: NzbgetGuardPaused
+    expr: nzbget_guard_paused == 1
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget downloads paused by the scratch guard ({{ "{{ $labels.instance }}" }})"
+      description: "Pruning could not bring /srv/nzbget under 85%, so downloads are paused until it drops below 75%. Post-processing still runs. See `journalctl -u nzbget-guard` on {{ "{{ $labels.instance }}" }}."
+
+  - alert: NzbgetGuardStale
+    expr: time() - nzbget_guard_last_run_timestamp_seconds > 1800
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget-guard has not run in 30 minutes ({{ "{{ $labels.instance }}" }})"
+      description: "Nothing is stopping nzbget filling its scratch SSD. Check `systemctl status nzbget-guard.timer nzbget-guard.service` on {{ "{{ $labels.instance }}" }}."
+
 - name: sas_phy_alerts
   rules:
   # SAS transport counters are cumulative, so alert on the RATE of increase (a
@@ -639,3 +740,122 @@ groups:
     annotations:
       summary: "IPMI sensor warning: {{ "{{ $labels.name }}" }} ({{ "{{ $labels.type }}" }}) on {{ "{{ $labels.instance }}" }}"
       description: "BMC reports sensor '{{ "{{ $labels.name }}" }}' (type {{ "{{ $labels.type }}" }}) in a non-critical warning state on {{ "{{ $labels.instance }}" }} for 15m. Approaching a threshold; check the Dell Hardware (IPMI) dashboard before it escalates."
+
+- name: ups_alerts
+  rules:
+  # The three Back-UPS on node005's NUT server (nut_ups.yaml). upsmon on
+  # node005/node006 does the shutting down; these only make it visible. All
+  # three hang off one wall socket, so a real outage fires for all three.
+  - alert: UpsOnBattery
+    expr: network_ups_tools_ups_status{flag="OB"} == 1
+    for: 30s
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} is on battery"
+      description: "{{ "{{ $labels.ups }}" }} lost input power. upsmon shuts node005 and node006 down when any UPS reaches low battery (420s runtime). Check the wall socket and breaker."
+
+  - alert: UpsLowBattery
+    expr: network_ups_tools_ups_status{flag="LB"} == 1
+    for: 0m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} is at low battery"
+      description: "{{ "{{ $labels.ups }}" }} reports LB (runtime under 420s). If it is also on battery, upsmon is shutting the hypervisors down now. If it is on-line, its battery is too weak to cover a shutdown: replace it."
+
+  # Full-charge runtime creeping toward the shutdown threshold means an aging
+  # battery: an outage would trigger shutdown within moments of starting.
+  # NOTE: `on(ups)` is required. The status series carries a `flag` label the
+  # runtime series lacks, so a bare `and` matches nothing and the rule is mute.
+  - alert: UpsRuntimeNearShutdownThreshold
+    expr: network_ups_tools_battery_runtime < 600 and on(ups) network_ups_tools_ups_status{flag="OL"} == 1
+    for: 1h
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "UPS {{ "{{ $labels.ups }}" }} has under 10 min runtime on-line"
+      description: "{{ "{{ $labels.ups }}" }} would last {{ "{{ $value }}" }}s at current load and upsmon shuts down at 420s, so an outage starts the shutdown almost at once. Shed load from it or replace its battery."
+
+  # Absence is the alertable state: if the exporter or NUT server is down, every
+  # rule above goes quiet at the moment it matters.
+  - alert: UpsMonitoringDown
+    expr: up{job="nut"} == 0 or absent(up{job="nut"})
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "UPS monitoring down for {{ "{{ $labels.ups }}" }}"
+      description: "Prometheus cannot read {{ "{{ $labels.ups }}" }} via nut-exporter on ocean:9197 -> node005:3493. Check `upsc -l` on node005, the nut-driver@ units, and the nut-exporter container. upsmon shutdown may still work; visibility does not."
+
+- name: data01_worker_alerts
+  rules:
+  # [data01_workers] mount ocean's /data01 over NFS and keep service state on a
+  # local disk over /data01/services (data01_worker.yaml). Worker list comes
+  # from the inventory, so a new worker is covered by being in the group.
+{% set data01_worker_re = groups['data01_workers'] | map('regex_replace', '$', '.home') | join('|') %}
+  # Exporter up but no NFS /data01: the worker's media jobs have nothing to read.
+  - alert: Data01WorkerNfsMissing
+    expr: up{job="node_exporter",instance=~"{{ data01_worker_re }}"} == 1 unless on(instance) node_filesystem_size_bytes{mountpoint="/data01",fstype="nfs4"}
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} has no NFS /data01"
+      description: "{{ "{{ $labels.instance }}" }} is up but ocean's /data01 is not mounted (nfs4). Check nfs-server on ocean and `findmnt /data01` on the worker; docker on the worker will not start without it."
+
+  # The local state disk is gone: docker's sentinel guard keeps containers from
+  # writing into ocean's /data01/services, so the worker's services are down.
+  - alert: Data01WorkerStateDiskMissing
+    expr: up{job="node_exporter",instance=~"{{ data01_worker_re }}"} == 1 unless on(instance) node_filesystem_size_bytes{mountpoint="/data01/services",fstype="ext4"}
+    for: 5m
+    labels:
+      severity: critical
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} lost its local /data01/services disk"
+      description: "The local ext4 state disk is not mounted on {{ "{{ $labels.instance }}" }}. docker refuses to start (no .worker-local sentinel), so its services are down. Do NOT remove the guard; remount the disk."
+
+  # A hard NFS mount waits instead of failing, so a sick export shows up as
+  # retransmissions and stalled jobs, not errors.
+  - alert: Data01WorkerNfsRetransmits
+    expr: rate(node_nfs_rpc_retransmissions_total{instance=~"{{ data01_worker_re }}"}[10m]) > 0
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "NFS retransmits on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.instance }}" }} has been retransmitting NFS RPCs to ocean for 10m ({{ "{{ $value | humanize }}" }}/s). Processes on the mount stall rather than fail; check ocean's load and nfsd."
+
+- name: netboot_alerts
+  rules:
+  # Netboot hosts (vars/vars_netboot.yaml) are diskless and off most of the
+  # time, so only "booted but broken" alerts. netboot-role writes
+  # netboot_role_up 0 before it starts the role and 1 once the role is up.
+  - alert: NetbootRoleDown
+    expr: up{job="netboot-hosts"} == 1 and on(instance) netboot_role_up == 0
+    for: 5m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} booted but its netboot role is not up"
+      description: "{{ "{{ $labels.instance }}" }} is running the live image but role {{ "{{ $labels.role }}" }} never started. Check `journalctl -u netboot-role` on it and the bundle at http://{{ netboot_server.name }}.home/roles/{{ "{{ $labels.role }}" }}/start.sh."
+
+  # Up with no role metric at all means the image has no netboot-role, or it
+  # never got as far as writing one.
+  - alert: NetbootRoleMissing
+    expr: up{job="netboot-hosts"} == 1 unless on(instance) netboot_role_up
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} booted with no netboot role metric"
+      description: "{{ "{{ $labels.instance }}" }} is up but exports no netboot_role_up. netboot-role.service did not run; check `systemctl status netboot-role` on it."

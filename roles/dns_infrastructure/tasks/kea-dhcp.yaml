@@ -1,11 +1,15 @@
 ---
 # Kea DHCP deployment tasks
 
+# NOTE: validated with the running image's own parser before it lands. The
+# play is serial across the HA pair, but its per-host check is DNS, not DHCP,
+# so a config Kea rejects would otherwise take down both peers in turn.
 - name: Deploy Kea DHCP4 configuration
   ansible.builtin.template:
     src: kea/kea-dhcp4.conf.j2
     dest: "{{ dns_home }}/config/kea-dhcp4.conf"
     mode: '0644'
+    validate: docker run --rm --network host -v %s:/etc/kea/kea-dhcp4.conf:ro jonasal/kea-dhcp4:2 -t /etc/kea/kea-dhcp4.conf
   notify: Restart kea
 
 - name: Deploy Kea DHCP-DDNS configuration

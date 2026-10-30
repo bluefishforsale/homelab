@@ -1,0 +1,53 @@
+---
+# NUT -> Prometheus exporter for the three UPSes on node005 (nut_ups.yaml).
+# Runs on ocean beside Prometheus; reads node005:3493 over the LAN.
+- name: NUT exporter
+  hosts: ocean
+  become: true
+
+  vars:
+    service: nut-exporter
+    files: "{{ playbook_dir }}/../../../../files/nut-exporter"
+    home: "/data01/services/nut-exporter"
+    nut_exporter_version: "3.3.0"
+    nut_server_host: 192.168.1.105  # static IP, not a DDNS name (see nut_ups.yaml)
+    # Hardcoded (not vars_service_ports) so this deploy does not fan out to every
+    # playbook referencing that shared file. Matches the prometheus scrape job.
+    nut_exporter_port: 9197
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: nut_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/nut-exporter.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: nut_unit
+
+    - name: Enable and start the exporter (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (nut_compose is changed or nut_unit is changed) else 'started' }}"
+        daemon_reload: true
+
+    - name: Exporter reads a UPS from node005
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ nut_exporter_port }}/ups_metrics?ups=ups-3B2116X60966"
+        return_content: true
+      register: nut_metrics
+      until: nut_metrics.status == 200 and 'network_ups_tools_ups_load' in nut_metrics.content
+      retries: 12
+      delay: 10

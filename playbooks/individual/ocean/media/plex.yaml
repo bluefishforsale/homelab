@@ -65,7 +65,7 @@
     kometa_home: "{{ data }}/services/{{ kometa_service }}"
     ramdisk: /mnt/ramdisk
     user: media
-    uid: 1001
+    uid: "{{ system_users.media.uid }}"
 
   tasks:
 
@@ -269,6 +269,15 @@
       owner: "{{ user }}"
       group: "{{ user }}"
     register: kometa_config_result
+    tags: [config, kometa]
+
+  - name: Copy repo-managed kometa collection files
+    ansible.builtin.copy:
+      src: "{{ files }}/kometa/curated.yml"
+      dest: "{{ kometa_home }}/config/curated.yml"
+      mode: '0644'
+      owner: "{{ user }}"
+      group: "{{ user }}"
     tags: [config, kometa]
 
   - name: Create kometa docker-compose files

@@ -50,14 +50,14 @@
 - name: Deploy Radarr for Movies
   ansible.builtin.import_playbook: individual/ocean/media/radarr.yaml
 
+- name: Deploy Lidarr for Music
+  ansible.builtin.import_playbook: individual/ocean/media/lidarr.yaml
+
 - name: Deploy Prowlarr for Indexer Management
   ansible.builtin.import_playbook: individual/ocean/media/prowlarr.yaml
 
 - name: Deploy Bazarr for Subtitles
   ansible.builtin.import_playbook: individual/ocean/media/bazarr.yaml
-
-- name: Deploy NZBGet for Downloads
-  ansible.builtin.import_playbook: individual/ocean/media/nzbget.yaml
 
 - name: Deploy Overseerr for Media Requests
   ansible.builtin.import_playbook: individual/ocean/media/overseerr.yaml

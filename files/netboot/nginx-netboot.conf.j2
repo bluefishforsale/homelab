@@ -1,0 +1,34 @@
+# netboot01: static server for netboot images and role bundles
+# (docs/specs/2026-10-29-netboot-design.md). LAN only: PXE clients and the
+# smoke VM fetch from here, nothing else should.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name {{ netboot_server.name }} {{ netboot_server.name }}.home;
+
+    root {{ netboot_root }};
+    autoindex off;
+
+    # Squashfs images are GB-sized; let the kernel do the copy.
+    sendfile on;
+    tcp_nopush on;
+
+    allow 192.168.1.0/24;
+    allow 127.0.0.1;
+    deny all;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # One-shot next-boot flags: POST sets one, the GET from iPXE consumes it.
+    location /next-boot/ {
+        proxy_pass http://127.0.0.1:{{ netboot_next_boot_port }};
+    }
+
+    location / {
+        try_files $uri =404;
+    }
+}

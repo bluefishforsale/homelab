@@ -1,0 +1,275 @@
+---
+# NZBGet on harbor, so downloads, par repair and unpacking happen on a local SSD
+# and only finished files cross NFS into ocean's /data01/incoming (#1005). The
+# pool no longer takes the random I/O, which is what let NZBGet run 24/7.
+#
+# Needs create_harbor_vm.yaml's scsi2 (the passed-through 870 EVO) and
+# data01_worker.yaml's mounts. Container paths match the ocean install exactly,
+# so Sonarr/Radarr remote path mappings and the queue carried over from ocean
+# resolve unchanged.
+
+- name: Retire NZBGet on ocean
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  tasks:
+    # NOTE: stopped before harbor's copy below; a live nzbget rewrites its
+    # queue mid-copy and harbor would resume from a torn one.
+    - name: Stop and disable the ocean units
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: [nzbget-prune.timer, nzbget-prune.service, nzbget-exporter.service, nzbget.service]
+      failed_when: false
+
+    - name: Remove the ocean units and prune install
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/nzbget.service
+        - /etc/systemd/system/nzbget-exporter.service
+        - /etc/systemd/system/nzbget-prune.service
+        - /etc/systemd/system/nzbget-prune.timer
+        - /usr/local/bin/nzbget-prune
+        - /etc/nzbget-prune.env
+        - /data01/services/node-exporter/text_files/nzbget_prune.prom
+      register: ocean_units_removed
+
+    - name: Reload systemd on ocean
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: ocean_units_removed is changed
+
+- name: NZBGet on harbor
+  hosts: harbor
+  become: true
+  gather_facts: true
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: nzbget
+    image: linuxserver/nzbget
+    version: latest
+    nzbget_port: "{{ service_ports.nzbget.port }}"
+    exporter_image: frebib/nzbget-exporter
+    exporter_version: latest
+    exporter_port: "{{ service_ports.nzbget_exporter.port }}"
+    data: /data01
+    files: "{{ playbook_dir }}/../../../files/nzbget"
+    incoming: "{{ data }}/incoming"
+    complete: "{{ data }}/complete"
+    home: "{{ data }}/services/{{ service }}"
+    user: media
+    # The 870 EVO, by the id QEMU gives scsi2; sdX can reorder.
+    scratch_disk: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+    scratch: /srv/nzbget
+    ocean_data01: /mnt/ocean-data01
+    migrated: "{{ scratch }}/.migrated-from-ocean"
+
+  tasks:
+
+  - name: Read the state mount
+    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+    register: state_mount
+    changed_when: false
+
+  - name: Config and queue land on the local disk, not ocean's NFS
+    ansible.builtin.assert:
+      that: state_mount.stdout == 'ext4'
+      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+  - name: Read the scratch disk's filesystem
+    ansible.builtin.command: "blkid -o value -s TYPE {{ scratch_disk }}"
+    register: scratch_fs
+    changed_when: false
+    failed_when: scratch_fs.rc not in [0, 2]
+
+  # blkid exits 2 when the device has no filesystem at all; anything already on
+  # it is left alone.
+  - name: Make the scratch disk ext4 (blank disk only)
+    ansible.builtin.command: "mkfs.ext4 -L nzbget-scratch -m 0 {{ scratch_disk }}"
+    when: scratch_fs.rc == 2
+
+  # No online discard: Debian's weekly fstrim.timer trims it instead of every
+  # unpack's deletes stalling on the MegaRAID.
+  - name: Mount the scratch disk
+    ansible.builtin.mount:
+      path: "{{ scratch }}"
+      src: "{{ scratch_disk }}"
+      fstype: ext4
+      opts: defaults,noatime
+      state: mounted
+
+  - name: Ensure directories exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    loop:
+    - "{{ home }}"
+    - "{{ home }}/config"
+    - "{{ home }}/scratch"
+    - "{{ home }}/scripts"
+    - "{{ home }}/scripts/repos"
+    - "{{ scratch }}"
+    - "{{ scratch }}/intermediate"
+    - "{{ scratch }}/tmp"
+
+  # One time: carry ocean's queue, history, half-finished jobs and extension
+  # scripts over, so NZBGet resumes where ocean stopped. ocean's /data01 is one
+  # dataset, so a second NFS mount sees /data01/services that harbor's local
+  # disk hides at the usual path.
+  - name: Read the migration marker
+    ansible.builtin.stat:
+      path: "{{ migrated }}"
+    register: migrated_stat
+
+  - name: Copy NZBGet's state from ocean
+    when: not migrated_stat.stat.exists
+    block:
+    - name: Mount ocean's /data01 read-only
+      ansible.builtin.shell: |
+        set -e
+        mkdir -p {{ ocean_data01 }}
+        mountpoint -q {{ ocean_data01 }} || mount -t nfs4 -o ro,nfsvers=4.2,nconnect=4 {{ hostvars['ocean'].ansible_ssh_host }}:/data01 {{ ocean_data01 }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    # As media, not root: the export root_squashes, and media's uid matches.
+    # runuser, not become_user: harbor has no ACL support, so Ansible cannot
+    # hand its temp files to an unprivileged user.
+    # Intermediate first and the queue last, so a copy cut short reruns and
+    # never leaves a queue pointing at jobs that are not here yet.
+    - name: Copy intermediate, scripts, then queue and history
+      ansible.builtin.command:
+        argv:
+          - /usr/sbin/runuser
+          - -u
+          - "{{ user }}"
+          - --
+          - bash
+          - -ec
+          - |
+            src={{ ocean_data01 }}/services/{{ service }}
+            rsync -aH --delete "$src/scratch/intermediate/" {{ scratch }}/intermediate/
+            rsync -aH "$src/scripts/" {{ home }}/scripts/
+            rsync -aH --exclude=/intermediate --exclude=/tmp --exclude='/nzbget*.log' --exclude=/nzbget.lock "$src/scratch/" {{ home }}/scratch/
+      async: 14400
+      poll: 30
+      changed_when: true
+
+    - name: Mark the migration done
+      ansible.builtin.file:
+        path: "{{ migrated }}"
+        state: touch
+        mode: '0644'
+
+    always:
+    - name: Unmount ocean's /data01
+      ansible.builtin.shell: "! mountpoint -q {{ ocean_data01 }} || umount {{ ocean_data01 }}"
+      changed_when: false
+
+  - name: Ensure nzbget log file exists
+    ansible.builtin.file:
+      path: "{{ home }}/scratch/nzbget.log"
+      state: touch
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+      modification_time: preserve
+      access_time: preserve
+
+  - name: Create config files
+    ansible.builtin.template:
+      src: "{{ files }}/config/nzbget.conf.j2"
+      dest: "{{ home }}/config/nzbget.conf"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0644'
+    register: nzbget_conf
+
+  # 0600: the exporter's environment carries the control password.
+  - name: Template compose file
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0600'
+    register: nzbget_compose
+
+  - name: Install systemd unit
+    ansible.builtin.template:
+      src: "{{ files }}/nzbget.service.j2"
+      dest: "/etc/systemd/system/{{ service }}.service"
+      mode: '0644'
+    register: nzbget_unit
+
+  - name: Enable and start nzbget (restart only on config, compose or unit change)
+    ansible.builtin.systemd:
+      name: "{{ service }}.service"
+      enabled: true
+      state: "{{ 'restarted' if (nzbget_conf is changed or nzbget_compose is changed or nzbget_unit is changed) else 'started' }}"
+      daemon_reload: true
+
+  - name: Wait for nzbget to answer
+    ansible.builtin.uri:
+      url: "http://localhost:{{ nzbget_port }}/jsonrpc/version"
+      url_username: nzbget
+      url_password: "{{ media_services.nzbget.control_password }}"
+      force_basic_auth: true
+    register: nzbget_version
+    until: nzbget_version.status == 200
+    retries: 20
+    delay: 6
+    no_log: true
+
+  # nzbget keeps failed jobs' intermediate files forever and nothing imports
+  # stale incoming downloads; this prunes both daily. Rules and their tests:
+  # files/nzbget/nzbget-prune.py, test_nzbget_prune.py.
+  - name: Install nzbget-prune
+    ansible.builtin.copy:
+      src: "{{ files }}/nzbget-prune.py"
+      dest: /usr/local/bin/nzbget-prune
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create nzbget-prune environment
+    ansible.builtin.template:
+      src: "{{ files }}/nzbget-prune.env.j2"
+      dest: /etc/nzbget-prune.env
+      owner: root
+      group: root
+      mode: '0600'
+
+  - name: Create nzbget-prune systemd units
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    loop:
+    - nzbget-prune.service
+    - nzbget-prune.timer
+    - nzbget-guard.service
+    - nzbget-guard.timer
+    register: nzbget_prune_units
+
+  # The guard is the same script with --guard: every 5 minutes, past 85% of the
+  # scratch SSD it prunes without the retry windows, then pauses downloads
+  # until usage is back under 75%.
+  - name: Enable and start the prune and guard timers
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: started
+      enabled: true
+      daemon_reload: "{{ nzbget_prune_units is changed }}"
+    loop:
+    - nzbget-prune.timer
+    - nzbget-guard.timer

@@ -305,6 +305,23 @@ jobs:
       - name: Alert receiver selftest
         run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
 
+      # nzbget-prune runs rm -rf on harbor scratch and data01 daily; its keep rules are the defect ledger.
+      - name: nzbget-prune rules
+        run: python3 files/nzbget/test_nzbget_prune.py
+
+      # A wrong TOU boundary misprices every minute on the Power dashboard.
+      - name: emporia-exporter rate schedule
+        run: python3 files/emporia-exporter/test_rates.py
+
+      # Every per-node Tdarr panel is an aggregate of job records whose shape
+      # changed across Tdarr versions.
+      - name: tdarr-exporter job math
+        run: python3 files/tdarr-exporter/test_exporter.py
+
+      # A bad profile body is rejected by Lidarr mid-deploy, or silently allows lossless.
+      - name: lidarr quality profile
+        run: python3 files/ocean-lidarr/test_lidarr_configure.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.

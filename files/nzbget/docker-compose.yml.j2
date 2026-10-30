@@ -1,0 +1,50 @@
+# Rendered by playbooks/individual/workers/nzbget.yaml.
+#
+# NZBGet and its exporter as one compose project, so docker-refresh@nzbget
+# keeps both images current. Container paths are the ones the ocean install
+# used, so Sonarr/Radarr's remote path mappings and the carried-over queue
+# resolve unchanged.
+services:
+  nzbget:
+    image: "{{ image }}:{{ version }}"
+    container_name: nzbget
+    hostname: nzbget
+    environment:
+      TZ: America/Los_Angeles
+      PUID: "{{ system_users.media.uid }}"
+      PGID: "{{ system_users.media.gid }}"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - "{{ home }}/scripts:/scripts"
+      - "{{ home }}/config:/config"
+      - "{{ home }}/scratch:/scratch"
+      # Download, par repair and unpack on the 870 EVO; only finished files
+      # cross NFS into data01.
+      - "{{ scratch }}/intermediate:/scratch/intermediate"
+      - "{{ scratch }}/tmp:/scratch/tmp"
+      - "{{ incoming }}:/downloads"
+      - "{{ complete }}:/movies"
+      - "{{ complete }}:/tv"
+    ports:
+      - "{{ nzbget_port }}:{{ nzbget_port }}"
+    cpus: 6
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:{{ nzbget_port }}/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  nzbget-exporter:
+    image: "{{ exporter_image }}:{{ exporter_version }}"
+    container_name: nzbget-exporter
+    hostname: nzbget-exporter
+    environment:
+      TZ: America/Los_Angeles
+      NZBGET_HOST: "http://nzbget:{{ media_services.nzbget.control_password }}@nzbget:{{ nzbget_port }}"
+    ports:
+      - "{{ exporter_port }}:9452"
+    depends_on:
+      - nzbget
+    restart: unless-stopped

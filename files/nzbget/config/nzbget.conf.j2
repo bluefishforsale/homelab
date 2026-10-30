@@ -1186,8 +1186,7 @@ UpdateInterval=200
 # Examples: "08:00", "00:00,06:00,12:00,18:00", "*:00", "*,*:00,*:30".
 #
 # NOTE: Also see option <TimeCorrection>.
-#Task1.Time=08:00
-
+#
 # Week days to execute the command (1-7).
 #
 # Comma separated list of week days numbers.
@@ -1195,8 +1194,7 @@ UpdateInterval=200
 # Character '-' may be used to define ranges.
 #
 # Examples: "1-7", "1-5", "5,6", "1-5, 7".
-#Task1.WeekDays=1-7
-
+#
 # Command to be executed (PauseDownload, UnpauseDownload, PausePostProcess,
 # UnpausePostProcess, PauseScan, UnpauseScan, DownloadRate, Script, Process,
 # ActivateServer, DeactivateServer, FetchFeed).
@@ -1218,8 +1216,7 @@ UpdateInterval=200
 #
 # On start the program checks all tasks and determines current state
 # for download-pause, scan-pause, download-rate and active servers.
-#Task1.Command=PauseDownload
-
+#
 # Parameters for the command if needed.
 #
 # Some scheduler commands require additional parameters:
@@ -1253,13 +1250,8 @@ UpdateInterval=200
 #                     Example: bookmarks feed, another feed.
 #                     NOTE: feed names should not have commas.
 #                     NOTE: use feed id "0" to fetch all feeds.
-#Task1.Param=
-
-#Task2.Time=20:00
-#Task2.WeekDays=1-7
-#Task2.Command=UnpauseDownload
-#Task2.Param=
-
+#
+####
 
 ##############################################################################
 ### CHECK AND REPAIR                                                       ###
@@ -1703,14 +1695,6 @@ Category4.Aliases=
 UpdateCheck=stable
 SkipWrite=no
 RemoteTimeout=30
-Task1.Time=02:00
-Task1.WeekDays=1-7
-Task1.Command=UnpauseDownload
-Task1.Param=
-Task2.Time=18:00
-Task2.WeekDays=1-7
-Task2.Command=PauseDownload
-Task2.Param=
 Server1.CertVerification=Strict
 Server2.CertVerification=Strict
 Server3.CertVerification=Strict

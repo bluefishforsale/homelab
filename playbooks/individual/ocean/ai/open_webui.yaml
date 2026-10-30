@@ -17,8 +17,8 @@
     files: "{{ playbook_dir }}/../../../../files/ocean-open-webui"
     home: "{{ data }}/services/{{ service }}"
     user: media
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
     # Using SQLite for database storage (stored in /data01/services/open-webui/data)
 
   tasks:
@@ -95,8 +95,9 @@
   - name: Enable open-webui service
     ansible.builtin.systemd:
       name: open-webui.service
-      enabled: yes
-      daemon_reload: yes
+      enabled: true
+      state: started
+      daemon_reload: true
 
   - name: Wait for open-webui service to start
     ansible.builtin.wait_for:

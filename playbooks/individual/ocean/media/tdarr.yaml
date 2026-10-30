@@ -123,6 +123,13 @@
     - Reload systemd daemon
     - Restart tdarr service
 
+  # NOTE: the unit edits above only reach systemd through handlers. Without this
+  # flush, a stopped unit starts on the stale definition (2026-10-23: PUID 1001
+  # after the renumber, readonly DB) and the API tasks below fail before any
+  # handler runs.
+  - name: Apply unit changes before starting
+    ansible.builtin.meta: flush_handlers
+
   - name: Enable and start tdarr service
     ansible.builtin.systemd:
       name: tdarr.service
@@ -193,7 +200,11 @@
 
   # Newest first, so a fresh download (a request, or a media-refetch.py batch)
   # is processed within hours instead of waiting behind the whole backlog.
-  - name: Process the tdarr queue newest first
+  # NOTE: the stall detector counts Replace Original's copy back as no progress.
+  # A worker node copies its result to /media over NFS (EXDEV, so no rename),
+  # and at the default 300s it killed a 70 GB 2160p copy on harbor at 62 GB
+  # (2026-10-29), leaving a .tmp in the library and the output in the cache.
+  - name: Process the tdarr queue newest first, with a stall window that fits an NFS copy-back
     ansible.builtin.uri:
       url: "http://localhost:{{ tdarr_port_web }}/api/v2/cruddb"
       method: POST
@@ -205,6 +216,7 @@
           docID: globalsettings
           obj:
             queueSortType: sortDateNewest
+            workerStallDetectorInterval: 1800
     changed_when: false
 
   # Worker limits live in tdarr's DB, not the node config, and the API only

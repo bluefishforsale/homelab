@@ -69,6 +69,20 @@ scrape_configs:
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 
+  # Diskless netboot machines (vars/vars_netboot.yaml). Not in inventory and
+  # off most of the day, so they get their own job, which ServiceDown skips.
+  # Scraped by address, not name: Kea hands the address out only to the live
+  # image, while <name>.home follows whatever the machine last booted (DDNS),
+  # which on the tower is usually Windows.
+  - job_name: 'netboot-hosts'
+    scrape_interval: 30s
+    static_configs:
+{% for name, host in netboot_hosts.items() if name != 'netboot-smoke' %}
+    - targets: ['{{ host.ip }}:9100']
+      labels:
+        instance: '{{ name }}-live'
+{% endfor %}
+
   - job_name: 'process-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
@@ -141,10 +155,21 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9707']
 
-  - job_name: 'sonarr-exporter'
+  - job_name: 'lidarr-exporter'
     relabel_configs: *dropPortNumber
     scrape_interval: 3m
     scrape_timeout: 2m
+    static_configs:
+    - targets: ['ocean.home:9709']
+
+  - job_name: 'sonarr-exporter'
+    relabel_configs: *dropPortNumber
+    # NOTE: ENABLE_ADDITIONAL_METRICS makes exportarr v2 walk every series
+    # serially (~1,150 API calls at 574 series), so a scrape runs 65-105s and
+    # flapped at a 2m timeout. Keep the interval under the 5m staleness lookback
+    # or the series go absent between scrapes.
+    scrape_interval: 4m
+    scrape_timeout: 3m50s
     static_configs:
     - targets: ['ocean.home:9708']
 
@@ -160,7 +185,7 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 15s
     static_configs:
-    - targets: ['ocean.home:9452']
+    - targets: ['harbor.home:9452']
 
   # Jellyfin has no native /metrics endpoint (:8096/metrics 404s); its metrics
   # come from the jellyfin-exporter job above. This direct scrape only produced
@@ -179,6 +204,39 @@ scrape_configs:
     scrape_timeout: 60s
     static_configs:
     - targets: ['ocean.home:9199']
+
+  # Tdarr via its API; each scrape reads the whole job history (~30 MB), so
+  # the interval is relaxed and the timeout covers a busy server.
+  - job_name: 'tdarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 2m
+    scrape_timeout: 60s
+    static_configs:
+    - targets: ['ocean.home:9196']
+
+  # Emporia smart plugs via the cloud API; the exporter polls once a minute.
+  - job_name: 'emporia-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 60s
+    static_configs:
+    - targets: ['ocean.home:9198']
+
+  # The three UPSes on node005's NUT server, one scrape per UPS (the exporter
+  # reads one UPS per request, chosen by ?ups=). Target = NUT UPS name.
+  - job_name: 'nut'
+    metrics_path: /ups_metrics
+    scrape_interval: 30s
+    static_configs:
+    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-3B2116X60175']
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_ups
+    - source_labels: [__address__]
+      target_label: ups
+    - source_labels: [__address__]
+      target_label: instance
+    - target_label: __address__
+      replacement: ocean.home:9197
 
   - job_name: 'mtr-exporter'
     relabel_configs: *dropPortNumber
@@ -321,6 +379,10 @@ scrape_configs:
         # the only signal they are actually serving. /docs is mem0's one
         # unauthenticated route; it is served by the same app as /memories.
         - http://ocean.home:8888/docs
+        # netboot01's nginx serves netboot images and role bundles to PXE clients.
+        - http://netboot01.home/healthz
+        # The exporter stays up while Lidarr is down, so up==0 cannot see it.
+        - http://ocean.home:8686/ping
         labels:
           probe_type: "http"
           category: "homelab_services"

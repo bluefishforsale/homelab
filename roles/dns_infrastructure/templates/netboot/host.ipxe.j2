@@ -1,0 +1,9 @@
+#!ipxe
+# {{ item.key }} (vars/vars_netboot.yaml)
+set nb-host {{ item.key }}
+set nb-role {{ item.value.role }}
+set nb-channel {{ item.value.channel | default('current') }}
+set menu-default {{ item.value.default | default('local') }}
+{% if item.value.timeout_ms is defined %}
+set menu-timeout {{ item.value.timeout_ms }}
+{% endif %}

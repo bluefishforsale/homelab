@@ -1,0 +1,50 @@
+#!ipxe
+# Rendered by homelab (roles/dns_infrastructure, vars/vars_netboot.yaml).
+# Order: a per-MAC host file sets this machine's name, role, channel and
+# default; anything unregistered gets the plain menu. The countdown default is
+# local disk unless a host file says otherwise, and no entry here writes a disk.
+
+set nb http://{{ netboot_server.ip }}
+set menu-default local
+set menu-timeout 10000
+set nb-channel current
+chain --autofree http://{{ ansible_host }}:{{ service_ports.dns_stack.netboot_http }}/hosts/${mac:hexhyp}.ipxe || echo no host file for ${mac}
+# One-shot override set with POST /next-boot/<host> on netboot01; reading it
+# consumes it. netboot01 being down only costs the override, not the menu.
+chain --autofree ${nb}/next-boot/${mac:hexhyp}.ipxe || echo no next-boot flag
+
+:menu
+menu netboot ${nb-host} ${mac}
+item --key l local Boot local disk
+item --key t live  Debian live (role: ${nb-role})
+item --key n nbxyz netboot.xyz utilities (internet)
+item --key s shell iPXE shell
+choose --default ${menu-default} --timeout ${menu-timeout} target || goto local
+goto ${target}
+
+:local
+exit
+
+:live
+isset ${nb-role} || goto norole
+chain --autofree ${nb}/images/debian-live/${nb-channel}.ipxe || goto noimage
+kernel ${nb}/images/debian-live/${nb-sha}/vmlinuz initrd=initrd.img boot=live fetch=${nb}/images/debian-live/${nb-sha}/filesystem.squashfs hostname=${nb-host} netboot.role=${nb-role} netboot.url=${nb} || goto noimage
+initrd --name initrd.img ${nb}/images/debian-live/${nb-sha}/initrd.img || goto noimage
+boot || goto noimage
+
+:norole
+echo ${mac} has no netboot role in vars/vars_netboot.yaml
+sleep 5
+goto menu
+
+:noimage
+echo debian-live ${nb-channel} is not available from ${nb}
+sleep 5
+goto menu
+
+:nbxyz
+chain --autofree https://boot.netboot.xyz || goto menu
+
+:shell
+shell
+goto menu

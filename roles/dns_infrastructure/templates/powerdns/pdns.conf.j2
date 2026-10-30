@@ -47,6 +47,12 @@ distributor-threads=2
 cache-ttl=60
 negquery-cache-ttl=60
 query-cache-ttl=20
+# NOTE: the zone cache only learns about zones created out of process (pdnsutil
+# in import-zones.sh) on its refresh, default 300s. Every primary rebuild then
+# answered REFUSED for every zone for up to five minutes and tripped the serial
+# deploy gate (2026-10-21). Three zones need no cache; the packet cache above
+# still fronts the backend.
+zone-cache-refresh-interval=0
 
 # Logging
 log-dns-details=no

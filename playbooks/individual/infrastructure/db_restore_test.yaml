@@ -1,0 +1,71 @@
+---
+# Proves the nightly DB backups can actually be restored. Each backup is pulled
+# from GCS with a read-only key, loaded into a throwaway network-less container
+# on harbor, integrity-checked and probed for its newest record. Results land as
+# homelab_db_restore_test_* in node-exporter's textfile collector; the alerts
+# live in files/ocean-prometheus/alert_rules.yml.j2 (backup_alerts).
+#
+# Runs on harbor, not ocean, so a restore test never competes with the live
+# databases. Nothing here touches /data01 NFS: the work dir is on harbor's root disk.
+- name: Configure the nightly DB restore test
+  hosts: harbor
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    service: db-restore-test
+    home: "/var/lib/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/{{ service }}"
+    backup_files: "{{ playbook_dir }}/../../../files/db-backup"
+    backup_gcs_bucket: homelab-db-backups
+    textfile_dir: /data01/services/node-exporter/text_files
+
+  tasks:
+    - name: Ensure the state and work directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      loop:
+        - "{{ home }}"
+        - "{{ home }}/work"
+
+    - name: Deploy the restore script (same one used for real restores)
+      ansible.builtin.copy:
+        src: "{{ backup_files }}/db-restore.sh"
+        dest: "{{ home }}/db-restore.sh"
+        mode: '0755'
+
+    - name: Land the read-only GCS key
+      ansible.builtin.copy:
+        content: "{{ backup_storage.gcs.restore_test_key }}"
+        dest: "{{ home }}/gcs-ro.json"
+        mode: '0600'
+      no_log: true
+
+    - name: Render the restore-test env
+      ansible.builtin.template:
+        src: "{{ files }}/db-restore-test.env.j2"
+        dest: "{{ home }}/db-restore-test.env"
+        mode: '0600'
+
+    - name: Deploy systemd service + timer
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - db-restore-test.service
+        - db-restore-test.timer
+
+    - name: Enable and start the nightly timer
+      ansible.builtin.systemd:
+        name: db-restore-test.timer
+        enabled: true
+        state: started
+        daemon_reload: true

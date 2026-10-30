@@ -1621,7 +1621,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=~\".+\"}[5m])) by (name)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{instance=\"$node\",container_label_com_docker_compose_service=~\".+\"}[5m])) by (name)",
           "hide": false,
           "interval": "",
           "legendFormat": "{{name}}",

@@ -21,8 +21,8 @@
     # poll callback; the listener itself still binds :80 in the container.
     ntfy_base_url: "https://ntfy.terrac.com"
     ntfy_topic: homelab
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
     - name: Ensure ntfy directories exist

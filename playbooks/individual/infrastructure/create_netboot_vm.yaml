@@ -1,0 +1,95 @@
+---
+# Proxmox VM creation for netboot01, the netboot image server
+# Serves the large netboot artifacts (kernel, initrd, squashfs) and role
+# bundles over HTTP; the iPXE menu itself stays on the dns HA pair (spec:
+# docs/specs/2026-10-29-netboot-design.md). On node005 so the data plane sits
+# on the opposite node from ocean. Pattern mirrors create_registry_cache_vm.yaml.
+
+- name: Create netboot01 VM on Proxmox
+  hosts: node005
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../../../vars/vars_netboot.yaml
+  vars:
+    netboot_vm_id: 4000
+    netboot_vm_name: "{{ netboot_server.name }}"
+    netboot_vm_cores: 2
+    netboot_vm_memory_mb: 2048
+    netboot_vm_disk_size_increase: "+247G"  # template is 3G; three versions of each image
+    netboot_vm_template_id: 9999  # Debian 12 cloud-init template
+    netboot_vm_onboot: 1
+
+    # Static from the netboot registry, not a dig lookup: *.home is a wildcard
+    # to ocean, so a lookup that races the record would return ocean's address.
+    netboot_vm_ip: "{{ netboot_server.ip }}"
+    netboot_vm_netmask: 24
+    netboot_vm_gateway: 192.168.1.1
+    netboot_vm_nameserver: 192.168.1.2
+
+  tasks:
+    - name: Download SSH keys for netboot VM
+      ansible.builtin.get_url:
+        url: "https://github.com/bluefishforsale.keys"
+        dest: "/root/ssh.keys"
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Check netboot VM status
+      ansible.builtin.command: "qm status {{ netboot_vm_id }}"
+      register: netboot_vm_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Clone template for netboot VM
+      ansible.builtin.command: "qm clone {{ netboot_vm_template_id }} {{ netboot_vm_id }}"
+      when: netboot_vm_status.rc != 0
+      register: clone_result
+
+    - name: Set netboot VM name and network configuration
+      ansible.builtin.shell: |
+        qm set {{ netboot_vm_id }} --name {{ netboot_vm_name }}
+        qm set {{ netboot_vm_id }} --ipconfig0 ip={{ netboot_vm_ip }}/{{ netboot_vm_netmask }},gw={{ netboot_vm_gateway }}
+        qm set {{ netboot_vm_id }} --nameserver {{ netboot_vm_nameserver }}
+        qm set {{ netboot_vm_id }} --onboot {{ netboot_vm_onboot }}
+      when: netboot_vm_status.rc != 0 or netboot_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set SSH keys for netboot VM
+      ansible.builtin.shell: "qm set {{ netboot_vm_id }} --sshkeys /root/ssh.keys"
+      when: netboot_vm_status.rc != 0 or netboot_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Resize netboot VM disk
+      ansible.builtin.shell: "qm resize {{ netboot_vm_id }} scsi0 {{ netboot_vm_disk_size_increase }}"
+      when: netboot_vm_status.rc != 0
+      changed_when: true
+
+    - name: Set netboot VM CPU and memory
+      ansible.builtin.shell: |
+        qm set {{ netboot_vm_id }} --cores {{ netboot_vm_cores }}
+        qm set {{ netboot_vm_id }} --memory {{ netboot_vm_memory_mb }}
+      when: netboot_vm_status.rc != 0 or netboot_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set netboot VM description
+      ansible.builtin.shell: |
+        qm set {{ netboot_vm_id }} --description "netboot01 - netboot image server (nginx, /srv/netboot)"
+      when: netboot_vm_status.rc != 0
+      changed_when: true
+
+    - name: Start netboot VM
+      ansible.builtin.command: "qm start {{ netboot_vm_id }}"
+      when: netboot_vm_status.rc != 0 or netboot_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Wait for netboot VM to boot and accept SSH connections (max 5 minutes)
+      ansible.builtin.wait_for:
+        host: "{{ netboot_vm_ip }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+        msg: "Waiting for {{ netboot_vm_ip }}:22 to become available..."
+      when: netboot_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)

@@ -19,7 +19,7 @@ ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
 ExecStart=docker run --rm \
     --name {{ service }} \
     --hostname {{ service }} \
-   -e PUID=1001 -e PGID=1001 \
+   -e PUID={{ system_users.media.uid }} -e PGID={{ system_users.media.gid }} \
    -p {{ port }}:6767 \
    -v {{home}}:/config \
    -v {{complete}}/movies:/movies \

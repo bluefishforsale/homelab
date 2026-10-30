@@ -1,0 +1,93 @@
+#!/bin/bash
+# Rendered by playbooks/individual/infrastructure/netboot.yaml.
+#
+# tdarr-gpu role: a diskless live host (the gaming tower's 4090) joins ocean's
+# tdarr server as a GPU node. The ephemeral cousin of
+# playbooks/individual/workers/tdarr_node.yaml: same image pinning, same
+# in-container paths, but everything here lives in RAM and is rebuilt per boot.
+# Local disks are never touched; the transcode cache is a capped tmpfs.
+set -euo pipefail
+
+SERVER_IP={{ tdarr_server_ip }}
+SERVER_URL=http://$SERVER_IP:{{ service_ports.tdarr.port }}
+NODE_NAME=$(hostname).home
+HOME_DIR=/srv/tdarr-node
+
+# A node refuses a server of another version, and a version baked into the
+# image at build time would drift, so pin to whatever the server runs now.
+VERSION=$(curl -fsS "$SERVER_URL/api/v2/status" | jq -r .version)
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]{2}\.[0-9]{2}$ ]] || { echo "tdarr server reported version '$VERSION'" >&2; exit 1; }
+
+# ocean exports only the library to netboot hosts (nfs_export_data01.yaml).
+mkdir -p /data01/complete
+mountpoint -q /data01/complete || mount -t nfs4 -o {{ tdarr_gpu_nfs_opts }} "$SERVER_IP:/data01/complete" /data01/complete
+
+# NOTE: the cap is what turns a full cache into one failed job (tdarr retries
+# it) instead of the OOM killer taking the whole node down with 64 GB of RAM.
+mkdir -p "$HOME_DIR/cache" "$HOME_DIR/configs" "$HOME_DIR/logs"
+mountpoint -q "$HOME_DIR/cache" || mount -t tmpfs -o size={{ tdarr_gpu_cache_size }},mode=0775,uid={{ system_users.media.uid }},gid={{ system_users.media.gid }} tmpfs "$HOME_DIR/cache"
+chown {{ system_users.media.uid }}:{{ system_users.media.gid }} "$HOME_DIR/configs" "$HOME_DIR/logs"
+
+NODE_IP=$(ip -4 route get "$SERVER_IP" | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+cat >"$HOME_DIR/docker-compose.yml" <<EOF
+services:
+  tdarr-node:
+    image: ghcr.io/haveagitgat/tdarr_node:$VERSION
+    container_name: tdarr-node
+    hostname: tdarr-node-$(hostname)
+    environment:
+      TZ: America/Los_Angeles
+      PUID: "{{ system_users.media.uid }}"
+      PGID: "{{ system_users.media.gid }}"
+      inContainer: "true"
+      serverIP: "$SERVER_IP"
+      serverPort: "{{ tdarr_server_api_port }}"
+      nodeID: "$NODE_NAME"
+      nodeName: "$NODE_NAME"
+      nodeIP: "$NODE_IP"
+      nodePort: "8267"
+      NVIDIA_DRIVER_CAPABILITIES: all
+      NVIDIA_VISIBLE_DEVICES: all
+    volumes:
+      - /data01/complete:/media
+      - $HOME_DIR/cache:/temp
+      - $HOME_DIR/configs:/app/configs
+      - $HOME_DIR/logs:/app/logs
+    ports:
+      - "8267:8267"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video, compute, utility]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qas Tdarr_Node /proc/[0-9]*/cmdline"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+EOF
+docker compose -f "$HOME_DIR/docker-compose.yml" up -d
+
+# Worker limits live on the server, keyed by nodeID, and only move one step
+# per API call, so walk each type to its committed count.
+NODE_ID=""
+for _ in $(seq 1 30); do
+  NODE_ID=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg n "$NODE_NAME" 'to_entries[] | select(.value.nodeName == $n) | .key' | head -1)
+  [[ -n "$NODE_ID" ]] && break
+  sleep 10
+done
+[[ -n "$NODE_ID" ]] || { echo "tdarr server never listed $NODE_NAME" >&2; exit 1; }
+
+{% for type, want in tdarr_gpu_worker_limits.items() %}
+have=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg id "$NODE_ID" '.[$id].workerLimits.{{ type }} // 0')
+while (( have != {{ want }} )); do
+  if (( have < {{ want }} )); then process=increase; have=$((have + 1)); else process=decrease; have=$((have - 1)); fi
+  curl -fsS -X POST -H 'Content-Type: application/json' "$SERVER_URL/api/v2/alter-worker-limit" \
+    -d "$(jq -cn --arg id "$NODE_ID" --arg p "$process" '{data:{nodeID:$id,process:$p,workerType:"{{ type }}"}}')" >/dev/null
+done
+{% endfor %}
+echo "$NODE_NAME joined tdarr $VERSION as $NODE_ID"

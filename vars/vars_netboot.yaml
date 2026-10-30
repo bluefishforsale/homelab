@@ -1,0 +1,39 @@
+---
+# Netboot registry (docs/specs/2026-10-29-netboot-design.md). The one place a
+# PXE-booted machine is declared; Kea live-only addresses, iPXE per-MAC files,
+# the NFS export and scrape targets all render from it.
+#
+# NOTE: ip is handed out only to the live image (Kea reservation on the
+# image's DUID-LL client-id, built from mac), never by MAC alone. The tower's Windows install
+# shares the MAC, and ocean's NFS export trusts this address.
+#
+# NOTE: these hosts are deliberately NOT ansible inventory. Anything in
+# inventory joins groups['all'], so every `hosts: all` play and the fleet-wide
+# scrape loops would target a machine that is powered off most of the day.
+
+netboot_server:
+  name: netboot01
+  ip: 192.168.1.33
+
+# Per host: mac, ip, role; optional channel (current|candidate, default
+# current), default menu entry (local|live, default local), timeout_ms, and
+# nfs (true to mount ocean's /data01/complete).
+netboot_hosts:
+  gaming:
+    mac: "58:11:22:ad:f4:7a"
+    ip: 192.168.1.40
+    role: tdarr-gpu
+    # Defaults to Windows on its own disk; tdarr is hotkey t or a next-boot flag.
+    default: local
+    # Gets read-write /data01/complete over NFS (nfs_export_data01.yaml),
+    # squashed to the media user, keyed on ip.
+    nfs: true
+  # Throwaway VM the promotion gate creates on node005 (bc:24:11 is Proxmox's
+  # OUI). It always boots the candidate image, never current.
+  netboot-smoke:
+    mac: "bc:24:11:4e:42:01"
+    ip: 192.168.1.34
+    role: smoke
+    channel: candidate
+    default: live
+    timeout_ms: 1000

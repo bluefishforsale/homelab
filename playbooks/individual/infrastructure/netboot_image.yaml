@@ -1,0 +1,238 @@
+---
+# Pull a netboot image that netboot-images CI pushed to GHCR and stage it as
+# the candidate (docs/specs/2026-10-29-netboot-design.md). Dispatched by
+# .github/workflows/deploy-netboot-images.yml with netboot_image and
+# netboot_sha; never auto-applied from a push here, since it needs both.
+
+- name: Stage a netboot image as candidate
+  hosts: netboot
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  vars:
+    netboot_root: /srv/netboot
+    image_dir: "{{ netboot_root }}/images/{{ netboot_image }}"
+    oras_version: 1.3.6
+    oras_sha256: 66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0
+    netboot_keep_versions: 3
+
+  tasks:
+    # Both values come from another repo's dispatch payload and end up in paths
+    # and a registry reference, so they are checked before anything uses them.
+    - name: Dispatch payload is a known image and a full commit sha
+      ansible.builtin.assert:
+        that:
+          - netboot_image is defined and netboot_image is match('^[a-z0-9-]+$')
+          - netboot_sha is defined and netboot_sha is match('^[0-9a-f]{40}$')
+        fail_msg: "netboot_image='{{ netboot_image | default('') }}' netboot_sha='{{ netboot_sha | default('') }}'"
+
+    - name: Download oras
+      ansible.builtin.get_url:
+        url: "https://github.com/oras-project/oras/releases/download/v{{ oras_version }}/oras_{{ oras_version }}_linux_amd64.tar.gz"
+        dest: "/tmp/oras_{{ oras_version }}.tar.gz"
+        checksum: "sha256:{{ oras_sha256 }}"
+        mode: '0644'
+
+    - name: Install oras
+      ansible.builtin.unarchive:
+        src: "/tmp/oras_{{ oras_version }}.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        include: [oras]
+        creates: /usr/local/bin/oras
+      register: oras_install
+
+    - name: Ensure the image dir exists
+      ansible.builtin.file:
+        path: "{{ image_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # Logged in whether the package is public or not, so flipping its
+    # visibility never breaks the pull.
+    - name: Log oras in to GHCR
+      ansible.builtin.command:
+        cmd: oras login ghcr.io --registry-config /root/.oras-config.json -u bluefishforsale --password-stdin
+        stdin: "{{ development.github.packages_read_token }}"
+      changed_when: false
+      no_log: true
+
+    - name: Pull into a staging dir
+      ansible.builtin.command:
+        cmd: >-
+          oras pull --registry-config /root/.oras-config.json
+          -o {{ image_dir }}/.staging-{{ netboot_sha }}
+          ghcr.io/bluefishforsale/netboot-images/{{ netboot_image }}:{{ netboot_sha }}
+        creates: "{{ image_dir }}/{{ netboot_sha }}/filesystem.squashfs"
+      register: oras_pull
+
+    - name: Staged files are all present and non-empty
+      ansible.builtin.stat:
+        path: "{{ image_dir }}/.staging-{{ netboot_sha }}/{{ item }}"
+      loop: [vmlinuz, initrd.img, filesystem.squashfs]
+      register: staged
+      when: oras_pull is changed
+
+    - name: Fail on a missing or empty layer
+      ansible.builtin.assert:
+        that: item.stat.exists and item.stat.size > 0
+        fail_msg: "{{ item.item }} missing or empty in {{ netboot_image }}:{{ netboot_sha }}"
+      loop: "{{ staged.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: oras_pull is changed
+
+    # oras checks each layer against its manifest digest as it pulls, so a
+    # completed pull is a verified one; the rename makes it visible atomically.
+    - name: Promote staging dir to its sha
+      ansible.builtin.command:
+        cmd: mv {{ image_dir }}/.staging-{{ netboot_sha }} {{ image_dir }}/{{ netboot_sha }}
+      when: oras_pull is changed
+
+    - name: Make the files world-readable for nginx
+      ansible.builtin.file:
+        path: "{{ image_dir }}/{{ netboot_sha }}"
+        mode: u=rwX,go=rX
+        recurse: true
+
+    - name: Point candidate at the new sha
+      ansible.builtin.file:
+        src: "{{ netboot_sha }}"
+        dest: "{{ image_dir }}/candidate"
+        state: link
+        force: true
+
+    # The menu resolves a channel to a sha once, through this stub, and fetches
+    # kernel, initrd and squashfs by sha. Following the symlink per file instead
+    # would let a promotion mid-boot pair one build's kernel with another's root.
+    - name: Publish the candidate sha for iPXE
+      ansible.builtin.copy:
+        dest: "{{ image_dir }}/candidate.ipxe"
+        content: |
+          #!ipxe
+          set nb-sha {{ netboot_sha }}
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Find staged versions
+      ansible.builtin.find:
+        paths: "{{ image_dir }}"
+        file_type: directory
+        patterns: ['[0-9a-f]*']
+        use_regex: false
+      register: versions
+
+    - name: Read current
+      ansible.builtin.stat:
+        path: "{{ image_dir }}/current"
+      register: current_link
+
+    # Keep the newest few, and never the sha current or candidate points at,
+    # however old: those are what a backout points back to.
+    - name: Prune old versions
+      vars:
+        pinned:
+          - "{{ netboot_sha }}"
+          - "{{ (current_link.stat.lnk_target | default('')) | basename }}"
+        newest: "{{ (versions.files | sort(attribute='mtime', reverse=true))[:netboot_keep_versions] | map(attribute='path') | list }}"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ versions.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: item.path not in newest and (item.path | basename) not in pinned
+
+# Smoke gate: boot the candidate in a throwaway diskless VM on node005 and wait
+# for it to report the right sha. The VM's per-MAC file (vars_netboot.yaml,
+# netboot-smoke) always boots candidate with role=smoke. It has no GPU, so this
+# proves kernel, initrd, fetch=, live-boot and the role skeleton, not nvidia.
+- name: Smoke-boot the candidate
+  hosts: node005
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - ../../../vars/vars_netboot.yaml
+
+  vars:
+    smoke: "{{ netboot_hosts['netboot-smoke'] }}"
+    smoke_vm_id: 4001
+    # The squashfs is copied into RAM by live-boot, so this has to hold the
+    # whole image plus a running system.
+    smoke_vm_memory_mb: 8192
+    smoke_timeout_s: 300
+
+  tasks:
+    - name: Smoke boot
+      block:
+        - name: Remove a smoke VM left over from an interrupted run
+          ansible.builtin.shell: |
+            qm stop {{ smoke_vm_id }} --skiplock 1 || true
+            qm destroy {{ smoke_vm_id }} --purge 1 --skiplock 1
+          register: leftover
+          changed_when: leftover.rc == 0
+          failed_when: false
+
+        - name: Create the smoke VM
+          ansible.builtin.command: >-
+            qm create {{ smoke_vm_id }} --name netboot-smoke
+            --memory {{ smoke_vm_memory_mb }} --cores 2 --ostype l26
+            --net0 virtio={{ smoke.mac }},bridge=vmbr0
+            --boot order=net0 --onboot 0
+            --description "Throwaway netboot smoke VM; destroyed by netboot_image.yaml"
+
+        - name: Start the smoke VM
+          ansible.builtin.command: qm start {{ smoke_vm_id }}
+
+        - name: Smoke VM reports the candidate sha with its role up
+          ansible.builtin.uri:
+            url: "http://{{ smoke.ip }}:9100/metrics"
+            return_content: true
+          register: smoke_metrics
+          until: >-
+            smoke_metrics.status == 200
+            and ('netboot_image_info{role="smoke",sha="' ~ netboot_sha ~ '"} 1') in smoke_metrics.content
+            and 'netboot_role_up{role="smoke"} 1' in smoke_metrics.content
+          retries: "{{ (smoke_timeout_s / 10) | int }}"
+          delay: 10
+      always:
+        - name: Destroy the smoke VM
+          ansible.builtin.shell: |
+            qm stop {{ smoke_vm_id }} --skiplock 1 || true
+            qm destroy {{ smoke_vm_id }} --purge 1 --skiplock 1
+          changed_when: true
+
+# Only reached when the smoke play passed: any failure above ends the run with
+# current untouched, which is the halt. Nothing rolls back on its own.
+- name: Promote candidate to current
+  hosts: netboot
+  become: true
+  gather_facts: false
+
+  vars:
+    image_dir: "/srv/netboot/images/{{ netboot_image }}"
+
+  tasks:
+    - name: Point current at the smoke-tested sha
+      ansible.builtin.file:
+        src: "{{ netboot_sha }}"
+        dest: "{{ image_dir }}/current"
+        state: link
+        force: true
+
+    - name: Publish the current sha for iPXE
+      ansible.builtin.copy:
+        dest: "{{ image_dir }}/current.ipxe"
+        content: |
+          #!ipxe
+          set nb-sha {{ netboot_sha }}
+        owner: root
+        group: root
+        mode: '0644'

@@ -40,12 +40,46 @@ module.exports = async (args) => {
   // With one in the output ffmpeg reports time=N/A, tdarr sees no progress, and
   // its stall detector cancels the job (Kiss of the Spider Woman, 2026-10-18).
   // Plex shows its own poster, so the cover goes, even from a finished file.
-  const isCover = (s) => s.codec_type === 'video' && /^image\//.test(tags(s).MIMETYPE || '');
+  // The flow can hand a cover over as codec_type "attachment" (Bound, 2026-10-24).
+  // Font attachments stay: the subtitles need them. An mp4 cover carries no
+  // mimetype, only the attached_pic disposition (Tenzing, 2026-10-24).
+  const isCover = (s) => ['video', 'attachment'].includes(s.codec_type)
+    && (/^image\//.test(tags(s).MIMETYPE || '') || (s.disposition || {}).attached_pic === 1);
   streams.filter(isCover).forEach((s) => {
     log(`drop cover ${tags(s).FILENAME || ''} encoded as ${s.codec_name} video`);
     s.removed = true;
     cmd.shouldProcess = true;
   });
+
+  // mp4 text subtitles (Tenzing, 2026-10-24): matroska cannot hold mov_text.
+  streams.filter((s) => s.codec_name === 'mov_text').forEach((s) => {
+    s.outputArgs.push('-c:{outputIndex}', 'srt');
+    cmd.shouldProcess = true;
+  });
+  // Nor any data stream (Tenzing's bin_data text track).
+  streams.filter((s) => s.codec_type === 'data').forEach((s) => {
+    log(`drop data stream ${s.codec_name}`);
+    s.removed = true;
+    cmd.shouldProcess = true;
+  });
+  // ffmpeg's progress time waits on the sparsest output stream. A foreign
+  // forced track can go half an hour between cues, and tdarr's stall detector
+  // cancels the job (Blade Runner 2049, 2026-10-28). English forced subs stay.
+  const isForced = (s) => (s.disposition || {}).forced === 1 || /forced/i.test(title(s));
+  streams.filter((s) => s.codec_type === 'subtitle' && isForced(s) && !['eng', 'en'].includes(lang(s)))
+    .forEach((s) => {
+      log(`drop ${lang(s)} forced subtitle ${title(s)}`);
+      s.removed = true;
+      cmd.shouldProcess = true;
+    });
+  // This ffmpeg probes a WebVTT track in matroska as codec "unknown", and the
+  // matroska muxer then refuses the whole output (The Mongoose, 2026-10-29).
+  streams.filter((s) => s.codec_type === 'subtitle' && ['unknown', 'none'].includes(s.codec_name))
+    .forEach((s) => {
+      log(`drop ${lang(s)} subtitle ffmpeg cannot identify`);
+      s.removed = true;
+      cmd.shouldProcess = true;
+    });
 
   const audio = streams.filter((s) => s.codec_type === 'audio');
   if (audio.length === 0) {
@@ -124,6 +158,10 @@ module.exports = async (args) => {
   // undershoots over a whole film, so it aims at -16: full films measured
   // -17.8 (Amistad) and -19.2 (The Tree of Life), against -20.1 and -21.3 when
   // aimed at -18. loudnorm resamples to 192 kHz, hence the aresample to 48k.
+  // NOTE: loudnorm can emit NaN when the source's audio parameters change
+  // mid-stream, and AAC then fails the encode at its last frame (Last Cab to
+  // Darwin, 2:01:38, twice). The aeval zeroes non-finite samples; at 192 kHz,
+  // ahead of the aresample, it slowed the chain from 1.9x to 1.1x realtime.
   // Some encoders leave the layout unset; 6 and 8 channels are 5.1 and 7.1.
   const layout = main.channel_layout || { 6: '5.1', 8: '7.1' }[main.channels] || '';
   const surr = (side) => (/7\.1/.test(layout) ? `0.3*B${side}+0.3*S${side}`
@@ -144,7 +182,8 @@ module.exports = async (args) => {
   };
   clearStats(dialogue);
   dialogue.outputArgs.push('-c:{outputIndex}', 'aac', '-b:{outputIndex}', '192k',
-      '-filter:{outputIndex}', `${downmix},loudnorm=I=-16:LRA=7:TP=-1.5,aresample=48000`,
+      '-filter:{outputIndex}', `${downmix},loudnorm=I=-16:LRA=7:TP=-1.5,aresample=48000,`
+        + 'aeval=if(isnan(val(ch))+isinf(val(ch))\\,0\\,val(ch)):c=same',
       '-metadata:s:{outputIndex}', `title=${DIALOGUE_TITLE}`,
       '-metadata:s:{outputIndex}', `language=${lang(main)}`,
       '-disposition:{outputIndex}', 'default');

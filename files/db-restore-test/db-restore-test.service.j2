@@ -1,0 +1,14 @@
+[Unit]
+Description=Restore every DB backup into a throwaway container and probe it
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ home }}/db-restore-test.env
+# NOTE: points the script's env-file loader away from ocean's db-backup.env path.
+Environment=DB_BACKUP_ENV=/nonexistent
+ExecStart={{ home }}/db-restore.sh
+Nice=10
+TimeoutStartSec=3h

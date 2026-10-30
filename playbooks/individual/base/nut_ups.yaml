@@ -1,0 +1,253 @@
+---
+# UPS monitoring and power-loss shutdown for the bare-metal hosts, via NUT.
+#
+# Three Back-UPS XS 1500M hang off one USB hub on node005. apcupsd could only
+# read one of them (the first it found), so two UPSes reported to nothing and
+# node006 sat at COMMLOST with no shutdown signal at all. NUT runs one driver
+# per UPS pinned by serial, serves all three on :3493, and node006 follows as a
+# network secondary. The exporter on ocean (nut_exporter.yaml) reads the same
+# server.
+#
+# NOTE: serial + any_errors_fatal + the gates below are what make this safe.
+# A wrong upsmon config shuts a hypervisor down, so node005 must prove all three
+# UPSes read on-line before upsmon starts, and node006 is not touched unless
+# node005 finished clean. If the drivers cannot read the UPSes, the rescue puts
+# apcupsd back rather than leaving node005 with no UPS software at all.
+
+- name: NUT UPS monitoring and shutdown
+  hosts: baremetal
+  become: true
+  serial: 1
+  any_errors_fatal: true
+  order: sorted
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  vars:
+    nut_server: node005
+    # USB serials; labels everywhere (NUT names, metrics) are ups-<serial>.
+    nut_ups_serials:
+      - 3B2116X60966
+      - 3B2037X27090
+      - 3B2116X60175
+    # NOTE: must stay under every UPS's full-charge runtime at its real load, or
+    # that UPS reads OL LB on mains, the on-line gates below fail, and any outage
+    # is an instant fleet shutdown. Was 420 (apcupsd MINUTES 7) until a node006
+    # PSU came back on 2026-10-29 and put ups-3B2116X60966 at 36% load, where it
+    # reads 387-465s on full charge. Recheck with `upsc` after moving any plug.
+    nut_low_runtime_seconds: 300
+    # How long the primary holds itself up for the secondaries to power off.
+    # Budget: node006 has to stop ocean inside this, since it is node006's load
+    # that drains the batteries fastest. Once node006 is off its UPSes drop back
+    # to node005's own ~11% and the primary's guest stop plus the 20s UPS off
+    # delay run on far more than the remaining nut_low_runtime_seconds.
+    nut_shutdown_wait_seconds: 200
+    nut_secondary_ips: "{{ groups['baremetal'] | difference([nut_server]) | map('extract', hostvars, 'ansible_ssh_host') | list }}"
+    nut_files: "{{ playbook_dir }}/../../../files/nut"
+    # NOTE: the server's static IP, not node005.home. Names on this LAN have
+    # flapped under DDNS collisions; one that resolves to the wrong box can feed
+    # a secondary a fake OB+LB, and upsmon acts on that by shutting down.
+    nut_server_ip: "{{ hostvars[nut_server].ansible_ssh_host }}"
+    nut_ups_host: "{{ 'localhost' if inventory_hostname == nut_server else nut_server_ip }}"
+
+  tasks:
+    - name: Install NUT
+      ansible.builtin.apt:
+        name: "{{ ['nut-client', 'nut-server'] if inventory_hostname == nut_server else ['nut-client'] }}"
+        update_cache: true
+        cache_valid_time: 86400
+
+    # Before upsmon.conf, which points SHUTDOWNCMD at it on the primary.
+    - name: Install the primary's shutdown wait
+      ansible.builtin.template:
+        src: "{{ nut_files }}/shutdown-wait.sh.j2"
+        dest: /usr/local/sbin/nut-shutdown-wait
+        owner: root
+        group: root
+        mode: '0755'
+      when: inventory_hostname == nut_server
+      register: nut_shutdown_wait
+
+    - name: Template client config
+      ansible.builtin.template:
+        src: "{{ nut_files }}/{{ item }}.j2"
+        dest: "/etc/nut/{{ item }}"
+        owner: root
+        group: nut
+        mode: '0640'
+      loop:
+        - nut.conf
+        - upsmon.conf
+      register: nut_client_conf
+
+    - name: Collect service facts
+      ansible.builtin.service_facts:
+
+    - name: NUT server
+      when: inventory_hostname == nut_server
+      block:
+        - name: Template server config
+          ansible.builtin.template:
+            src: "{{ nut_files }}/{{ item }}.j2"
+            dest: "/etc/nut/{{ item }}"
+            owner: root
+            group: nut
+            mode: '0640'
+          loop:
+            - ups.conf
+            - upsd.conf
+            - upsd.users
+          register: nut_server_conf
+
+        # apcupsd holds the UPS HID devices; the NUT drivers cannot claim them
+        # while it runs.
+        - name: Stop apcupsd
+          ansible.builtin.systemd:
+            name: apcupsd
+            state: stopped
+          when: "'apcupsd.service' in ansible_facts.services"
+
+        - name: Start drivers and upsd, prove all UPSes read on-line
+          block:
+            # The package's udev rule hands 051d:0002 to group nut, but only on
+            # a device event; these were plugged in long before NUT was installed.
+            - name: Re-apply udev rules to the APC devices
+              ansible.builtin.shell: |
+                udevadm control --reload-rules
+                udevadm trigger --subsystem-match=usb --attr-match=idVendor=051d
+                udevadm settle
+              changed_when: false
+
+            # rc 42 is "sections and services differed, but now match up"
+            # (nut-driver-enumerator.sh), i.e. success with changes.
+            - name: Regenerate per-UPS driver units from ups.conf
+              ansible.builtin.command: /sbin/upsdrvsvcctl resync
+              register: nut_resync
+              changed_when: nut_resync.rc == 42
+              failed_when: nut_resync.rc not in [0, 42]
+
+            - name: Start drivers
+              ansible.builtin.systemd:
+                name: nut-driver.target
+                state: "{{ 'restarted' if nut_server_conf is changed else 'started' }}"
+                enabled: true
+                daemon_reload: true
+
+            - name: Start upsd
+              ansible.builtin.systemd:
+                name: nut-server.service
+                state: "{{ 'restarted' if (nut_server_conf is changed or nut_client_conf is changed) else 'started' }}"
+                enabled: true
+
+            - name: Wait for every UPS to report status
+              ansible.builtin.command: "upsc ups-{{ item }}@localhost ups.status"
+              register: nut_status
+              until: nut_status.rc == 0
+              retries: 12
+              delay: 5
+              changed_when: false
+              loop: "{{ nut_ups_serials }}"
+
+            # Inside the block so a failure here also restores apcupsd. With
+            # ignorelb, a UPS whose full-charge runtime is already under
+            # nut_low_runtime_seconds reads OL LB and would fail this.
+            - name: Every UPS reads on-line, not on battery, not low
+              ansible.builtin.assert:
+                that:
+                  - "'OL' in item.stdout.split()"
+                  - "'OB' not in item.stdout.split()"
+                  - "'LB' not in item.stdout.split()"
+                fail_msg: "ups-{{ item.item }} status is '{{ item.stdout }}'"
+                quiet: true
+              loop: "{{ nut_status.results }}"
+              loop_control:
+                label: "ups-{{ item.item }}"
+
+          rescue:
+            # NOTE: only hand the USB devices back when apcupsd is there to take
+            # them. Once a clean run has purged it, stopping NUT here leaves both
+            # hypervisors with no shutdown signal at all (2026-10-29, OL LB on one
+            # UPS stopped upsd for hours). A NUT that reads LB still protects us.
+            - name: Stop NUT so apcupsd can take the USB devices back
+              ansible.builtin.systemd:
+                name: "{{ item }}"
+                state: stopped
+              loop:
+                - nut-server.service
+                - nut-driver.target
+              failed_when: false
+              when: "'apcupsd.service' in ansible_facts.services"
+
+            - name: Restore apcupsd
+              ansible.builtin.systemd:
+                name: apcupsd
+                state: started
+              when: "'apcupsd.service' in ansible_facts.services"
+
+            - name: Fail with the reason
+              ansible.builtin.fail:
+                msg: "NUT could not read every UPS as on-line; {{ 'apcupsd restored' if 'apcupsd.service' in ansible_facts.services else 'NUT left running (no apcupsd to fall back to)' }} on {{ inventory_hostname }}. Check `upsc -l`, `journalctl -u 'nut-driver@*'`."
+
+    - name: Read each UPS from this host
+      ansible.builtin.command: "upsc ups-{{ item }}@{{ nut_ups_host }}"
+      register: nut_vars
+      changed_when: false
+      loop: "{{ nut_ups_serials }}"
+
+    # Gate: upsmon acts on OB+LB immediately, so it must not start while any
+    # UPS is on battery or low, or a misread here becomes a hypervisor shutdown.
+    - name: Every UPS is on-line and not low before upsmon starts
+      ansible.builtin.assert:
+        that:
+          - "'ups.status: OL' in item.stdout"
+          - "'LB' not in (item.stdout | regex_search('ups.status: .*') | default(''))"
+        fail_msg: "{{ item.item }} is not plainly on-line: {{ item.stdout | regex_search('ups.status: .*') }}"
+        quiet: true
+      loop: "{{ nut_vars.results }}"
+      loop_control:
+        label: "ups-{{ item.item }}"
+
+    - name: Show runtime per UPS
+      ansible.builtin.debug:
+        msg: "ups-{{ item.item }}: {{ item.stdout | regex_search('battery.runtime: .*') }}, {{ item.stdout | regex_search('ups.load: .*') }}"
+      loop: "{{ nut_vars.results }}"
+      loop_control:
+        label: "ups-{{ item.item }}"
+
+    - name: Remove apcupsd (replaced by NUT)
+      ansible.builtin.apt:
+        name: apcupsd
+        state: absent
+        purge: true
+
+    # A run that templates upsmon.conf and then fails a gate never restarts
+    # upsmon, and the next run sees the file unchanged. Compare the file to the
+    # running process instead, so a config written by a failed run still loads.
+    - name: Check whether upsmon predates its config
+      ansible.builtin.shell: |
+        started=$(systemctl show nut-monitor.service -p ActiveEnterTimestamp --value)
+        [ -n "$started" ] && [ "$(stat -c %Y /etc/nut/upsmon.conf)" -gt "$(date -d "$started" +%s)" ]
+      register: nut_upsmon_stale
+      changed_when: false
+      failed_when: false
+
+    - name: Start upsmon
+      ansible.builtin.systemd:
+        name: nut-monitor.service
+        state: "{{ 'restarted' if (nut_client_conf is changed or nut_shutdown_wait is changed or nut_upsmon_stale.rc == 0) else 'started' }}"
+        enabled: true
+
+    # Gate before the next host: upsd must list THIS host as a logged-in
+    # upsmon on every UPS, or this host has no shutdown signal. `upsc -c` lists
+    # every client, so match this host's own address, not just "non-empty".
+    - name: upsmon is logged in to every UPS
+      ansible.builtin.command: "upsc -c ups-{{ item }}@{{ nut_ups_host }}"
+      register: nut_clients
+      until: >-
+        (inventory_hostname == nut_server and ('127.0.0.1' in nut_clients.stdout or '::1' in nut_clients.stdout))
+        or ansible_ssh_host in nut_clients.stdout_lines
+      retries: 12
+      delay: 5
+      changed_when: false
+      loop: "{{ nut_ups_serials }}"

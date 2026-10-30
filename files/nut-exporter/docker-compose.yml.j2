@@ -1,0 +1,20 @@
+# Rendered by playbooks/individual/ocean/monitoring/nut_exporter.yaml.
+#
+# Reads the NUT server on {{ nut_server_host }} anonymously (upsd allows
+# variable reads without login). One scrape = one UPS, chosen by ?ups=; the
+# prometheus job fans out over the three. The image is FROM scratch, so there is
+# no shell for a compose healthcheck: up{job="nut"} and the ups_alerts group are
+# its health signal.
+services:
+  nut-exporter:
+    image: "ghcr.io/druggeri/nut_exporter:{{ nut_exporter_version }}"
+    container_name: "{{ service }}"
+    hostname: "{{ service }}"
+    environment:
+      NUT_EXPORTER_SERVER: "{{ nut_server_host }}"
+      NUT_EXPORTER_VARIABLES: "battery.charge,battery.runtime,battery.runtime.low,input.voltage,ups.load,ups.realpower.nominal,ups.status"
+    ports:
+      - "{{ nut_exporter_port }}:9199"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

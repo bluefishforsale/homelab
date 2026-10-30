@@ -79,7 +79,7 @@ flowchart TD
 | Radarr | `individual/ocean/media/radarr.yaml` |
 | Prowlarr | `individual/ocean/media/prowlarr.yaml` |
 | Bazarr | `individual/ocean/media/bazarr.yaml` |
-| NZBGet | `individual/ocean/media/nzbget.yaml` |
+| NZBGet | `individual/workers/nzbget.yaml` |
 | Overseerr | `individual/ocean/media/overseerr.yaml` |
 | Tautulli | `individual/ocean/media/tautulli.yaml` |
 | Tdarr | `individual/ocean/media/tdarr.yaml` |

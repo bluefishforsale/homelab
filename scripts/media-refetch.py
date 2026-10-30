@@ -13,7 +13,7 @@ item goes through a ledger, so a run can stop anywhere and resume:
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
-The old file is only deleted once a search has found a release to replace it.
+The old file is only deleted once Radarr or Sonarr has accepted a grab to replace it.
 
   media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do
@@ -153,6 +153,16 @@ def tdarr_files(mode, **kw):
     return mc.post("tdarr", "/api/v2/cruddb", {"data": {"collection": "FileJSONDB", "mode": mode, **kw}})
 
 
+# 2100-01-01 in ms. tdarr takes the highest bumped value first, so counting down
+# from here keeps refetches first-in-first-out and ahead of the UI's bump
+# button, which writes the current time.
+BUMP_CEILING = 4102444800000
+
+
+def bump_value(t):
+    return BUMP_CEILING - int(t.timestamp() * 1000)
+
+
 def bump(item, files, yes):
     """Put an item's files at the front of tdarr's queue, ahead of the library backlog."""
     todo = [f for f in files if needs_bump(tdarr_files("getById", docID=f))]
@@ -162,15 +172,21 @@ def bump(item, files, yes):
     if not yes:
         return False
     for f in todo:
-        # The value tdarr's own per-file bump button writes.
-        tdarr_files("update", docID=f, obj={"bumped": int(dt.datetime.now().timestamp() * 1000)})
+        tdarr_files("update", docID=f, obj={"bumped": bump_value(dt.datetime.now())})
     return True
+
+
+def same_film(title, year):
+    """False when the release names only other years: Radarr maps a remake's release onto the original."""
+    years = {int(y) for y in re.findall(r"\b(19\d\d|20\d\d)\b", title)}
+    return not years or any(abs(y - year) <= 1 for y in years)    # festival vs release year
 
 
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
+    year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
-          and r.get("downloadAllowed")]
+          and r.get("downloadAllowed") and same_film(r["title"], year)]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
@@ -198,12 +214,15 @@ def pack_rejection(profiles):
 # A season search goes to every indexer live and comes back with thousands of
 # releases; Young Sheldon S01 took longer than the client's default 120s.
 SEARCH_TIMEOUT = 600
+# An anime season search is the pack query plus one search per episode, each
+# about 50-75s (DAN DA DAN S02: 13 searches, 656s on 2026-10-24).
+EPISODE_SEARCH = 90
 
 
 def best_tv_release(item):
     if item["pack"]:
         rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"],
-                      timeout=SEARCH_TIMEOUT)
+                      timeout=SEARCH_TIMEOUT + EPISODE_SEARCH * len(item["episode_ids"]))
         allowed = pack_rejection(mc.get("sonarr", "/api/v3/releaseprofile"))
         ok = [r for r in rels if r.get("fullSeason") and acceptable(r, allowed)]
     else:
@@ -365,6 +384,23 @@ def note(item, msg):
     print(f"{item['state']:8} {item['title']}: {msg}")
 
 
+def gave_up(grabbed, downloading):
+    """A download still in the client's queue is waited on however long it takes."""
+    return not downloading and now() - grabbed > GRAB_TIMEOUT
+
+
+def import_blocked(downloading):
+    """Finished, but the *arr will not import it, so it stays queued and reads as downloading forever."""
+    return bool(downloading) and all(q.get("status") == "completed" and q.get("trackedDownloadStatus") == "warning"
+                                     for q in downloading)
+
+
+def blocklist(app, downloading):
+    for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+        mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true",
+                  skipRedownload="true")
+
+
 def step(item, yes):
     """Advance one item by one state. Returns True when something changed."""
     mid = item["movie_id"]
@@ -387,9 +423,11 @@ def step(item, yes):
         if not yes:
             return False
         movie = mc.get("radarr", f"/api/v3/movie/{mid}")
+        # Grab first: a refused grab must leave the old file, and the download
+        # takes minutes, long before Radarr would import over it.
+        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         if movie.get("hasFile"):
             mc.delete("radarr", f"/api/v3/moviefile/{movie['movieFile']['id']}")
-        mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -402,12 +440,20 @@ def step(item, yes):
             # its own re-search may find nothing it will take; search again here.
             failed = [h for h in mc.get("radarr", "/api/v3/history/movie", movieId=mid, eventType=4)  # 4 = downloadFailed
                       if dt.datetime.fromisoformat(h["date"].replace("Z", "+00:00")) > grabbed]
-            if failed and not mc.get("radarr", "/api/v3/queue/details", movieId=mid):
+            downloading = mc.get("radarr", "/api/v3/queue/details", movieId=mid)
+            if failed and not downloading:
                 note(item, f"download failed ({failed[-1].get('sourceTitle', '')[:60]}); searching again")
                 if yes:
                     item["state"] = "planned"
                 return yes
-            if now() - grabbed > GRAB_TIMEOUT:
+            if import_blocked(downloading):
+                note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                blocklist("radarr", downloading)
+                item["state"] = "planned"
+                return True
+            if gave_up(grabbed, downloading):
                 note(item, f"nothing imported after {GRAB_TIMEOUT}; check the Radarr queue")
                 item["state"] = "stuck"
                 return True
@@ -494,10 +540,11 @@ def step_tv(item, yes, ledger):
         if not yes:
             return False
         # NOTE: a pack covers every episode in the season, and Sonarr will not
-        # import over a file that already meets the cutoff, so all of them go.
+        # import over a file that already meets the cutoff, so all of them go,
+        # but only once the grab is accepted.
+        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         for fid in {f["id"] for f in tv_files(sid, eps).values()}:
             mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
-        mc.post("sonarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -514,8 +561,17 @@ def step_tv(item, yes, ledger):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            # Finished but Sonarr will not import it (a misparsed "pack" holding one
+            # episode): it stays in the queue, so it would read as downloading forever.
+            if import_blocked(downloading) and not new:
+                note(item, f"Sonarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
+                if not yes:
+                    return False
+                blocklist("sonarr", downloading)
+                item["state"] = "planned"
+                return True
             if not new or downloading:
-                if now() - grabbed > GRAB_TIMEOUT:
+                if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
                     item["state"] = "stuck"
                     return True
@@ -604,7 +660,8 @@ def cmd_auto(a):
     if not active and not start <= hour < end:
         # NOTE: a batch deletes each old file when it grabs the new one. Started
         # at 20:30 on 2026-10-13, after NZBGet's 18:00 pause, 25 popular movies
-        # sat missing from Plex until downloads resumed at 02:00.
+        # sat missing from Plex until downloads resumed at 02:00. NZBGet has
+        # run 24/7 since #1005, so narrow the window only if it pauses again.
         print(f"not planning: {hour:02d}:00 is outside the {a.window}h batch window")
     elif not active:
         free = free_tb()
@@ -654,8 +711,8 @@ def main():
     au.add_argument("--movies", type=int, default=25)
     au.add_argument("--max-gb", type=float, default=2000)
     au.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
-    au.add_argument("--window", default="2-12",
-                    help="local hours START-END in which a new batch may start; NZBGet downloads 02-18")
+    au.add_argument("--window", default="0-24",
+                    help="local hours START-END in which a new batch may start; NZBGet downloads 24/7")
     au.add_argument("--min-free-tb", type=float, default=3.0,
                     help="do not start a batch with less than this free on /data01")
     au.add_argument("--yes", action="store_true")

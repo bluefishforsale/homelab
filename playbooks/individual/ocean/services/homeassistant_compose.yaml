@@ -4,6 +4,9 @@
   become: true
   gather_facts: true
 
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
   vars:
     service: homeassistant
     image: ghcr.io/home-assistant/home-assistant
@@ -13,8 +16,8 @@
     files: "{{ playbook_dir }}/../../../../files/ocean-homeassistant-compose"
     home: "{{ data }}/services/{{ service }}"
     user: media
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
 
@@ -107,8 +110,9 @@
   - name: Enable Home Assistant service
     ansible.builtin.systemd:
       name: homeassistant.service
-      enabled: yes
-      daemon_reload: yes
+      enabled: true
+      state: started
+      daemon_reload: true
 
   handlers:
   - name: Reload systemd daemon

@@ -33,3 +33,9 @@ dns_group: root
 
 # Docker configuration
 docker_compose_version: "2.40.3"
+
+# iPXE served to PXE clients (tasks/netboot.yaml). Kea names the binaries
+# ipxe.efi / undionly.kpxe and the netbootxyz container ships neither, so
+# they come from upstream iPXE's release tarball.
+ipxe_version: v2.0.0
+ipxe_sha256: 01a526d4cc791fc30362259c609d6c506cc64a7bdff51b9a5eb788354e17eee1

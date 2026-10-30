@@ -234,7 +234,7 @@ jobs:
             radarr) PLAYBOOK="playbooks/individual/ocean/media/radarr.yaml" ;;
             prowlarr) PLAYBOOK="playbooks/individual/ocean/media/prowlarr.yaml" ;;
             bazarr) PLAYBOOK="playbooks/individual/ocean/media/bazarr.yaml" ;;
-            nzbget) PLAYBOOK="playbooks/individual/ocean/media/nzbget.yaml" ;;
+            nzbget) PLAYBOOK="playbooks/individual/workers/nzbget.yaml" ;;
             tautulli) PLAYBOOK="playbooks/individual/ocean/media/tautulli.yaml" ;;
             overseerr) PLAYBOOK="playbooks/individual/ocean/media/overseerr.yaml" ;;
             plex-meta-manager) PLAYBOOK="playbooks/individual/ocean/media/plex-meta-manager.yaml" ;;

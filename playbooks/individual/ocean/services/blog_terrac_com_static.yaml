@@ -25,8 +25,8 @@
     git_clone_path: "{{ home }}/repo"
     web_root: "{{ git_clone_path }}/public"
     user: media
-    uid: 1001
-    gid: 1001
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
     accept_hostkey: yes
     # Public identifier, not a secret. Canonical list lives in
     # scripts/cloudflare-harden.py (ZONES) and monitoring/cloudflare_exporter.yaml (cf_zones).

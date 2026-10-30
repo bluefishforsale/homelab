@@ -1,0 +1,181 @@
+---
+# netboot01 image server (docs/specs/2026-10-29-netboot-design.md)
+# Serves kernel/initrd/squashfs and role bundles to PXE clients. Debian's nginx
+# package, not a container: it is a static file server, unattended-upgrades
+# keeps it patched, and it does not depend on docker, which the fleet bootstrap
+# installs after the host joins inventory.
+#
+# Prerequisites:
+#   - VM created via playbooks/individual/infrastructure/create_netboot_vm.yaml
+
+- name: Deploy netboot image server
+  hosts: netboot
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_netboot.yaml
+    - ../../../vars/vars_service_ports.yaml
+
+  vars:
+    service: netboot
+    files: "{{ playbook_dir }}/../../../files/netboot"
+    netboot_root: /srv/netboot
+    netboot_next_boot_dir: /var/lib/netboot-next-boot
+    netboot_next_boot_port: "{{ service_ports.netboot.next_boot }}"
+
+    # tdarr-gpu role bundle (files/netboot/roles/tdarr-gpu/start.sh.j2).
+    tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
+    tdarr_server_api_port: 8266
+    # Same mount options as the data01 workers (data01_worker.yaml).
+    tdarr_gpu_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime"
+    # 40G of the tower's 64G; see the PRD's RAM budget.
+    tdarr_gpu_cache_size: 40G
+    tdarr_gpu_worker_limits:
+      transcodegpu: 3
+      healthcheckgpu: 1
+      transcodecpu: 0
+      healthcheckcpu: 2
+
+  tasks:
+    - name: Wait for cloud-init to finish on first boot
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      failed_when: false
+
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+        lock_timeout: 600
+
+    - name: Ensure netboot directories exist
+      ansible.builtin.file:
+        path: "{{ netboot_root }}/{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: ["", images, roles, hosts]
+
+    # Role bundles: each live host fetches and runs roles/<role>/start.sh at
+    # boot (netboot-role in the netboot-images image). LAN-readable, so a
+    # bundle may carry ids and addresses but never a secret.
+    # NOTE: find, not the fileglob lookup. fileglob only globs the file name,
+    # so roles/*/start.sh.j2 matched nothing and every bundle was silently
+    # skipped while the play reported success.
+    - name: Find role bundles in the repo
+      ansible.builtin.find:
+        paths: "{{ files }}/roles"
+        patterns: start.sh.j2
+        recurse: true
+      delegate_to: localhost
+      become: false
+      register: role_bundles
+
+    - name: There is at least one role bundle
+      ansible.builtin.assert:
+        that: role_bundles.matched > 0
+        fail_msg: "no files/netboot/roles/*/start.sh.j2 found under {{ files }}/roles"
+
+    - name: Ensure role bundle dirs exist
+      ansible.builtin.file:
+        path: "{{ netboot_root }}/roles/{{ item | dirname | basename }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ role_bundles.files | map(attribute='path') | list }}"
+
+    - name: Render role bundles
+      ansible.builtin.template:
+        src: "{{ item }}"
+        dest: "{{ netboot_root }}/roles/{{ item | dirname | basename }}/start.sh"
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ role_bundles.files | map(attribute='path') | list }}"
+
+    - name: Install the next-boot flag service
+      ansible.builtin.template:
+        src: "{{ files }}/next-boot.py.j2"
+        dest: /usr/local/sbin/netboot-next-boot
+        owner: root
+        group: root
+        mode: '0755'
+      register: next_boot_script
+
+    - name: Install the next-boot unit
+      ansible.builtin.template:
+        src: "{{ files }}/netboot-next-boot.service.j2"
+        dest: /etc/systemd/system/netboot-next-boot.service
+        owner: root
+        group: root
+        mode: '0644'
+      register: next_boot_unit
+
+    - name: Run the next-boot service
+      ansible.builtin.systemd:
+        name: netboot-next-boot
+        enabled: true
+        daemon_reload: true
+        state: "{{ 'restarted' if (next_boot_script is changed or next_boot_unit is changed) else 'started' }}"
+
+    - name: Render netboot site
+      ansible.builtin.template:
+        src: "{{ files }}/nginx-netboot.conf.j2"
+        dest: /etc/nginx/sites-available/netboot
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Enable netboot site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/netboot
+        dest: /etc/nginx/sites-enabled/netboot
+        state: link
+      notify: Reload nginx
+
+    - name: Disable the stock default site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+    - name: Check nginx config
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Ensure nginx is enabled and running
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+
+    - name: Flush handlers before the health check
+      ansible.builtin.meta: flush_handlers
+
+    - name: netboot01 answers on /healthz
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/healthz"
+        return_content: true
+      register: netboot_health
+      failed_when: netboot_health.content != "ok\n"
+
+    - name: next-boot answers through nginx
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/next-boot/healthz"
+        return_content: true
+      register: next_boot_health
+      until: next_boot_health.status == 200
+      retries: 5
+      delay: 2
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
