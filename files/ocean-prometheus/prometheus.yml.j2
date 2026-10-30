@@ -69,6 +69,16 @@ scrape_configs:
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 
+  # Diskless netboot machines (vars/vars_netboot.yaml). Not in inventory and
+  # off most of the day, so they get their own job, which ServiceDown skips.
+  - job_name: 'netboot-hosts'
+    scrape_interval: 30s
+    relabel_configs: *dropPortNumber
+    static_configs:
+{% for name, host in netboot_hosts.items() if name != 'netboot-smoke' %}
+    - targets: ['{{ name }}.home:9100']
+{% endfor %}
+
   - job_name: 'process-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
