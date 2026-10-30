@@ -1,0 +1,111 @@
+---
+# Lidarr for music. The state dir from the 2025 install (database, artists,
+# MediaCover) is reused as-is, so this play owns only config.xml, the compose
+# project and the settings lidarr-configure.py converges.
+- name: Lidarr and exporter on ocean
+  hosts: ocean
+  become: true
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: lidarr
+    image: lscr.io/linuxserver/lidarr
+    version: latest
+    lidarr_port: "{{ service_ports.lidarr.port }}"
+    exporter_service: lidarr-exporter
+    exporter_image: ghcr.io/onedr0p/exportarr
+    exporter_version: latest
+    exporter_port: "{{ service_ports.lidarr_exporter.port }}"
+    files: "{{ playbook_dir }}/../../../../files/ocean-lidarr"
+    home: "/data01/services/{{ service }}"
+    library: /data01/complete/music/by-artist
+    # All of incoming, so /downloads/music/... matches the paths NZBGet on
+    # harbor reports and no remote path mapping is needed.
+    incoming: /data01/incoming
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
+    nzbget_host: harbor.home
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        owner: "{{ uid }}"
+        group: "{{ gid }}"
+        mode: '0755'
+
+    - name: Template config.xml (holds the API key)
+      ansible.builtin.template:
+        src: "{{ files }}/config.xml.j2"
+        dest: "{{ home }}/config.xml"
+        owner: "{{ uid }}"
+        group: "{{ gid }}"
+        mode: '0600'
+      register: lidarr_config
+
+    - name: Template compose file (holds the API key)
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0600'
+      register: lidarr_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/lidarr.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: lidarr_unit
+
+    - name: Enable and start lidarr (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (lidarr_config is changed or lidarr_compose is changed or lidarr_unit is changed) else 'started' }}"
+        daemon_reload: true
+
+    - name: Wait for Lidarr's API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ lidarr_port }}/api/v1/system/status"
+        headers:
+          X-Api-Key: "{{ media_services.lidarr.api_key }}"
+      register: lidarr_status
+      until: lidarr_status.status == 200
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Converge download client, quality profile and Prowlarr sync
+      ansible.builtin.script:
+        cmd: "{{ files }}/lidarr-configure.py"
+        executable: python3
+      environment:
+        LIDARR_URL: "http://127.0.0.1:{{ lidarr_port }}"
+        LIDARR_PUBLIC_URL: "http://ocean.home:{{ lidarr_port }}"
+        LIDARR_API_KEY: "{{ media_services.lidarr.api_key }}"
+        PROWLARR_URL: "http://127.0.0.1:{{ service_ports.prowlarr.port }}"
+        PROWLARR_PUBLIC_URL: "http://ocean.home:{{ service_ports.prowlarr.port }}"
+        PROWLARR_API_KEY: "{{ media_services.prowlarr.api_key }}"
+        NZBGET_HOST: "{{ nzbget_host }}"
+        NZBGET_PORT: "{{ service_ports.nzbget.port }}"
+        NZBGET_PASSWORD: "{{ media_services.nzbget.control_password }}"
+      register: lidarr_configure
+      changed_when: "'changed:' in lidarr_configure.stdout"
+
+    - name: Show what the configurator changed
+      ansible.builtin.debug:
+        var: lidarr_configure.stdout_lines
+
+    - name: Wait for the exporter to serve Lidarr metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ exporter_port }}/metrics"
+        return_content: true
+      register: lidarr_metrics
+      until: lidarr_metrics.status == 200 and lidarr_metrics.content is search('lidarr_system_status(\\{[^}]*\\})? 1')
+      retries: 12
+      delay: 10
+      changed_when: false

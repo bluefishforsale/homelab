@@ -50,6 +50,9 @@
 - name: Deploy Radarr for Movies
   ansible.builtin.import_playbook: individual/ocean/media/radarr.yaml
 
+- name: Deploy Lidarr for Music
+  ansible.builtin.import_playbook: individual/ocean/media/lidarr.yaml
+
 - name: Deploy Prowlarr for Indexer Management
   ansible.builtin.import_playbook: individual/ocean/media/prowlarr.yaml
 

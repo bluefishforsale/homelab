@@ -155,6 +155,13 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9707']
 
+  - job_name: 'lidarr-exporter'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 3m
+    scrape_timeout: 2m
+    static_configs:
+    - targets: ['ocean.home:9709']
+
   - job_name: 'sonarr-exporter'
     relabel_configs: *dropPortNumber
     # NOTE: ENABLE_ADDITIONAL_METRICS makes exportarr v2 walk every series
@@ -374,6 +381,8 @@ scrape_configs:
         - http://ocean.home:8888/docs
         # netboot01's nginx serves netboot images and role bundles to PXE clients.
         - http://netboot01.home/healthz
+        # The exporter stays up while Lidarr is down, so up==0 cannot see it.
+        - http://ocean.home:8686/ping
         labels:
           probe_type: "http"
           category: "homelab_services"

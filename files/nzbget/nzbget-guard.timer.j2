@@ -1,0 +1,9 @@
+[Unit]
+Description=Check nzbget's scratch SSD every 5 minutes
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=5m
+
+[Install]
+WantedBy=timers.target
