@@ -115,7 +115,8 @@ def ensure_download_client(base, key, host, port, password):
     # here until some other field differs.
     if client and not set_fields(client["fields"], values) and client["enable"]:
         return
-    set_fields(body["fields"], {**values, "password": password})
+    values["password"] = password
+    set_fields(body["fields"], values)
     body.update(name="NZBGet", enable=True)
     if client:
         api(base, key, f"/api/v1/downloadclient/{client['id']}?forceSave=true", "PUT", body)
