@@ -107,6 +107,19 @@
         state: link
         force: true
 
+    # The menu resolves a channel to a sha once, through this stub, and fetches
+    # kernel, initrd and squashfs by sha. Following the symlink per file instead
+    # would let a promotion mid-boot pair one build's kernel with another's root.
+    - name: Publish the candidate sha for iPXE
+      ansible.builtin.copy:
+        dest: "{{ image_dir }}/candidate.ipxe"
+        content: |
+          #!ipxe
+          set nb-sha {{ netboot_sha }}
+        owner: root
+        group: root
+        mode: '0644'
+
     - name: Find staged versions
       ansible.builtin.find:
         paths: "{{ image_dir }}"
