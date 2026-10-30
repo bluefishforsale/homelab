@@ -117,6 +117,18 @@ def test_foreign_forced_subtitles_are_dropped():
     assert [s["index"] for s in out if s["removed"]] == [2, 4], out
 
 
+def test_subtitle_ffmpeg_cannot_identify_is_dropped():
+    # The Mongoose (2026-10-29): a WebVTT track in matroska probes as codec
+    # "unknown", the matroska muxer refuses it ("Subtitle codec 0 is not
+    # supported") and the whole job fails before the first frame.
+    out = run([
+        stream(0, "video", "h264", width=1920, height=1080),
+        stream(1, "audio", "aac", channels=2, tags={"language": "eng"}),
+        stream(2, "subtitle", "unknown", tags={"language": "eng"}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [2], out
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
