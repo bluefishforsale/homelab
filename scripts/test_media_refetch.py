@@ -261,6 +261,38 @@ def test_season_marked_failed_long_ago_searches_again():
     assert item["state"] == "no-release"
 
 
+def test_pack_sonarr_imported_only_part_of_searches_the_rest():
+    # Attack on Titan S04 (2026-10-30): the SiQ pack imported 28 of 30 episodes and
+    # Sonarr held the release as import-blocked for the other two. Still queued, it
+    # read as downloading, so the item would have waited in grabbed forever.
+    grabbed = refetch.now() - refetch.dt.timedelta(hours=1)
+    rows = [{"id": 700 + e, "episodeId": e, "downloadId": "D", "title": "SiQ", "status": "completed",
+             "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"} for e in (1, 2, 3)]
+    deleted, posted = [], []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return rows if path.endswith("/queue/details") else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+        def post(self, app, path, data):
+            posted.append(data)
+
+    refetch.mc = Fake()
+    refetch.tv_files = lambda sid, eps: {e: {"id": 100 + e, "dateAdded": refetch.now().isoformat(),
+                                             "path": f"/tv/{e}.mkv"} for e in eps if e != 3}
+    refetch.subs = lambda path: ["eng"]
+    item = {"series_id": 1, "season": 4, "episode_ids": [1, 2, 3], "pack": True, "state": "grabbed",
+            "grabbed_at": grabbed.isoformat(), "attempts": 0, "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    # Not blocklisted: the release was good for the episodes it held.
+    assert deleted == [("/api/v3/queue/701", {"removeFromClient": "true", "blocklist": "false"})], deleted
+    assert posted == [{"name": "EpisodeSearch", "episodeIds": [3]}], posted
+    assert item["state"] == "imported"
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
