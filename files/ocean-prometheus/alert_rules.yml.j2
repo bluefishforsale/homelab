@@ -633,6 +633,35 @@ groups:
       summary: "nzbget-prune has not succeeded in 2 days ({{ "{{ $labels.instance }}" }})"
       description: "Failed and stale downloads are piling up on harbor's scratch SSD and data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
 
+  # Normal running holds the active jobs and a week of failed ones, well under
+  # half the 1.8T SSD. Past 85% something is wrong even if the guard copes.
+  - alert: NzbgetScratchHigh
+    expr: (1 - node_filesystem_avail_bytes{instance="harbor.home",mountpoint="/srv/nzbget"} / node_filesystem_size_bytes{instance="harbor.home",mountpoint="/srv/nzbget"}) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget scratch SSD over 85% on {{ "{{ $labels.instance }}" }}"
+      description: "/srv/nzbget is {{ "{{ $value }}" }}% used. nzbget-guard prunes failed and orphaned jobs and pauses downloads past 85%; check `journalctl -u nzbget-guard` and `du -sh /srv/nzbget/intermediate/*` for what is holding the space."
+
+  - alert: NzbgetGuardPaused
+    expr: nzbget_guard_paused == 1
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget downloads paused by the scratch guard ({{ "{{ $labels.instance }}" }})"
+      description: "Pruning could not bring /srv/nzbget under 85%, so downloads are paused until it drops below 75%. Post-processing still runs. See `journalctl -u nzbget-guard` on {{ "{{ $labels.instance }}" }}."
+
+  - alert: NzbgetGuardStale
+    expr: time() - nzbget_guard_last_run_timestamp_seconds > 1800
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget-guard has not run in 30 minutes ({{ "{{ $labels.instance }}" }})"
+      description: "Nothing is stopping nzbget filling its scratch SSD. Check `systemctl status nzbget-guard.timer nzbget-guard.service` on {{ "{{ $labels.instance }}" }}."
+
 - name: sas_phy_alerts
   rules:
   # SAS transport counters are cumulative, so alert on the RATE of increase (a

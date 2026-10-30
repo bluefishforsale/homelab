@@ -1,0 +1,11 @@
+[Unit]
+Description=Prune and pause nzbget when harbor's scratch SSD passes 85%
+After={{ service }}.service
+Wants={{ service }}.service
+RequiresMountsFor={{ data }} {{ scratch }}
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/nzbget-prune.env
+ExecStart=/usr/bin/python3 /usr/local/bin/nzbget-prune --guard
+TimeoutStartSec=30m
