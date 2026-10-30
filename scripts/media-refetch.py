@@ -57,6 +57,9 @@ MAX_ATTEMPTS = 3
 GRAB_TIMEOUT = dt.timedelta(hours=12)
 # Inside tdarr.py drive's 7-day horizon, so the flow has had its chance.
 FLOW_TIMEOUT = dt.timedelta(days=3)
+# Marking a grab failed makes the *arr search and grab on its own; give that
+# grab this long to reach the queue before searching ourselves.
+REDOWNLOAD_GRACE = dt.timedelta(minutes=30)
 # With a file on disk every release carries one of these; a release whose only
 # rejections are these is one Radarr would take if the file were gone.
 EXISTING_FILE = "Existing file on disk"
@@ -389,6 +392,10 @@ def gave_up(grabbed, downloading):
     return not downloading and now() - grabbed > GRAB_TIMEOUT
 
 
+def awaiting_redownload(item):
+    return "failed_at" in item and now() - dt.datetime.fromisoformat(item["failed_at"]) < REDOWNLOAD_GRACE
+
+
 def import_blocked(downloading):
     """Finished, but the *arr will not import it, so it stays queued and reads as downloading forever."""
     return bool(downloading) and all(q.get("status") == "completed" and q.get("trackedDownloadStatus") == "warning"
@@ -414,6 +421,8 @@ def step(item, yes):
             if yes:
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
+        if awaiting_redownload(item):
+            return False
         rel = best_release(mid)
         if not rel:
             note(item, "no acceptable release found; left as is")
@@ -477,7 +486,7 @@ def step(item, yes):
         latest = max(hist, key=lambda h: h["date"])
         mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
         mc.post("radarr", f"/api/v3/history/failed/{latest['id']}", {})
-        item["state"] = "planned"
+        item.update(state="planned", failed_at=now().isoformat())
         return True
 
     if item["state"] == "imported":
@@ -522,6 +531,8 @@ def step_tv(item, yes, ledger):
             if yes:
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
+        if awaiting_redownload(item):
+            return False
         rel = best_tv_release(item)
         if not rel and item["pack"]:
             note(item, f"no acceptable season pack; searching its {len(item['bad'])} bad episodes one at a time")
@@ -606,7 +617,7 @@ def step_tv(item, yes, ledger):
         for fid in {f["id"] for f in new.values()}:
             mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
         mc.post("sonarr", f"/api/v3/history/failed/{latest['id']}", {})
-        item["state"] = "planned"
+        item.update(state="planned", failed_at=now().isoformat())
         return True
 
     if item["state"] == "imported":

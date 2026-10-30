@@ -230,6 +230,37 @@ def test_movie_download_radarr_cannot_import_is_blocklisted_not_waited_on():
     assert item["state"] == "planned"
 
 
+def test_season_just_marked_failed_waits_for_sonarrs_own_redownload():
+    # The Simpsons S11 and S12 (2026-10-30): marking a KONTRAST pack failed for
+    # missing subtitles made Sonarr grab DSNP episodes while we grabbed an iVy
+    # pack in the same tick. DSNP imported first, and 43 iVy rows sat blocked.
+    searched = []
+    refetch.mc = FakeArr([])
+    refetch.best_tv_release = lambda item: searched.append(item) or None
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "planned",
+            "failed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    assert not refetch.step_tv(item, True, {})
+    assert searched == [] and item["state"] == "planned"
+
+
+def test_movie_just_marked_failed_waits_for_radarrs_own_redownload():
+    searched = []
+    refetch.mc = FakeArr([])
+    refetch.best_release = lambda mid: searched.append(mid) or None
+    item = {"movie_id": 1, "state": "planned", "failed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    assert not refetch.step(item, yes=True)
+    assert searched == [] and item["state"] == "planned"
+
+
+def test_season_marked_failed_long_ago_searches_again():
+    refetch.mc = FakeArr([])
+    refetch.best_tv_release = lambda item: None
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": False, "state": "planned",
+            "failed_at": (refetch.now() - refetch.REDOWNLOAD_GRACE * 2).isoformat(), "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    assert item["state"] == "no-release"
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
