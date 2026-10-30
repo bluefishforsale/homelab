@@ -11,14 +11,21 @@ netboot_server:
   name: netboot01
   ip: 192.168.1.33
 
+# Per host: mac, ip, role; optional channel (current|candidate, default
+# current), default menu entry (local|live, default local) and timeout_ms.
 netboot_hosts:
   gaming:
     mac: "58:11:22:ad:f4:7a"
     ip: 192.168.1.40
     role: tdarr-gpu
+    # Defaults to Windows on its own disk; tdarr is hotkey t or a next-boot flag.
+    default: local
   # Throwaway VM the promotion gate creates on node005 (bc:24:11 is Proxmox's
   # OUI). It always boots the candidate image, never current.
   netboot-smoke:
     mac: "bc:24:11:4e:42:01"
     ip: 192.168.1.34
     role: smoke
+    channel: candidate
+    default: live
+    timeout_ms: 1000

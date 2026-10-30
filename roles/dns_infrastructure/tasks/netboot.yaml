@@ -1,2 +1,81 @@
 ---
-# netboot.xyz PXE/TFTP tasks
+# Netboot front door on each dns server (docs/specs/2026-10-29-netboot-design.md).
+# Kea hands PXE clients ipxe.efi / undionly.kpxe over TFTP, then, once they
+# are running iPXE, http://<this server>:8070/menu.ipxe. Both are served by the
+# netbootxyz container: TFTP from config/menus, HTTP from assets. Images
+# themselves live on netboot01; this is only the small, HA part.
+
+- name: Download iPXE release binaries
+  ansible.builtin.get_url:
+    url: "https://github.com/ipxe/ipxe/releases/download/{{ ipxe_version }}/ipxeboot.tar.gz"
+    dest: "/tmp/ipxeboot-{{ ipxe_version }}.tar.gz"
+    checksum: "sha256:{{ ipxe_sha256 }}"
+    mode: '0644'
+
+# NOTE: owned by uid 1000 (nbxyz in the container) or the container's dnsmasq,
+# which runs --tftp-secure, refuses to serve them and every PXE client stalls
+# at the first step with no error on the server side.
+- name: Install iPXE binaries into the TFTP root
+  ansible.builtin.unarchive:
+    src: "/tmp/ipxeboot-{{ ipxe_version }}.tar.gz"
+    dest: "{{ dns_home }}/data/netboot/config/menus"
+    remote_src: true
+    include:
+      - ipxeboot/x86_64/ipxe.efi
+      - ipxeboot/x86_64/undionly.kpxe
+    extra_opts: [--strip-components=2]
+    owner: "1000"
+    group: "1000"
+
+- name: Ensure per-host menu dir exists
+  ansible.builtin.file:
+    path: "{{ dns_home }}/data/netboot/assets/hosts"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: '0755'
+
+- name: Render the boot menu
+  ansible.builtin.template:
+    src: netboot/menu.ipxe.j2
+    dest: "{{ dns_home }}/data/netboot/assets/menu.ipxe"
+    owner: "1000"
+    group: "1000"
+    mode: '0644'
+
+- name: Render per-MAC host files
+  ansible.builtin.template:
+    src: netboot/host.ipxe.j2
+    dest: "{{ dns_home }}/data/netboot/assets/hosts/{{ item.value.mac | replace(':', '-') | lower }}.ipxe"
+    owner: "1000"
+    group: "1000"
+    mode: '0644'
+  loop: "{{ netboot_hosts | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Find per-MAC host files
+  ansible.builtin.find:
+    paths: "{{ dns_home }}/data/netboot/assets/hosts"
+    patterns: ["*.ipxe"]
+  register: netboot_host_files
+
+# A host removed from vars_netboot.yaml must stop getting its role, not keep
+# booting into it from a stale file.
+- name: Remove host files for hosts no longer registered
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ netboot_host_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: >-
+    (item.path | basename | regex_replace('\.ipxe$', ''))
+    not in (netboot_hosts.values() | map(attribute='mac') | map('replace', ':', '-') | map('lower') | list)
+
+- name: Menu is served over HTTP
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ service_ports.dns_stack.netboot_http }}/menu.ipxe"
+    return_content: true
+  register: netboot_menu
+  failed_when: not netboot_menu.content.startswith('#!ipxe')
