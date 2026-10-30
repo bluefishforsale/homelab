@@ -95,31 +95,40 @@ jobs:
           python3 -m pip install --user --break-system-packages --quiet ansible pyyaml
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Run LOCOMO against a stack built from the mem0 checkout
-        # Keys are read here and live only in this step's shell, never in
-        # GITHUB_ENV, so no later step (the artifact upload) can see them.
+      - name: Read the two keys from the vault
+        # NOTE: its own step so the vault password is never in the environment
+        # of any process that runs code from the mem0 checkout (a child can read
+        # its parent's environment through /proc). Only the two derived keys
+        # cross over, through a 0600 file the next step deletes.
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          umask 077
+          echo "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/.vault_pass"
+          export ANSIBLE_VAULT_PASSWORD_FILE="$RUNNER_TEMP/.vault_pass"
+          extraction=$(python3 scripts/vault.py get ai_services.openai.api_key)
+          # NOTE: a pre-provisioned spare llama.cpp token. A named one would need
+          # a vault edit plus a llamacpp redeploy, which bounces agentbox's lanes.
+          # Rename it in the vault and here together if it ever gets a real name.
+          judge=$(python3 scripts/vault.py get ai_services.llamacpp.api_keys.spare2)
+          rm -f "$RUNNER_TEMP/.vault_pass"
+          echo "::add-mask::$extraction"
+          echo "::add-mask::$judge"
+          printf '%s\n%s\n' "$extraction" "$judge" > "$RUNNER_TEMP/.nightly_keys"
+
+      - name: Run LOCOMO against a stack built from the mem0 checkout
+        env:
           JUDGE_BASE_URL: http://ocean.home:8080/v1
           JUDGE_MODEL: qwen3-coder-30b-a3b
           CONVERSATIONS: ${{ steps.params.outputs.conversations }}
           PUSHGATEWAY_URL: http://ocean.home:9091
           RUN_ID: ${{ github.run_id }}
         run: |
-          umask 077
-          echo "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/.vault_pass"
-          export ANSIBLE_VAULT_PASSWORD_FILE="$RUNNER_TEMP/.vault_pass"
-          EXTRACTION_OPENAI_API_KEY=$(python3 scripts/vault.py get ai_services.openai.api_key)
-          # NOTE: a pre-provisioned spare llama.cpp token. A named one would need
-          # a vault edit plus a llamacpp redeploy, which bounces agentbox's lanes.
-          # Rename it in the vault and here together if it ever gets a real name.
-          JUDGE_API_KEY=$(python3 scripts/vault.py get ai_services.llamacpp.api_keys.spare2)
-          rm -f "$RUNNER_TEMP/.vault_pass"
-          echo "::add-mask::$EXTRACTION_OPENAI_API_KEY"
-          echo "::add-mask::$JUDGE_API_KEY"
+          { read -r EXTRACTION_OPENAI_API_KEY; read -r JUDGE_API_KEY; } < "$RUNNER_TEMP/.nightly_keys"
+          rm -f "$RUNNER_TEMP/.nightly_keys"
           COMMIT_SHA=$(git -C mem0 rev-parse HEAD)
-          # NOTE: env -i, so code from the mem0 checkout inherits the two keys
-          # it needs and never the vault password, which unlocks everything.
+          # env -i: the checkout gets the variables it uses and nothing else
+          # the runner happens to carry.
           env -i PATH="$PATH" HOME="$HOME" \
             EXTRACTION_OPENAI_API_KEY="$EXTRACTION_OPENAI_API_KEY" JUDGE_API_KEY="$JUDGE_API_KEY" \
             JUDGE_BASE_URL="$JUDGE_BASE_URL" JUDGE_MODEL="$JUDGE_MODEL" CONVERSATIONS="$CONVERSATIONS" \
