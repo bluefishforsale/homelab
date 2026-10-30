@@ -44,6 +44,9 @@ service_ports:
   karma:
     port: 8181
 
+  pushgateway:
+    port: 9091
+
   grafana:
     port: 8910
 

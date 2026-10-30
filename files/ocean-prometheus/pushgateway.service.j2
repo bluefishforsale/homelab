@@ -1,0 +1,23 @@
+[Unit]
+Description={{ pushgateway_service }}
+After=docker.service zfs-mount.service zfs-import.target
+Requires=docker.service zfs-mount.service zfs-import.target
+RequiresMountsFor=/data01
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ pushgateway_home }}
+EnvironmentFile={{ pushgateway_home }}/.env
+Environment="COMPOSE_HTTP_TIMEOUT=180"
+
+ExecStartPre=-docker compose down --timeout 30
+ExecStart=docker compose up -d --quiet-pull
+ExecStop=docker compose down --timeout 30
+ExecReload=docker compose restart
+
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
