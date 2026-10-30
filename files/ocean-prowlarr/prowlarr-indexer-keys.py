@@ -47,7 +47,7 @@ def stored_keys(db):
 
 def redact(msg, secrets):
     """Indexer test failures can quote the request URL, apikey= and all."""
-    msg = re.sub(r"(?i)(apikey=)[^&\s\"']+", r"\1***", msg)
+    msg = re.sub(r"(?i)(apikey)=[^&\s\"']+", r"\1=***", msg)
     for s in secrets:
         msg = msg.replace(s, "***")
     return msg
