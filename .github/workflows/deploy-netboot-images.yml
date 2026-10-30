@@ -1,0 +1,87 @@
+name: Deploy netboot image
+
+# netboot-images CI pushes an image to GHCR and dispatches here; this stages it
+# on netboot01 as the candidate (docs/specs/2026-10-29-netboot-design.md).
+# Its own group, not deploy-ocean: it touches only netboot01 (and, with the
+# smoke gate, a throwaway VM on node005), never ocean.
+concurrency:
+  group: deploy-netboot
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image name in ghcr.io/bluefishforsale/netboot-images/"
+        required: true
+        default: "debian-live"
+        type: string
+      sha:
+        description: "netboot-images commit sha (the image tag)"
+        required: true
+        type: string
+
+  repository_dispatch:
+    types: [deploy-netboot-images]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Stage netboot image
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Payload arrives via env, never inline ${{ }} in the script; the playbook
+      # re-validates both values before it uses them.
+      - name: Resolve image and sha
+        id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_IMAGE: ${{ github.event.client_payload.image }}
+          CLIENT_SHA: ${{ github.event.client_payload.sha }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            IMAGE="$CLIENT_IMAGE"; SHA="$CLIENT_SHA"
+          else
+            IMAGE="$INPUT_IMAGE"; SHA="$INPUT_SHA"
+          fi
+          [[ "$IMAGE" =~ ^[a-z0-9-]+$ ]] || { echo "bad image: $IMAGE"; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "bad sha: $SHA"; exit 1; }
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Stage image on netboot01
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          NETBOOT_IMAGE: ${{ steps.params.outputs.image }}
+          NETBOOT_SHA: ${{ steps.params.outputs.sha }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+          set +e
+          ansible-playbook -i inventories/production/hosts.ini --vault-password-file=/tmp/.vault_pass \
+            playbooks/individual/infrastructure/netboot_image.yaml \
+            -e "netboot_image=$NETBOOT_IMAGE netboot_sha=$NETBOOT_SHA" 2>&1 | tee /tmp/playbook.log
+          ANSIBLE_EXIT=${PIPESTATUS[0]}
+          rm -f /tmp/.vault_pass
+          exit "$ANSIBLE_EXIT"
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass

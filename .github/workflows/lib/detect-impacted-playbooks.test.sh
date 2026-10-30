@@ -194,6 +194,9 @@ assert_eq "mixed playbook+workflow commit keeps only the playbook" \
 out=$(printf 'playbooks/individual/ocean/data01_zfs.yaml\n' | bash "$SCRIPT")
 assert_eq "zfs playbook is dispatch-only (never auto-applies)" "[]" "$out"
 
+out=$(printf 'playbooks/individual/infrastructure/netboot_image.yaml\n' | bash "$SCRIPT")
+assert_eq "netboot_image needs a dispatched sha, so a push never applies it" "[]" "$out"
+
 # 30. A dashboard JSON change deploys ONLY via grafana_compose. The backup
 #     playbook grafana_dashboards.yaml also references files/grafana-compose but
 #     must NOT run as a deploy (it exports live dashboards over the committed
