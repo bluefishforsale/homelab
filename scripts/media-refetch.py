@@ -581,6 +581,16 @@ def step_tv(item, yes, ledger):
                 blocklist("sonarr", downloading)
                 item["state"] = "planned"
                 return True
+            # Sonarr imported what it could match and holds the rest of the release as
+            # blocked; clear it so the episodes it lacked get searched.
+            if import_blocked(downloading):
+                note(item, f"Sonarr imported {len(new)} of {len(eps)} from {downloading[0]['title'][:60]}; "
+                           "clearing the rest from the queue")
+                if not yes:
+                    return False
+                for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+                    mc.delete("sonarr", f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="false")
+                downloading = []
             if not new or downloading:
                 if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
