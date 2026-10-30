@@ -43,6 +43,16 @@
         mode: '0755'
       loop: ["", images, roles, hosts]
 
+    # Role bundles: each live host runs roles/<role>/start.sh at boot
+    # (netboot-role in the netboot-images image).
+    - name: Publish role bundles
+      ansible.builtin.copy:
+        src: "{{ files }}/roles/"
+        dest: "{{ netboot_root }}/roles/"
+        owner: root
+        group: root
+        mode: u=rwX,go=rX
+
     - name: Render netboot site
       ansible.builtin.template:
         src: "{{ files }}/nginx-netboot.conf.j2"

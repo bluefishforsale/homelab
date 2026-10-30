@@ -148,3 +148,91 @@
       loop_control:
         label: "{{ item.path | basename }}"
       when: item.path not in newest and (item.path | basename) not in pinned
+
+# Smoke gate: boot the candidate in a throwaway diskless VM on node005 and wait
+# for it to report the right sha. The VM's per-MAC file (vars_netboot.yaml,
+# netboot-smoke) always boots candidate with role=smoke. It has no GPU, so this
+# proves kernel, initrd, fetch=, live-boot and the role skeleton, not nvidia.
+- name: Smoke-boot the candidate
+  hosts: node005
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - ../../../vars/vars_netboot.yaml
+
+  vars:
+    smoke: "{{ netboot_hosts['netboot-smoke'] }}"
+    smoke_vm_id: 4001
+    # The squashfs is copied into RAM by live-boot, so this has to hold the
+    # whole image plus a running system.
+    smoke_vm_memory_mb: 8192
+    smoke_timeout_s: 300
+
+  tasks:
+    - name: Smoke boot
+      block:
+        - name: Remove a smoke VM left over from an interrupted run
+          ansible.builtin.shell: |
+            qm stop {{ smoke_vm_id }} --skiplock 1 || true
+            qm destroy {{ smoke_vm_id }} --purge 1 --skiplock 1
+          register: leftover
+          changed_when: leftover.rc == 0
+          failed_when: false
+
+        - name: Create the smoke VM
+          ansible.builtin.command: >-
+            qm create {{ smoke_vm_id }} --name netboot-smoke
+            --memory {{ smoke_vm_memory_mb }} --cores 2 --ostype l26
+            --net0 virtio={{ smoke.mac }},bridge=vmbr0
+            --boot order=net0 --onboot 0
+            --description "Throwaway netboot smoke VM; destroyed by netboot_image.yaml"
+
+        - name: Start the smoke VM
+          ansible.builtin.command: qm start {{ smoke_vm_id }}
+
+        - name: Smoke VM reports the candidate sha with its role up
+          ansible.builtin.uri:
+            url: "http://{{ smoke.ip }}:9100/metrics"
+            return_content: true
+          register: smoke_metrics
+          until: >-
+            smoke_metrics.status == 200
+            and ('netboot_image_info{role="smoke",sha="' ~ netboot_sha ~ '"} 1') in smoke_metrics.content
+            and 'netboot_role_up{role="smoke"} 1' in smoke_metrics.content
+          retries: "{{ (smoke_timeout_s / 10) | int }}"
+          delay: 10
+      always:
+        - name: Destroy the smoke VM
+          ansible.builtin.shell: |
+            qm stop {{ smoke_vm_id }} --skiplock 1 || true
+            qm destroy {{ smoke_vm_id }} --purge 1 --skiplock 1
+          changed_when: true
+
+# Only reached when the smoke play passed: any failure above ends the run with
+# current untouched, which is the halt. Nothing rolls back on its own.
+- name: Promote candidate to current
+  hosts: netboot
+  become: true
+  gather_facts: false
+
+  vars:
+    image_dir: "/srv/netboot/images/{{ netboot_image }}"
+
+  tasks:
+    - name: Point current at the smoke-tested sha
+      ansible.builtin.file:
+        src: "{{ netboot_sha }}"
+        dest: "{{ image_dir }}/current"
+        state: link
+        force: true
+
+    - name: Publish the current sha for iPXE
+      ansible.builtin.copy:
+        dest: "{{ image_dir }}/current.ipxe"
+        content: |
+          #!ipxe
+          set nb-sha {{ netboot_sha }}
+        owner: root
+        group: root
+        mode: '0644'
