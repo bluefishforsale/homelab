@@ -1,7 +1,11 @@
 ---
 # Netboot registry (docs/specs/2026-10-29-netboot-design.md). The one place a
-# PXE-booted machine is declared; Kea reservations, iPXE per-MAC files, the NFS
-# export and scrape targets all render from it.
+# PXE-booted machine is declared; Kea live-only addresses, iPXE per-MAC files,
+# the NFS export and scrape targets all render from it.
+#
+# NOTE: ip is handed out only to the live image (Kea class on vendor class
+# netboot-live plus mac), never by MAC alone. The tower's Windows install
+# shares the MAC, and ocean's NFS export trusts this address.
 #
 # NOTE: these hosts are deliberately NOT ansible inventory. Anything in
 # inventory joins groups['all'], so every `hosts: all` play and the fleet-wide

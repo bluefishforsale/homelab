@@ -122,6 +122,15 @@
                 "next-server": "{{ ansible_host }}",
                 "boot-file-name": "undionly.kpxe"
             },
+{% for name, host in netboot_hosts.items() %}
+            {
+                // The live image's systemd-networkd sends this vendor class
+                // (netboot-images, 20-wired.network) with a DUID client-id, so
+                // it never matches or reuses a lease Windows took on this MAC.
+                "name": "netboot-live-{{ name }}",
+                "test": "option[60].text == 'netboot-live' and pkt4.mac == 0x{{ host.mac | replace(':', '') | lower }}"
+            },
+{% endfor %}
             {
                 "name": "BIOS-fallback",
                 "test": "not member('ipxe_detected') and not member('UEFI-64') and not member('Legacy-BIOS')",
@@ -134,7 +143,16 @@
             {
                 "id": 1,
                 "subnet": "192.168.1.0/24",
-                "pools": [
+                // Netboot hosts (vars/vars_netboot.yaml) get their fixed address
+                // only while running the live image, never by MAC alone: the
+                // gaming tower's Windows install shares the MAC, and the address
+                // is what ocean's NFS export trusts. Listed before the dynamic
+                // pool so a live client takes its own address first.
+                "pools": [{% for name, host in netboot_hosts.items() %}
+                    {
+                        "pool": "{{ host.ip }} - {{ host.ip }}",
+                        "client-class": "netboot-live-{{ name }}"
+                    },{% endfor %}
                     {
                         "pool": "192.168.1.150 - 192.168.1.239"
                     }
@@ -152,13 +170,7 @@
                         "hw-address": "ac:1f:6b:19:f2:06",
                         "ip-address": "192.168.1.144",
                         "hostname": "ocean-eth0"
-                    }{% for name, host in netboot_hosts.items() %},
-                    {
-                        "hw-address": "{{ host.mac }}",
-                        "ip-address": "{{ host.ip }}",
-                        "hostname": "{{ name }}"
-                    }{% endfor %}
-
+                    }
                 ]
             }
         ],
