@@ -12,12 +12,24 @@
   vars:
     harbor_vm_id: 6000
     harbor_vm_name: harbor
-    harbor_vm_cores: 16
+    # 24 of node005's 56 threads, weighted 2x the cpuunits default (100) so
+    # tdarr encodes and nzbget unpacks win over the runner under contention.
+    harbor_vm_cores: 24
+    harbor_vm_cpuunits: 200
     harbor_vm_memory_mb: 32768  # 32 GB; fits after the #623 reclaim
     harbor_vm_disk_size_increase: "+61G"  # template is 3G; OS + /var/lib/docker
     # Local service state, mounted over /data01/services so nothing with a WAL
     # lands on NFS.
     harbor_vm_state_disk: "vmpool-storage:200"
+    # The vmpool mirror is shared by every node005 VM and tdarr already
+    # saturates it, so NZBGet's download and unpack scratch gets this whole SSD
+    # (870 EVO 2TB). It sits on the MegaRAID with the mirror, so the controller
+    # can't be passed through; a whole-disk passthrough on its own iothread is
+    # the closest to native. By WWN, never sdX.
+    harbor_vm_scratch_disk: /dev/disk/by-id/wwn-0x5002538f54b047b7
+    # virtio-scsi-single gives each disk its own controller, which iothread needs.
+    harbor_vm_scsihw: virtio-scsi-single
+    harbor_vm_disk_opts: "iothread=1,aio=native,cache=none,discard=on,ssd=1"
     harbor_vm_template_id: 9999  # Debian 12 cloud-init template
     harbor_vm_onboot: 1
     # Passthrough host CPU features; kvm64 masks AVX2.
@@ -82,8 +94,27 @@
       when: harbor_vm_status.rc != 0
       changed_when: true
 
+    # NOTE: the disk and CPU tasks below only touch a stopped VM. Changing them
+    # here does nothing to a running harbor until `qm shutdown 6000` and a
+    # re-run of this play, which applies them and starts it again.
+    - name: Put every harbor VM disk on its own iothread
+      ansible.builtin.shell: |
+        set -e
+        qm set {{ harbor_vm_id }} --scsihw {{ harbor_vm_scsihw }}
+        for d in scsi0 scsi1; do
+          vol=$(qm config {{ harbor_vm_id }} | awk -v d="$d:" '$1 == d {split($2, a, ","); print a[1]}')
+          qm set {{ harbor_vm_id }} --$d "$vol,{{ harbor_vm_disk_opts }}"
+        done
+        qm set {{ harbor_vm_id }} --scsi2 {{ harbor_vm_scratch_disk }},{{ harbor_vm_disk_opts }},backup=0,replicate=0
+      args:
+        executable: /bin/bash
+      when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
+      changed_when: true
+
     - name: Set harbor VM CPU cores
-      ansible.builtin.shell: "qm set {{ harbor_vm_id }} --cores {{ harbor_vm_cores }}"
+      ansible.builtin.shell: |
+        qm set {{ harbor_vm_id }} --cores {{ harbor_vm_cores }}
+        qm set {{ harbor_vm_id }} --cpuunits {{ harbor_vm_cpuunits }}
       when: harbor_vm_status.rc != 0 or harbor_vm_status.stdout is not search('running')
       changed_when: true
 
