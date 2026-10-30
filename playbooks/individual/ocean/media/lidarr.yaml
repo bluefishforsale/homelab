@@ -27,7 +27,7 @@
     incoming: /data01/incoming
     uid: "{{ system_users.media.uid }}"
     gid: "{{ system_users.media.gid }}"
-    nzbget_host: 192.168.1.32
+    nzbget_host: harbor.home
 
   tasks:
     - name: Ensure basedir exists

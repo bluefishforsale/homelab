@@ -107,9 +107,8 @@ def ensure_download_client(base, key, host, port, password):
     client = next((c for c in clients if c["implementation"] == "Nzbget"), None)
     body = client or next(s for s in api(base, key, "/api/v1/downloadclient/schema")
                           if s["implementation"] == "Nzbget")
-    category = next(f["name"] for f in body["fields"] if f["name"].endswith("Category"))
     values = {"host": host, "port": port, "username": "nzbget", "useSsl": False,
-              "addPaused": False, category: MUSIC_CATEGORY}
+              "addPaused": False, "musicCategory": MUSIC_CATEGORY}
     # NOTE: the password reads back masked, so it is compared by nothing and sent
     # only alongside a real change. A rotated NZBGet password will not be pushed
     # here until some other field differs.
