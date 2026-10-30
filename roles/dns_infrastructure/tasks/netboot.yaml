@@ -1,6 +1,6 @@
 ---
 # Netboot front door on each dns server (docs/specs/2026-10-29-netboot-design.md).
-# Kea hands PXE clients ipxe.efi / undionly.kpxe over TFTP, then, once they
+# Kea hands PXE clients snponly.efi / undionly.kpxe over TFTP, then, once they
 # are running iPXE, http://<this server>:8070/menu.ipxe. Both are served by the
 # netbootxyz container: TFTP from config/menus, HTTP from assets. Images
 # themselves live on netboot01; this is only the small, HA part.
@@ -21,7 +21,7 @@
     dest: "{{ dns_home }}/data/netboot/config/menus"
     remote_src: true
     include:
-      - ipxeboot/x86_64/ipxe.efi
+      - ipxeboot/x86_64/snponly.efi
       - ipxeboot/x86_64/undionly.kpxe
     extra_opts: [--strip-components=2]
     owner: "1000"
