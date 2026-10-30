@@ -46,6 +46,16 @@ def test_validation_error_never_echoes_the_submitted_key():
     assert "Invalid API Key" in msg and "s3cret-key" not in msg
 
 
+def test_error_message_quoting_the_request_url_has_its_key_redacted():
+    # Prowlarr's test failure can quote the indexer URL it called.
+    msg = keys.redact("Unable to connect: https://api.example/api?t=caps&apikey=s3cret-key&o=xml", ())
+    assert "s3cret-key" not in msg and "apikey=***" in msg
+
+
+def test_known_keys_are_redacted_wherever_they_appear():
+    assert "s3cret" not in keys.redact("Invalid key s3cret for indexer", ("s3cret",))
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

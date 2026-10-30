@@ -45,7 +45,15 @@ def stored_keys(db):
     return {i: (name, json.loads(s).get("apiKey")) for i, name, s in rows}
 
 
-def api(base, key, path, method="GET", body=None):
+def redact(msg, secrets):
+    """Indexer test failures can quote the request URL, apikey= and all."""
+    msg = re.sub(r"(?i)(apikey=)[^&\s\"']+", r"\1***", msg)
+    for s in secrets:
+        msg = msg.replace(s, "***")
+    return msg
+
+
+def api(base, key, path, method="GET", body=None, secrets=()):
     req = urllib.request.Request(
         base + path,
         method=method,
@@ -56,7 +64,7 @@ def api(base, key, path, method="GET", body=None):
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read() or "null")
     except urllib.error.HTTPError as e:
-        raise SystemExit(f"{method} {path}: {e.code} {error_messages(e.read())}")
+        raise SystemExit(f"{method} {path}: {e.code} {redact(error_messages(e.read()), (key, *secrets))}")
 
 
 def error_messages(raw):
@@ -78,7 +86,7 @@ def main():
         for f in idx["fields"]:
             if f["name"] == "apiKey":
                 f["value"] = new
-        api(base, key, f"/api/v1/indexer/{i}", "PUT", idx)
+        api(base, key, f"/api/v1/indexer/{i}", "PUT", idx, secrets=(new,))
         print(f"changed: {idx['name']} API key")
 
 
