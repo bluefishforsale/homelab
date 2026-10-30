@@ -22,6 +22,7 @@ Architecture diagrams and documentation for the homelab infrastructure.
 | [networking.md](networking.md) | Network configuration |
 | [network-topology.md](network-topology.md) | Network diagram |
 | [ocean-services.md](ocean-services.md) | Ocean service architecture |
+| [data01-workers.md](data01-workers.md) | harbor and other hosts on /data01 over NFS |
 | [deployment-flow.md](deployment-flow.md) | Service deployment order |
 | [physical-architecture.md](physical-architecture.md) | Physical server layout |
 
