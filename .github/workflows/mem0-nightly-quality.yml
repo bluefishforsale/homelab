@@ -1,0 +1,125 @@
+---
+# Nightly end-to-end quality run for the mem0 fork: LOCOMO with real extraction
+# (gpt-4o-mini, as ocean runs) and local grading (ocean's llama.cpp), results
+# pushed to the Pushgateway for trend alerts.
+#
+# Lives here rather than in the mem0 repo on purpose. mem0 is a public fork, and
+# a self-hosted runner registered there would run any fork PR's workflow file on
+# a host with the Docker socket. These runners already exist and this repo
+# requires approval for every external contributor's workflow run.
+name: mem0 nightly quality
+
+on:
+  schedule:
+    - cron: "0 10 * * *"  # 03:00 Pacific (daylight time)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "mem0 commit to test (40-char SHA). Empty means main."
+        required: false
+        default: ""
+        type: string
+      conversations:
+        description: "LOCOMO conversation indices, comma-separated (0-9)."
+        required: false
+        default: "0,1"
+        type: string
+  # From the mem0 repo, for an on-demand run against a specific commit.
+  repository_dispatch:
+    types: [mem0-quality]
+
+concurrency:
+  group: mem0-nightly-quality
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  locomo:
+    name: LOCOMO
+    runs-on: [self-hosted, homelab, docker]
+    environment: Github Actions CI
+    timeout-minutes: 360
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Resolve parameters
+        id: params
+        # Payload through env vars, never inline expansion: client_payload is
+        # attacker-controlled if the dispatch token ever leaks.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_CONVERSATIONS: ${{ github.event.client_payload.conversations }}
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_CONVERSATIONS: ${{ inputs.conversations }}
+        run: |
+          case "$EVENT_NAME" in
+            repository_dispatch) REF="$CLIENT_SHA"; CONVERSATIONS="${CLIENT_CONVERSATIONS:-0,1}" ;;
+            workflow_dispatch)   REF="$INPUT_REF";  CONVERSATIONS="${INPUT_CONVERSATIONS:-0,1}" ;;
+            *)                   REF="";            CONVERSATIONS="0,1" ;;
+          esac
+          if [ -n "$REF" ] && ! [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::ref must be a 40-char commit SHA"; exit 1
+          fi
+          if ! [[ "$CONVERSATIONS" =~ ^[0-9](,[0-9])*$ ]]; then
+            echo "::error::conversations must look like 0,1"; exit 1
+          fi
+          echo "ref=${REF:-main}" >> "$GITHUB_OUTPUT"
+          echo "conversations=$CONVERSATIONS" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout mem0
+        uses: actions/checkout@v4
+        with:
+          repository: bluefishforsale/mem0
+          ref: ${{ steps.params.outputs.ref }}
+          path: mem0
+          submodules: true
+
+      - name: Install Ansible (for ansible-vault)
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible pyyaml
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Read secrets from the vault
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          umask 077
+          echo "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/.vault_pass"
+          export ANSIBLE_VAULT_PASSWORD_FILE="$RUNNER_TEMP/.vault_pass"
+          extraction=$(python3 scripts/vault.py get ai_services.openai.api_key)
+          # NOTE: a pre-provisioned spare llama.cpp token. A named one would need
+          # a vault edit plus a llamacpp redeploy, which bounces agentbox's lanes.
+          # Rename it in the vault and here together if it ever gets a real name.
+          judge=$(python3 scripts/vault.py get ai_services.llamacpp.api_keys.spare2)
+          echo "::add-mask::$extraction"
+          echo "::add-mask::$judge"
+          {
+            echo "EXTRACTION_OPENAI_API_KEY=$extraction"
+            echo "JUDGE_API_KEY=$judge"
+          } >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/.vault_pass"
+
+      - name: Run LOCOMO against a stack built from the mem0 checkout
+        env:
+          JUDGE_BASE_URL: http://ocean.home:8080/v1
+          JUDGE_MODEL: qwen3-coder-30b-a3b
+          CONVERSATIONS: ${{ steps.params.outputs.conversations }}
+          PUSHGATEWAY_URL: http://ocean.home:9091
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          COMMIT_SHA=$(git -C mem0 rev-parse HEAD)
+          export COMMIT_SHA
+          OUT_DIR="$RUNNER_TEMP/locomo" bash mem0/tests/quality/nightly/run.sh
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locomo-${{ github.run_id }}
+          path: ${{ runner.temp }}/locomo
+          if-no-files-found: warn
+          retention-days: 30
