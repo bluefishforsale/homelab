@@ -9,6 +9,9 @@ set menu-default local
 set menu-timeout 10000
 set nb-channel current
 chain --autofree http://{{ ansible_host }}:{{ service_ports.dns_stack.netboot_http }}/hosts/${mac:hexhyp}.ipxe || echo no host file for ${mac}
+# One-shot override set with POST /next-boot/<host> on netboot01; reading it
+# consumes it. netboot01 being down only costs the override, not the menu.
+chain --autofree ${nb}/next-boot/${mac:hexhyp}.ipxe || echo no next-boot flag
 
 :menu
 menu netboot ${nb-host} ${mac}

@@ -22,6 +22,8 @@
     service: netboot
     files: "{{ playbook_dir }}/../../../files/netboot"
     netboot_root: /srv/netboot
+    netboot_next_boot_dir: /var/lib/netboot-next-boot
+    netboot_next_boot_port: "{{ service_ports.netboot.next_boot }}"
 
     # tdarr-gpu role bundle (files/netboot/roles/tdarr-gpu/start.sh.j2).
     tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
@@ -96,6 +98,31 @@
         mode: '0755'
       loop: "{{ role_bundles.files | map(attribute='path') | list }}"
 
+    - name: Install the next-boot flag service
+      ansible.builtin.template:
+        src: "{{ files }}/next-boot.py.j2"
+        dest: /usr/local/sbin/netboot-next-boot
+        owner: root
+        group: root
+        mode: '0755'
+      register: next_boot_script
+
+    - name: Install the next-boot unit
+      ansible.builtin.template:
+        src: "{{ files }}/netboot-next-boot.service.j2"
+        dest: /etc/systemd/system/netboot-next-boot.service
+        owner: root
+        group: root
+        mode: '0644'
+      register: next_boot_unit
+
+    - name: Run the next-boot service
+      ansible.builtin.systemd:
+        name: netboot-next-boot
+        enabled: true
+        daemon_reload: true
+        state: "{{ 'restarted' if (next_boot_script is changed or next_boot_unit is changed) else 'started' }}"
+
     - name: Render netboot site
       ansible.builtin.template:
         src: "{{ files }}/nginx-netboot.conf.j2"
@@ -137,6 +164,15 @@
         return_content: true
       register: netboot_health
       failed_when: netboot_health.content != "ok\n"
+
+    - name: next-boot answers through nginx
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/next-boot/healthz"
+        return_content: true
+      register: next_boot_health
+      until: next_boot_health.status == 200
+      retries: 5
+      delay: 2
 
   handlers:
     - name: Reload nginx
