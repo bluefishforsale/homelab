@@ -25,10 +25,10 @@ ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --qu
 ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
 
 # Stop command  
-ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --timeout 30
 
 # Reload command - force recreation to pick up new config files
-ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --timeout 30
 ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d --force-recreate
 
 # Service behavior
