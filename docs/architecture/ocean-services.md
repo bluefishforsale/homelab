@@ -24,6 +24,7 @@ graph TB
             Plex[Plex<br/>:32400]
             Sonarr[Sonarr<br/>:8989]
             Radarr[Radarr<br/>:7878]
+            Lidarr[Lidarr<br/>:8686]
             Prowlarr[Prowlarr<br/>:9696]
             Bazarr[Bazarr<br/>:6767]
             NZBGet[NZBGet<br/>:6789]
@@ -58,8 +59,10 @@ graph TB
     
     Prowlarr --> Sonarr
     Prowlarr --> Radarr
+    Prowlarr --> Lidarr
     Sonarr --> NZBGet
     Radarr --> NZBGet
+    Lidarr --> NZBGet
     
     Plex --> Tautulli
     Overseerr --> Sonarr
@@ -85,7 +88,7 @@ graph TB
 |----------|----------|
 | Network | nginx, cloudflared, cloudflare_ddns |
 | AI/ML | llama.cpp, Open WebUI, paia, mem0 |
-| Media | Plex, Sonarr, Radarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr |
+| Media | Plex, Sonarr, Radarr, Lidarr, Prowlarr, Bazarr, NZBGet, Overseerr, Tautulli, Tdarr |
 | Monitoring | Prometheus, Grafana, NVIDIA DCGM, UnPoller |
 | Services | Audible Downloader, Home Assistant, GlobalView |
 

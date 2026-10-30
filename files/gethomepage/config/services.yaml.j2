@@ -45,6 +45,14 @@
           url: http://192.168.1.143:{{ service_ports.radarr.port }}
           key: "{{ media_services.radarr.api_key }}"
 
+    - Lidarr:
+        icon: lidarr
+        href: http://lidarr.home
+        widget:
+          type: lidarr
+          url: http://192.168.1.143:{{ service_ports.lidarr.port }}
+          key: "{{ media_services.lidarr.api_key }}"
+
     - Prowlarr:
         icon: prowlarr
         href: http://prowlarr.home

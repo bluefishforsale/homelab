@@ -318,6 +318,10 @@ jobs:
       - name: tdarr-exporter job math
         run: python3 files/tdarr-exporter/test_exporter.py
 
+      # A bad profile body is rejected by Lidarr mid-deploy, or silently allows lossless.
+      - name: lidarr quality profile
+        run: python3 files/ocean-lidarr/test_lidarr_configure.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.

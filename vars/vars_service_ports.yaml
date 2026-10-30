@@ -93,6 +93,9 @@ service_ports:
   radarr_exporter:
     port: 9707
 
+  lidarr_exporter:
+    port: 9709
+
   prowlarr_exporter:
     port: 9710
 
@@ -157,6 +160,9 @@ service_ports:
 
   radarr:
     port: 8903
+
+  lidarr:
+    port: 8686
 
   bazarr:
     port: 6767
