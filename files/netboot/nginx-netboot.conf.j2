@@ -23,6 +23,11 @@ server {
         return 200 "ok\n";
     }
 
+    # One-shot next-boot flags: POST sets one, the GET from iPXE consumes it.
+    location /next-boot/ {
+        proxy_pass http://127.0.0.1:{{ netboot_next_boot_port }};
+    }
+
     location / {
         try_files $uri =404;
     }
