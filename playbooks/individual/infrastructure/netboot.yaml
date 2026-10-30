@@ -1,0 +1,92 @@
+---
+# netboot01 image server (docs/specs/2026-10-29-netboot-design.md)
+# Serves kernel/initrd/squashfs and role bundles to PXE clients. Debian's nginx
+# package, not a container: it is a static file server, unattended-upgrades
+# keeps it patched, and it does not depend on docker, which the fleet bootstrap
+# installs after the host joins inventory.
+#
+# Prerequisites:
+#   - VM created via playbooks/individual/infrastructure/create_netboot_vm.yaml
+
+- name: Deploy netboot image server
+  hosts: netboot
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../vars/vars_netboot.yaml
+
+  vars:
+    service: netboot
+    files: "{{ playbook_dir }}/../../../files/netboot"
+    netboot_root: /srv/netboot
+
+  tasks:
+    - name: Wait for cloud-init to finish on first boot
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      failed_when: false
+
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+        lock_timeout: 600
+
+    - name: Ensure netboot directories exist
+      ansible.builtin.file:
+        path: "{{ netboot_root }}/{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: ["", images, roles, hosts]
+
+    - name: Render netboot site
+      ansible.builtin.template:
+        src: "{{ files }}/nginx-netboot.conf.j2"
+        dest: /etc/nginx/sites-available/netboot
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Enable netboot site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/netboot
+        dest: /etc/nginx/sites-enabled/netboot
+        state: link
+      notify: Reload nginx
+
+    - name: Disable the stock default site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+    - name: Check nginx config
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Ensure nginx is enabled and running
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+
+    - name: Flush handlers before the health check
+      ansible.builtin.meta: flush_handlers
+
+    - name: netboot01 answers on /healthz
+      ansible.builtin.uri:
+        url: "http://127.0.0.1/healthz"
+        return_content: true
+      register: netboot_health
+      failed_when: netboot_health.content != "ok\n"
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded

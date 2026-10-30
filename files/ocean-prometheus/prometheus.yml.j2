@@ -358,6 +358,8 @@ scrape_configs:
         # the only signal they are actually serving. /docs is mem0's one
         # unauthenticated route; it is served by the same app as /memories.
         - http://ocean.home:8888/docs
+        # netboot01's nginx serves netboot images and role bundles to PXE clients.
+        - http://netboot01.home/healthz
         labels:
           probe_type: "http"
           category: "homelab_services"
