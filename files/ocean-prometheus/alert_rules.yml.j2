@@ -634,7 +634,7 @@ groups:
       summary: "nzbget-prune has not succeeded in 2 days ({{ "{{ $labels.instance }}" }})"
       description: "Failed and stale downloads are piling up on harbor's scratch SSD and data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
 
-  # Normal running holds the active jobs and a week of failed ones, well under
+  # Normal running holds the active jobs and two days of failed ones, well under
   # half the 1.8T SSD. Past 85% something is wrong even if the guard copes.
   - alert: NzbgetScratchHigh
     expr: (1 - node_filesystem_avail_bytes{instance="harbor.home",mountpoint="/srv/nzbget"} / node_filesystem_size_bytes{instance="harbor.home",mountpoint="/srv/nzbget"}) * 100 > 85
