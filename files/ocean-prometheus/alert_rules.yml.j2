@@ -91,9 +91,10 @@ groups:
       summary: "Disk filling on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
       description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is projected to run out of space within 24h at the current rate."
 
-  # Service down alert (excluding all blackbox probes)
+  # Service down alert (excluding all blackbox probes). netboot-hosts is out
+  # too: a diskless netboot machine being off is normal, see netboot_alerts.
   - alert: ServiceDown
-    expr: up{job!~"blackbox-.*"} == 0
+    expr: up{job!~"blackbox-.*|netboot-hosts"} == 0
     for: 5m
     labels:
       severity: critical
@@ -802,3 +803,30 @@ groups:
     annotations:
       summary: "NFS retransmits on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.instance }}" }} has been retransmitting NFS RPCs to ocean for 10m ({{ "{{ $value | humanize }}" }}/s). Processes on the mount stall rather than fail; check ocean's load and nfsd."
+
+- name: netboot_alerts
+  rules:
+  # Netboot hosts (vars/vars_netboot.yaml) are diskless and off most of the
+  # time, so only "booted but broken" alerts. netboot-role writes
+  # netboot_role_up 0 before it starts the role and 1 once the role is up.
+  - alert: NetbootRoleDown
+    expr: up{job="netboot-hosts"} == 1 and on(instance) netboot_role_up == 0
+    for: 5m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} booted but its netboot role is not up"
+      description: "{{ "{{ $labels.instance }}" }} is running the live image but role {{ "{{ $labels.role }}" }} never started. Check `journalctl -u netboot-role` on it and the bundle at http://{{ netboot_server.name }}.home/roles/{{ "{{ $labels.role }}" }}/start.sh."
+
+  # Up with no role metric at all means the image has no netboot-role, or it
+  # never got as far as writing one.
+  - alert: NetbootRoleMissing
+    expr: up{job="netboot-hosts"} == 1 unless on(instance) netboot_role_up
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} booted with no netboot role metric"
+      description: "{{ "{{ $labels.instance }}" }} is up but exports no netboot_role_up. netboot-role.service did not run; check `systemctl status netboot-role` on it."

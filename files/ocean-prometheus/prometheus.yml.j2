@@ -69,6 +69,20 @@ scrape_configs:
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 
+  # Diskless netboot machines (vars/vars_netboot.yaml). Not in inventory and
+  # off most of the day, so they get their own job, which ServiceDown skips.
+  # Scraped by address, not name: Kea hands the address out only to the live
+  # image, while <name>.home follows whatever the machine last booted (DDNS),
+  # which on the tower is usually Windows.
+  - job_name: 'netboot-hosts'
+    scrape_interval: 30s
+    static_configs:
+{% for name, host in netboot_hosts.items() if name != 'netboot-smoke' %}
+    - targets: ['{{ host.ip }}:9100']
+      labels:
+        instance: '{{ name }}-live'
+{% endfor %}
+
   - job_name: 'process-exporter'
     relabel_configs: *dropPortNumber
     static_configs:

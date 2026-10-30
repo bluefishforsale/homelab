@@ -20,6 +20,26 @@
     nfs_export_path: /data01
     # No crossmnt, so the data01/docker child dataset is never traversed.
     nfs_export_options: rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1
+    # Diskless netboot hosts that opt in (vars_netboot.yaml) get only the
+    # library, never all of /data01: they boot from an image anyone on the LAN
+    # can fetch and sit at an address nothing else vouches for, so they must
+    # not be able to reach /data01/services and its databases. all_squash maps
+    # every write to the media user regardless of what the client claims.
+    #
+    # NOTE: subtree_check, unlike the workers' export. /data01/complete and
+    # /data01/services are one dataset (data01), so without it the server
+    # accepts any file handle on that filesystem and a crafted one reaches
+    # service state despite the narrower path. Its usual cost, stale handles
+    # when an open file is renamed across directories, does not arise: tdarr
+    # builds output in the host's local tmpfs and copies it back. The real
+    # boundary would be a dataset split, which is a hand-run ZFS change.
+    netboot_export_path: /data01/complete
+    netboot_export_options: "rw,sync,subtree_check,all_squash,anonuid={{ system_users.media.uid }},anongid={{ system_users.media.gid }},sec=sys,fsid=2"
+    netboot_client_ips: "{{ netboot_hosts.values() | selectattr('nfs', 'defined') | selectattr('nfs') | map(attribute='ip') | list }}"
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_netboot.yaml
 
   tasks:
     # NOTE: an empty client list renders a bare "/data01", which exportfs
@@ -80,6 +100,28 @@
         mode: '0644'
       notify: Reload exports
 
+    # Absent, not empty, when no netboot host opts in: an empty client list
+    # would export the path to every host.
+    - name: Export the library to netboot hosts
+      ansible.builtin.copy:
+        dest: /etc/exports.d/netboot-hosts.exports
+        content: |
+          # Managed by Ansible (nfs_export_data01.yaml)
+          {{ netboot_export_path }} {% for ip in netboot_client_ips %}{{ ip }}({{ netboot_export_options }}){{ ' ' if not loop.last }}{% endfor %}
+
+        owner: root
+        group: root
+        mode: '0644'
+      when: netboot_client_ips | length > 0
+      notify: Reload exports
+
+    - name: Drop the netboot export when no netboot host opts in
+      ansible.builtin.file:
+        path: /etc/exports.d/netboot-hosts.exports
+        state: absent
+      when: netboot_client_ips | length == 0
+      notify: Reload exports
+
     - name: Enable and start nfs-server
       ansible.builtin.systemd:
         name: nfs-server
@@ -116,6 +158,16 @@
         that: live_exports.stdout is search(hostvars[item].ansible_ssh_host | regex_escape ~ '\\(')
         fail_msg: "{{ item }} missing from exportfs -v: {{ live_exports.stdout }}"
       loop: "{{ groups['data01_workers'] }}"
+
+    # The netboot export must be the library alone, squashed; a netboot host
+    # showing up on the /data01 line would mean it can reach service state.
+    - name: Assert each netboot host gets only the squashed library export
+      ansible.builtin.assert:
+        that:
+          - live_exports.stdout is search(netboot_export_path ~ '\\s+' ~ (item | regex_escape) ~ '\\(.*all_squash')
+          - live_exports.stdout is not search('/data01\\s+' ~ (item | regex_escape) ~ '\\(')
+        fail_msg: "{{ item }} export is wrong: {{ live_exports.stdout }}"
+      loop: "{{ netboot_client_ips }}"
 
   handlers:
     - name: Restart nfs-server

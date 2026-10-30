@@ -14,12 +14,27 @@
   gather_facts: true
 
   vars_files:
+    - ../../../vault/secrets.yaml
     - ../../../vars/vars_netboot.yaml
+    - ../../../vars/vars_service_ports.yaml
 
   vars:
     service: netboot
     files: "{{ playbook_dir }}/../../../files/netboot"
     netboot_root: /srv/netboot
+
+    # tdarr-gpu role bundle (files/netboot/roles/tdarr-gpu/start.sh.j2).
+    tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
+    tdarr_server_api_port: 8266
+    # Same mount options as the data01 workers (data01_worker.yaml).
+    tdarr_gpu_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime"
+    # 40G of the tower's 64G; see the PRD's RAM budget.
+    tdarr_gpu_cache_size: 40G
+    tdarr_gpu_worker_limits:
+      transcodegpu: 3
+      healthcheckgpu: 1
+      transcodecpu: 0
+      healthcheckcpu: 2
 
   tasks:
     - name: Wait for cloud-init to finish on first boot
@@ -43,15 +58,26 @@
         mode: '0755'
       loop: ["", images, roles, hosts]
 
-    # Role bundles: each live host runs roles/<role>/start.sh at boot
-    # (netboot-role in the netboot-images image).
-    - name: Publish role bundles
-      ansible.builtin.copy:
-        src: "{{ files }}/roles/"
-        dest: "{{ netboot_root }}/roles/"
+    # Role bundles: each live host fetches and runs roles/<role>/start.sh at
+    # boot (netboot-role in the netboot-images image). LAN-readable, so a
+    # bundle may carry ids and addresses but never a secret.
+    - name: Ensure role bundle dirs exist
+      ansible.builtin.file:
+        path: "{{ netboot_root }}/roles/{{ item | dirname | basename }}"
+        state: directory
         owner: root
         group: root
-        mode: u=rwX,go=rX
+        mode: '0755'
+      loop: "{{ lookup('ansible.builtin.fileglob', files + '/roles/*/start.sh.j2', wantlist=true) }}"
+
+    - name: Render role bundles
+      ansible.builtin.template:
+        src: "{{ item }}"
+        dest: "{{ netboot_root }}/roles/{{ item | dirname | basename }}/start.sh"
+        owner: root
+        group: root
+        mode: '0755'
+      loop: "{{ lookup('ansible.builtin.fileglob', files + '/roles/*/start.sh.j2', wantlist=true) }}"
 
     - name: Render netboot site
       ansible.builtin.template:
