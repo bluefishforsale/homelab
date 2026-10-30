@@ -32,6 +32,22 @@ The tdarr side has prior art too. `playbooks/individual/workers/tdarr_node.yaml`
 
 **Monitoring.** netboot01 runs node-exporter and an nginx health check like any other VM. A powered-off tower is normal and must not page, so netboot host alerts fire only on "up but broken": the node-exporter target is up and `netboot_role_up == 0` for 5 minutes, or the host is up and its tdarr node is missing from `/api/v2/get-nodes`. A failed smoke gate alerts through the playbook run.
 
+## Changes made while building
+
+These replaced parts of the decisions above once they met the real system, and each landed in the PR named.
+
+The netboot hosts are not an inventory group. Inventory means `groups['all']`, so every `hosts: all` play and the fleet-wide scrape loops would chase a tower that is off most of the day, which is the same reason `[k8s]` is commented out. They live in `vars/vars_netboot.yaml` instead, and Kea, the menu, the NFS export and the scrape job all render from it (#1017).
+
+PXE had never worked here at all. Kea named `ipxe.efi` and `undionly.kpxe`, the netbootxyz container shipped neither, and `menu.ipxe` was a 404 because nothing populated the assets dir its nginx serves. The dns role now installs both binaries from iPXE v2.0.0's release tarball, owned by uid 1000 so the container's `--tftp-secure` dnsmasq will serve them (#1036).
+
+The live address is reserved by client-id, not MAC. A MAC reservation also handed `.40`, and with it the NFS export, to the tower's Windows install. A vendor-class pool didn't fix it either, because networkd requests the address its initramfs lease already holds and Kea grants a requested address from any pool the client may use. The image sends DUID-LL with IAID 0 (`ff:00:00:00:00:00:03:00:01:<mac>`), Windows sends `01:<mac>`, and Kea reserves by that client-id (#1043, #1051). Kea config is now validated with the running image's `kea-dhcp4 -t` before it lands.
+
+Netboot hosts never get the `/data01` export. They get `/data01/complete` alone, `all_squash` to the media user, with `subtree_check`, because `complete` and `services` are one dataset and without it a crafted file handle reaches service state (#1043). The real boundary would be a dataset split, which is a hand-run ZFS change.
+
+`tdarr_node` pulls from GHCR directly. `cached_registries` exists only in the registry-cache spec, not in code.
+
+The smoke VM has 8 GB, not 4, because live-boot copies the whole squashfs into RAM. A failed role publishes the failing command as `netboot_role_failed_info` over node-exporter, since the first broken boot had no working SSH to look through.
+
 ## Goals (v1)
 
 1. `netboot01` exists on node005 at `192.168.1.33`, serves `/srv/netboot` over nginx, and is monitored.
