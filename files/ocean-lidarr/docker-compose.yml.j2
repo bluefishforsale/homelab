@@ -45,6 +45,7 @@ services:
       - ENABLE_ADDITIONAL_METRICS=true
     ports:
       - "{{ exporter_port }}:9709"
+    # No healthcheck: the image has no shell. up{job="lidarr-exporter"} covers it.
     # Start-ordering only: gating on Lidarr's health would hold the exporter
     # down for as long as Lidarr's start_period, and the exporter tolerates
     # Lidarr being briefly unavailable on its own.

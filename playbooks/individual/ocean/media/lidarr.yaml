@@ -1,7 +1,7 @@
 ---
-# Lidarr for music, back after a year off. The state dir from the 2025 install
-# (database, artists, MediaCover) is reused as-is; this play owns config.xml,
-# the compose project and the settings lidarr-configure.py converges.
+# Lidarr for music. The state dir from the 2025 install (database, artists,
+# MediaCover) is reused as-is, so this play owns only config.xml, the compose
+# project and the settings lidarr-configure.py converges.
 - name: Lidarr and exporter on ocean
   hosts: ocean
   become: true
@@ -38,13 +38,13 @@
         group: "{{ gid }}"
         mode: '0755'
 
-    - name: Template config.xml
+    - name: Template config.xml (holds the API key)
       ansible.builtin.template:
         src: "{{ files }}/config.xml.j2"
         dest: "{{ home }}/config.xml"
         owner: "{{ uid }}"
         group: "{{ gid }}"
-        mode: '0644'
+        mode: '0600'
       register: lidarr_config
 
     - name: Template compose file (holds the API key)

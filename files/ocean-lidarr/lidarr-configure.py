@@ -160,9 +160,9 @@ def main():
     profile_id = ensure_profile(base, key)
     ensure_profile_in_use(base, key, profile_id)
     ensure_download_client(base, key, env["NZBGET_HOST"], int(env["NZBGET_PORT"]), env["NZBGET_PASSWORD"])
-    remove_foreign_indexers(base, key, env["PROWLARR_PUBLIC_URL"])
     ensure_prowlarr_app(env["PROWLARR_URL"], env["PROWLARR_API_KEY"], env["PROWLARR_PUBLIC_URL"],
                         env["LIDARR_PUBLIC_URL"], key)
+    remove_foreign_indexers(base, key, env["PROWLARR_PUBLIC_URL"])
 
 
 if __name__ == "__main__":
