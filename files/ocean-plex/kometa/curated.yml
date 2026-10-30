@@ -29,6 +29,17 @@ collections:
       - 501979   # Bill & Ted Face the Music (2020)
       - 335797   # Sing (2016)
       - 114150   # Pitch Perfect (2012)
+      - 1059811  # Flora and Son (2023)
+      - 470333   # Hearts Beat Loud (2018)
+      - 130593   # Good Vibrations (2012)
+      - 71       # Billy Elliot (2000)
+      - 13258    # Son of Rambow (2007)
+      - 786      # Almost Famous (2000)
+      - 777270   # Belfast (2021)
+      - 342737   # 20th Century Women (2016)
+      - 84892    # The Perks of Being a Wallflower (2012)
+      - 147773   # The Way Way Back (2013)
+      - 83666    # Moonrise Kingdom (2012)
     collection_order: release
     sync_mode: sync
     radarr_add_missing: true
