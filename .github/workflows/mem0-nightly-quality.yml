@@ -118,8 +118,14 @@ jobs:
           echo "::add-mask::$EXTRACTION_OPENAI_API_KEY"
           echo "::add-mask::$JUDGE_API_KEY"
           COMMIT_SHA=$(git -C mem0 rev-parse HEAD)
-          export EXTRACTION_OPENAI_API_KEY JUDGE_API_KEY COMMIT_SHA
-          OUT_DIR="$RUNNER_TEMP/locomo" bash mem0/tests/quality/nightly/run.sh
+          # NOTE: env -i, so code from the mem0 checkout inherits the two keys
+          # it needs and never the vault password, which unlocks everything.
+          env -i PATH="$PATH" HOME="$HOME" \
+            EXTRACTION_OPENAI_API_KEY="$EXTRACTION_OPENAI_API_KEY" JUDGE_API_KEY="$JUDGE_API_KEY" \
+            JUDGE_BASE_URL="$JUDGE_BASE_URL" JUDGE_MODEL="$JUDGE_MODEL" CONVERSATIONS="$CONVERSATIONS" \
+            PUSHGATEWAY_URL="$PUSHGATEWAY_URL" RUN_ID="$RUN_ID" COMMIT_SHA="$COMMIT_SHA" \
+            OUT_DIR="$RUNNER_TEMP/locomo" \
+            bash mem0/tests/quality/nightly/run.sh
 
       - name: Upload results
         if: always()
