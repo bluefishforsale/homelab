@@ -58,9 +58,9 @@ done
 # keinos/sqlite3 runs argv AS the command (tini) and defaults to a non-root user
 # that can't read container-owned files or write staging, so 'sqlite3' + --user root.
 SQLITE_DBS=(
-  sonarr/sonarr.db radarr/radarr.db lidarr/lidarr.db
+  sonarr/sonarr.db radarr/radarr.db
   prowlarr/config/prowlarr.db bazarr/db/bazarr.db
-  jellyfin/config/data/jellyfin.db navidrome/data/navidrome.db
+  jellyfin/config/data/jellyfin.db
   tautulli/config/tautulli.db overseerr/config/db/db.sqlite3
   homeassistant/config/home-assistant_v2.db open-webui/data/webui.db
   paia/data/paia.db photonic_inventory/data/photonic.db
@@ -77,15 +77,9 @@ for rel in "${SQLITE_DBS[@]}"; do
     log "backed up sqlite:$svc"; else fail "sqlite:$svc"; rm -f "$WORK/sqlite/$svc.db"; fi
 done
 
-# --- At-rest mysql (container stopped): cold copy -> mysql-atrest.tar ---
-if [ -d "$SERVICES_DIR/mysql/data" ] && ! running mysql; then
-  docker run --rm -v "$SERVICES_DIR/mysql":/src:ro -v "$WORK":/out "$ALPINE_IMAGE" \
-    tar cf /out/mysql-atrest.tar -C /src data 2>/dev/null && log "cold-copied at-rest mysql" || fail "mysql-atrest"
-fi
-
 # Flatten sqlite backups into $WORK, then gzip every payload.
 mv "$WORK"/sqlite/*.db "$WORK"/ 2>/dev/null || true; rmdir "$WORK/sqlite" 2>/dev/null || true
-docker run --rm -v "$WORK":/w "$ALPINE_IMAGE" sh -c 'for f in /w/*.sql /w/*.db /w/*.tar; do [ -e "$f" ] && gzip -f "$f"; done'
+docker run --rm -v "$WORK":/w "$ALPINE_IMAGE" sh -c 'for f in /w/*.sql /w/*.db; do [ -e "$f" ] && gzip -f "$f"; done'
 
 # --- Upload each payload to gs://bucket/<service>/<file> (service = name before first dot) ---
 # Stable object names -> each run is a new version; retention is the bucket's
