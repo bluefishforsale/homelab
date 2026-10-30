@@ -660,7 +660,8 @@ def cmd_auto(a):
     if not active and not start <= hour < end:
         # NOTE: a batch deletes each old file when it grabs the new one. Started
         # at 20:30 on 2026-10-13, after NZBGet's 18:00 pause, 25 popular movies
-        # sat missing from Plex until downloads resumed at 02:00.
+        # sat missing from Plex until downloads resumed at 02:00. NZBGet has
+        # run 24/7 since #1005, so narrow the window only if it pauses again.
         print(f"not planning: {hour:02d}:00 is outside the {a.window}h batch window")
     elif not active:
         free = free_tb()
@@ -710,8 +711,8 @@ def main():
     au.add_argument("--movies", type=int, default=25)
     au.add_argument("--max-gb", type=float, default=2000)
     au.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
-    au.add_argument("--window", default="2-12",
-                    help="local hours START-END in which a new batch may start; NZBGet downloads 02-18")
+    au.add_argument("--window", default="0-24",
+                    help="local hours START-END in which a new batch may start; NZBGet downloads 24/7")
     au.add_argument("--min-free-tb", type=float, default=3.0,
                     help="do not start a batch with less than this free on /data01")
     au.add_argument("--yes", action="store_true")

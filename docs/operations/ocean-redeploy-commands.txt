@@ -56,7 +56,7 @@ ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml
 
 # NZBGet (download client)
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/nzbget.yaml
+ansible-playbook -i inventories/production/hosts.ini playbooks/individual/workers/nzbget.yaml
 
 # Prowlarr (indexer manager)
 ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/prowlarr.yaml
@@ -138,7 +138,7 @@ ssh ocean "cd /data01/services && for dir in */; do if [ -f \${dir}docker-compos
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/unpoller.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/monitoring/nvidia_dcgm.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/plex.yaml && \
-# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/nzbget.yaml && \
+# ansible-playbook -i inventories/production/hosts.ini playbooks/individual/workers/nzbget.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/prowlarr.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/sonarr.yaml && \
 # ansible-playbook -i inventories/production/hosts.ini playbooks/individual/ocean/media/radarr.yaml && \

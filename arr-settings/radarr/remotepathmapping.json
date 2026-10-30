@@ -1,6 +1,6 @@
 [
   {
-    "host": "192.168.1.143",
+    "host": "192.168.1.32",
     "localPath": "/downloads/",
     "remotePath": "/downloads/movies/"
   }

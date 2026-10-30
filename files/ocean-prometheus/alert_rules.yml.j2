@@ -631,7 +631,7 @@ groups:
       severity: warning
     annotations:
       summary: "nzbget-prune has not succeeded in 2 days ({{ "{{ $labels.instance }}" }})"
-      description: "Failed and stale downloads are piling up on data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
+      description: "Failed and stale downloads are piling up on harbor's scratch SSD and data01 again. Check `systemctl status nzbget-prune.service` and its journal on {{ "{{ $labels.instance }}" }}; it prunes nothing while nzbget's API is unreachable."
 
 - name: sas_phy_alerts
   rules:

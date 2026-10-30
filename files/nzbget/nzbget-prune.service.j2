@@ -1,8 +1,8 @@
 [Unit]
-Description=Prune failed, orphaned and stale nzbget downloads on data01
+Description=Prune failed, orphaned and stale nzbget downloads
 After={{ service }}.service
 Wants={{ service }}.service
-RequiresMountsFor={{ data }}
+RequiresMountsFor={{ data }} {{ scratch }}
 
 [Service]
 Type=oneshot
