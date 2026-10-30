@@ -257,11 +257,19 @@
     loop:
     - nzbget-prune.service
     - nzbget-prune.timer
+    - nzbget-guard.service
+    - nzbget-guard.timer
     register: nzbget_prune_units
 
-  - name: Enable and start nzbget-prune timer
+  # The guard is the same script with --guard: every 5 minutes, past 85% of the
+  # scratch SSD it prunes without the retry windows, then pauses downloads
+  # until usage is back under 75%.
+  - name: Enable and start the prune and guard timers
     ansible.builtin.systemd:
-      name: nzbget-prune.timer
+      name: "{{ item }}"
       state: started
       enabled: true
       daemon_reload: "{{ nzbget_prune_units is changed }}"
+    loop:
+    - nzbget-prune.timer
+    - nzbget-guard.timer
