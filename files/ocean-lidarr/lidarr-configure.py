@@ -126,15 +126,24 @@ def ensure_download_client(base, key, host, port, password):
 
 
 def ensure_prowlarr_app(prowlarr, pkey, prowlarr_public, lidarr_public, lkey):
-    apps = api(prowlarr, pkey, "/api/v1/applications")
-    if any(a["implementation"] == "Lidarr" for a in apps):
+    app = next((a for a in api(prowlarr, pkey, "/api/v1/applications")
+                if a["implementation"] == "Lidarr"), None)
+    urls = {"prowlarrUrl": prowlarr_public, "baseUrl": lidarr_public}
+    # apiKey reads back masked like the NZBGet password, so it rides along with
+    # a URL change. A leftover app with the right URLs and a stale key would
+    # sync nothing; Prowlarr's own health check reports that one.
+    if app and not set_fields(app["fields"], urls) and app["syncLevel"] == "fullSync":
         return
-    body = next(s for s in api(prowlarr, pkey, "/api/v1/applications/schema")
-                if s["implementation"] == "Lidarr")
-    set_fields(body["fields"], {"prowlarrUrl": prowlarr_public, "baseUrl": lidarr_public, "apiKey": lkey})
+    body = app or next(s for s in api(prowlarr, pkey, "/api/v1/applications/schema")
+                       if s["implementation"] == "Lidarr")
+    urls["apiKey"] = lkey
+    set_fields(body["fields"], urls)
     body.update(name="Lidarr", syncLevel="fullSync")
-    api(prowlarr, pkey, "/api/v1/applications?forceSave=true", "POST", body)
-    print("changed: Lidarr registered in Prowlarr")
+    if app:
+        api(prowlarr, pkey, f"/api/v1/applications/{app['id']}?forceSave=true", "PUT", body)
+    else:
+        api(prowlarr, pkey, "/api/v1/applications?forceSave=true", "POST", body)
+    print("changed: Lidarr application in Prowlarr")
 
 
 def remove_foreign_indexers(base, key, prowlarr_public):
