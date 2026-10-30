@@ -164,7 +164,7 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 15s
     static_configs:
-    - targets: ['ocean.home:9452']
+    - targets: ['harbor.home:9452']
 
   # Jellyfin has no native /metrics endpoint (:8096/metrics 404s); its metrics
   # come from the jellyfin-exporter job above. This direct scrape only produced

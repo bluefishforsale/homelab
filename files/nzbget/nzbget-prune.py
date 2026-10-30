@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prunes what nzbget leaves behind on data01, so failed and abandoned downloads stop eating the pool.
+"""Prunes what nzbget leaves behind, so failed and abandoned downloads stop eating its scratch SSD and data01.
 
 nzbget keeps a failed job's intermediate files for a manual retry and never
 deletes them when its history entry expires, and finished downloads Sonarr or
@@ -119,7 +119,7 @@ def _write_metrics(path, deleted, now):
 def main():
     dry_run = "--dry-run" in sys.argv[1:]
     data = os.environ.get("DATA", "/data01")
-    areas = {"intermediate": f"{data}/services/nzbget/scratch/intermediate",
+    areas = {"intermediate": os.environ["INTERMEDIATE"],
              "incoming/movies": f"{data}/incoming/movies",
              "incoming/tv": f"{data}/incoming/tv"}
 
