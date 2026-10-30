@@ -61,6 +61,37 @@
       state: started
       daemon_reload: yes
 
+  - name: Wait for Prowlarr's API
+    ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ prowlarr_port }}/api/v1/system/status"
+      headers:
+        X-Api-Key: "{{ media_services.prowlarr.api_key }}"
+    register: prowlarr_status
+    until: prowlarr_status.status == 200
+    retries: 30
+    delay: 10
+    changed_when: false
+
+  # Keys live in media_services.prowlarr.indexers.<slug>.api_key, the slug being
+  # the indexer's Prowlarr name lowercased with punctuation dropped (NZBs.in ->
+  # nzbsin). Sonarr, Radarr and Lidarr need nothing: they reach indexers
+  # through Prowlarr's proxy with Prowlarr's own key.
+  - name: Push indexer API keys from the vault
+    ansible.builtin.script:
+      cmd: "{{ files }}/prowlarr-indexer-keys.py"
+      executable: python3
+    environment:
+      PROWLARR_URL: "http://127.0.0.1:{{ prowlarr_port }}"
+      PROWLARR_API_KEY: "{{ media_services.prowlarr.api_key }}"
+      PROWLARR_DB: "{{ home }}/config/prowlarr.db"
+      INDEXER_KEYS: "{{ media_services.prowlarr.indexers | to_json }}"
+    register: prowlarr_indexer_keys
+    changed_when: "'changed:' in prowlarr_indexer_keys.stdout"
+
+  - name: Show which indexer keys were pushed
+    ansible.builtin.debug:
+      var: prowlarr_indexer_keys.stdout_lines
+
   handlers:
   - name: Reload prowlarr systemd daemon
     ansible.builtin.systemd:
