@@ -61,6 +61,23 @@
     # Role bundles: each live host fetches and runs roles/<role>/start.sh at
     # boot (netboot-role in the netboot-images image). LAN-readable, so a
     # bundle may carry ids and addresses but never a secret.
+    # NOTE: find, not the fileglob lookup. fileglob only globs the file name,
+    # so roles/*/start.sh.j2 matched nothing and every bundle was silently
+    # skipped while the play reported success.
+    - name: Find role bundles in the repo
+      ansible.builtin.find:
+        paths: "{{ files }}/roles"
+        patterns: start.sh.j2
+        recurse: true
+      delegate_to: localhost
+      become: false
+      register: role_bundles
+
+    - name: There is at least one role bundle
+      ansible.builtin.assert:
+        that: role_bundles.matched > 0
+        fail_msg: "no files/netboot/roles/*/start.sh.j2 found under {{ files }}/roles"
+
     - name: Ensure role bundle dirs exist
       ansible.builtin.file:
         path: "{{ netboot_root }}/roles/{{ item | dirname | basename }}"
@@ -68,7 +85,7 @@
         owner: root
         group: root
         mode: '0755'
-      loop: "{{ lookup('ansible.builtin.fileglob', files + '/roles/*/start.sh.j2', wantlist=true) }}"
+      loop: "{{ role_bundles.files | map(attribute='path') | list }}"
 
     - name: Render role bundles
       ansible.builtin.template:
@@ -77,7 +94,7 @@
         owner: root
         group: root
         mode: '0755'
-      loop: "{{ lookup('ansible.builtin.fileglob', files + '/roles/*/start.sh.j2', wantlist=true) }}"
+      loop: "{{ role_bundles.files | map(attribute='path') | list }}"
 
     - name: Render netboot site
       ansible.builtin.template:
