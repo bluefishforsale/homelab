@@ -143,12 +143,17 @@
         opts: "{{ data01_nfs_opts }}"
         state: mounted
 
+    # NOTE: _netdev on a local disk is deliberate. Requiring data01.mount from a
+    # mount in local-fs.target is an ordering cycle (NFS waits on the network,
+    # which waits on local-fs); at boot systemd breaks it by dropping the NFS
+    # mount, and units ordered on it never start. _netdev files this mount
+    # under remote-fs.target with the NFS one instead.
     - name: Mount the local state disk over /data01/services
       ansible.builtin.mount:
         path: /data01/services
         src: "{{ worker_state_disk }}"
         fstype: ext4
-        opts: "defaults,noatime,x-systemd.requires=data01.mount"
+        opts: "defaults,noatime,_netdev,x-systemd.requires=data01.mount"
         state: mounted
 
     - name: Read mounts after
