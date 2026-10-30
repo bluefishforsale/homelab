@@ -152,7 +152,13 @@
                         "hw-address": "ac:1f:6b:19:f2:06",
                         "ip-address": "192.168.1.144",
                         "hostname": "ocean-eth0"
-                    }
+                    }{% for name, host in netboot_hosts.items() %},
+                    {
+                        "hw-address": "{{ host.mac }}",
+                        "ip-address": "{{ host.ip }}",
+                        "hostname": "{{ name }}"
+                    }{% endfor %}
+
                 ]
             }
         ],

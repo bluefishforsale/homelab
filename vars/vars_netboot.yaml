@@ -1,0 +1,24 @@
+---
+# Netboot registry (docs/specs/2026-10-29-netboot-design.md). The one place a
+# PXE-booted machine is declared; Kea reservations, iPXE per-MAC files, the NFS
+# export and scrape targets all render from it.
+#
+# NOTE: these hosts are deliberately NOT ansible inventory. Anything in
+# inventory joins groups['all'], so every `hosts: all` play and the fleet-wide
+# scrape loops would target a machine that is powered off most of the day.
+
+netboot_server:
+  name: netboot01
+  ip: 192.168.1.33
+
+netboot_hosts:
+  gaming:
+    mac: "58:11:22:ad:f4:7a"
+    ip: 192.168.1.40
+    role: tdarr-gpu
+  # Throwaway VM the promotion gate creates on node005 (bc:24:11 is Proxmox's
+  # OUI). It always boots the candidate image, never current.
+  netboot-smoke:
+    mac: "bc:24:11:4e:42:01"
+    ip: 192.168.1.34
+    role: smoke
