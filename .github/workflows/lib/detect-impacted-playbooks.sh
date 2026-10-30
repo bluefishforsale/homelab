@@ -98,6 +98,9 @@ emit() {
   #     edit under files/dns-stack/ reverse-mapped into it and failed the
   #     production apply, because a files/<svc> input maps to EVERY playbook
   #     referencing that dir, deprecated ones included.
+  #   - netboot_image: pulls one image build from GHCR, so it only means
+  #     something with the image and sha that netboot-images CI dispatches.
+  #     Run on push it has neither and fails its own payload check.
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
@@ -106,6 +109,7 @@ emit() {
     playbooks/operations/decommission/*) return 0 ;;
     playbooks/archive/*) return 0 ;;
     playbooks/deprecated/*) return 0 ;;
+    playbooks/individual/infrastructure/netboot_image.yaml) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"
