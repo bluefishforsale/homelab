@@ -8,7 +8,8 @@ because they reach every indexer through Prowlarr's proxy, never directly.
 
 The API reads keys back masked, so the comparison reads Prowlarr's database
 (read-only) and only a differing key is PUT through the API. Prowlarr tests
-the indexer on save, so a bad key fails the deploy instead of being stored.
+an enabled indexer on save, so a bad key fails the deploy instead of being
+stored; a disabled one takes the key untested.
 """
 import json
 import os
@@ -29,6 +30,8 @@ def stale(stored, wanted):
     stored: {id: (name, key)} from the database. wanted: {slug: key} from the vault.
     """
     by_slug = {slug(name): (i, key) for i, (name, key) in stored.items()}
+    if len(by_slug) < len(stored):
+        raise SystemExit(f"two Prowlarr indexers share a slug: {sorted(n for n, _ in stored.values())}")
     unknown = sorted(set(wanted) - set(by_slug))
     if unknown:
         raise SystemExit(f"vault has keys for indexers Prowlarr does not: {unknown} "

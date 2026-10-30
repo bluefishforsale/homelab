@@ -39,6 +39,16 @@ def test_vault_slug_with_no_indexer_fails_instead_of_being_skipped():
         raise AssertionError("expected SystemExit")
 
 
+def test_two_indexers_with_one_slug_fail_instead_of_one_being_dropped():
+    # "NZB.su" and "Nzbsu" both slug to nzbsu; one would never get its key.
+    try:
+        keys.stale({1: ("NZB.su", "a"), 2: ("Nzbsu", "b")}, {"nzbsu": "c"})
+    except SystemExit as e:
+        assert "share a slug" in str(e)
+    else:
+        raise AssertionError("expected SystemExit")
+
+
 def test_validation_error_never_echoes_the_submitted_key():
     raw = json.dumps([{"propertyName": "ApiKey", "errorMessage": "Invalid API Key",
                        "attemptedValue": "s3cret-key"}]).encode()
