@@ -196,7 +196,9 @@ def _prune(areas, pressure, dry_run):
 
 def guard(dry_run):
     scratch = os.environ["SCRATCH"]
-    marker = os.path.join(scratch, ".guard-paused")
+    # Root-owned StateDirectory, not the scratch disk: media owns that, and a
+    # symlink planted at the marker path would have root truncate its target.
+    marker = os.path.join(os.environ["STATE_DIRECTORY"], "paused")
     pruned = 0
     used = _used(scratch)
     if used >= HIGH:

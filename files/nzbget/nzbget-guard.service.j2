@@ -7,5 +7,7 @@ RequiresMountsFor={{ data }} {{ scratch }}
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/nzbget-prune.env
+StateDirectory=nzbget-guard
+StateDirectoryMode=0700
 ExecStart=/usr/bin/python3 /usr/local/bin/nzbget-prune --guard
 TimeoutStartSec=30m
