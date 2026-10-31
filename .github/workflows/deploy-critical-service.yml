@@ -108,7 +108,6 @@ jobs:
               ;;
             # dhcp) DEPRECATED - Use dns02 stack health check instead
             #   ssh dns02 "systemctl is-active dns-stack.service"
-            ;;  # Keep semicolon for case syntax
             plex)
               echo "Testing Plex availability..."
               curl -f http://192.168.1.143:32400/web/index.html || exit 1
@@ -253,7 +252,6 @@ jobs:
             # dhcp) DEPRECATED - Use dns02 stack health check instead
             #   ssh dns02 "systemctl is-active dns-stack.service"
             #   ssh dns02 "docker logs kea-dhcp4 --tail 20"
-            ;;  # Keep semicolon for case syntax
             plex)
               echo "Testing Plex availability..."
               for i in {1..10}; do
@@ -285,7 +283,7 @@ jobs:
           echo "2. Verify service is accessible"
           echo "3. Consider rollback if needed"
           echo ""
-          echo "Backup available at: /tmp/*-backup-*.tar.gz"
+          echo "Backup available at: /tmp/*-backup-*.tar.gz on the target host(s)"
           exit 1
 
   summary:
