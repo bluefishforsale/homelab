@@ -15,16 +15,32 @@ route:
   group_by: ['alertname', 'job']
   
   # How long to wait before sending a notification about new group of alerts
-  group_wait: 10s
-  
-  # How long to wait before sending notification about new alerts added to group
-  group_interval: 10s
-  
-  # How long to wait before re-sending notification about group
-  repeat_interval: 1h
-  
+  group_wait: 30s
+
+  # How long to wait before sending notification about new alerts added to group.
+  # Also the floor between two notifications for one group, so a flapping alert
+  # or a fleet-wide blip lands as one message, not one per state change.
+  group_interval: 5m
+
+  # How long to wait before re-sending notification about a group still firing.
+  # Every repeat is an email AND an ntfy push, and at 1h a warning that sat
+  # firing for three days sent ~80 of each: 795 emails in the week to
+  # 2026-10-30. A firing alert already has its open GitHub issue; the repeat is
+  # only a reminder. Keep under alertmanager's 120h notification-log retention.
+  repeat_interval: 24h
+
   # Default receiver (fallback)
   receiver: 'agentbox'
+
+  routes:
+  # Hardware that needs hands (UPS battery, PSU, disk): the first push is the
+  # signal, and nothing changes until someone swaps a part, so remind daily.
+  # Must stay above the critical route, which would otherwise catch the
+  # critical ones (UpsOnBattery, IpmiSensorCritical) at 4h.
+  - matchers: ['remediation="manual"']
+    repeat_interval: 24h
+  - matchers: ['severity="critical"']
+    repeat_interval: 4h
 
 # Inhibition rules allow to mute a set of alerts given that another alert is firing.
 inhibit_rules:
