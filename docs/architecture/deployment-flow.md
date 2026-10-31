@@ -1,103 +1,46 @@
 # Deployment Flow
 
-Ocean services deployment order based on `playbooks/03_ocean_services.yaml`.
+The site orchestrators and the order they apply in. A normal change never runs
+these: main-apply maps it to its owning playbook and applies only that (see
+[deploy-pipeline.md](deploy-pipeline.md)). The orchestrators replay only on an
+`inventories/**` or `group_vars/all*` change, or by hand through the
+**Deploy Services** workflow (`deploy-services.yml`). Never run them from the
+laptop.
 
----
+## Orchestrators
 
-## Master Playbook
+`playbooks/00_site.yaml` imports, in order:
 
-```bash
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/03_ocean_services.yaml --ask-vault-pass
-```
+| Playbook | Covers |
+|---|---|
+| `01_base_system.yaml` | packages, users and keys, sysctl/udev, logging, unattended upgrades, fail2ban, ramdisk (`individual/base/`) |
+| `02_core_infrastructure.yaml` | NIC bonds and qdisc, PERC RAID, the dns01/dns02 VMs and HA stack, pi-hole (`individual/core/`) |
+| `03_ocean_services.yaml` | every container service on ocean, below |
 
----
+## 03_ocean_services order
 
-## Deployment Phases
+Network first, because everything else is reached through it; monitoring after
+the services it watches.
 
-```mermaid
-flowchart TD
-    Start([Start]) --> Network{Network Services}
-    
-    Network --> DDNS[cloudflare_ddns.yaml]
-    DDNS --> Tunnels[cloudflared.yaml]
-    Tunnels --> Nginx[nginx_compose.yaml]
-    
-    Nginx --> AI{AI/ML Services}
-    AI --> Llama[llamacpp.yaml]
-    Llama --> WebUI[open_webui.yaml]
-    
-    WebUI --> Media{Media Services}
-    Media --> Plex[plex.yaml]
-    Plex --> Sonarr[sonarr.yaml]
-    Sonarr --> Radarr[radarr.yaml]
-    Radarr --> Prowlarr[prowlarr.yaml]
-    Prowlarr --> Bazarr[bazarr.yaml]
-    Bazarr --> NZBGet[nzbget.yaml]
-    NZBGet --> Overseerr[overseerr.yaml]
-    Overseerr --> Tautulli[tautulli.yaml]
-    Tautulli --> Tdarr[tdarr.yaml]
-    
-    Tdarr --> Monitoring{Monitoring}
-    Monitoring --> Prometheus[prometheus.yaml]
-    Prometheus --> Grafana[grafana_compose.yaml]
-    Grafana --> DCGM[nvidia_dcgm.yaml]
-    DCGM --> UnPoller[unpoller.yaml]
-    
-    UnPoller --> Services{Application Services}
-    Services --> NextCloud[nextcloud.yaml]
-    NextCloud --> Audible[audible_downloader.yaml]
-    Audible --> HomeAssistant[homeassistant_compose.yaml]
-    
-    HomeAssistant --> Complete([Complete])
-    
-    subgraph deps[Dependencies]
-        GPU[RTX 3090 - AI Services]
-        ZFS[data01 - Storage]
-    end
-    
-    GPU -.-> AI
-    ZFS -.-> Start
-```
+| Phase | Playbooks under `playbooks/individual/ocean/` |
+|---|---|
+| Network | `network/certbot`, `network/cloudflare_ddns`, `network/cloudflared`, `network/nginx_compose` |
+| AI | `ai/llamacpp`, `ai/open_webui`, `ai/paia` |
+| Media | `media/plex`, `media/sonarr`, `media/radarr`, `media/lidarr`, `media/prowlarr`, `media/bazarr`, `media/overseerr`, `media/tautulli`, `media/tdarr` |
+| Monitoring | `monitoring/prometheus`, `monitoring/grafana_compose`, `monitoring/nvidia_dcgm`, `monitoring/unpoller` |
+| Services | `services/terrac_com`, `services/audible_downloader`, `services/homeassistant_compose` |
 
----
+Not in 03, so a site replay leaves them alone: NZBGet and the tdarr node run on
+harbor (`playbooks/individual/workers/`, see
+[data01-workers.md](data01-workers.md)), and services deployed by their own
+repo's dispatch (blog, mem0, my-ta-jose, etrading, photonic-inventory) have a
+workflow each.
 
-## Individual Playbook Paths
-
-| Phase | Playbook Path |
-|-------|---------------|
-| **Network** | |
-| Cloudflare DDNS | `individual/ocean/network/cloudflare_ddns.yaml` |
-| Cloudflare Tunnels | `individual/ocean/network/cloudflared.yaml` |
-| nginx | `individual/ocean/network/nginx_compose.yaml` |
-| **AI/ML** | |
-| llama.cpp | `individual/ocean/ai/llamacpp.yaml` |
-| Open WebUI | `individual/ocean/ai/open_webui.yaml` |
-| **Media** | |
-| Plex | `individual/ocean/media/plex.yaml` |
-| Sonarr | `individual/ocean/media/sonarr.yaml` |
-| Radarr | `individual/ocean/media/radarr.yaml` |
-| Prowlarr | `individual/ocean/media/prowlarr.yaml` |
-| Bazarr | `individual/ocean/media/bazarr.yaml` |
-| NZBGet | `individual/workers/nzbget.yaml` |
-| Overseerr | `individual/ocean/media/overseerr.yaml` |
-| Tautulli | `individual/ocean/media/tautulli.yaml` |
-| Tdarr | `individual/ocean/media/tdarr.yaml` |
-| **Monitoring** | |
-| Prometheus | `individual/ocean/monitoring/prometheus.yaml` |
-| Grafana | `individual/ocean/monitoring/grafana_compose.yaml` |
-| NVIDIA DCGM | `individual/ocean/monitoring/nvidia_dcgm.yaml` |
-| UnPoller | `individual/ocean/monitoring/unpoller.yaml` |
-| **Services** | |
-| NextCloud | `individual/ocean/services/nextcloud.yaml` |
-| Audible Downloader | `individual/ocean/services/audible_downloader.yaml` |
-| Home Assistant | `individual/ocean/services/homeassistant_compose.yaml` |
-
----
-
-## Deploy Individual Service
+## Running one
 
 ```bash
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/ocean/media/plex.yaml --ask-vault-pass
+gh workflow run deploy-services.yml -f playbook=playbooks/03_ocean_services.yaml -f check_mode=true
 ```
+
+Dry-run first; the same workflow without `check_mode` applies. It holds the
+`deploy-ocean` concurrency group, so it waits for any ocean deploy in flight.
