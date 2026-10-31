@@ -25,6 +25,11 @@ Architecture diagrams and documentation for the homelab infrastructure.
 | [data01-workers.md](data01-workers.md) | harbor and other hosts on /data01 over NFS |
 | [agent-autonomy.md](agent-autonomy.md) | What agentbox drafts may merge, lanes, escalation |
 | [decommissioning.md](decommissioning.md) | Gated one-time teardown of a removed service |
+| [deploy-pipeline.md](deploy-pipeline.md) | CI workflows, concurrency, vault, health, rollback |
+| [registry-cache.md](registry-cache.md) | Pull-through Docker registry mirror |
+| [blog-terrac-com.md](blog-terrac-com.md) | Hugo blog, Shape B static deploy |
+| [terminalbench.md](terminalbench.md) | Dispatch-only CPU model benchmark |
+| [wan-path-diagnosis.md](wan-path-diagnosis.md) | Per-hop MTR and Plex path probes |
 | [deployment-flow.md](deployment-flow.md) | Service deployment order |
 | [physical-architecture.md](physical-architecture.md) | Physical server layout |
 
