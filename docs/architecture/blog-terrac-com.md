@@ -11,7 +11,7 @@ here. This doc covers only what is specific to the blog.
 
 | File | Host | What it owns |
 |---|---|---|
-| `.github/workflows/deploy-blog-terrac-com.yml` | runner | `repository_dispatch: deploy-blog-terrac-com` (branch from `client_payload.branch`, default `main`) or `workflow_dispatch`. Runs the playbook with `-e git_branch=...`, then an SSH health check. No concurrency group. |
+| `.github/workflows/deploy-blog-terrac-com.yml` | runner | `repository_dispatch: deploy-blog-terrac-com` (branch from `client_payload.branch`, default `main`) or `workflow_dispatch`. Runs the playbook with `-e git_branch=...`, then an SSH check that `repo/public/index.html` exists. `deploy-ocean` group. |
 | `ocean/services/blog_terrac_com_static.yaml` | ocean | Deletes and re-clones the repo into `/data01/services/blog_terrac_com/repo` as `terrac`, warns if `public/index.html` is missing, then purges the Cloudflare edge cache for `blog.terrac.com`. |
 | `ocean/network/nginx_compose.yaml` | ocean | Owns the vhost in `files/nginx-compose/proxy_hostname_web_proxy.conf` and the `:ro` mount of `/data01/services/blog_terrac_com` in `files/nginx-compose/docker-compose.yml.j2`. |
 | `ocean/network/cloudflared.yaml` | ocean | Tunnel ingress from `vars/vars_cloudflared.yaml`: `blog.terrac.com` to `http://192.168.1.143:80`. First label `blog` is in `fully_public_services`, so no Access gate. |
@@ -44,13 +44,9 @@ There is no `.home` vhost for the blog and no port in
   playbook's purge (`hosts: [blog.terrac.com]`, vault `cloudflare.api_email` /
   `api_key`, zone id inline) is the only thing that makes a deploy visible
   before 2h. It is skipped when `public/index.html` is missing.
-- The workflow health check looks in the wrong place. It runs
-  `test -f /data01/services/blog_terrac_com/index.html` over SSH, but the served
-  file is `.../repo/public/index.html`. It only passes if a stale file exists at
-  the old path (not verified on the host). Treat a green run as "playbook
-  finished", not "site serves".
-- No `deploy-ocean` serialization. The workflow has no `concurrency:`
-  block, so two dispatches can clone into the same dir at once.
+- A stale `index.html` from the old rsync layout still sits at
+  `/data01/services/blog_terrac_com/`. Nothing serves it; the health check tested
+  it until #1099, which is why that check passed while looking in the wrong place.
 
 ## Monitoring
 

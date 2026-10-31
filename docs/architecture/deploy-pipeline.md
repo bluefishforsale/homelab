@@ -22,14 +22,14 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 |---|---|---|---|
 | `main-apply.yml` | push to master (path filter), dispatch with a playbook list | The only push-time apply. `detect-changes` runs the detector (`:89`) and the resolver (`:95`); `apply-playbooks` runs each playbook and fails if any failed; `verify-deployment` probes after. Dispatch input bypasses the detector and its exclusions (`:70-82`). | resolved per run, job level (`:127-130`) |
 | `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
-| `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml` (`:83`), an ocean play. | none |
+| `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml`, an ocean play. | `deploy-ocean` |
 | `deploy-netboot-images.yml` | `repository_dispatch` `deploy-netboot-images` | `infrastructure/netboot_image.yaml` with image and sha. Excluded from push detection. | `deploy-netboot` |
 | `deploy-registry-cache.yml` | `repository_dispatch` `deploy-registry-cache` | `infrastructure/registry_cache.yaml`. | `deploy-registry-cache` |
 | `deploy-ocean-service.yml` | dispatch, service choice | Validate, `--check`, then apply one mapped playbook. | `deploy-ocean` |
-| `deploy-critical-service.yml` | dispatch, `dns` or `plex` | Same with a `critical-services` environment approval (`:151-152`). | `deploy-<service>` |
-| `deploy-services.yml` | dispatch, orchestrator choice | Runs `00_site` or `01`/`02`/`03` whole. | none |
-| `deploy-changed-services.yml` | dispatch, `base_ref` | Diffs `origin/<base_ref>...HEAD` (`:54`) and applies ocean playbooks. Older parallel detector. | none |
-| `rollback.yml` | dispatch | See Rollback. | none |
+| `deploy-critical-service.yml` | dispatch, `dns` or `plex` | Same with a `critical-services` environment approval. dns runs `core/services/dns_ha_stack.yaml`. | `deploy-ocean` (plex), `deploy-dns_servers` (dns) |
+| `deploy-services.yml` | dispatch, orchestrator choice | Runs `00_site` or `01`/`02`/`03` whole. | `deploy-ocean` |
+| `deploy-changed-services.yml` | dispatch, `base_ref` | Diffs `origin/<base_ref>...HEAD` (`:54`) and applies ocean playbooks. Older parallel detector. | `deploy-ocean` |
+| `rollback.yml` | dispatch | See Rollback. | `deploy-ocean` |
 | `decommission.yml` | dispatch | Report or apply a `playbooks/operations/decommission/<svc>.yaml`, then archive it with a `[skip ci]` push to master. Needs `contents: write`. | `deploy-ocean` |
 | `health-check.yml` | dispatch, `workflow_call` | Ocean, DNS and runner checks; exits 1 when unhealthy (`:291`). Nothing calls it today. | none |
 | `ci-validate.yml`, `pr-deploy.yml`, `pr-hygiene.yml` | push, PR | Syntax and lint only, plus the detector and resolver tests (`ci-validate.yml:288-294`). No apply. | none |
@@ -50,10 +50,8 @@ ocean dispatch workflows, even when it lands on ocean:
   both mean harbor);
 - multi-play playbooks keyed by their first play only (`workers/nzbget.yaml` is
   ocean, then harbor, and resolves to `deploy-ocean`);
-- `deploy-critical-service.yml` plex runs (`deploy-plex`);
-- the workflows with no group at all: `deploy-blog-terrac-com`, `deploy-services`,
-  `deploy-changed-services`, `rollback`. The phase 1 plan deferred the last
-  three; blog came later and never got one.
+- a site run (`deploy-services.yml` `00_site`) or a rollback, which holds
+  `deploy-ocean` but also touches the dns pair and the rest of the fleet.
 
 `cancel-in-progress: false` everywhere. A GitHub concurrency group
 holds one running and one pending run, and a newer pending run cancels the older
