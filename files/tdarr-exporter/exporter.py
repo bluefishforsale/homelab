@@ -8,11 +8,13 @@ server's API on every scrape and serves it as Prometheus gauges.
 NOTE: a job's start is when the server STAGED it for a node, not when a worker
 picked it up, so tdarr_job_duration_seconds includes time spent waiting in the
 node's staging slot (hours, for a transcode behind a long queue). Healthchecks
-barely wait, so theirs is close to pure processing time.
+barely wait, so theirs is close to pure processing time. For transcodes use
+tdarr_job_processing_seconds_*, which runs from the worker's start.
 """
 import collections
 import json
 import os
+import threading
 import time
 import urllib.request
 
@@ -25,6 +27,10 @@ PORT = int(os.environ.get("TDARR_EXPORTER_PORT", "9196"))
 # bytes are lifetime.
 WINDOW_HOURS = float(os.environ.get("TDARR_DURATION_WINDOW_HOURS", "24"))
 TIMEOUT = float(os.environ.get("TDARR_TIMEOUT_SECONDS", "30"))
+# Reading the pending queue pages through every file (about a minute for 11k),
+# far too slow for a scrape, so a thread refreshes it this often.
+QUEUE_REFRESH_SECONDS = float(os.environ.get("TDARR_QUEUE_REFRESH_SECONDS", "900"))
+QUEUE_PAGE = 1000
 # StatisticsJSONDB keys its queue counts by table number.
 TABLE_STATES = {"table1Count": "pending", "table2Count": "success", "table3Count": "error",
                 "table5Count": "health_ok", "table6Count": "health_error"}
@@ -54,9 +60,22 @@ def workers(nodes):
             for n in nodes.values() for wid, w in (n.get("workers") or {}).items()]
 
 
-def summarize(jobs, live, now_ms, window_s):
+def remember_starts(started, nodes, oldest_ms):
+    """Record when each running job's worker began it, and forget stale ones."""
+    for n in nodes.values():
+        for w in (n.get("workers") or {}).values():
+            if w.get("startTime", 0) > 0 and (w.get("job") or {}).get("jobId"):
+                started.setdefault(w["job"]["jobId"], w["startTime"])
+    for jid in [k for k, v in started.items() if v < oldest_ms]:
+        del started[jid]
+
+
+def summarize(jobs, live, now_ms, window_s, started=None):
+    """started maps jobId to the startTime a worker reported for it."""
+    started = started or {}
     counts = collections.Counter()
     seconds = collections.defaultdict(list)
+    processing = collections.defaultdict(lambda: [0.0, 0])
     sizes = collections.defaultdict(lambda: [0.0, 0.0])
     latest = {}
     since_ms = now_ms - window_s * 1000
@@ -67,13 +86,27 @@ def summarize(jobs, live, now_ms, window_s):
             latest[node] = (j["start"], j["job"]["version"])
         if result == "success" and j.get("end", 0) >= since_ms:
             seconds[(node, type_)].append(j["duration"] / 1000)
+            if j.get("_id") in started:
+                processing[(node, type_)][0] += (j["end"] - started[j["_id"]]) / 1000
+                processing[(node, type_)][1] += 1
         if result == "success" and type_ == "transcode" and j["fileSizeEndGB"] > 0:
             sizes[node][0] += j["fileSizeStartGB"] * GIB
             sizes[node][1] += j["fileSizeEndGB"] * GIB
     return {"counts": dict(counts),
             "durations": {k: (min(v), sum(v) / len(v), max(v)) for k, v in seconds.items()},
+            "processing": {k: tuple(v) for k, v in processing.items()},
             "bytes": {k: tuple(v) for k, v in sizes.items()},
             "versions": {k: v[1] for k, v in latest.items()}}
+
+
+def queue_by_codec(rows):
+    """(files, seconds of video) per video codec among pending files."""
+    files, seconds = collections.Counter(), collections.Counter()
+    for r in rows:
+        codec = r.get("video_codec_name") or "unknown"
+        files[codec] += 1
+        seconds[codec] += r.get("duration") or 0
+    return {c: (files[c], seconds[c]) for c in files}
 
 
 def api(path, payload=None):
@@ -88,11 +121,38 @@ def crud(collection, mode, **kw):
     return api("/api/v2/cruddb", {"data": {"collection": collection, "mode": mode, **kw}})
 
 
+def read_queue():
+    rows, start = [], 0
+    while True:
+        page = api("/api/v2/client/status-tables",
+                   {"data": {"start": start, "pageSize": QUEUE_PAGE, "filters": [], "sorts": [],
+                             "opts": {"table": "table1"}}})["array"]
+        rows += [{"video_codec_name": r.get("video_codec_name"), "duration": r.get("duration")} for r in page]
+        if len(page) < QUEUE_PAGE:
+            return rows
+        start += QUEUE_PAGE
+
+
+QUEUE = {}
+
+
+def refresh_queue():
+    while True:
+        try:
+            QUEUE.update(codecs=queue_by_codec(read_queue()), at=time.time())
+        except Exception as e:  # keep the last good read; the timestamp shows its age
+            print(f"[err] queue: {e}", flush=True)
+        time.sleep(QUEUE_REFRESH_SECONDS)
+
+
 def gauge(name, doc, labels=()):
     return GaugeMetricFamily(name, doc, labels=list(labels))
 
 
 class TdarrCollector:
+    def __init__(self):
+        self.started = {}
+
     def collect(self):
         began = time.time()
         up = gauge("tdarr_up", "1 if every Tdarr API read in this scrape succeeded")
@@ -111,7 +171,9 @@ class TdarrCollector:
         yield up
 
         live = {nid: n["nodeName"] for nid, n in nodes.items()}
-        s = summarize(jobs, live, time.time() * 1000, WINDOW_HOURS * 3600)
+        now_ms = time.time() * 1000
+        remember_starts(self.started, nodes, oldest_ms=now_ms - 2 * WINDOW_HOURS * 3_600_000)
+        s = summarize(jobs, live, now_ms, WINDOW_HOURS * 3600, self.started)
 
         g = gauge("tdarr_server_info", "Tdarr server build", ["version", "engine"])
         g.add_metric([status.get("version", ""), status.get("serverEngine", "")], 1)
@@ -175,6 +237,27 @@ class TdarrCollector:
             for stat, v in zip(("min", "avg", "max"), stats3):
                 g.add_metric([node, type_, stat], v)
         yield g
+        g_sum = gauge("tdarr_job_processing_seconds_sum",
+                      f"Worker-start-to-finished time summed over successful jobs in the last {WINDOW_HOURS:g}h",
+                      ["node", "type"])
+        g_count = gauge("tdarr_job_processing_count",
+                        f"Successful jobs in the last {WINDOW_HOURS:g}h whose worker start this exporter saw",
+                        ["node", "type"])
+        for k, (total, n) in s["processing"].items():
+            g_sum.add_metric(list(k), total)
+            g_count.add_metric(list(k), n)
+        yield from (g_sum, g_count)
+
+        if "codecs" in QUEUE:
+            g_files = gauge("tdarr_queue_files", "Pending (queued) files by video codec", ["codec"])
+            g_secs = gauge("tdarr_queue_video_seconds", "Video length of pending files by video codec", ["codec"])
+            for codec, (n, secs) in QUEUE["codecs"].items():
+                g_files.add_metric([codec], n)
+                g_secs.add_metric([codec], secs)
+            g_at = gauge("tdarr_queue_read_timestamp_seconds", "When the pending queue was last read")
+            g_at.add_metric([], QUEUE["at"])
+            yield from (g_files, g_secs, g_at)
+
         g_in = gauge("tdarr_transcode_input_bytes", "Lifetime input size of successful transcodes", ["node"])
         g_out = gauge("tdarr_transcode_output_bytes", "Lifetime output size of successful transcodes", ["node"])
         for node, (b_in, b_out) in s["bytes"].items():
@@ -188,6 +271,7 @@ class TdarrCollector:
 
 
 def main():
+    threading.Thread(target=refresh_queue, daemon=True).start()
     REGISTRY.register(TdarrCollector())
     start_http_server(PORT)
     print(f"tdarr-exporter on :{PORT}, tdarr={URL}", flush=True)

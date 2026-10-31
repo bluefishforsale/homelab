@@ -424,7 +424,7 @@ Each PR is one service, one branch, independently reviewable, and respects the
 - **PR-C client tooling.** `scripts/systemctl-api.sh`. Outside the deploy path
   filter, so no apply. Can be written against the contract above before the server
   exists.
-- **PR-D docs.** The ADR 0002 decommissioning step (phase 1 F2) and the
+- **PR-D docs.** The decommissioning step (`docs/architecture/decommissioning.md`) (phase 1 F2) and the
   `deploy-pattern.md` onboarding requirement (D4).
 
 **Wave 2, after PR-A merges and PR-B has a release:**

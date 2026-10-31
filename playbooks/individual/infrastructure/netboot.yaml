@@ -32,6 +32,8 @@
     tdarr_gpu_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime"
     # 40G of the tower's 64G; see the PRD's RAM budget.
     tdarr_gpu_cache_size: 40G
+    # Same tag as ocean's (files/ocean-nvidia/docker-compose.yml.j2).
+    dcgm_exporter_image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
     tdarr_gpu_worker_limits:
       transcodegpu: 3
       healthcheckgpu: 1

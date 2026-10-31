@@ -202,6 +202,16 @@
             and 'netboot_role_up{role="smoke"} 1' in smoke_metrics.content
           retries: "{{ (smoke_timeout_s / 10) | int }}"
           delay: 10
+
+        # SSH is the way into a live host when its role breaks, and an image
+        # once shipped with :22 open but no sshd behind it (ssh.socket up,
+        # ssh.service stuck), so the gate wants a real banner, not a port.
+        - name: Smoke VM answers SSH with a banner
+          ansible.builtin.wait_for:
+            host: "{{ smoke.ip }}"
+            port: 22
+            search_regex: '^SSH-2\.0-'
+            timeout: 60
       always:
         - name: Destroy the smoke VM
           ansible.builtin.shell: |

@@ -72,6 +72,33 @@ services:
 EOF
 docker compose -f "$HOME_DIR/docker-compose.yml" up -d
 
+# GPU metrics for the Better NVIDIA DCGM dashboard, scraped as netboot-dcgm.
+# Host networking so its Hostname label is this host's name, as on ocean.
+DCGM_DIR=/srv/dcgm-exporter
+mkdir -p "$DCGM_DIR"
+cat >"$DCGM_DIR/docker-compose.yml" <<EOF
+services:
+  dcgm-exporter:
+    image: {{ dcgm_exporter_image }}
+    container_name: dcgm-exporter
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    healthcheck:
+      test: ["CMD", "nvidia-smi"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+EOF
+docker compose -f "$DCGM_DIR/docker-compose.yml" up -d
+
 # Worker limits live on the server, keyed by nodeID, and only move one step
 # per API call, so walk each type to its committed count.
 NODE_ID=""
@@ -81,6 +108,12 @@ for _ in $(seq 1 30); do
   sleep 10
 done
 [[ -n "$NODE_ID" ]] || { echo "tdarr server never listed $NODE_NAME" >&2; exit 1; }
+
+# NOTE: the flow's Route Encoder By Worker step encodes with NVENC only on a
+# node whose gpuSelect is nvenc. A node registers with '-', and every job on
+# the 4090 then ran libx265 on the CPU (2026-10-31).
+curl -fsS -X POST -H 'Content-Type: application/json' "$SERVER_URL/api/v2/update-node" \
+  -d "$(jq -cn --arg id "$NODE_ID" '{data:{nodeID:$id,nodeUpdates:{gpuSelect:"nvenc"}}}')" >/dev/null
 
 {% for type, want in tdarr_gpu_worker_limits.items() %}
 have=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg id "$NODE_ID" '.[$id].workerLimits.{{ type }} // 0')

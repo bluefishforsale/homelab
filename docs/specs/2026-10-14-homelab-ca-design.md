@@ -230,7 +230,7 @@ phase 2 or later.
 
 - **F1. CA regeneration is a fleet-wide flag day.** Mitigated by D3.
 - **F2. No revocation, ever. Mandatory follow-on:** decommissioning must wipe
-  `/etc/homelab-pki`, and `docs/adr/0002-service-decommissioning.md` needs that
+  `/etc/homelab-pki`, and `docs/architecture/decommissioning.md` needs that
   step added. Without it, a retired host's disk is a permanent fleet credential.
 - **F3. Trust must precede consumption.** A host with the CA but no certificate is
   fine. A client without CA trust rejects a perfectly valid certificate. This is
