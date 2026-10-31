@@ -114,7 +114,12 @@
                 "name": "UEFI-64",
                 "test": "option[93].hex == 0x0007 and not member('ipxe_detected')",
                 "next-server": "{{ ansible_host }}",
-                "boot-file-name": "ipxe.efi"
+                // snponly.efi, not ipxe.efi: the full build carries iPXE's own
+                // USB host drivers, which take the xHCI controller from the
+                // firmware and with it the keyboard (the tower's Logitech
+                // receiver went dead at the menu). snponly drives only the NIC,
+                // through the firmware's SNP.
+                "boot-file-name": "snponly.efi"
             },
             {
                 "name": "Legacy-BIOS",
@@ -163,7 +168,10 @@
                         // 01:<mac>. A reservation also beats the address the
                         // initramfs lease left for networkd to request.
                         "client-id": "ff:00:00:00:00:00:03:00:01:{{ host.mac | lower }}",
-                        "ip-address": "{{ host.ip }}"
+                        "ip-address": "{{ host.ip }}",
+                        // The live image sends no hostname; without this DDNS
+                        // registers a generated myhost-<ip> name instead.
+                        "hostname": "{{ name }}"
                     }{% endfor %}
 
                 ]

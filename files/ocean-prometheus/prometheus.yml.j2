@@ -92,6 +92,19 @@ scrape_configs:
         instance: '{{ name }}-live'
 {% endfor %}
 
+  # GPU netboot roles also run dcgm-exporter (files/netboot/roles/tdarr-gpu),
+  # so the Better NVIDIA DCGM dashboard shows them beside ocean. Its own job,
+  # not netboot-hosts: the netboot alerts read up{job="netboot-hosts"} as "the
+  # machine is up", and a second target there would read as a missing role.
+  - job_name: 'netboot-dcgm'
+    scrape_interval: 30s
+    static_configs:
+{% for name, host in netboot_hosts.items() if host.role == 'tdarr-gpu' %}
+    - targets: ['{{ host.ip }}:9400']
+      labels:
+        instance: '{{ name }}-live'
+{% endfor %}
+
   - job_name: 'process-exporter'
     relabel_configs: *dropPortNumber
     static_configs:

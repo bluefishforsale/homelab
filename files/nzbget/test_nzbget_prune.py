@@ -31,16 +31,17 @@ def test_intermediate_of_queued_job_is_never_pruned():
     assert got == [], got
 
 
-def test_failed_job_files_pruned_after_7_days():
+def test_failed_job_files_pruned_after_2_days():
     # Gladiator II remux, FAILURE/PAR, 34 GiB held in intermediate. The history
-    # entry stays (Sonarr/Radarr already reacted); only the files go.
-    entries = [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", NOW - 8 * DAY)]
+    # entry stays (Sonarr/Radarr already reacted); only the files go. A week
+    # of these was 650 GiB on 2026-10-30, a third of the scratch SSD.
+    entries = [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", NOW - 3 * DAY)]
     got = prune.targets(entries, queue_ids=set(), history={84080: "FAILURE/PAR"}, now=NOW)
     assert got == [("intermediate", "Gladiator.II.2024.1080p.BluRay.REMUX.#84080", "failed")], got
 
 
-def test_failed_job_younger_than_7_days_is_kept():
-    # The week is the window for a manual "post-process again" from nzbget.
+def test_failed_job_younger_than_2_days_is_kept():
+    # Two days is the window for a manual "post-process again" from nzbget.
     entries = [("intermediate", "The.Madison.S01E06.1080p.BluRay.#84110", NOW - 1 * DAY)]
     got = prune.targets(entries, queue_ids=set(), history={84110: "FAILURE/UNPACK"}, now=NOW)
     assert got == [], got

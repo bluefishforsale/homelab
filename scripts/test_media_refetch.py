@@ -230,11 +230,119 @@ def test_movie_download_radarr_cannot_import_is_blocklisted_not_waited_on():
     assert item["state"] == "planned"
 
 
+def test_season_just_marked_failed_waits_for_sonarrs_own_redownload():
+    # The Simpsons S11 and S12 (2026-10-30): marking a KONTRAST pack failed for
+    # missing subtitles made Sonarr grab DSNP episodes while we grabbed an iVy
+    # pack in the same tick. DSNP imported first, and 43 iVy rows sat blocked.
+    searched = []
+    refetch.mc = FakeArr([])
+    refetch.best_tv_release = lambda item: searched.append(item) or None
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": True, "state": "planned",
+            "failed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    assert not refetch.step_tv(item, True, {})
+    assert searched == [] and item["state"] == "planned"
+
+
+def test_movie_just_marked_failed_waits_for_radarrs_own_redownload():
+    searched = []
+    refetch.mc = FakeArr([])
+    refetch.best_release = lambda mid: searched.append(mid) or None
+    item = {"movie_id": 1, "state": "planned", "failed_at": refetch.now().isoformat(), "title": "t", "log": []}
+    assert not refetch.step(item, yes=True)
+    assert searched == [] and item["state"] == "planned"
+
+
+def test_season_marked_failed_long_ago_searches_again():
+    refetch.mc = FakeArr([])
+    refetch.best_tv_release = lambda item: None
+    item = {"series_id": 1, "season": 2, "episode_ids": [1, 2], "pack": False, "state": "planned",
+            "failed_at": (refetch.now() - refetch.REDOWNLOAD_GRACE * 2).isoformat(), "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    assert item["state"] == "no-release"
+
+
+def test_pack_sonarr_imported_only_part_of_searches_the_rest():
+    # Attack on Titan S04 (2026-10-30): the SiQ pack imported 28 of 30 episodes and
+    # Sonarr held the release as import-blocked for the other two. Still queued, it
+    # read as downloading, so the item would have waited in grabbed forever.
+    grabbed = refetch.now() - refetch.dt.timedelta(hours=1)
+    rows = [{"id": 700 + e, "episodeId": e, "downloadId": "D", "title": "SiQ", "status": "completed",
+             "trackedDownloadState": "importPending", "trackedDownloadStatus": "warning"} for e in (1, 2, 3)]
+    deleted, posted = [], []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return rows if path.endswith("/queue/details") else []
+
+        def delete(self, app, path, **params):
+            deleted.append((path, params))
+
+        def post(self, app, path, data):
+            posted.append(data)
+
+    refetch.mc = Fake()
+    refetch.tv_files = lambda sid, eps: {e: {"id": 100 + e, "dateAdded": refetch.now().isoformat(),
+                                             "path": f"/tv/{e}.mkv"} for e in eps if e != 3}
+    refetch.subs = lambda path: ["eng"]
+    item = {"series_id": 1, "season": 4, "episode_ids": [1, 2, 3], "pack": True, "state": "grabbed",
+            "grabbed_at": grabbed.isoformat(), "attempts": 0, "title": "t", "log": []}
+    refetch.step_tv(item, True, {})
+    # Not blocklisted: the release was good for the episodes it held.
+    assert deleted == [("/api/v3/queue/701", {"removeFromClient": "true", "blocklist": "false"})], deleted
+    assert posted == [{"name": "EpisodeSearch", "episodeIds": [3]}], posted
+    assert item["state"] == "imported"
+
+
 def test_earlier_bump_is_transcoded_first():
     # tdarr takes the highest bumped value first. A timestamp made the newest import
     # jump the line: 12 movies bumped 2026-10-20 sat behind 279 TV files bumped after.
     t = refetch.dt.datetime(2026, 10, 20, 20, 0)
     assert refetch.bump_value(t) > refetch.bump_value(t + refetch.dt.timedelta(minutes=1))
+
+
+def test_movie_tdarr_is_still_transcoding_past_flow_timeout_keeps_waiting():
+    # Friday (1995), bumped onto harbor's CPU workers at about 2% an hour, would have
+    # gone stuck at 3 days with its transcode still running (#1087).
+    f = "/media/movies/Friday (1995)/Friday.mkv"
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"n": {"workers": {"w": {"workerType": "transcodecpu", "file": f}}}}
+
+    saved = refetch.probe, refetch.conformance.reasons, refetch.bump
+    refetch.mc = Fake()
+    refetch.probe = lambda file: {}
+    refetch.conformance.reasons = lambda probed: ["video-not-hevc"]
+    refetch.bump = lambda item, files, yes: False
+    long_ago = (refetch.now() - refetch.FLOW_TIMEOUT * 2).isoformat()
+    item = {"movie_id": 1, "state": "imported", "file": f, "title": "t", "log": [],
+            "grabbed_at": long_ago, "imported_at": long_ago}
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.probe, refetch.conformance.reasons, refetch.bump = saved
+    assert item["state"] == "imported", item["log"]
+
+
+def test_season_tdarr_is_still_transcoding_past_flow_timeout_keeps_waiting():
+    files = ["/media/tv/Dollhouse/Season 1/E01.mkv", "/media/tv/Dollhouse/Season 1/E02.mkv"]
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"n": {"workers": {"w": {"workerType": "transcodegpu", "file": files[1]}}}}
+
+    saved = refetch.probe, refetch.conformance.reasons, refetch.bump
+    refetch.mc = Fake()
+    refetch.probe = lambda file: file
+    refetch.conformance.reasons = lambda probed: ["video-not-hevc"] if probed == files[1] else []
+    refetch.bump = lambda item, files, yes: False
+    item = {"series_id": 1, "season": 1, "episode_ids": [1, 2], "state": "imported", "files": files,
+            "title": "t", "log": [], "imported_at": (refetch.now() - refetch.FLOW_TIMEOUT * 2).isoformat()}
+    try:
+        refetch.step_tv(item, True, {})
+    finally:
+        refetch.probe, refetch.conformance.reasons, refetch.bump = saved
+    assert item["state"] == "imported", item["log"]
 
 
 if __name__ == "__main__":

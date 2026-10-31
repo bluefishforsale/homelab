@@ -62,21 +62,20 @@ this repo's master, is a production change, not a checkpoint.
 ## The agent fleet (agentbox)
 
 `agentbox` is an always-on VM that watches the deployable repos' open issues and
-resolves them, while staying drivable live from the phone. Its design and the
-fixed-cost constraints are in the plan; the autonomy policy is
-[ADR 0001](docs/adr/0001-tiered-agent-autonomy.md). Vocabulary:
+resolves them, while staying drivable live from the phone. The autonomy policy is
+[agent-autonomy.md](docs/architecture/agent-autonomy.md). Vocabulary:
 
-- **Lane** - a path that work takes through a model tier. The **premium lane**
-  is Claude Code on the Max subscription (sanctioned, fixed-cost). The **free
-  lanes** are opencode routed to Gemini (drafting) and the local GPU (triage).
-  Lanes are labelled on telemetry (`lane=free|claude`) so cost breaks down by
-  tier.
-- **Drafter** - the opencode `build` agent that writes the actual fix on the
-  free lane. Routed to Gemini 2.5 Flash because the draft has to be a mergeable
-  diff; the local model handles triage and bulk, not drafting.
-- **Escalation** - handing an issue from the free lane to the premium lane
-  (relabel `needs-claude`). Failure-driven: it happens when the draft yields no
-  usable diff, or the opened PR's CI goes red. Not predicted from "complexity."
+- **Lane** - a path that work takes through a model tier, all free when
+  unattended: the local GPU (`local-llama`) first, then Gemini Flash, then the
+  escalation tier. Claude Code runs only in RC sessions, with a human present.
+  Lanes are labelled on telemetry (`lane=free|review|escalate|reconcile`) so
+  cost breaks down by tier.
+- **Drafter** - the opencode `build` agent that writes the actual fix, walking
+  `LANES` in `files/agentbox/issue-watcher.sh` cheapest first.
+- **Escalation** - handing an issue from the free lanes to the escalation tier
+  (`escalate.sh`, the strongest free model; relabel `needs-escalation`).
+  Failure-driven: it happens when the draft yields no usable diff, or the opened
+  PR's CI goes red. Not predicted from "complexity."
 - **RC session** - a persistent `claude remote-control` process for one repo,
   run as a systemd template instance (`agentbox-rc@<repo>.service`, cwd
   `repos/<repo>`), drivable live from the Android app or desktop. One per repo

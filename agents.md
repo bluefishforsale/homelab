@@ -12,6 +12,8 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
   `prom.sh` (metrics), `loki.sh` (logs), `fleet-systemctl.sh` / `docker.sh` (fleet state),
   `alerts.sh`, `cf.sh` (Cloudflare), `vault.py` (secrets), `fleet-restart.sh` (the only
   mutating one).
+- **data01 workers** (harbor: docker hosts on ocean's pool over NFS, local state) ->
+  [`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)
 - **Onboarding a new external-repo service** -> [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
 - **Validate:** `make validate`
 
@@ -127,8 +129,8 @@ is the worst possible outcome. So storage is exempt from "merge = deploy":
 
 ### Nothing with a write-ahead log goes over NFS
 
-`/data01` is exported over NFS to worker hosts (spec:
-[`docs/specs/2026-10-17-node005-docker-host-design.md`](docs/specs/2026-10-17-node005-docker-host-design.md)),
+`/data01` is exported over NFS to worker hosts (architecture:
+[`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)),
 and every service on ocean keeps its config and database under `/data01/services/<svc>`.
 Those two facts together are a trap: run a service on a worker with its config dir on the
 NFS mount and its database corrupts.
