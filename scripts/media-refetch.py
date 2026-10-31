@@ -152,6 +152,13 @@ def needs_bump(record):
     return bool(record) and record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
 
 
+def transcoding_now():
+    """Files a tdarr worker is transcoding right now, by tdarr-node path."""
+    nodes = mc.get("tdarr", "/api/v2/get-nodes").values()
+    return {w.get("file") for n in nodes for w in n["workers"].values()
+            if (w.get("workerType") or "").startswith("transcode")}
+
+
 def tdarr_files(mode, **kw):
     return mc.post("tdarr", "/api/v2/cruddb", {"data": {"collection": "FileJSONDB", "mode": mode, **kw}})
 
@@ -496,7 +503,8 @@ def step(item, yes):
             # Secrets came out of the flow HEVC but with no dialogue track and
             # stalled every batch from 2026-10-14 until this timeout existed.
             imported = dt.datetime.fromisoformat(item.get("imported_at", item["grabbed_at"]))
-            if now() - imported > FLOW_TIMEOUT:
+            # A CPU worker takes a day or more over a remux; one still running is not stalled.
+            if now() - imported > FLOW_TIMEOUT and item["file"] not in transcoding_now():
                 note(item, f"still {','.join(why)} after {FLOW_TIMEOUT}; check the tdarr flow")
                 item["state"] = "stuck"
                 return True
@@ -634,7 +642,7 @@ def step_tv(item, yes, ledger):
         whys = [conformance.reasons(probe(f)) for f in item["files"]]
         waiting = [w for w in whys if "no-dialogue-track" in w or "video-not-hevc" in w]
         if waiting:
-            if now() - when(item["imported_at"]) > FLOW_TIMEOUT:
+            if now() - when(item["imported_at"]) > FLOW_TIMEOUT and not transcoding_now() & set(item["files"]):
                 note(item, f"{len(waiting)} files still {','.join(waiting[0])} after {FLOW_TIMEOUT}; "
                            "check the tdarr flow")
                 item["state"] = "stuck"
