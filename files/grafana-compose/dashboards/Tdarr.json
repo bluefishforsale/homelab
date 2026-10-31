@@ -162,7 +162,7 @@
       "gridPos": {
         "x": 8,
         "y": 1,
-        "w": 12,
+        "w": 8,
         "h": 4
       },
       "targets": [
@@ -196,6 +196,53 @@
         "textMode": "value_and_name"
       },
       "description": "Whole-library file counts, not per node: Tdarr queues files globally. pending = waiting for a transcode decision, staged = handed to a node slot, success/error = transcode outcome, health_* = health check outcome."
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "Queue burn-down (est.)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_queue_video_seconds{codec!=\"hevc\"}) * 24 / avg_over_time(sum(tdarr_worker_fps)[24h:5m])",
+          "legendFormat": "burn-down",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "How long the pending queue takes to encode at the last 24h's average frames per second across all workers. Frames are estimated as the pending non-HEVC video length times 24 fps, since tdarr stores no frame rate; HEVC files are left out because they skip the encode. Rough: the fps average also includes fast audio-only passes, and the queue is re-read every 15 minutes."
     },
     {
       "id": 5,
@@ -557,7 +604,7 @@
     {
       "id": 14,
       "type": "bargauge",
-      "title": "Transcode job time, 24h (min / avg / max)",
+      "title": "Transcode time per file, 24h avg",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -565,13 +612,13 @@
       "gridPos": {
         "x": 0,
         "y": 19,
-        "w": 12,
+        "w": 10,
         "h": 8
       },
       "targets": [
         {
-          "expr": "tdarr_job_duration_seconds{node=~\"$node\",type=\"transcode\"}",
-          "legendFormat": "{{node}} {{stat}}",
+          "expr": "sum by (node) (tdarr_job_processing_seconds_sum{node=~\"$node\",type=\"transcode\"}) / sum by (node) (tdarr_job_processing_count{node=~\"$node\",type=\"transcode\"})",
+          "legendFormat": "{{node}}",
           "datasource": {
             "type": "prometheus",
             "uid": "bf02tpxiz6m0wf"
@@ -599,26 +646,73 @@
         "displayMode": "gradient",
         "showUnfilled": true
       },
-      "description": "Successful jobs that finished in the last 24h. Measured from when the server STAGED the job, so a transcode includes its wait in the node's staging slot; health checks barely wait."
+      "description": "Average time a worker spent on each successful transcode that finished in the last 24h, from the worker starting it to the job ending. Not from staging: a file can sit in a node's staging slot for a day behind bumped files, which is what used to put 1 day on ocean's max. Counts only jobs the exporter saw running, so it fills in over the 24h after an exporter restart."
     },
     {
-      "id": 15,
-      "type": "bargauge",
-      "title": "Healthcheck job time, 24h (min / avg / max)",
+      "id": 25,
+      "type": "stat",
+      "title": "Avg transcode time per file",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
       },
       "gridPos": {
-        "x": 12,
+        "x": 10,
         "y": 19,
-        "w": 12,
+        "w": 4,
         "h": 8
       },
       "targets": [
         {
-          "expr": "tdarr_job_duration_seconds{node=~\"$node\",type=\"healthcheck\"}",
-          "legendFormat": "{{node}} {{stat}}",
+          "expr": "sum(tdarr_job_processing_seconds_sum{node=~\"$node\",type=\"transcode\"}) / sum(tdarr_job_processing_count{node=~\"$node\",type=\"transcode\"})",
+          "legendFormat": "all nodes",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "Across the selected nodes, weighted by job: total worker time over successful transcodes in the last 24h divided by their count. One worker's time, not the farm's: with N workers busy, files finish N times as often."
+    },
+    {
+      "id": 15,
+      "type": "bargauge",
+      "title": "Healthcheck job time, 24h avg",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 19,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "tdarr_job_duration_seconds{node=~\"$node\",type=\"healthcheck\",stat=\"avg\"}",
+          "legendFormat": "{{node}}",
           "datasource": {
             "type": "prometheus",
             "uid": "bf02tpxiz6m0wf"
@@ -651,7 +745,7 @@
     {
       "id": 16,
       "type": "timeseries",
-      "title": "Transcode job time, 24h window",
+      "title": "Transcode time per file, 24h avg",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -664,8 +758,8 @@
       },
       "targets": [
         {
-          "expr": "tdarr_job_duration_seconds{node=~\"$node\",type=\"transcode\"}",
-          "legendFormat": "{{node}} {{stat}}",
+          "expr": "sum by (node) (tdarr_job_processing_seconds_sum{node=~\"$node\",type=\"transcode\"}) / sum by (node) (tdarr_job_processing_count{node=~\"$node\",type=\"transcode\"})",
+          "legendFormat": "{{node}}",
           "datasource": {
             "type": "prometheus",
             "uid": "bf02tpxiz6m0wf"
@@ -685,8 +779,7 @@
           "placement": "bottom",
           "calcs": [
             "lastNotNull",
-            "mean",
-            "max"
+            "mean"
           ]
         },
         "tooltip": {
@@ -694,7 +787,7 @@
           "sort": "desc"
         }
       },
-      "description": "Successful jobs that finished in the last 24h. Measured from when the server STAGED the job, so a transcode includes its wait in the node's staging slot; health checks barely wait."
+      "description": "Average time a worker spent on each successful transcode that finished in the last 24h, from the worker starting it to the job ending. Not from staging: a file can sit in a node's staging slot for a day behind bumped files, which is what used to put 1 day on ocean's max. Counts only jobs the exporter saw running, so it fills in over the 24h after an exporter restart."
     },
     {
       "id": 17,

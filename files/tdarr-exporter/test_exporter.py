@@ -127,6 +127,37 @@ def test_node_version_is_the_version_of_its_most_recent_job():
     assert summarize([new, old])["versions"] == {"harbor.home": "3.01.00"}
 
 
+def test_processing_time_runs_from_worker_start_not_from_staging():
+    # Staged-to-finished put a day on ocean's max: a file staged to its slot
+    # waited behind bumped refetch files. A worker's startTime is when it really
+    # began, and it and the job's end come from the same node's clock, which
+    # also cancels gaming's 69-minute skew that made its staged times negative.
+    j = {**job(duration_s=86_400), "_id": "J1"}
+    started = {"J1": j["end"] - 600_000}
+    s = exporter.summarize([j, {**job(duration_s=50), "_id": "unseen"}], LIVE, NOW_MS, 24 * 3600, started)
+    assert s["processing"] == {("harbor.home", "transcode"): (600.0, 1)}
+
+
+def test_worker_starts_are_remembered_after_the_worker_moves_on():
+    # A job's record lands in JobsJSONDB only once it ends, when its worker has
+    # already dropped it, so the start has to be kept from an earlier scrape.
+    started = {"done": NOW_MS - HOUR_MS, "ancient": NOW_MS - 72 * HOUR_MS}
+    nodes = {"n": {"nodeName": "ocean.home", "workers": {
+        "a": {"workerType": "transcodegpu", "startTime": NOW_MS - 60_000, "job": {"jobId": "J2"}},
+        "b": {"workerType": "transcodegpu", "startTime": 0, "job": {"jobId": "J3"}}}}}
+    exporter.remember_starts(started, nodes, oldest_ms=NOW_MS - 48 * HOUR_MS)
+    assert started == {"done": NOW_MS - HOUR_MS, "J2": NOW_MS - 60_000}
+
+
+def test_pending_queue_sums_video_length_by_codec():
+    # The burn-down panel divides what is left to encode by frames per second.
+    # Streams carry no frame rate here, only the file's duration, and a file
+    # tdarr has not probed yet has none.
+    rows = [{"video_codec_name": "h264", "duration": 3600}, {"video_codec_name": "h264", "duration": 1800},
+            {"video_codec_name": "hevc", "duration": 2400}, {"duration": None}]
+    assert exporter.queue_by_codec(rows) == {"h264": (2, 5400), "hevc": (1, 2400), "unknown": (1, 0)}
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
