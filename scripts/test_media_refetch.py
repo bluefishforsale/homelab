@@ -300,6 +300,51 @@ def test_earlier_bump_is_transcoded_first():
     assert refetch.bump_value(t) > refetch.bump_value(t + refetch.dt.timedelta(minutes=1))
 
 
+def test_movie_tdarr_is_still_transcoding_past_flow_timeout_keeps_waiting():
+    # Friday (1995), bumped onto harbor's CPU workers at about 2% an hour, would have
+    # gone stuck at 3 days with its transcode still running (#1087).
+    f = "/media/movies/Friday (1995)/Friday.mkv"
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"n": {"workers": {"w": {"workerType": "transcodecpu", "file": f}}}}
+
+    saved = refetch.probe, refetch.conformance.reasons, refetch.bump
+    refetch.mc = Fake()
+    refetch.probe = lambda file: {}
+    refetch.conformance.reasons = lambda probed: ["video-not-hevc"]
+    refetch.bump = lambda item, files, yes: False
+    long_ago = (refetch.now() - refetch.FLOW_TIMEOUT * 2).isoformat()
+    item = {"movie_id": 1, "state": "imported", "file": f, "title": "t", "log": [],
+            "grabbed_at": long_ago, "imported_at": long_ago}
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.probe, refetch.conformance.reasons, refetch.bump = saved
+    assert item["state"] == "imported", item["log"]
+
+
+def test_season_tdarr_is_still_transcoding_past_flow_timeout_keeps_waiting():
+    files = ["/media/tv/Dollhouse/Season 1/E01.mkv", "/media/tv/Dollhouse/Season 1/E02.mkv"]
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"n": {"workers": {"w": {"workerType": "transcodegpu", "file": files[1]}}}}
+
+    saved = refetch.probe, refetch.conformance.reasons, refetch.bump
+    refetch.mc = Fake()
+    refetch.probe = lambda file: file
+    refetch.conformance.reasons = lambda probed: ["video-not-hevc"] if probed == files[1] else []
+    refetch.bump = lambda item, files, yes: False
+    item = {"series_id": 1, "season": 1, "episode_ids": [1, 2], "state": "imported", "files": files,
+            "title": "t", "log": [], "imported_at": (refetch.now() - refetch.FLOW_TIMEOUT * 2).isoformat()}
+    try:
+        refetch.step_tv(item, True, {})
+    finally:
+        refetch.probe, refetch.conformance.reasons, refetch.bump = saved
+    assert item["state"] == "imported", item["log"]
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
