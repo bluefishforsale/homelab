@@ -13,6 +13,11 @@
     runner_vm_name: gh-runner-01
     runner_vm_hostname: gh-runner-01
     runner_vm_cores: 16
+    # NOTE: never the kvm64 default. It hides SSE4.2/POPCNT, so anything
+    # built for x86-64-v2 dies on import: NumPy 2.x does, which broke every
+    # Docker build here that installs spaCy. The VM is pinned to node005 and
+    # never migrates, so host costs nothing and leaves headroom for v3 wheels.
+    runner_vm_cpu_type: host
     runner_vm_memory_mb: 12288  # 12 GB; 90d peak used 3.97 GB
     runner_vm_disk_size_increase: "+32G"  # Add storage beyond template default
     runner_vm_template_id: 9999  # Clone from this template (same as k8s VMs)
@@ -66,6 +71,11 @@
 
     - name: Set runner VM CPU cores
       ansible.builtin.shell: "qm set {{ runner_vm_id }} --cores {{ runner_vm_cores }}"
+      when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
+      changed_when: true
+
+    - name: Set runner VM CPU type
+      ansible.builtin.shell: "qm set {{ runner_vm_id }} --cpu {{ runner_vm_cpu_type }}"
       when: runner_vm_status.rc != 0 or runner_vm_status.stdout is not search('running')
       changed_when: true
 
