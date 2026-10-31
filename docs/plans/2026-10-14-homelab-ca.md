@@ -54,7 +54,7 @@ Failure modes the spec implies that no task's happy path exercises. Each has its
 - `.github/workflows/lib/validate-ca-sans.test.sh` — its test, fixture-driven, following the existing `detect-impacted-playbooks.test.sh` pattern.
 
 **Modify:**
-- `docs/adr/0002-service-decommissioning.md` — add the mandatory step wiping `/etc/homelab-pki`. Spec F2. Without it a retired host's disk is a permanent fleet credential, because nothing expires and nothing revokes.
+- `docs/architecture/decommissioning.md` — add the mandatory step wiping `/etc/homelab-pki`. Spec F2. Without it a retired host's disk is a permanent fleet credential, because nothing expires and nothing revokes.
 - `.github/workflows/ci-validate.yml` — run `validate-ca-sans.test.sh` and `validate-ca-sans.sh` in the existing **Validate Deploy Mapping** job.
 
 **Out of scope for this plan:**
@@ -1102,11 +1102,11 @@ Spec F2. Without this, a retired host's disk stays a valid fleet credential fore
 because nothing expires and nothing revokes.
 
 **Files:**
-- Modify: `docs/adr/0002-service-decommissioning.md`
+- Modify: `docs/architecture/decommissioning.md`
 
 - [ ] **Step 1: Read the ADR**
 
-Read `docs/adr/0002-service-decommissioning.md` in full and find where host-level
+Read `docs/architecture/decommissioning.md` in full and find where host-level
 teardown steps are listed. Match the document's existing structure and voice rather
 than appending a differently-shaped section.
 
@@ -1127,7 +1127,7 @@ Add a step requiring, as part of decommissioning any host:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/adr/0002-service-decommissioning.md
+git add docs/architecture/decommissioning.md
 git commit -m "docs(adr-0002): wipe PKI material when decommissioning a host"
 ```
 

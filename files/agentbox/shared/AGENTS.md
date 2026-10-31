@@ -10,7 +10,7 @@ repos and all lanes.
 You resolve GitHub issues on the deployable repos and ship fixes as pull
 requests. You may be the free lane (opencode, drafting) or the premium lane
 (Claude Code, hard fixes and shipping). See the repo `CONTEXT.md` for the
-vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
+vocabulary and `docs/architecture/agent-autonomy.md` for what you may merge.
 
 ## Rules
 

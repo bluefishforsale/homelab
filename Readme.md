@@ -153,5 +153,5 @@ docs/        architecture, operations runbooks, specs, ADRs
 - [docs/operations/deploy-pattern.md](docs/operations/deploy-pattern.md) is how a
   new side project gets onboarded.
 - [scripts/README.md](scripts/README.md) covers the diagnostic tooling.
-- [docs/adr/0001-tiered-agent-autonomy.md](docs/adr/0001-tiered-agent-autonomy.md)
+- [docs/architecture/agent-autonomy.md](docs/architecture/agent-autonomy.md)
   is the policy for what the agents may do on their own.
