@@ -31,25 +31,25 @@ There is no `.home` vhost for the blog and no port in
 
 ## Gotchas
 
-- **Clone, not rsync.** The playbook removes `repo/` and clones fresh every
+- Clone, not rsync. The playbook removes `repo/` and clones fresh every
   run; nginx serves `repo/public` in place. `rsync` is installed but unused.
   NOTE: between the delete and the clone finishing, the site has no files and
   serves 404s.
-- **Git auth is terrac's key on ocean.** `/home/terrac/.ssh/id_ed25519`, also
+- Git auth is terrac's key on ocean. `/home/terrac/.ssh/id_ed25519`, also
   reused by `mem0.yaml` and `tdarr.yaml` for private clones. If the key is
   missing the play generates one, prints it for a GitHub deploy key, and fails
   on purpose until you add it and re-run.
-- **Edge cache.** `scripts/cloudflare-harden.py` puts `blog.terrac.com` in
+- Edge cache. `scripts/cloudflare-harden.py` puts `blog.terrac.com` in
   `CACHE_HOSTS` with a 7200s edge TTL that overrides origin headers. The
   playbook's purge (`hosts: [blog.terrac.com]`, vault `cloudflare.api_email` /
   `api_key`, zone id inline) is the only thing that makes a deploy visible
   before 2h. It is skipped when `public/index.html` is missing.
-- **The workflow health check looks in the wrong place.** It runs
+- The workflow health check looks in the wrong place. It runs
   `test -f /data01/services/blog_terrac_com/index.html` over SSH, but the served
   file is `.../repo/public/index.html`. It only passes if a stale file exists at
   the old path (not verified on the host). Treat a green run as "playbook
   finished", not "site serves".
-- **No `deploy-ocean` serialization.** The workflow has no `concurrency:`
+- No `deploy-ocean` serialization. The workflow has no `concurrency:`
   block, so two dispatches can clone into the same dir at once.
 
 ## Monitoring
@@ -69,10 +69,10 @@ cloudflared being down.
 
 ## Not built
 
-- **`deploy-ocean-service.yml` entry** (plan Task 4). Its option list has
+- `deploy-ocean-service.yml` entry (plan Task 4). Its option list has
   `terrac_com` but not `blog_terrac_com_static`; deploy only through
   `deploy-blog-terrac-com.yml`.
-- **Uptime probe** for `blog.terrac.com` (see Monitoring).
+- Uptime probe for `blog.terrac.com` (see Monitoring).
 - The external repo (Hugo, PaperMod submodule, build workflow) lives outside
   this repo and is not verified here. CMS, comments, analytics, search and auth
   were non-goals and do not exist.

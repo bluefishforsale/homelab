@@ -18,19 +18,10 @@ Was ADR 0002 (2026-09-16).
 
 ## Invariants
 
-- Report by default. Nothing destructive runs until `decom_confirm` equals the
-  service name. The gate is a variable, not `--check`: a `check_mode: false`
-  task still runs under `--check`.
-- Order is alerts (72h silence), then services, then files. The unit stops before
-  its files go because its `ExecStop` is usually `docker compose down`. Each phase
-  toggles alone, so "silence today, tear down Friday" works.
-- Data needs its own token, is tarred, and the tarball must list a non-zero
-  member count before deletion. A ZFS dataset mountpoint is refused.
-- Postflight fails if the unit, container or config survived, and writes a
-  receipt to `/data01/decommissioned/<svc>-<stamp>.json`.
-- On full success the job `git mv`s the playbook into
-  `playbooks/archive/<date>-<svc>.yaml` and pushes to master with `[skip ci]`,
-  the one deliberate CI write to master.
+The gate, phase order, data token, guards and receipt are in the role
+[README](../../roles/decommission/README.md). The one piece outside the role is the
+archive step: on full success the job `git mv`s the playbook into `playbooks/archive/<date>-<svc>.yaml` and
+pushes to master with `[skip ci]`, the one deliberate CI write to master.
 
 NOTE: `playbooks/operations/decommission/*` and `playbooks/archive/*` must stay
 excluded at the detector's `emit()` chokepoint

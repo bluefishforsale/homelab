@@ -101,17 +101,17 @@ installs on all hosts keeps `registry:2` and `grafana/promtail:latest` current.
 
 ## Not built
 
-- **Non-Hub routing.** No `registry_cache_enabled`, `registry_cache_host` or
+- Non-Hub routing. No `registry_cache_enabled`, `registry_cache_host` or
   `cached_registries` var exists, and compose templates still name `ghcr.io/`,
   `registry.gitlab.com/` and `nvcr.io/` directly (for example
   `files/gethomepage/`, `files/dns-stack/`, `files/ocean-nvidia/`). The ghcr,
   gitlab and nvcr caches run and are scraped but serve no traffic from the
   fleet.
-- **Garbage collection.** No timer or script runs `registry garbage-collect`.
+- Garbage collection. No timer or script runs `registry garbage-collect`.
   Disk is bounded only by the ~200G VM disk; watch `registry_cache_size_bytes`.
-- **Cache warming.** No playbook pre-pulls fleet images through the cache.
-- **Registry-specific alerts** (the spec also deferred these).
-- **TLS.** The mirror is plain HTTP (out of scope in the spec).
+- Cache warming. No playbook pre-pulls fleet images through the cache.
+- Registry-specific alerts (the spec also deferred these).
+- TLS. The mirror is plain HTTP (out of scope in the spec).
 
 ## Backout
 

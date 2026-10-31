@@ -3,8 +3,7 @@
 How a change in this repo, or a dispatch from an external repo, becomes an
 `ansible-playbook` run against a production host. It exists so a merge touches
 the fewest playbooks and two deploys to one host never overlap. It is phase 1 of
-the [shape-up design](../specs/2026-05-10-deploy-pipeline-shape-up-design.md);
-phases 2 and 3 are not built.
+the 2026-05-10 shape-up design (in git history); phases 2 and 3 are not built.
 
 Every workflow runs on the self-hosted pool, labels `[self-hosted, homelab,
 ansible]`: four ephemeral containers on gh-runner-01 (192.168.1.20)
@@ -74,9 +73,8 @@ means updating the GitHub secret.
 `verify-deployment` waits 30s, then TCP-probes 192.168.1.143 on 80, 32400, 9090
 and 3000 and runs two `dig`s against 192.168.1.2. Targets come from a regex on
 playbook paths (`main-apply.yml:97-108`). Both steps are `continue-on-error`
-(`:366`, `:412`), and the `runners` target is computed but never checked. A green
-main-apply is not proof of health; use `health-check.yml` or
-`scripts/homelab-health.sh`.
+(`:366`, `:412`), and the `runners` target is computed but never checked. For real health see
+the [deploy gotchas](../../agents.md#deploy-gotchas-read-before-shipping-a-change).
 
 ## Rollback
 

@@ -54,7 +54,7 @@ Failure modes the spec implies that no task's happy path exercises. Each has its
 - `.github/workflows/lib/validate-ca-sans.test.sh` — its test, fixture-driven, following the existing `detect-impacted-playbooks.test.sh` pattern.
 
 **Modify:**
-- `docs/architecture/decommissioning.md` — add the mandatory step wiping `/etc/homelab-pki`. Spec F2. Without it a retired host's disk is a permanent fleet credential, because nothing expires and nothing revokes.
+- `docs/architecture/decommissioning.md`: add the mandatory step wiping `/etc/homelab-pki`. Spec F2. Without it a retired host's disk is a permanent fleet credential, because nothing expires and nothing revokes.
 - `.github/workflows/ci-validate.yml` — run `validate-ca-sans.test.sh` and `validate-ca-sans.sh` in the existing **Validate Deploy Mapping** job.
 
 **Out of scope for this plan:**

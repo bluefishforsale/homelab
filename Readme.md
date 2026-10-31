@@ -141,7 +141,7 @@ vars/        shared variables, including the port registry
 inventories/ hosts
 vault/       ansible-vault encrypted secrets
 scripts/     diagnostics: prom.sh, loki.sh, alerts.sh, vault.py, ...
-docs/        architecture, operations runbooks, specs, ADRs
+docs/        architecture, operations runbooks, unbuilt specs and plans
 ```
 
 ## Where to read next
