@@ -1,6 +1,12 @@
 ---
 name: Deploy Services
 
+# Same key as the ocean dispatch workflows, so a site or rollback apply never
+# overlaps one. Other hosts aren't covered; one group per run is all GitHub allows.
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
