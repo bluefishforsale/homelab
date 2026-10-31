@@ -44,6 +44,8 @@ jobs:
     steps:
       - name: Checkout homelab repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Resolve parameters
         id: params
@@ -76,24 +78,31 @@ jobs:
           repository: bluefishforsale/mem0
           ref: ${{ steps.params.outputs.ref }}
           path: mem0
-          submodules: true
+          # Submodules only after the trust check below; the public repo needs
+          # no token once cloned.
+          submodules: false
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Refuse commits that are not on a mem0 branch
         # NOTE: GitHub serves any commit in the fork network through the parent
         # repo, so a SHA pushed only to someone's fork checks out here fine. The
-        # next step hands that code the vault-derived keys; only commits on a
+        # next steps hand that code the vault-derived keys; only commits on a
         # branch of bluefishforsale/mem0 (writable by its owner alone) may run.
         run: |
           sha=$(git -C mem0 rev-parse HEAD)
           if [ -z "$(git -C mem0 branch -r --contains "$sha")" ]; then
             echo "::error::$sha is not on any branch of bluefishforsale/mem0"; exit 1
           fi
+          git -C mem0 submodule update --init --depth 1
 
       - name: Install Ansible (for ansible-vault)
+        # Into this job's temp dir rather than ~/.local, which survives into
+        # later jobs because the ephemeral runner containers restart rather than
+        # recreate.
         run: |
-          python3 -m pip install --user --break-system-packages --quiet ansible pyyaml
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --quiet --break-system-packages \
+            --target "$RUNNER_TEMP/vault-py" ansible-core pyyaml
 
       - name: Read the two keys from the vault
         # NOTE: its own step so the vault password is never in the environment
@@ -106,6 +115,7 @@ jobs:
           umask 077
           echo "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/.vault_pass"
           export ANSIBLE_VAULT_PASSWORD_FILE="$RUNNER_TEMP/.vault_pass"
+          export PATH="$RUNNER_TEMP/vault-py/bin:$PATH" PYTHONPATH="$RUNNER_TEMP/vault-py"
           extraction=$(python3 scripts/vault.py get ai_services.openai.api_key)
           # NOTE: a pre-provisioned spare llama.cpp token. A named one would need
           # a vault edit plus a llamacpp redeploy, which bounces agentbox's lanes.
@@ -129,7 +139,10 @@ jobs:
           COMMIT_SHA=$(git -C mem0 rev-parse HEAD)
           # env -i: the checkout gets the variables it uses and nothing else
           # the runner happens to carry.
-          env -i PATH="$PATH" HOME="$HOME" \
+          # A throwaway HOME, so nothing the stack writes lands in the runner
+          # user's real one.
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" \
             EXTRACTION_OPENAI_API_KEY="$EXTRACTION_OPENAI_API_KEY" JUDGE_API_KEY="$JUDGE_API_KEY" \
             JUDGE_BASE_URL="$JUDGE_BASE_URL" JUDGE_MODEL="$JUDGE_MODEL" CONVERSATIONS="$CONVERSATIONS" \
             PUSHGATEWAY_URL="$PUSHGATEWAY_URL" RUN_ID="$RUN_ID" COMMIT_SHA="$COMMIT_SHA" \
