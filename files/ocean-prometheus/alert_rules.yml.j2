@@ -91,10 +91,10 @@ groups:
       summary: "Disk filling on {{ "{{ $labels.instance }}" }} ({{ "{{ $labels.mountpoint }}" }})"
       description: "{{ "{{ $labels.mountpoint }}" }} on {{ "{{ $labels.instance }}" }} is projected to run out of space within 24h at the current rate."
 
-  # Service down alert (excluding all blackbox probes). netboot-hosts is out
-  # too: a diskless netboot machine being off is normal, see netboot_alerts.
+  # Service down alert (excluding all blackbox probes). The netboot-* jobs are
+  # out too: a diskless netboot machine being off is normal, see netboot_alerts.
   - alert: ServiceDown
-    expr: up{job!~"blackbox-.*|netboot-hosts"} == 0
+    expr: up{job!~"blackbox-.*|netboot-.*"} == 0
     for: 5m
     labels:
       severity: critical
@@ -859,3 +859,15 @@ groups:
     annotations:
       summary: "{{ "{{ $labels.instance }}" }} booted with no netboot role metric"
       description: "{{ "{{ $labels.instance }}" }} is up but exports no netboot_role_up. netboot-role.service did not run; check `systemctl status netboot-role` on it."
+
+  # A GPU role runs dcgm-exporter beside its work; the box up with that target
+  # down means its GPU is missing from the DCGM dashboard.
+  - alert: NetbootDcgmDown
+    expr: up{job="netboot-dcgm"} == 0 and on(instance) up{job="netboot-hosts"} == 1
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} is up but its dcgm-exporter is not"
+      description: "{{ "{{ $labels.instance }}" }} is running the live image but nothing answers on :9400. Check `docker ps -a` and `docker logs dcgm-exporter` on it, and `nvidia-smi`."
