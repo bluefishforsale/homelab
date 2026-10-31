@@ -62,8 +62,7 @@ this repo's master, is a production change, not a checkpoint.
 ## The agent fleet (agentbox)
 
 `agentbox` is an always-on VM that watches the deployable repos' open issues and
-resolves them, while staying drivable live from the phone. Its design and the
-fixed-cost constraints are in the plan; the autonomy policy is
+resolves them, while staying drivable live from the phone. The autonomy policy is
 [agent-autonomy.md](docs/architecture/agent-autonomy.md). Vocabulary:
 
 - **Lane** - a path that work takes through a model tier, all free when

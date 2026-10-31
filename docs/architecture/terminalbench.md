@@ -37,7 +37,7 @@ extra_vars: terminalbench_enabled=true terminalbench_n_tasks=1
 
 ## Gotchas
 
-- The run fails at the first task until a new PAT exists. The results push
+- The run fails before any model starts until a new PAT exists. The results push
   needs `terminalbench.pat` (contents:write on this repo), which was deleted
   from the vault in #476. The assert in `terminalbench.yaml` fails fast instead
   of hours into the run. Mint one or drop the push block.

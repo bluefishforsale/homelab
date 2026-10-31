@@ -15,7 +15,7 @@ the worst thing to spend money on.
 | 1, 2 | `files/agentbox/issue-watcher.sh` (`LANES`) | `local-llama/local`, then `google/gemini-flash-latest` |
 | review | same, `REVIEW_MODEL` | `google/gemini-3.1-pro-preview` must answer `LGTM` |
 | 3 | `files/agentbox/escalate.sh` | strongest free model |
-| human | label `needs-human-merge` | |
+| human | `needs-human-merge` (PR open, human merges); `needs-human` when tier 3 also fails (`escalate.sh`) | |
 
 Claude Code is not a lane. Headless it cannot run shell commands and its OAuth
 expires needing an interactive login, which stalled this tier for a month
@@ -25,13 +25,14 @@ present.
 ## Rules
 
 - Default: open PR, label `needs-human-merge`, stop. A human merges.
-- Auto-merge (`gh pr merge --auto --squash`) only when all three hold: the repo
-  is in `AGENTBOX_AUTOMERGE_REPOS` (default empty, homelab is not in it), the
-  review passed, and `no_prod_effect` accepts every changed path
+- Auto-merge (`gh pr merge --auto --squash`) only when the repo is in
+  `AGENTBOX_AUTOMERGE_REPOS` (default empty, homelab is not in it) and
+  `no_prod_effect` accepts every changed path
   (`NOPROD_RE='^(docs/|README|CONTEXT|.*\.md$|.*_test\.|test/|tests/|spec/)'`).
-  The gate lives in both `issue-watcher.sh` and `escalate.sh`, because blast
-  radius belongs to the change, not the author. A failed review un-readies the
-  PR and labels it `agent-review-flagged`.
+  Both `issue-watcher.sh` and `escalate.sh` apply that gate, because blast
+  radius belongs to the change, not the author. The watcher also requires the
+  review to pass; a failed review un-readies the PR and labels it
+  `agent-review-flagged`. `escalate.sh` has no review step.
 - Escalation is failure-driven: every free lane yielding no diff, or an agent
   PR's CI rollup going `FAILURE`/`ERROR`. On red CI the watcher closes the PR with
   `--delete-branch` and relabels the issue `needs-escalation`, so tier 3
