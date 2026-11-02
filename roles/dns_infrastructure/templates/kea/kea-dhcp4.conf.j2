@@ -172,7 +172,14 @@
                         // The live image sends no hostname; without this DDNS
                         // registers a generated myhost-<ip> name instead.
                         "hostname": "{{ name }}"
-                    }{% endfor %}
+                    }{% if host.local_ip is defined %},
+                    {
+                        // The OS on the machine's own disk (Windows on the
+                        // tower), which sends client-id 01:<mac>.
+                        "client-id": "01:{{ host.mac | lower }}",
+                        "ip-address": "{{ host.local_ip }}",
+                        "hostname": "{{ name }}-local"
+                    }{% endif %}{% endfor %}
 
                 ]
             }

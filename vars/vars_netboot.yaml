@@ -16,12 +16,15 @@ netboot_server:
   ip: 192.168.1.33
 
 # Per host: mac, ip, role; optional channel (current|candidate, default
-# current), default menu entry (local|live, default local), timeout_ms, and
-# nfs (true to mount ocean's /data01/complete).
+# current), default menu entry (local|live, default local), timeout_ms,
+# nfs (true to mount ocean's /data01/complete), and local_ip (a fixed address
+# for the OS on the machine's own disk, registered as <name>-local).
 netboot_hosts:
   gaming:
     mac: "58:11:22:ad:f4:7a"
     ip: 192.168.1.40
+    # Windows. Never the live ip: ocean's NFS export trusts that one.
+    local_ip: 192.168.1.41
     role: tdarr-gpu
     # Defaults to tdarr: it restarted unattended twice (10-31, 11-02) and sat in
     # Windows until noticed. Windows is hotkey l or a next-boot flag.
