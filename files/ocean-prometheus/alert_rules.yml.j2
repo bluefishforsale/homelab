@@ -871,3 +871,15 @@ groups:
     annotations:
       summary: "{{ "{{ $labels.instance }}" }} is up but its dcgm-exporter is not"
       description: "{{ "{{ $labels.instance }}" }} is running the live image but nothing answers on :9400. Check `docker ps -a` and `docker logs dcgm-exporter` on it, and `nvidia-smi`."
+
+  # A new boot time on a box that was already up is a restart: deliberate or
+  # not, each one is worth a record. gaming has restarted unattended with
+  # normal metrics right before (2026-10-31, 11-02), so this is the log of when.
+  - alert: NetbootHostRebooted
+    expr: changes(node_boot_time_seconds{job="netboot-hosts"}[30m]) > 0
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "{{ "{{ $labels.instance }}" }} restarted"
+      description: "{{ "{{ $labels.instance }}" }} came back up with a new boot time. Its journal from before the restart is in Loki: {job=\"netboot\"} for the 15 minutes before the boot. Log lines that stop mid-stream with no shutdown point at a hard reset (power, RAM tuning); a clean shutdown sequence means something asked for it."
