@@ -4,10 +4,13 @@ groups:
   # High CPU usage alert. ocean runs the tdarr/refetch batch work, which holds it
   # above 80% for long stretches (7d to 2026-10-15: 261 alerting minutes at
   # 80%/5m, 14 issues in three days), and Plex has CPU priority there, so busy
-  # is not hurting anyone. It gets the companion rule below. All other hosts
-  # alert at 80% for 5m.
+  # is not hurting anyone. It gets the companion rule below. Netboot hosts are
+  # excluded outright: they boot into a single batch role (gaming-live is a
+  # tdarr-gpu transcode node), so a pegged CPU is the role doing its job, and a
+  # broken role is NetbootRoleDown's to report. All other hosts alert at 80%
+  # for 5m.
   - alert: HighCpuUsage
-    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{instance!="ocean.home",mode="idle"}[5m])) * 100) > 80
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{instance!="ocean.home",job!="netboot-hosts",mode="idle"}[5m])) * 100) > 80
     for: 5m
     labels:
       severity: warning
@@ -202,9 +205,14 @@ groups:
   # Any host running docker is expected to carry at least one instance. 2h rides
   # out the rollout window, where a host still on the old single sweep has no
   # docker-refresh@ series yet.
+  #
+  # Netboot hosts are excluded: they run a RAM-only image that is rebuilt from
+  # scratch every boot, and their role pulls its images at boot (tdarr-gpu pins
+  # the node to the server's version), so a weekly refresh timer has nothing to
+  # do there. netboot01, the server, is a normal VM and stays covered.
   - alert: DockerRefreshTimersMissing
     expr: >
-      count by (instance) (node_systemd_unit_state{name="docker.service",state="active"} == 1)
+      count by (instance) (node_systemd_unit_state{name="docker.service",state="active",job!="netboot-hosts"} == 1)
        unless
       count by (instance) (node_systemd_timer_last_trigger_seconds{name=~"docker-refresh@.*"})
     for: 2h
@@ -756,23 +764,32 @@ groups:
       summary: "UPS {{ "{{ $labels.ups }}" }} is on battery"
       description: "{{ "{{ $labels.ups }}" }} lost input power. upsmon shuts node005 and node006 down when any UPS reaches low battery (420s runtime). Check the wall socket and breaker."
 
+  # On battery only. An on-line UPS raises LB whenever its runtime estimate dips
+  # under 420s, which on a weak battery tracks load: ups-3B2116X60966 paged
+  # critical 23 times in the week to 2026-10-30 with no power event at all. That
+  # case is a battery to replace, and UpsRuntimeNearShutdownThreshold below
+  # (runtime < 600s on-line) already covers it as a warning.
   - alert: UpsLowBattery
-    expr: network_ups_tools_ups_status{flag="LB"} == 1
+    expr: network_ups_tools_ups_status{flag="LB"} == 1 and on(ups) network_ups_tools_ups_status{flag="OB"} == 1
     for: 0m
     labels:
       severity: critical
       remediation: manual
     annotations:
-      summary: "UPS {{ "{{ $labels.ups }}" }} is at low battery"
-      description: "{{ "{{ $labels.ups }}" }} reports LB (runtime under 420s). If it is also on battery, upsmon is shutting the hypervisors down now. If it is on-line, its battery is too weak to cover a shutdown: replace it."
+      summary: "UPS {{ "{{ $labels.ups }}" }} is at low battery on battery power"
+      description: "{{ "{{ $labels.ups }}" }} is on battery and reports LB (runtime under 420s): upsmon is shutting the hypervisors down now."
 
   # Full-charge runtime creeping toward the shutdown threshold means an aging
   # battery: an outage would trigger shutdown within moments of starting.
   # NOTE: `on(ups)` is required. The status series carries a `flag` label the
   # runtime series lacks, so a bare `and` matches nothing and the rule is mute.
+  # keep_firing_for: the runtime estimate follows load (ups-3B2116X60966 swung
+  # 381s to 2214s in a week), so a weak battery resolved and re-fired every
+  # time load dipped, 1 to 3h apart. The battery did not get better in between.
   - alert: UpsRuntimeNearShutdownThreshold
     expr: network_ups_tools_battery_runtime < 600 and on(ups) network_ups_tools_ups_status{flag="OL"} == 1
     for: 1h
+    keep_firing_for: 6h
     labels:
       severity: warning
       remediation: manual
