@@ -23,8 +23,9 @@ netboot_hosts:
     mac: "58:11:22:ad:f4:7a"
     ip: 192.168.1.40
     role: tdarr-gpu
-    # Defaults to Windows on its own disk; tdarr is hotkey t or a next-boot flag.
-    default: local
+    # Defaults to tdarr: it restarted unattended twice (10-31, 11-02) and sat in
+    # Windows until noticed. Windows is hotkey l or a next-boot flag.
+    default: live
     # Gets read-write /data01/complete over NFS (nfs_export_data01.yaml),
     # squashed to the media user, keyed on ip.
     nfs: true
