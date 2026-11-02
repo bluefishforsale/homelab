@@ -872,11 +872,14 @@ groups:
       summary: "{{ "{{ $labels.instance }}" }} is up but its dcgm-exporter is not"
       description: "{{ "{{ $labels.instance }}" }} is running the live image but nothing answers on :9400. Check `docker ps -a` and `docker logs dcgm-exporter` on it, and `nvidia-smi`."
 
-  # A new boot time on a box that was already up is a restart: deliberate or
-  # not, each one is worth a record. gaming has restarted unattended with
-  # normal metrics right before (2026-10-31, 11-02), so this is the log of when.
+  # Up for under 30m after being up in the two hours before is a restart:
+  # deliberate or not, each one is worth a record. gaming has restarted
+  # unattended with normal metrics right before (2026-10-31, 11-02).
+  # NOTE: not changes(node_boot_time_seconds): the tower boots with its RTC an
+  # hour off, and timesyncd's step moves the computed boot time, so that fired
+  # on every cold start.
   - alert: NetbootHostRebooted
-    expr: changes(node_boot_time_seconds{job="netboot-hosts"}[30m]) > 0
+    expr: (node_time_seconds{job="netboot-hosts"} - node_boot_time_seconds{job="netboot-hosts"} < 1800) and on(instance) max_over_time(up{job="netboot-hosts"}[2h] offset 35m) == 1
     labels:
       severity: warning
       remediation: manual
