@@ -16,9 +16,9 @@ HOME_DIR=/srv/tdarr-node
 # The journal lives in RAM here, so whatever the kernel said before an
 # unattended restart (MCE, Xid, OOM) is gone at the next boot unless it was
 # already in Loki. Started first so it runs even when the tdarr setup fails.
-PROMTAIL_DIR=/srv/promtail
-mkdir -p "$PROMTAIL_DIR"
-cat >"$PROMTAIL_DIR/config.yml" <<EOF
+# NOTE: the image's apt promtail, not grafana/promtail: that image is built
+# without journal support and shipped nothing (2026-11-03).
+cat >/etc/promtail/config.yml <<EOF
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
@@ -42,20 +42,7 @@ scrape_configs:
         target_label: container
         regex: '(.+)'
 EOF
-cat >"$PROMTAIL_DIR/docker-compose.yml" <<EOF
-services:
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    restart: unless-stopped
-    volumes:
-      - $PROMTAIL_DIR/config.yml:/etc/promtail/config.yml:ro
-      - /run/log/journal:/run/log/journal:ro
-      - /var/log/journal:/var/log/journal:ro
-      - /etc/machine-id:/etc/machine-id:ro
-    command: ["-config.file=/etc/promtail/config.yml"]
-EOF
-docker compose -f "$PROMTAIL_DIR/docker-compose.yml" up -d
+systemctl restart promtail
 
 # A node refuses a server of another version, and a version baked into the
 # image at build time would drift, so pin to whatever the server runs now.
