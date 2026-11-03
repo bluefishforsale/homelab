@@ -6,6 +6,9 @@ RequiresMountsFor={{ data }} {{ scratch }}
 
 [Service]
 Type=oneshot
+# Media, not root: the /data01 export root_squashes, so root can't unlink
+# media's files under incoming/ there. systemd reads the env file as root.
+User={{ user }}
 EnvironmentFile=/etc/nzbget-prune.env
 ExecStart=/usr/bin/python3 /usr/local/bin/nzbget-prune
 TimeoutStartSec=2h
