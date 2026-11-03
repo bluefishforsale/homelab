@@ -19,7 +19,9 @@ SLUG="$OWNER/$REPO"
 BRANCH="agent/roadmap-sync"
 WORKROOT="{{ home }}/work"
 LOGDIR="{{ home }}/agent-logs"
-WT="$WORKROOT/$REPO"
+# Own clone, not the watcher's $WORKROOT/$REPO: that tree is shared, and a
+# draft left dirty there failed this checkout every day (#1118).
+WT="$WORKROOT/roadmap-$REPO"
 EV="$LOGDIR/roadmap-evidence.txt"   # outside the worktree: never committed
 PROM="${HOMELAB_PROM:-http://192.168.1.143:9090}"
 ALERT="${HOMELAB_ALERTMANAGER:-http://192.168.1.143:9093}"
@@ -35,7 +37,10 @@ export OTEL_RESOURCE_ATTRIBUTES="repo=$REPO,lane=reconcile,service=agentbox"
 # commits land here, so the daily force-push is safe and keeps a single clean PR.
 [ -d "$WT/.git" ] || gh repo clone "$SLUG" "$WT" -- -q
 git -C "$WT" fetch -q origin
-git -C "$WT" checkout -q -B "$BRANCH" origin/HEAD
+# -f and clean: nothing else writes this clone, so yesterday's opencode debris
+# is the only thing they can discard.
+git -C "$WT" checkout -q -f -B "$BRANCH" origin/HEAD
+git -C "$WT" clean -qfd
 
 # --- Evidence: what is deployed AND healthy right now ---
 {
