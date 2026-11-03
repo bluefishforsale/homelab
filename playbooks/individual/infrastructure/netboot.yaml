@@ -36,7 +36,9 @@
     # Same tag as ocean's (files/ocean-nvidia/docker-compose.yml.j2).
     dcgm_exporter_image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
     tdarr_gpu_worker_limits:
-      transcodegpu: 3
+      # NVENC averaged 30% busy at 3 (2026-11-03). The tmpfs cache, not the
+      # GPU, is what runs out first: big remuxes filled it at 3.
+      transcodegpu: 5
       healthcheckgpu: 1
       transcodecpu: 0
       healthcheckcpu: 2
