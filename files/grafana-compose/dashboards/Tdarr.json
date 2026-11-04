@@ -213,7 +213,7 @@
       },
       "targets": [
         {
-          "expr": "sum(tdarr_queue_video_seconds{codec!=\"hevc\"}) * 24 / avg_over_time(sum(tdarr_worker_fps)[24h:5m])",
+          "expr": "sum(tdarr_queue_files) / clamp_min(-delta(sum(tdarr_queue_files)[24h:15m]), 1) * 86400",
           "legendFormat": "burn-down",
           "datasource": {
             "type": "prometheus",
@@ -242,7 +242,7 @@
         "graphMode": "none",
         "textMode": "value"
       },
-      "description": "How long the pending queue takes to encode at the last 24h's average frames per second across all workers. Frames are estimated as the pending non-HEVC video length times 24 fps, since tdarr stores no frame rate; HEVC files are left out because they skip the encode. Rough: the fps average also includes fast audio-only passes, and the queue is re-read every 15 minutes."
+      "description": "How long the queue takes to empty at the last 24h's net pace: queued files now over how many fewer there are than a day ago. Net of new arrivals, so a refetch batch slows it. The old estimate counted only non-HEVC video at 24 fps and read 4 days when 6,700 HEVC files were moving at under 200 a day (2026-11-04). A queue that is not shrinking reads as thousands of days, on purpose."
     },
     {
       "id": 5,
