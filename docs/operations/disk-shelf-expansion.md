@@ -16,7 +16,9 @@ power budget are already covered.
 
 Everything below was read live on 2026-11-04.
 
-`data01` is a single 8-wide RAIDZ2 of 12 TB Exos X14 SATA drives (`ST12000NM0127`).
+`data01` is a single 8-wide RAIDZ2 (`nparity: 2`, `ashift: 12` per `zdb -C`) of 12 TB
+Seagate SATA drives (`ST12000NM0127`), with `recordsize` `128K` on the root dataset and
+`failmode` `wait` (the default, per `zpool get failmode`).
 `zpool list` reports `87.2T SIZE, 76.1T ALLOC, 11.2T FREE`, capacity `87%`, fragmentation
 `20%`. The last scrub took `1 days 06:59:04` with 0 errors, and the pool is `ONLINE`
 with no errors on any member. Past 80% full, ZFS allocation slows and fragmentation
@@ -29,7 +31,8 @@ only way to grow `data01` is to add a new top-level vdev.
 The disks reach ocean through PCI passthrough on node006 (Proxmox `pve-manager/8.4.0`,
 kernel `6.8.12-9-pve`). The internal HBA is a SAS2308 at `02:00.0` (`[1000:0087]`), link
 `8GT/s x8`, alone in IOMMU group 40. It is bound to vfio-pci by device ID in
-`/etc/modprobe.d` (`options vfio-pci ids=10de:2204,10de:1aef,1000:0087`, see
+`/etc/modprobe.d` (`options vfio-pci ids=10de:2204,10de:1aef,1000:0087 disable_vga=1`,
+with `softdep mpt3sas pre: vfio-pci` so vfio-pci loads first, see
 [proxmox.md](proxmox.md)) and attached to VM 5000 as `hostpci1=02:00,pcie=1`. The RTX
 3090 is `hostpci0` in IOMMU group 14.
 
@@ -67,7 +70,13 @@ a scrub or resilver. Clients get at most 1.1 GB/s over 10GbE anyway, so SAS2 isn
 bottleneck that matters. Two 12-bay shelves on two separate HBA ports also give each
 shelf its own link, which beats one 24-bay SAS2 shelf squeezed through a single 2.2 GB/s
 port. If the budget stretches and the noise in the room matters, the Supermicro 846 is
-the better box. Run it with a 9300-8e and everything else in this doc still applies.
+the better box. Run it with a 9300-8e and everything else in this doc still applies,
+except the vfio ID covered under HBA below.
+
+Noise and power in the table are relative rankings from the used-server community, not
+measurements. Nobody publishes reliable dB figures for these shelves, and the number
+depends heavily on PSU count and fan firmware. If noise turns out to matter more than
+expected, measure the first shelf before buying the second.
 
 Set the MD1200 to unified mode, not split mode, and cable to the EMM's In port. One EMM
 per shelf is enough, since a second EMM only adds a path for dual-ported SAS drives and
@@ -113,7 +122,7 @@ shelf, losing that shelf (both PSUs, the EMM, the cable, the HBA port) faults th
 and suspends the whole pool. RAIDZ2 can't be spread at two-or-fewer disks per enclosure
 without four or more enclosures, so the rule here is the opposite: each new vdev lives
 entirely inside one shelf. A shelf outage then suspends the pool (an outage, with
-`failmode=wait` holding I/O) rather than corrupting it, since the disks come back intact
+the pool's `failmode=wait` holding I/O) rather than corrupting it, since the disks come back intact
 when power or cabling returns and `zpool clear` resumes. Dual PSUs per shelf are what
 make that rare.
 
@@ -121,9 +130,12 @@ Per 12-bay shelf, the recommended layout is one 10-wide RAIDZ2 vdev with 2 bays 
 empty. The empty bays are deliberate: the disk replacement runbook
 ([zfs-data01-disk-replacement-runbook.md](zfs-data01-disk-replacement-runbook.md))
 prefers replacing into a free bay so the outgoing disk stays readable through the
-resilver, and the R720's internal bays have none. 10-wide RAIDZ2 is 80% efficient, a
-little better than the existing 8-wide's 75%, without the resilver time of 12-wide.
-Mixed vdev widths in one pool are fine.
+resilver, and the R720's internal bays have none. On paper 10-wide RAIDZ2 is 80%
+efficient against the existing 8-wide's 75%. With `ashift: 12` and `128K` records, RAIDZ
+padding pulls that down to roughly 76% and 71%, so the gap holds. Datasets with 1M
+records (media) land close to the paper numbers. 10-wide also avoids the resilver time
+of 12-wide. Mixed vdev widths in one pool work, but `zpool add` warns about them, so the
+procedure below needs `-f`.
 
 Rough usable space per shelf, before ZFS overhead:
 
@@ -158,23 +170,29 @@ snapshot-first, and the VM's PCI config is set by hand with `qm set`. Every step
 2. Schedule a window. Installing the HBA means powering off node006, which takes ocean
    and every service on it down.
 3. Shut down ocean, then node006. Install the 9207-8e in a free x8 slot (PCI1-3 or PCI6,
-   PCI5 only if the 3090 clears it). Rack and cable the shelves, power them on and give
-   the fans a minute to settle before node006 boots, so the HBA sees the disks at
-   enumeration.
+   PCI5 only if the 3090 clears it). Rack and cable the shelves and power them on. The
+   host never sees the disks (the card belongs to vfio-pci), so what matters is that the
+   shelves are up and settled before ocean boots and its mpt3sas driver scans the bus.
 4. On node006, confirm the new card is claimed by vfio-pci and isolated:
    `lspci -nnk | grep -A3 1000:0087` should show `Kernel driver in use: vfio-pci` for both
-   controllers, and `find /sys/kernel/iommu_groups -name '0000:<bus>:00.0'` should land
-   in a group with nothing else in it.
+   controllers. Find the new card's group with
+   `find /sys/kernel/iommu_groups -name '0000:<bus>:00.0'`, then
+   `ls /sys/kernel/iommu_groups/<N>/devices` should list that one device and nothing else.
 5. Attach it to ocean: `qm set 5000 --hostpci2=<bus>:00,pcie=1`. Record the line in
    [proxmox.md](proxmox.md) next to `hostpci0` and `hostpci1`.
 6. Boot ocean. Check that the new disks show up (`lsscsi`, `ls -l /dev/disk/by-id/wwn-*`),
    check `smartctl -a` on each, and map every WWN to a shelf and bay before going further.
-7. Snapshot whatever is worth snapshotting, then do a dry run that prints the resulting
-   layout without changing anything, using WWN paths only:
-   `zpool add -n data01 raidz2 /dev/disk/by-id/wwn-... (x10)`.
-   Read the output. If it shows the new vdev as anything other than `raidz2`, stop.
+7. Check the pool first: `zpool status data01` all `ONLINE` with zero errors and a recent
+   clean scrub. Snapshots don't protect against `zpool add` (they live in the same pool),
+   so the safeguard here is the dry run, which prints the resulting layout without
+   changing anything. Use WWN paths only:
+   `zpool add -n -f -o ashift=12 data01 raidz2 /dev/disk/by-id/wwn-... (x10)`.
+   Without `-f` it refuses with a `mismatched replication level` error (8-way vs 10-way
+   raidz). That error is expected here, and `-f` overrides only that check. Read the
+   output. If the new vdev shows as anything other than a 10-disk `raidz2`, stop.
+   `ashift=12` is set explicitly to match `raidz2-0` rather than trusting autodetection.
 8. Run the same command without `-n`. Then `zpool status data01` should show `raidz2-0`
-   and `raidz2-1`, both `ONLINE`.
+   and `raidz2-1`, both `ONLINE`, and `zdb -C data01` should show `ashift: 12` on both.
 9. Repeat 7-8 for the second shelf, once the first has run cleanly for a while.
 
 ## Monitoring
