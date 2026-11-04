@@ -68,6 +68,9 @@ JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso
 # A bonus disc Sonarr parses as the whole season. It imports nothing, and the
 # season's old files are gone by then.
 EXTRAS = re.compile(r"\bextras\b", re.I)
+# The same disc also comes without the word. An SD DVDRip runs 170-350 MB an
+# episode; under this, the release cannot hold what it would replace.
+MIN_EPISODE_BYTES = 50e6
 TV_SEASON = re.compile(r"^/tv/([^/]+)/Season (\d+)/")
 # NOTE: this Sonarr release profile keeps Sonarr's own searches off season
 # packs. Packs are grabbed past it on purpose, a season at a time; Sonarr puts
@@ -241,7 +244,8 @@ def best_tv_release(item):
     else:
         rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
         ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
-    ok = [r for r in ok if not EXTRAS.search(r["title"])]
+    ok = [r for r in ok if not EXTRAS.search(r["title"])
+          and r["size"] >= MIN_EPISODE_BYTES * len(item["episode_ids"])]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
