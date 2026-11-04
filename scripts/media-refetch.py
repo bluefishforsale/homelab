@@ -65,6 +65,9 @@ REDOWNLOAD_GRACE = dt.timedelta(minutes=30)
 EXISTING_FILE = "Existing file on disk"
 # Not library content; re-downloading would not fix it and nothing should.
 JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso$|/VIDEO_TS/)", re.I)
+# A bonus disc Sonarr parses as the whole season. It imports nothing, and the
+# season's old files are gone by then.
+EXTRAS = re.compile(r"\bextras\b", re.I)
 TV_SEASON = re.compile(r"^/tv/([^/]+)/Season (\d+)/")
 # NOTE: this Sonarr release profile keeps Sonarr's own searches off season
 # packs. Packs are grabbed past it on purpose, a season at a time; Sonarr puts
@@ -238,6 +241,7 @@ def best_tv_release(item):
     else:
         rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
         ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
+    ok = [r for r in ok if not EXTRAS.search(r["title"])]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
