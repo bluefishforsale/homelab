@@ -292,3 +292,45 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+
+  # Moved in from the host-only Movies.yml and config/movies/. These stay views
+  # of what is on disk: Best of the 1980s is a 1000-title discover query, and
+  # add-missing on it would flood Radarr.
+  Best of the 1980s:
+    sort_title: "!Best of the 1980s"
+    summary: A collection of the Top Content of the 1980s
+    tmdb_discover:
+      primary_release_date.gte: 01/01/1980
+      primary_release_date.lte: 12/31/1989
+      with_original_language: en
+      sort_by: popularity.desc
+      limit: 1000
+
+  Vulture’s 101 Best Movie Endings:
+    sort_title: "!Vulture’s 101 Best Movie Endings"
+    letterboxd_list: https://letterboxd.com/brianformo/list/vultures-101-best-movie-endings/
+
+  Black 90s:
+    sort_title: "!Black 90s"
+    imdb_list:
+      - https://www.imdb.com/list/ls003750715/
+      - https://www.imdb.com/list/ls090949545/
+      - https://www.imdb.com/list/ls071915266/
+      - https://www.imdb.com/list/ls054431555/
+    collection_order: release
+    sync_mode: sync
+
+  Blacksploitation:
+    sort_title: "!Blacksploitation"
+    imdb_list:
+      - https://www.imdb.com/list/ls003927595/
+      - https://www.imdb.com/list/ls024742906/
+      - https://www.imdb.com/list/ls066690694/
+      - https://www.imdb.com/list/ls082531467/
+      - https://www.imdb.com/list/ls058887687/
+      - https://www.imdb.com/list/ls092000232/
+      - https://www.imdb.com/list/ls004973383/
+      - https://www.imdb.com/list/ls002390328/
+      - https://www.imdb.com/list/ls099205831/
+    collection_order: release
+    sync_mode: sync
