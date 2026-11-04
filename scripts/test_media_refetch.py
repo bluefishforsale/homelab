@@ -170,13 +170,29 @@ def test_extras_disc_is_never_the_season():
         def get(self, app, path, **kw):
             if path == "/api/v3/releaseprofile":
                 return []
-            return [{"title": t, "fullSeason": True, "downloadAllowed": True, "rejections": [EXISTING],
-                     "releaseWeight": w}
+            return [{"title": t, "size": 9e9, "fullSeason": True, "downloadAllowed": True,
+                     "rejections": [EXISTING], "releaseWeight": w}
                     for w, t in enumerate(["Star.Trek.Voyager.S06.EXTRAS.DVDRip.x264-MARS",
                                            "Star.Trek.Voyager.S06.NTSC.DVD.DD5.1.MPEG-2.REMUX-S0NNY"])]
     refetch.mc = Fake()
     item = {"pack": True, "series_id": 1, "season": 6, "episode_ids": [1]}
     assert "EXTRAS" not in BEST_TV_RELEASE(item)["title"]
+
+
+def test_pack_too_small_to_hold_the_season_is_not_grabbed():
+    # Voyager S06 then picked the same 0.4 GB disc without EXTRAS in its name:
+    # about 15 MB for each of 26 episodes.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/releaseprofile":
+                return []
+            return [{"title": t, "size": s, "fullSeason": True, "downloadAllowed": True, "rejections": [EXISTING],
+                     "releaseWeight": w}
+                    for w, (t, s) in enumerate([("Star.Trek.Voyager.S06.iNTERNAL.DVDRip.x264-MARS", 0.4e9),
+                                                ("Star.Trek.Voyager.S06.DVDRip.x264-OTHER", 9e9)])]
+    refetch.mc = Fake()
+    item = {"pack": True, "series_id": 1, "season": 6, "episode_ids": list(range(26))}
+    assert BEST_TV_RELEASE(item)["title"].endswith("-OTHER")
 
 
 
