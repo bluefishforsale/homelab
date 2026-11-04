@@ -12,6 +12,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("refetch", os.path.join(HERE, "media-refetch.py"))
 refetch = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(refetch)
+# No test reaches a live host: a path lookup finds nothing and keeps the path it had.
+refetch.ssh = lambda cmd, stdin=None: ""
 
 PACK_TERM = r"Contains these ignored terms: /\bS\d+\b(?!E\d+\b)/i"
 
@@ -376,6 +378,36 @@ def test_season_tdarr_is_still_transcoding_past_flow_timeout_keeps_waiting():
     finally:
         refetch.probe, refetch.conformance.reasons, refetch.bump = saved
     assert item["state"] == "imported", item["log"]
+
+
+def test_season_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
+    # DS9 S02 (2026-11-04): the flow turned 26 imported .mp4s into .mkvs and the
+    # ledger kept probing the gone .mp4s, an ssh error every tick.
+    mp4 = "/media/tv/DS9/Season 2/E01.mp4"
+    mkv = "/media/tv/DS9/Season 2/E01.mkv"
+    probed, posted = [], []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {}
+
+        def post(self, app, path, data):
+            posted.append(data)
+
+    saved = refetch.ssh, refetch.probe, refetch.conformance.reasons, refetch.bump
+    refetch.mc = Fake()
+    refetch.ssh = lambda cmd, stdin=None: mkv + "\n" if mkv in cmd else ""
+    refetch.probe = lambda file: probed.append(file)
+    refetch.conformance.reasons = lambda probed: ["video-not-hevc"]
+    refetch.bump = lambda item, files, yes: False
+    item = {"series_id": 1, "season": 2, "episode_ids": [1], "state": "imported", "files": [mp4],
+            "title": "t", "log": [], "imported_at": refetch.now().isoformat()}
+    try:
+        refetch.step_tv(item, True, {})
+    finally:
+        refetch.ssh, refetch.probe, refetch.conformance.reasons, refetch.bump = saved
+    assert probed == [mkv] and item["files"] == [mkv], (probed, item["files"])
+    assert {"name": "RescanSeries", "seriesId": 1} in posted, posted
 
 
 if __name__ == "__main__":
