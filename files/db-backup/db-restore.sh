@@ -60,14 +60,11 @@ meta(){
     wordpress)              echo "mysql|wordpress.sql.gz|$WORDPRESS_DB_CONTAINER|" ;;
     jellystat-db)           echo "pg|jellystat-db.sql.gz|jellystat-db|" ;;
     mem0-postgres)          echo "pg|mem0-postgres.sql.gz|mem0-postgres|" ;;
-    mysql-atrest)           echo "tar|mysql-atrest.tar.gz|mysql|$SERVICES_DIR/mysql/data" ;;
     sonarr)     echo "sqlite|sonarr.db.gz|sonarr|$SERVICES_DIR/sonarr/sonarr.db" ;;
     radarr)     echo "sqlite|radarr.db.gz|radarr|$SERVICES_DIR/radarr/radarr.db" ;;
-    lidarr)     echo "sqlite|lidarr.db.gz|lidarr|$SERVICES_DIR/lidarr/lidarr.db" ;;
     prowlarr)   echo "sqlite|prowlarr.db.gz|prowlarr|$SERVICES_DIR/prowlarr/config/prowlarr.db" ;;
     bazarr)     echo "sqlite|bazarr.db.gz|bazarr|$SERVICES_DIR/bazarr/db/bazarr.db" ;;
     jellyfin)   echo "sqlite|jellyfin.db.gz|jellyfin|$SERVICES_DIR/jellyfin/config/data/jellyfin.db" ;;
-    navidrome)  echo "sqlite|navidrome.db.gz|navidrome|$SERVICES_DIR/navidrome/data/navidrome.db" ;;
     tautulli)   echo "sqlite|tautulli.db.gz|tautulli|$SERVICES_DIR/tautulli/config/tautulli.db" ;;
     overseerr)  echo "sqlite|overseerr.db.gz|overseerr|$SERVICES_DIR/overseerr/config/db/db.sqlite3" ;;
     homeassistant) echo "sqlite|homeassistant.db.gz|homeassistant|$SERVICES_DIR/homeassistant/config/home-assistant_v2.db" ;;
@@ -80,7 +77,7 @@ meta(){
     *) echo "" ;;
   esac
 }
-ALL="grafana-mysql wordpress jellystat-db mem0-postgres mysql-atrest sonarr radarr lidarr prowlarr bazarr jellyfin navidrome tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
+ALL="grafana-mysql wordpress jellystat-db mem0-postgres sonarr radarr prowlarr bazarr jellyfin tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
 
 # verify registry -> "IMAGE|SQL|MAX_AGE_HOURS". SQL returns the epoch of the newest
 # record; NULL (empty table) fails. MAX_AGE only for services that write on their
@@ -91,12 +88,9 @@ probe(){
     wordpress)     echo "mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
     jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|48' ;;
     mem0-postgres) echo 'ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
-    mysql-atrest)  echo "percona/percona-server:5.7|SELECT UNIX_TIMESTAMP(MAX(last_update)) FROM mysql.innodb_table_stats|" ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
-    lidarr)        echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|" ;;
     bazarr)        echo "|SELECT strftime('%s',MAX(timestamp)) FROM table_history|" ;;
     jellyfin)      echo "|SELECT strftime('%s',substr(MAX(DateCreated),1,19)) FROM ActivityLogs|" ;;
-    navidrome)     echo "|SELECT strftime('%s',substr(MAX(last_scan_at),1,19)) FROM library|" ;;
     tautulli)      echo "|SELECT MAX(started) FROM session_history|" ;;
     overseerr)     echo "|SELECT strftime('%s',substr(MAX(updatedAt),1,19)) FROM media|" ;;
     homeassistant) echo "|SELECT CAST(MAX(last_updated_ts) AS INTEGER) FROM states|48" ;;
@@ -153,18 +147,6 @@ verify_one(){
       out=$(docker run --rm --network none --user root -v "$payload":/db "$SQLITE_IMAGE" \
               sqlite3 /db "PRAGMA integrity_check; $sql;" 2>"$err")
       [ "$(head -1 <<<"$out")" = ok ] || { log "  integrity_check failed:"; head -5 <<<"$out" | sed 's/^/    /'; cat "$err"; return 1; }
-      ;;
-    tar)
-      mkdir -p "$TMP/$svc" && tar xf "$payload" -C "$TMP/$svc" || return 1
-      docker run -d --name "$c" --label "$VLABEL" --network none --user root -v "$TMP/$svc/data":/var/lib/mysql \
-        "$image" --user=root --skip-grant-tables --skip-networking >/dev/null || return 1
-      wait_log "$c" "ready for connections" || return 1
-      # The at-rest datadir was copied after its server died uncleanly (2025-11), so
-      # every boot replays the same recovery. A torn copy fails to reach ready or the probe.
-      if docker logs "$c" 2>&1 | grep -iE "crash recovery|not shut ?down normally" >/dev/null; then
-        log "  cold copy needed InnoDB crash recovery (it completed)"
-      fi
-      out=$(docker exec "$c" mysql -uroot -N -e "$sql" 2>"$err") || { cat "$err"; return 1; }
       ;;
   esac
   docker rm -fv "$c" >/dev/null 2>&1
@@ -234,9 +216,6 @@ restore_one(){
       mut docker run --rm -v "$(dirname "$target")":/d -v "$payload":/src:ro "$ALPINE_IMAGE" \
             sh -c "cp /src '/d/$base' && rm -f '/d/$base-wal' '/d/$base-shm'"
       mut docker start "$container"
-      ;;
-    tar)
-      mut docker run --rm -v "$target":/d -v "$payload":/src:ro "$ALPINE_IMAGE" sh -c "cd /d && tar xf /src"
       ;;
   esac
   log "  $svc: $([ "$DRY" = 1 ] && echo 'DRY-RUN - no changes made' || echo "restored (pre-restore copy in $PRE)")"

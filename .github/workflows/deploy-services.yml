@@ -1,6 +1,12 @@
 ---
 name: Deploy Services
 
+# Same key as the ocean dispatch workflows, so a site or rollback apply never
+# overlaps one. Other hosts aren't covered; a workflow takes one workflow-level group.
+concurrency:
+  group: deploy-ocean
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:

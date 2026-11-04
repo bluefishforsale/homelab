@@ -214,7 +214,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "scalar(node_load1{instance=\"$node\",job=\"$job\"}) * 100 / count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu))",
+          "expr": "scalar(node_load1{instance=\"$node\",job=~\"$job\"}) * 100 / count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu))",
           "format": "time_series",
           "instant": true,
           "range": false,
@@ -288,7 +288,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "clamp_min((1 - (node_memory_MemAvailable_bytes{instance=\"$node\", job=\"$job\"} / node_memory_MemTotal_bytes{instance=\"$node\", job=\"$job\"})) * 100, 0)",
+          "expr": "clamp_min((1 - (node_memory_MemAvailable_bytes{instance=\"$node\", job=~\"$job\"} / node_memory_MemTotal_bytes{instance=\"$node\", job=~\"$job\"})) * 100, 0)",
           "format": "time_series",
           "instant": true,
           "range": false,
@@ -519,7 +519,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(\n  (node_filesystem_size_bytes{instance=\"$node\", job=\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"}\n   - node_filesystem_avail_bytes{instance=\"$node\", job=\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"})\n  / node_filesystem_size_bytes{instance=\"$node\", job=\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"}\n) * 100\n",
+          "expr": "(\n  (node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"}\n   - node_filesystem_avail_bytes{instance=\"$node\", job=~\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"})\n  / node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\", mountpoint=\"/\", fstype!=\"rootfs\"}\n) * 100\n",
           "format": "time_series",
           "instant": true,
           "range": false,
@@ -764,7 +764,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu))",
+          "expr": "count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu))",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -844,7 +844,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"}",
+          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1018,7 +1018,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_disk_io_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n+ irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n+ irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n) / 100",
+          "expr": "sum(irate(node_disk_io_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n+ irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n+ irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n) / 100",
           "hide": false,
           "interval": "",
           "legendFormat": "__auto",
@@ -1123,7 +1123,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg by (mountpoint) (\n  (node_filesystem_size_bytes{instance=\"$node\", job=\"$job\", fstype=\"zfs\"}\n   - node_filesystem_avail_bytes{instance=\"$node\", job=\"$job\",fstype=\"zfs\"})\n  / node_filesystem_size_bytes{instance=\"$node\", job=\"$job\",  fstype=\"zfs\"}\n) * 100\n",
+          "expr": "avg by (mountpoint) (\n  (node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\", fstype=\"zfs\"}\n   - node_filesystem_avail_bytes{instance=\"$node\", job=~\"$job\",fstype=\"zfs\"})\n  / node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\",  fstype=\"zfs\"}\n) * 100\n",
           "format": "time_series",
           "instant": true,
           "legendFormat": "{{mountpoint}}",
@@ -1286,7 +1286,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "node_time_seconds{instance=\"$node\",job=\"$job\"} - node_boot_time_seconds{instance=\"$node\",job=\"$job\"}",
+          "expr": "node_time_seconds{instance=\"$node\",job=~\"$job\"} - node_boot_time_seconds{instance=\"$node\",job=~\"$job\"}",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1471,7 +1471,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"system\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\", mode=\"system\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "instant": false,
           "legendFormat": "Busy System",
@@ -1481,7 +1481,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"user\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\", mode=\"user\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "legendFormat": "Busy User",
           "range": true,
@@ -1490,7 +1490,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"iowait\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\", mode=\"iowait\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "legendFormat": "Busy Iowait",
           "range": true,
@@ -1499,7 +1499,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=~\".*irq\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\", mode=~\".*irq\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "legendFormat": "Busy IRQs",
           "range": true,
@@ -1508,7 +1508,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\",  mode!='idle',mode!='user',mode!='system',mode!='iowait',mode!='irq',mode!='softirq'}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\",  mode!='idle',mode!='user',mode!='system',mode!='iowait',mode!='irq',mode!='softirq'}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "legendFormat": "Busy Other",
           "range": true,
@@ -1517,7 +1517,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"idle\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+          "expr": "sum(irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\", mode=\"idle\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
           "format": "time_series",
           "legendFormat": "Idle",
           "range": true,
@@ -1737,7 +1737,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+          "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
           "interval": "",
           "legendFormat": "{{device}} - General IO",
           "range": true,
@@ -1746,7 +1746,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+          "expr": "irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
           "interval": "",
           "legendFormat": "{{device}} - Discard/TRIM",
           "range": true,
@@ -1755,7 +1755,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+          "expr": "irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
           "interval": "",
           "legendFormat": "{{device}} - Flush (write cache)",
           "range": true,
@@ -2076,7 +2076,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+          "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])*8",
           "format": "time_series",
           "legendFormat": "Rx {{device}}",
           "range": true,
@@ -2085,7 +2085,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "rate(node_network_transmit_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+          "expr": "rate(node_network_transmit_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])*8",
           "format": "time_series",
           "legendFormat": "Tx {{device}} ",
           "range": true,
@@ -2253,7 +2253,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"}",
+          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"}",
           "format": "time_series",
           "legendFormat": "Total",
           "range": true,
@@ -2262,7 +2262,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"} - (node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=\"$job\"})",
+          "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_MemFree_bytes{instance=\"$node\",job=~\"$job\"} - (node_memory_Cached_bytes{instance=\"$node\",job=~\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=~\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=~\"$job\"})",
           "format": "time_series",
           "legendFormat": "Used",
           "range": true,
@@ -2271,7 +2271,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=\"$job\"}",
+          "expr": "node_memory_Cached_bytes{instance=\"$node\",job=~\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=~\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=~\"$job\"}",
           "format": "time_series",
           "legendFormat": "Cache + Buffer",
           "range": true,
@@ -2280,7 +2280,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"}",
+          "expr": "node_memory_MemFree_bytes{instance=\"$node\",job=~\"$job\"}",
           "format": "time_series",
           "legendFormat": "Free",
           "range": true,
@@ -2289,7 +2289,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "(node_memory_SwapTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_SwapFree_bytes{instance=\"$node\",job=\"$job\"})",
+          "expr": "(node_memory_SwapTotal_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_SwapFree_bytes{instance=\"$node\",job=~\"$job\"})",
           "format": "time_series",
           "legendFormat": "Swap used",
           "range": true,
@@ -2385,7 +2385,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "((node_filesystem_size_bytes{instance=\"$node\", job=\"$job\", device!~\"rootfs\"} - node_filesystem_avail_bytes{instance=\"$node\", job=\"$job\", device!~\"rootfs\"}) / node_filesystem_size_bytes{instance=\"$node\", job=\"$job\", device!~\"rootfs\"}) * 100",
+          "expr": "((node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\", device!~\"rootfs\"} - node_filesystem_avail_bytes{instance=\"$node\", job=~\"$job\", device!~\"rootfs\"}) / node_filesystem_size_bytes{instance=\"$node\", job=~\"$job\", device!~\"rootfs\"}) * 100",
           "format": "time_series",
           "legendFormat": "{{mountpoint}}",
           "range": true,
@@ -2644,7 +2644,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"system\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"system\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "interval": "",
               "legendFormat": "System - Processes executing in kernel mode",
@@ -2654,7 +2654,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"user\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"user\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "User - Normal processes executing in user mode",
               "range": true,
@@ -2663,7 +2663,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"nice\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"nice\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Nice - Niced processes executing in user mode",
               "range": true,
@@ -2672,7 +2672,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"iowait\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"iowait\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Iowait - Waiting for I/O to complete",
               "range": true,
@@ -2681,7 +2681,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"irq\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"irq\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Irq - Servicing interrupts",
               "range": true,
@@ -2690,7 +2690,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"softirq\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"softirq\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Softirq - Servicing softirqs",
               "range": true,
@@ -2699,7 +2699,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"steal\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"steal\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Steal - Time spent in other operating systems when running in a virtualized environment",
               "range": true,
@@ -2708,7 +2708,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{mode=\"idle\",instance=\"$node\",job=\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu)))",
+              "expr": "sum(irate(node_cpu_seconds_total{mode=\"idle\",instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / scalar(count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu)))",
               "format": "time_series",
               "legendFormat": "Idle - Waiting for something to happen",
               "range": true,
@@ -2717,7 +2717,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval]))) > 0",
+              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval]))) > 0",
               "format": "time_series",
               "legendFormat": "Guest CPU usage",
               "range": true,
@@ -3117,7 +3117,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"} - node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"} - node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"} - node_memory_Slab_bytes{instance=\"$node\",job=\"$job\"} - node_memory_PageTables_bytes{instance=\"$node\",job=\"$job\"} - node_memory_SwapCached_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_MemFree_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_Buffers_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_Cached_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_Slab_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_PageTables_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_SwapCached_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Apps - Memory used by user-space applications",
               "range": true,
@@ -3126,7 +3126,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_PageTables_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_PageTables_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "PageTables - Memory used to map between virtual and physical memory addresses",
               "range": true,
@@ -3135,7 +3135,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_SwapCached_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_SwapCached_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "SwapCache - Memory that keeps track of pages that have been fetched from swap but not yet been modified",
               "range": true,
@@ -3144,7 +3144,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Slab_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Slab_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Slab - Memory used by the kernel to cache data structures for its own use (caches like inode, dentry, etc)",
               "range": true,
@@ -3153,7 +3153,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Cached_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Cache - Parked file data (file content) cache",
               "range": true,
@@ -3162,7 +3162,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Buffers_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Buffers - Block device (e.g. harddisk) cache",
               "range": true,
@@ -3171,7 +3171,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_MemFree_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Unused - Free memory unassigned",
               "range": true,
@@ -3180,7 +3180,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "(node_memory_SwapTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_SwapFree_bytes{instance=\"$node\",job=\"$job\"})",
+              "expr": "(node_memory_SwapTotal_bytes{instance=\"$node\",job=~\"$job\"} - node_memory_SwapFree_bytes{instance=\"$node\",job=~\"$job\"})",
               "format": "time_series",
               "legendFormat": "Swap - Swap space used",
               "range": true,
@@ -3189,7 +3189,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_HardwareCorrupted_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_HardwareCorrupted_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Hardware Corrupted - Amount of RAM that the kernel identified as corrupted / not working",
               "range": true,
@@ -3299,7 +3299,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+              "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])*8",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -3308,7 +3308,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+              "expr": "rate(node_network_transmit_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])*8",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -3418,7 +3418,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n / ignoring(speed) node_network_speed_bytes{instance=\"$node\",job=\"$job\", speed!=\"-1\"}",
+              "expr": "rate(node_network_receive_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n / ignoring(speed) node_network_speed_bytes{instance=\"$node\",job=~\"$job\", speed!=\"-1\"}",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -3427,7 +3427,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "(rate(node_network_transmit_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n / ignoring(speed) node_network_speed_bytes{instance=\"$node\",job=\"$job\", speed!=\"-1\"})",
+              "expr": "(rate(node_network_transmit_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n / ignoring(speed) node_network_speed_bytes{instance=\"$node\",job=~\"$job\", speed!=\"-1\"})",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -3537,7 +3537,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_reads_completed_total{instance=\"$node\",job=\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
+              "expr": "irate(node_disk_reads_completed_total{instance=\"$node\",job=~\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Read",
               "range": true,
               "refId": "A",
@@ -3545,7 +3545,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_writes_completed_total{instance=\"$node\",job=\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
+              "expr": "irate(node_disk_writes_completed_total{instance=\"$node\",job=~\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Write",
               "range": true,
               "refId": "B",
@@ -3654,7 +3654,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_read_bytes_total{instance=\"$node\",job=\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_bytes_total{instance=\"$node\",job=~\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Read",
               "range": true,
@@ -3663,7 +3663,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_written_bytes_total{instance=\"$node\",job=\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
+              "expr": "irate(node_disk_written_bytes_total{instance=\"$node\",job=~\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Write",
               "range": true,
@@ -3761,7 +3761,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filesystem_avail_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_avail_bytes{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "legendFormat": "{{mountpoint}}",
               "metric": "",
@@ -3771,7 +3771,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_filesystem_free_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_free_bytes{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "hide": true,
               "legendFormat": "{{mountpoint}} - Free",
@@ -3781,7 +3781,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_filesystem_size_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_size_bytes{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "hide": true,
               "legendFormat": "{{mountpoint}} - Size",
@@ -3880,7 +3880,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filesystem_size_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'} - node_filesystem_avail_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_size_bytes{instance=\"$node\",job=~\"$job\",device!~'rootfs'} - node_filesystem_avail_bytes{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "legendFormat": "{{mountpoint}}",
               "range": true,
@@ -3978,7 +3978,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"} [$__rate_interval])",
+              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=~\"$job\",device=~\"[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"} [$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{device}}",
@@ -4101,7 +4101,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_cpu_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_cpu_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "CPU - Some",
               "range": true,
@@ -4110,7 +4110,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_memory_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_memory_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Memory - Some",
               "range": true,
@@ -4119,7 +4119,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_memory_stalled_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_memory_stalled_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Memory - Full",
               "range": true,
@@ -4128,7 +4128,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_io_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_io_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "I/O - Some",
               "range": true,
@@ -4137,7 +4137,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_io_stalled_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_io_stalled_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "I/O - Full",
               "range": true,
@@ -4146,7 +4146,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_pressure_irq_stalled_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_irq_stalled_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "IRQ - Full",
               "range": true,
@@ -4279,7 +4279,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_Committed_AS_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Committed_AS_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Committed_AS – Memory promised to processes (not necessarily used)",
               "range": true,
@@ -4288,7 +4288,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_CommitLimit_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_CommitLimit_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "CommitLimit - Max allowable committed memory",
               "range": true,
@@ -4386,7 +4386,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_Writeback_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Writeback_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Writeback – Memory currently being flushed to disk",
               "range": true,
@@ -4395,7 +4395,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_WritebackTmp_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_WritebackTmp_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "WritebackTmp – FUSE temporary writeback buffers",
               "range": true,
@@ -4404,7 +4404,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Dirty_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Dirty_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Dirty – Memory marked dirty (pending write to disk)",
               "range": true,
@@ -4413,7 +4413,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_NFS_Unstable_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_NFS_Unstable_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "NFS Unstable – Pages sent to NFS server, awaiting storage commit",
               "range": true,
@@ -4511,7 +4511,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_SUnreclaim_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_SUnreclaim_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "SUnreclaim – Non-reclaimable slab memory (kernel objects)",
               "range": true,
@@ -4520,7 +4520,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_SReclaimable_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_SReclaimable_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "SReclaimable – Potentially reclaimable slab memory (e.g., inode cache)",
               "range": true,
@@ -4619,7 +4619,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_Mapped_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Mapped_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Mapped – Memory mapped from files (e.g., libraries, mmap)",
               "range": true,
@@ -4628,7 +4628,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Shmem_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Shmem_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Shmem – Shared memory used by processes and tmpfs",
               "range": true,
@@ -4637,7 +4637,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_ShmemHugePages_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_ShmemHugePages_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "ShmemHugePages – Shared memory (shmem/tmpfs) allocated with HugePages",
@@ -4647,7 +4647,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_ShmemPmdMapped_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_ShmemPmdMapped_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PMD Mapped – Shmem/tmpfs backed by Transparent HugePages (PMD)",
@@ -4778,7 +4778,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "(node_memory_Inactive_bytes{instance=\"$node\",job=\"$job\"}) \n/ \n(node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"})",
+              "expr": "(node_memory_Inactive_bytes{instance=\"$node\",job=~\"$job\"}) \n/ \n(node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"})",
               "format": "time_series",
               "legendFormat": "Inactive – Less recently used memory, more likely to be reclaimed",
               "range": true,
@@ -4787,7 +4787,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "(node_memory_Active_bytes{instance=\"$node\",job=\"$job\"}) \n/ \n(node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"})\n",
+              "expr": "(node_memory_Active_bytes{instance=\"$node\",job=~\"$job\"}) \n/ \n(node_memory_MemTotal_bytes{instance=\"$node\",job=~\"$job\"})\n",
               "format": "time_series",
               "legendFormat": "Active – Recently used memory, retained unless under pressure",
               "range": true,
@@ -4886,7 +4886,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_Inactive_file_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Inactive_file_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Inactive_file - File-backed memory on inactive LRU list",
               "range": true,
@@ -4895,7 +4895,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Inactive_anon_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Inactive_anon_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Inactive_anon – Anonymous memory on inactive LRU (incl. tmpfs & swap cache)",
               "range": true,
@@ -4904,7 +4904,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Active_file_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Active_file_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Active_file - File-backed memory on active LRU list",
               "range": true,
@@ -4913,7 +4913,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Active_anon_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Active_anon_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Active_anon – Anonymous memory on active LRU (incl. tmpfs & swap cache)",
               "range": true,
@@ -5012,7 +5012,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_KernelStack_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_KernelStack_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "KernelStack – Kernel stack memory (per-thread, non-reclaimable)",
               "range": true,
@@ -5021,7 +5021,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Percpu_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Percpu_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PerCPU – Dynamically allocated per-CPU memory (used by kernel modules)",
@@ -5031,7 +5031,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Bounce_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Bounce_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Bounce Memory – I/O buffer for DMA-limited devices",
@@ -5160,7 +5160,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_VmallocChunk_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_VmallocChunk_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Vmalloc Free Chunk – Largest available block in vmalloc area",
               "range": true,
@@ -5169,7 +5169,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_VmallocTotal_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_VmallocTotal_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Vmalloc Total – Total size of the vmalloc memory area",
               "range": true,
@@ -5178,7 +5178,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_VmallocUsed_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_VmallocUsed_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Vmalloc Used – Portion of vmalloc area currently in use",
               "range": true,
@@ -5276,7 +5276,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_AnonHugePages_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_AnonHugePages_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "AnonHugePages – Anonymous memory using HugePages",
               "range": true,
@@ -5285,7 +5285,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_AnonPages_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_AnonPages_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "AnonPages – Anonymous memory (non-file-backed)",
               "range": true,
@@ -5400,7 +5400,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_Unevictable_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Unevictable_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Unevictable – Kernel-pinned memory (not swappable)",
               "range": true,
@@ -5409,7 +5409,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_Mlocked_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_Mlocked_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Mlocked – Application-locked memory via mlock()",
               "range": true,
@@ -5782,7 +5782,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_DirectMap1G_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_DirectMap1G_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "DirectMap 1G – Memory mapped with 1GB pages",
               "range": true,
@@ -5791,7 +5791,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_DirectMap2M_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_DirectMap2M_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "DirectMap 2M – Memory mapped with 2MB pages",
@@ -5801,7 +5801,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_DirectMap4k_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_DirectMap4k_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "DirectMap 4K – Memory mapped with 4KB pages",
@@ -5900,7 +5900,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_memory_HugePages_Free{instance=\"$node\",job=\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_HugePages_Free{instance=\"$node\",job=~\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "HugePages Used – Currently allocated",
               "range": true,
@@ -5909,7 +5909,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_HugePages_Rsvd{instance=\"$node\",job=\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_HugePages_Rsvd{instance=\"$node\",job=~\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "HugePages Reserved – Promised but unused",
               "range": true,
@@ -5918,7 +5918,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_HugePages_Surp{instance=\"$node\",job=\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_HugePages_Surp{instance=\"$node\",job=~\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "HugePages Surplus – Dynamic pool extension",
               "range": true,
@@ -5927,7 +5927,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_memory_HugePages_Total{instance=\"$node\",job=\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_memory_HugePages_Total{instance=\"$node\",job=~\"$job\"} * node_memory_Hugepagesize_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "HugePages Total – Reserved memory",
               "range": true,
@@ -6051,7 +6051,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgpgin{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgpgin{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pagesin - Page in ops",
               "range": true,
@@ -6060,7 +6060,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgpgout{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgpgout{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pagesout - Page out ops",
               "range": true,
@@ -6170,7 +6170,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pswpin{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pswpin{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pswpin - Pages swapped in",
               "range": true,
@@ -6179,7 +6179,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pswpout{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pswpout{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pswpout - Pages swapped out",
               "range": true,
@@ -6315,7 +6315,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgfault{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgfault{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pgfault - Page major and minor fault ops",
               "range": true,
@@ -6324,7 +6324,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgmajfault{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgmajfault{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pgmajfault - Major page fault ops",
               "range": true,
@@ -6333,7 +6333,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgfault{instance=\"$node\",job=\"$job\"}[$__rate_interval])  - irate(node_vmstat_pgmajfault{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgfault{instance=\"$node\",job=~\"$job\"}[$__rate_interval])  - irate(node_vmstat_pgmajfault{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Pgminfault - Minor page fault ops",
               "range": true,
@@ -6447,7 +6447,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_vmstat_oom_kill{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_oom_kill{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "OOM Kills",
@@ -6559,7 +6559,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_timex_estimated_error_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_estimated_error_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Estimated error",
@@ -6569,7 +6569,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_offset_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_offset_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Offset local vs reference",
@@ -6579,7 +6579,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_maxerror_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_maxerror_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Maximum error",
@@ -6677,7 +6677,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_timex_loop_time_constant{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_loop_time_constant{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PLL Time Constant",
@@ -6775,7 +6775,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_timex_sync_status{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_sync_status{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Sync status (1 = ok)",
@@ -6785,7 +6785,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_frequency_adjustment_ratio{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_frequency_adjustment_ratio{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Frequency Adjustment",
@@ -6795,7 +6795,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_tick_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_tick_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -6806,7 +6806,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_tai_offset_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_tai_offset_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -6905,7 +6905,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_timex_pps_frequency_hertz{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_pps_frequency_hertz{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Frequency Offset",
@@ -6915,7 +6915,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_pps_stability_hertz{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_pps_stability_hertz{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Frequency Stability",
@@ -7013,7 +7013,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_timex_pps_jitter_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_pps_jitter_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Jitter",
@@ -7023,7 +7023,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_timex_pps_shift_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_timex_pps_shift_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Shift",
@@ -7125,7 +7125,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_timex_pps_calibration_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_timex_pps_calibration_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Calibrations/sec",
@@ -7135,7 +7135,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_timex_pps_error_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_timex_pps_error_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Errors/sec",
@@ -7145,7 +7145,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_timex_pps_stability_exceeded_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_timex_pps_stability_exceeded_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Stability Exceeded/sec",
@@ -7155,7 +7155,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_timex_pps_jitter_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_timex_pps_jitter_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PPS Jitter Events/sec",
@@ -7272,7 +7272,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_procs_blocked{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_procs_blocked{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Blocked (I/O Wait)",
               "range": true,
@@ -7281,7 +7281,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_procs_running{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_procs_running{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Runnable (Ready for CPU)",
               "range": true,
@@ -7464,7 +7464,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_processes_state{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_processes_state{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ state }}",
@@ -7563,7 +7563,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_forks_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_forks_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Process Forks per second",
               "range": true,
@@ -7677,7 +7677,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_schedstat_running_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_schedstat_running_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -7688,7 +7688,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -7699,7 +7699,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])\n/\n(irate(node_schedstat_running_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval]) + irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval]))\n",
+              "expr": "irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])\n/\n(irate(node_schedstat_running_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval]) + irate(node_schedstat_waiting_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval]))\n",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}}",
@@ -7828,7 +7828,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_processes_pids{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_processes_pids{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Number of PIDs",
@@ -7838,7 +7838,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_processes_max_processes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_processes_max_processes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "PIDs limit",
@@ -7967,7 +7967,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_processes_threads{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_processes_threads{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Allocated threads",
@@ -7977,7 +7977,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_processes_max_threads{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_processes_max_threads{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Threads limit",
@@ -8090,7 +8090,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_context_switches_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_context_switches_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Context switches",
               "range": true,
@@ -8099,7 +8099,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_intr_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_intr_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "Interrupts",
               "range": true,
@@ -8227,7 +8227,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_load1{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_load1{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Load 1m",
               "range": true,
@@ -8236,7 +8236,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_load5{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_load5{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Load 5m",
               "range": true,
@@ -8245,7 +8245,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_load15{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_load15{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Load 15m",
               "range": true,
@@ -8254,7 +8254,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "count(count(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}) by (cpu))",
+              "expr": "count(count(node_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}) by (cpu))",
               "format": "time_series",
               "legendFormat": "CPU Core Count",
               "range": true,
@@ -8418,7 +8418,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_cpu_scaling_frequency_hertz{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_cpu_scaling_frequency_hertz{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{ cpu }}",
@@ -8428,7 +8428,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "avg(node_cpu_scaling_frequency_max_hertz{instance=\"$node\",job=\"$job\"})",
+              "expr": "avg(node_cpu_scaling_frequency_max_hertz{instance=\"$node\",job=~\"$job\"})",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Max",
@@ -8438,7 +8438,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "avg(node_cpu_scaling_frequency_min_hertz{instance=\"$node\",job=\"$job\"})",
+              "expr": "avg(node_cpu_scaling_frequency_min_hertz{instance=\"$node\",job=~\"$job\"})",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Min",
@@ -8536,7 +8536,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_schedstat_timeslices_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_schedstat_timeslices_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{ cpu }}",
@@ -8635,7 +8635,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_interrupts_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_interrupts_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ type }} - {{ info }}",
@@ -8764,7 +8764,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_entropy_available_bits{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_entropy_available_bits{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Entropy available",
               "range": true,
@@ -8773,7 +8773,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_entropy_pool_size_bits{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_entropy_pool_size_bits{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Entropy pool max",
               "range": true,
@@ -8905,7 +8905,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_hwmon_temp_celsius{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_temp_celsius{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ chip_name }} {{ sensor }}",
@@ -8914,7 +8914,7 @@
               "step": 240
             },
             {
-              "expr": "node_hwmon_temp_crit_alarm_celsius{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_temp_crit_alarm_celsius{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -8924,7 +8924,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_hwmon_temp_crit_celsius{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_temp_crit_celsius{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ chip_name }} {{ sensor }} Critical",
@@ -8933,7 +8933,7 @@
               "step": 240
             },
             {
-              "expr": "node_hwmon_temp_crit_hyst_celsius{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_temp_crit_hyst_celsius{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -8942,7 +8942,7 @@
               "step": 240
             },
             {
-              "expr": "node_hwmon_temp_max_celsius{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_temp_max_celsius{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -9060,7 +9060,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "100 * node_cooling_device_cur_state{instance=\"$node\",job=\"$job\"} / node_cooling_device_max_state{instance=\"$node\",job=\"$job\"}",
+              "expr": "100 * node_cooling_device_cur_state{instance=\"$node\",job=~\"$job\"} / node_cooling_device_max_state{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ name }} - {{ type }} ",
@@ -9162,7 +9162,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_power_supply_online{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_power_supply_online{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ power_supply }} online",
@@ -9261,7 +9261,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_hwmon_fan_rpm{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_fan_rpm{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ chip_name }} {{ sensor }}",
@@ -9271,7 +9271,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_hwmon_fan_min_rpm{instance=\"$node\",job=\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_hwmon_fan_min_rpm{instance=\"$node\",job=~\"$job\"} * on(chip) group_left(chip_name) node_hwmon_chip_names{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "interval": "",
@@ -9460,7 +9460,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_systemd_units{instance=\"$node\",job=\"$job\",state=\"activating\"}",
+              "expr": "node_systemd_units{instance=\"$node\",job=~\"$job\",state=\"activating\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Activating",
@@ -9470,7 +9470,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_systemd_units{instance=\"$node\",job=\"$job\",state=\"active\"}",
+              "expr": "node_systemd_units{instance=\"$node\",job=~\"$job\",state=\"active\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Active",
@@ -9480,7 +9480,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_systemd_units{instance=\"$node\",job=\"$job\",state=\"deactivating\"}",
+              "expr": "node_systemd_units{instance=\"$node\",job=~\"$job\",state=\"deactivating\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Deactivating",
@@ -9490,7 +9490,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_systemd_units{instance=\"$node\",job=\"$job\",state=\"failed\"}",
+              "expr": "node_systemd_units{instance=\"$node\",job=~\"$job\",state=\"failed\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Failed",
@@ -9500,7 +9500,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_systemd_units{instance=\"$node\",job=\"$job\",state=\"inactive\"}",
+              "expr": "node_systemd_units{instance=\"$node\",job=~\"$job\",state=\"inactive\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Inactive",
@@ -9599,7 +9599,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_systemd_socket_current_connections{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_systemd_socket_current_connections{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ name }}",
@@ -9698,7 +9698,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_systemd_socket_accepted_connections_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_systemd_socket_accepted_connections_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ name }}",
@@ -9797,7 +9797,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_systemd_socket_refused_connections_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_systemd_socket_refused_connections_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{ name }}",
@@ -9937,7 +9937,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_reads_completed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_reads_completed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Read",
               "range": true,
               "refId": "A",
@@ -9945,7 +9945,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_writes_completed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_writes_completed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Write",
               "range": true,
               "refId": "B",
@@ -10069,7 +10069,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_read_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Read",
               "range": true,
@@ -10079,7 +10079,7 @@
             {
               "editorMode": "code",
               "exemplar": false,
-              "expr": "irate(node_disk_written_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_written_bytes_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "legendFormat": "{{device}} - Write",
@@ -10205,7 +10205,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_read_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval]) / irate(node_disk_reads_completed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval]) / irate(node_disk_reads_completed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Read",
               "range": true,
@@ -10214,7 +10214,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_write_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval]) / irate(node_disk_writes_completed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_write_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval]) / irate(node_disk_writes_completed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Write",
               "range": true,
@@ -10328,7 +10328,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_io_time_weighted_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_io_time_weighted_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}}",
               "range": true,
@@ -10453,7 +10453,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_reads_merged_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_reads_merged_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Read",
               "range": true,
               "refId": "A",
@@ -10461,7 +10461,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_writes_merged_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_writes_merged_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Write",
               "range": true,
               "refId": "B",
@@ -10574,7 +10574,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - General IO",
               "range": true,
@@ -10583,7 +10583,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_discard_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Discard/TRIM",
               "range": true,
@@ -10592,7 +10592,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_flush_requests_time_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Flush (write cache)",
               "range": true,
@@ -10705,7 +10705,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_discards_completed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_discards_completed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Discards completed",
               "range": true,
@@ -10714,7 +10714,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_discards_merged_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_discards_merged_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Discards merged",
               "range": true,
@@ -10723,7 +10723,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_flush_requests_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_flush_requests_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}} - Flush",
               "range": true,
@@ -10836,7 +10836,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_disk_discarded_sectors_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_disk_discarded_sectors_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "{{device}}",
               "range": true,
@@ -10950,7 +10950,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_disk_io_now{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_disk_io_now{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "{{device}}",
               "range": true,
@@ -11092,7 +11092,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filefd_maximum{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_filefd_maximum{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Max open files",
               "range": true,
@@ -11101,7 +11101,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_filefd_allocated{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_filefd_allocated{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "Open files",
               "range": true,
@@ -11199,7 +11199,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filesystem_files_free{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_files_free{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "legendFormat": "{{mountpoint}}",
               "range": true,
@@ -11298,7 +11298,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filesystem_readonly{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_readonly{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "legendFormat": "{{mountpoint}} - ReadOnly",
               "range": true,
@@ -11307,7 +11307,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_filesystem_device_error{instance=\"$node\",job=\"$job\",device!~'rootfs',fstype!~'tmpfs'}",
+              "expr": "node_filesystem_device_error{instance=\"$node\",job=~\"$job\",device!~'rootfs',fstype!~'tmpfs'}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{mountpoint}} - Device error",
@@ -11406,7 +11406,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_filesystem_files{instance=\"$node\",job=\"$job\",device!~'rootfs'}",
+              "expr": "node_filesystem_files{instance=\"$node\",job=~\"$job\",device!~'rootfs'}",
               "format": "time_series",
               "legendFormat": "{{mountpoint}}",
               "range": true,
@@ -11531,7 +11531,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_packets_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_packets_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{device}} - Rx in",
@@ -11541,7 +11541,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_packets_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_packets_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{device}} - Tx out",
@@ -11653,7 +11653,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_errs_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_errs_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -11662,7 +11662,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_errs_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_errs_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -11773,7 +11773,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_drop_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_drop_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -11782,7 +11782,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_drop_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_drop_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -11893,7 +11893,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_compressed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_compressed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -11902,7 +11902,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_compressed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_compressed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -12013,7 +12013,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_multicast_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_multicast_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -12124,7 +12124,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_nohandler_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_nohandler_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -12235,7 +12235,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_frame_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_frame_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -12346,7 +12346,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_receive_fifo_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_receive_fifo_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Rx in",
               "range": true,
@@ -12355,7 +12355,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_fifo_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_fifo_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -12466,7 +12466,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_colls_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_colls_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -12564,7 +12564,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "rate(node_network_transmit_carrier_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "rate(node_network_transmit_carrier_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "{{device}} - Tx out",
               "range": true,
@@ -12662,7 +12662,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_arp_entries{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_arp_entries{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "{{ device }} ARP Table",
               "range": true,
@@ -12790,7 +12790,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_nf_conntrack_entries{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "NF conntrack entries",
               "range": true,
@@ -12799,7 +12799,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries_limit{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_nf_conntrack_entries_limit{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "NF conntrack limit",
               "range": true,
@@ -12897,7 +12897,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_network_up{operstate=\"up\",instance=\"$node\",job=\"$job\"}",
+              "expr": "node_network_up{operstate=\"up\",instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "hide": true,
               "legendFormat": "{{interface}} - Operational state UP",
@@ -12907,7 +12907,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_network_carrier{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_network_carrier{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "instant": false,
               "legendFormat": "{{device}} - Physical link",
@@ -12980,7 +12980,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_network_speed_bytes{instance=\"$node\",job=\"$job\"} * 8",
+              "expr": "node_network_speed_bytes{instance=\"$node\",job=~\"$job\"} * 8",
               "format": "time_series",
               "legendFormat": "{{ device }}",
               "range": true,
@@ -13053,7 +13053,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_network_mtu_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_network_mtu_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "legendFormat": "{{ device }}",
               "range": true,
@@ -13166,7 +13166,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_alloc{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_alloc{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Allocated Sockets",
@@ -13176,7 +13176,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "In-Use Sockets",
@@ -13186,7 +13186,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_orphan{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_orphan{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Orphaned Sockets",
@@ -13196,7 +13196,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_tw{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_tw{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TIME_WAIT Sockets",
@@ -13296,7 +13296,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_UDPLITE_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_UDPLITE_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDPLite - In-Use Sockets",
@@ -13306,7 +13306,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_UDP_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_UDP_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP - In-Use Sockets",
@@ -13406,7 +13406,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_sockets_used{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_sockets_used{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Total sockets",
@@ -13506,7 +13506,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_FRAG_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_FRAG_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "FRAG - In-Use Sockets",
@@ -13516,7 +13516,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_RAW_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_RAW_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "RAW - In-Use Sockets",
@@ -13616,7 +13616,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_mem_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_mem_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TCP",
@@ -13626,7 +13626,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_UDP_mem_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_UDP_mem_bytes{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP",
@@ -13636,7 +13636,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_FRAG_memory{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_FRAG_memory{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "Fragmentation",
               "range": true,
@@ -13734,7 +13734,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_mem_bytes{instance=\"$node\",job=\"$job\"} / node_sockstat_TCP_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_mem_bytes{instance=\"$node\",job=~\"$job\"} / node_sockstat_TCP_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TCP",
@@ -13744,7 +13744,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_UDP_mem_bytes{instance=\"$node\",job=\"$job\"} / node_sockstat_UDP_inuse{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_UDP_mem_bytes{instance=\"$node\",job=~\"$job\"} / node_sockstat_UDP_inuse{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP",
@@ -13844,7 +13844,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_sockstat_TCP_mem{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_TCP_mem{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TCP",
@@ -13854,7 +13854,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_sockstat_UDP_mem{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_sockstat_UDP_mem{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP",
@@ -13966,7 +13966,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_softnet_processed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_softnet_processed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}} - Processed",
@@ -13976,7 +13976,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_softnet_dropped_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_softnet_dropped_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}} - Dropped",
@@ -14079,7 +14079,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_softnet_times_squeezed_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_softnet_times_squeezed_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}} - Times Squeezed",
@@ -14198,7 +14198,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_softnet_received_rps_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_softnet_received_rps_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}} - Processed",
@@ -14208,7 +14208,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_softnet_flow_limit_count_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_softnet_flow_limit_count_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CPU {{cpu}} - Dropped",
@@ -14334,7 +14334,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_IpExt_InOctets{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_IpExt_InOctets{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "IP Rx in",
@@ -14344,7 +14344,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_IpExt_OutOctets{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_IpExt_OutOctets{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "legendFormat": "IP Tx out",
               "range": true,
@@ -14465,7 +14465,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_InSegs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_InSegs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -14475,7 +14475,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_OutSegs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_OutSegs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TCP Tx out",
@@ -14586,7 +14586,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_InDatagrams{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_InDatagrams{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Rx in",
@@ -14596,7 +14596,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_OutDatagrams{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_OutDatagrams{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Tx out",
@@ -14711,7 +14711,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Icmp_InMsgs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Icmp_InMsgs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "ICMP Rx in",
@@ -14721,7 +14721,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Icmp_OutMsgs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Icmp_OutMsgs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "ICMP Tx out",
@@ -14820,7 +14820,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenOverflows{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenOverflows{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Listen Overflows",
@@ -14830,7 +14830,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Listen Drops",
@@ -14840,7 +14840,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "SYN Retransmits",
@@ -14850,7 +14850,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_RetransSegs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "Segment Retransmits",
               "range": true,
@@ -14858,7 +14858,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_InErrs{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_InErrs{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "Receive Errors",
               "range": true,
@@ -14866,7 +14866,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_OutRsts{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_OutRsts{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "RST Sent",
               "range": true,
@@ -14874,7 +14874,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPRcvQDrop{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPRcvQDrop{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "Receive Queue Drops",
               "range": true,
@@ -14882,7 +14882,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPOFOQueue{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPOFOQueue{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "Out-of-order Queued",
               "range": true,
@@ -14890,7 +14890,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPTimeouts{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPTimeouts{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "TCP Timeouts",
               "range": true,
@@ -14990,7 +14990,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_InErrors{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_InErrors{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Rx in Errors",
@@ -15000,7 +15000,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_NoPorts{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_NoPorts{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP No Listener",
@@ -15010,7 +15010,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_UdpLite_InErrors{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_UdpLite_InErrors{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "interval": "",
               "legendFormat": "UDPLite Rx in Errors",
               "range": true,
@@ -15018,7 +15018,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_RcvbufErrors{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_RcvbufErrors{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Rx in Buffer Errors",
@@ -15028,7 +15028,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Udp_SndbufErrors{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Udp_SndbufErrors{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Tx out Buffer Errors",
@@ -15139,7 +15139,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Icmp_InErrors{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Icmp_InErrors{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "ICMP Rx In",
@@ -15253,7 +15253,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_SyncookiesFailed{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_SyncookiesFailed{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "SYN Cookies Failed",
@@ -15263,7 +15263,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_SyncookiesRecv{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_SyncookiesRecv{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "SYN Cookies Validated",
@@ -15273,7 +15273,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_SyncookiesSent{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_SyncookiesSent{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "SYN Cookies Sent",
@@ -15402,7 +15402,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_CurrEstab{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_netstat_Tcp_CurrEstab{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Current Connections",
@@ -15412,7 +15412,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_MaxConn{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_netstat_Tcp_MaxConn{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Max Connections",
@@ -15510,7 +15510,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_udp_queues{instance=\"$node\",job=\"$job\",ip=\"v4\",queue=\"rx\"}",
+              "expr": "node_udp_queues{instance=\"$node\",job=~\"$job\",ip=\"v4\",queue=\"rx\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Rx in Queue",
@@ -15520,7 +15520,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_udp_queues{instance=\"$node\",job=\"$job\",ip=\"v4\",queue=\"tx\"}",
+              "expr": "node_udp_queues{instance=\"$node\",job=~\"$job\",ip=\"v4\",queue=\"tx\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "UDP Tx out Queue",
@@ -15619,7 +15619,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_ActiveOpens{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_ActiveOpens{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Active Opens",
@@ -15629,7 +15629,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_PassiveOpens{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_PassiveOpens{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Passive Opens",
@@ -15729,7 +15729,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_tcp_connection_states{state=\"established\",instance=\"$node\",job=\"$job\"}",
+              "expr": "node_tcp_connection_states{state=\"established\",instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Established",
@@ -15739,7 +15739,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_tcp_connection_states{state=\"fin_wait2\",instance=\"$node\",job=\"$job\"}",
+              "expr": "node_tcp_connection_states{state=\"fin_wait2\",instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "FIN_WAIT2",
@@ -15749,7 +15749,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_tcp_connection_states{state=\"listen\",instance=\"$node\",job=\"$job\"}",
+              "expr": "node_tcp_connection_states{state=\"listen\",instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Listen",
@@ -15759,7 +15759,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_tcp_connection_states{state=\"time_wait\",instance=\"$node\",job=\"$job\"}",
+              "expr": "node_tcp_connection_states{state=\"time_wait\",instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "TIME_WAIT",
@@ -15769,7 +15769,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "node_tcp_connection_states{state=\"close_wait\", instance=\"$node\", job=\"$job\"}",
+              "expr": "node_tcp_connection_states{state=\"close_wait\", instance=\"$node\", job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "CLOSE_WAIT",
@@ -15885,7 +15885,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_scrape_collector_duration_seconds{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_scrape_collector_duration_seconds{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{collector}}",
@@ -15983,7 +15983,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "irate(process_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])",
+              "expr": "irate(process_cpu_seconds_total{instance=\"$node\",job=~\"$job\"}[$__rate_interval])",
               "format": "time_series",
               "interval": "",
               "legendFormat": "Process CPU Usage",
@@ -16136,7 +16136,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "process_virtual_memory_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "process_virtual_memory_bytes{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "Virtual Memory",
               "range": true,
@@ -16145,7 +16145,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "process_virtual_memory_max_bytes{instance=\"$node\",job=\"$job\"}",
+              "expr": "process_virtual_memory_max_bytes{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "Virtual Memory Limit",
               "range": true,
@@ -16297,7 +16297,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "process_max_fds{instance=\"$node\",job=\"$job\"}",
+              "expr": "process_max_fds{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "Maximum open file descriptors",
               "range": true,
@@ -16306,7 +16306,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "process_open_fds{instance=\"$node\",job=\"$job\"}",
+              "expr": "process_open_fds{instance=\"$node\",job=~\"$job\"}",
               "interval": "",
               "legendFormat": "Open file descriptors",
               "range": true,
@@ -16385,7 +16385,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "node_scrape_collector_success{instance=\"$node\",job=\"$job\"}",
+              "expr": "node_scrape_collector_success{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{collector}}",
@@ -16395,7 +16395,7 @@
             },
             {
               "editorMode": "code",
-              "expr": "1 - node_textfile_scrape_error{instance=\"$node\",job=\"$job\"}",
+              "expr": "1 - node_textfile_scrape_error{instance=\"$node\",job=~\"$job\"}",
               "format": "time_series",
               "interval": "",
               "legendFormat": "textfile",
@@ -16434,15 +16434,15 @@
       },
       {
         "current": {
-          "text": "node_exporter",
-          "value": "node_exporter"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${ds_prometheus}"
         },
         "definition": "",
-        "includeAll": false,
+        "includeAll": true,
         "label": "Job",
         "name": "job",
         "options": [],
@@ -16453,7 +16453,8 @@
         "refresh": 1,
         "regex": "",
         "sort": 1,
-        "type": "query"
+        "type": "query",
+        "allValue": ".*"
       },
       {
         "current": {
@@ -16464,13 +16465,13 @@
           "type": "prometheus",
           "uid": "${ds_prometheus}"
         },
-        "definition": "label_values(node_uname_info{job=\"$job\"}, nodename)",
+        "definition": "label_values(node_uname_info{job=~\"$job\"}, nodename)",
         "includeAll": false,
         "label": "Nodename",
         "name": "nodename",
         "options": [],
         "query": {
-          "query": "label_values(node_uname_info{job=\"$job\"}, nodename)",
+          "query": "label_values(node_uname_info{job=~\"$job\"}, nodename)",
           "refId": "Prometheus-nodename-Variable-Query"
         },
         "refresh": 1,
@@ -16487,13 +16488,13 @@
           "type": "prometheus",
           "uid": "${ds_prometheus}"
         },
-        "definition": "label_values(node_uname_info{job=\"$job\", nodename=\"$nodename\"}, instance)",
+        "definition": "label_values(node_uname_info{job=~\"$job\", nodename=\"$nodename\"}, instance)",
         "includeAll": false,
         "label": "Instance",
         "name": "node",
         "options": [],
         "query": {
-          "query": "label_values(node_uname_info{job=\"$job\", nodename=\"$nodename\"}, instance)",
+          "query": "label_values(node_uname_info{job=~\"$job\", nodename=\"$nodename\"}, instance)",
           "refId": "Prometheus-node-Variable-Query"
         },
         "refresh": 1,
@@ -16509,7 +16510,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Node Exporter MINI",
+  "title": "Node Exporter Main",
   "uid": "bf05382hhm0aof",
   "version": 26,
   "weekStart": ""

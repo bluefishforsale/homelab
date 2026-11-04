@@ -1,8 +1,10 @@
 ---
 name: Deploy Critical Service (Protected)
 
+# NOTE: must match the key main-apply's resolver emits for the same playbook
+# (deploy-<first hosts:>), or a dispatch here and a push deploy run on one host at once.
 concurrency:
-  group: deploy-${{ inputs.service }}
+  group: ${{ inputs.service == 'plex' && 'deploy-ocean' || 'deploy-dns_servers' }}
   cancel-in-progress: false
 
 on:
@@ -52,7 +54,7 @@ jobs:
         run: |
           SERVICE="${{ inputs.service }}"
           case "$SERVICE" in
-            dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+            dns) PLAYBOOK="playbooks/individual/core/services/dns_ha_stack.yaml" ;;
             # dhcp) DEPRECATED - Use dns02 stack: playbooks/individual/core/services/dns02.yaml
             plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
             *) echo "❌ Unknown critical service"; exit 1 ;;
@@ -89,7 +91,7 @@ jobs:
         run: |
           SERVICE="${{ inputs.service }}"
           case "$SERVICE" in
-            dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+            dns) PLAYBOOK="playbooks/individual/core/services/dns_ha_stack.yaml" ;;
             # dhcp) DEPRECATED - Use dns02 stack: playbooks/individual/core/services/dns02.yaml
             plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
           esac
@@ -106,7 +108,6 @@ jobs:
               ;;
             # dhcp) DEPRECATED - Use dns02 stack health check instead
             #   ssh dns02 "systemctl is-active dns-stack.service"
-            ;;  # Keep semicolon for case syntax
             plex)
               echo "Testing Plex availability..."
               curl -f http://192.168.1.143:32400/web/index.html || exit 1
@@ -173,7 +174,7 @@ jobs:
         run: |
           SERVICE="${{ inputs.service }}"
           case "$SERVICE" in
-            dns) PLAYBOOK="playbooks/individual/core/services/bind9_ddns.yaml" ;;
+            dns) PLAYBOOK="playbooks/individual/core/services/dns_ha_stack.yaml" ;;
             plex) PLAYBOOK="playbooks/individual/ocean/media/plex.yaml" ;;
           esac
           echo "playbook=$PLAYBOOK" >> $GITHUB_OUTPUT
@@ -184,7 +185,9 @@ jobs:
           echo "📸 Creating configuration snapshot..."
           case "${{ inputs.service }}" in
             dns)
-              ssh dns01 "tar -czf /tmp/bind9-backup-$(date +%Y%m%d-%H%M%S).tar.gz /etc/bind /var/cache/bind"
+              for h in 192.168.1.2 192.168.1.3; do
+                ssh -o StrictHostKeyChecking=no debian@$h "sudo tar -czf /tmp/dns-stack-backup-$(date +%Y%m%d-%H%M%S).tar.gz /opt/dns-stack"
+              done
               echo "✅ DNS configuration backed up"
               ;;
             # dhcp) DEPRECATED - Use dns02 stack instead
@@ -249,7 +252,6 @@ jobs:
             # dhcp) DEPRECATED - Use dns02 stack health check instead
             #   ssh dns02 "systemctl is-active dns-stack.service"
             #   ssh dns02 "docker logs kea-dhcp4 --tail 20"
-            ;;  # Keep semicolon for case syntax
             plex)
               echo "Testing Plex availability..."
               for i in {1..10}; do
@@ -281,7 +283,7 @@ jobs:
           echo "2. Verify service is accessible"
           echo "3. Consider rollback if needed"
           echo ""
-          echo "Backup available at: /tmp/*-backup-*.tar.gz"
+          echo "Backup available at: /tmp/*-backup-*.tar.gz on the target host(s)"
           exit 1
 
   summary:

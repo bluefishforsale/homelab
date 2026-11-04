@@ -1,0 +1,162 @@
+---
+# Nightly end-to-end quality run for the mem0 fork: LOCOMO with real extraction
+# (gpt-4o-mini, as ocean runs) and local grading (ocean's llama.cpp), results
+# pushed to the Pushgateway for trend alerts.
+#
+# Lives here rather than in the mem0 repo on purpose. mem0 is a public fork, and
+# a self-hosted runner registered there would run any fork PR's workflow file on
+# a host with the Docker socket. These runners already exist and this repo
+# requires approval for every external contributor's workflow run.
+name: mem0 nightly quality
+
+on:
+  schedule:
+    - cron: "0 10 * * *"  # 03:00 Pacific (daylight time)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "mem0 commit to test (40-char SHA). Empty means main."
+        required: false
+        default: ""
+        type: string
+      conversations:
+        description: "LOCOMO conversation indices, comma-separated (0-9)."
+        required: false
+        default: "0,1"
+        type: string
+  # From the mem0 repo, for an on-demand run against a specific commit.
+  repository_dispatch:
+    types: [mem0-quality]
+
+concurrency:
+  group: mem0-nightly-quality
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  locomo:
+    name: LOCOMO
+    runs-on: [self-hosted, homelab, docker]
+    environment: Github Actions CI
+    timeout-minutes: 360
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve parameters
+        id: params
+        # Payload through env vars, never inline expansion: client_payload is
+        # attacker-controlled if the dispatch token ever leaks.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_CONVERSATIONS: ${{ github.event.client_payload.conversations }}
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_CONVERSATIONS: ${{ inputs.conversations }}
+        run: |
+          case "$EVENT_NAME" in
+            repository_dispatch) REF="$CLIENT_SHA"; CONVERSATIONS="${CLIENT_CONVERSATIONS:-0,1}" ;;
+            workflow_dispatch)   REF="$INPUT_REF";  CONVERSATIONS="${INPUT_CONVERSATIONS:-0,1}" ;;
+            *)                   REF="";            CONVERSATIONS="0,1" ;;
+          esac
+          if [ -n "$REF" ] && ! [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::ref must be a 40-char commit SHA"; exit 1
+          fi
+          if ! [[ "$CONVERSATIONS" =~ ^[0-9](,[0-9])*$ ]]; then
+            echo "::error::conversations must look like 0,1"; exit 1
+          fi
+          echo "ref=${REF:-main}" >> "$GITHUB_OUTPUT"
+          echo "conversations=$CONVERSATIONS" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout mem0
+        uses: actions/checkout@v4
+        with:
+          repository: bluefishforsale/mem0
+          ref: ${{ steps.params.outputs.ref }}
+          path: mem0
+          # Submodules only after the trust check below; the public repo needs
+          # no token once cloned.
+          submodules: false
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse commits that are not on a mem0 branch
+        # NOTE: GitHub serves any commit in the fork network through the parent
+        # repo, so a SHA pushed only to someone's fork checks out here fine. The
+        # next steps hand that code the vault-derived keys; only commits on a
+        # branch of bluefishforsale/mem0 (writable by its owner alone) may run.
+        run: |
+          sha=$(git -C mem0 rev-parse HEAD)
+          if [ -z "$(git -C mem0 branch -r --contains "$sha")" ]; then
+            echo "::error::$sha is not on any branch of bluefishforsale/mem0"; exit 1
+          fi
+          git -C mem0 submodule update --init --depth 1
+
+      - name: Install Ansible (for ansible-vault)
+        # Into this job's temp dir rather than ~/.local, which survives into
+        # later jobs because the ephemeral runner containers restart rather than
+        # recreate.
+        run: |
+          python3 -m pip install --quiet --break-system-packages \
+            --target "$RUNNER_TEMP/vault-py" ansible-core pyyaml
+
+      - name: Read the two keys from the vault
+        # NOTE: its own step so the vault password is never in the environment
+        # of any process that runs code from the mem0 checkout (a child can read
+        # its parent's environment through /proc). Only the two derived keys
+        # cross over, through a 0600 file the next step deletes.
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          umask 077
+          echo "$ANSIBLE_VAULT_PASSWORD" > "$RUNNER_TEMP/.vault_pass"
+          export ANSIBLE_VAULT_PASSWORD_FILE="$RUNNER_TEMP/.vault_pass"
+          export PATH="$RUNNER_TEMP/vault-py/bin:$PATH" PYTHONPATH="$RUNNER_TEMP/vault-py"
+          extraction=$(python3 scripts/vault.py get ai_services.openai.api_key)
+          # NOTE: a pre-provisioned spare llama.cpp token. A named one would need
+          # a vault edit plus a llamacpp redeploy, which bounces agentbox's lanes.
+          # Rename it in the vault and here together if it ever gets a real name.
+          judge=$(python3 scripts/vault.py get ai_services.llamacpp.api_keys.spare2)
+          rm -f "$RUNNER_TEMP/.vault_pass"
+          echo "::add-mask::$extraction"
+          echo "::add-mask::$judge"
+          printf '%s\n%s\n' "$extraction" "$judge" > "$RUNNER_TEMP/.nightly_keys"
+
+      - name: Run LOCOMO against a stack built from the mem0 checkout
+        env:
+          JUDGE_BASE_URL: http://ocean.home:8080/v1
+          JUDGE_MODEL: qwen3-coder-30b-a3b
+          CONVERSATIONS: ${{ steps.params.outputs.conversations }}
+          PUSHGATEWAY_URL: http://ocean.home:9091
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          { read -r EXTRACTION_OPENAI_API_KEY; read -r JUDGE_API_KEY; } < "$RUNNER_TEMP/.nightly_keys"
+          rm -f "$RUNNER_TEMP/.nightly_keys"
+          COMMIT_SHA=$(git -C mem0 rev-parse HEAD)
+          # env -i: the checkout gets the variables it uses and nothing else
+          # the runner happens to carry.
+          # A throwaway HOME, so nothing the stack writes lands in the runner
+          # user's real one.
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" \
+            EXTRACTION_OPENAI_API_KEY="$EXTRACTION_OPENAI_API_KEY" JUDGE_API_KEY="$JUDGE_API_KEY" \
+            JUDGE_BASE_URL="$JUDGE_BASE_URL" JUDGE_MODEL="$JUDGE_MODEL" CONVERSATIONS="$CONVERSATIONS" \
+            PUSHGATEWAY_URL="$PUSHGATEWAY_URL" RUN_ID="$RUN_ID" COMMIT_SHA="$COMMIT_SHA" \
+            OUT_DIR="$RUNNER_TEMP/locomo" \
+            bash mem0/tests/quality/nightly/run.sh
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locomo-${{ github.run_id }}
+          # Named files only, not the whole output folder.
+          path: |
+            ${{ runner.temp }}/locomo/metrics.json
+            ${{ runner.temp }}/locomo/locomo_results_*.json
+          if-no-files-found: warn
+          retention-days: 30

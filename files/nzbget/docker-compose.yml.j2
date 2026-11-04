@@ -13,6 +13,9 @@ services:
       TZ: America/Los_Angeles
       PUID: "{{ system_users.media.uid }}"
       PGID: "{{ system_users.media.gid }}"
+      # GetScripts' passwordList.py predates Python 3.12's invalid-escape
+      # warning and logs a dozen lines of it per job; the regexes still work.
+      PYTHONWARNINGS: ignore::SyntaxWarning
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - "{{ home }}/scripts:/scripts"

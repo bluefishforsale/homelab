@@ -28,12 +28,17 @@
     # tdarr-gpu role bundle (files/netboot/roles/tdarr-gpu/start.sh.j2).
     tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
     tdarr_server_api_port: 8266
+    loki_push_url: "http://{{ hostvars['ocean'].ansible_ssh_host }}:{{ service_ports.loki.port }}/loki/api/v1/push"
     # Same mount options as the data01 workers (data01_worker.yaml).
     tdarr_gpu_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime"
     # 40G of the tower's 64G; see the PRD's RAM budget.
     tdarr_gpu_cache_size: 40G
+    # Same tag as ocean's (files/ocean-nvidia/docker-compose.yml.j2).
+    dcgm_exporter_image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
     tdarr_gpu_worker_limits:
-      transcodegpu: 3
+      # NVENC averaged 30% busy at 3 (2026-11-03). The tmpfs cache, not the
+      # GPU, is what runs out first: big remuxes filled it at 3.
+      transcodegpu: 5
       healthcheckgpu: 1
       transcodecpu: 0
       healthcheckcpu: 2

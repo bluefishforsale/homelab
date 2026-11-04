@@ -5,7 +5,7 @@ from the host: a deleted path that maps to no playbook is a clean no-op, so the
 repo stops describing the service while the host keeps running it. This is the
 half that touches the host.
 
-Design rationale and anti-goals: [ADR 0002](../adr/0002-service-decommissioning.md).
+Design rationale and anti-goals: [decommissioning.md](../architecture/decommissioning.md).
 
 ## The sequence
 

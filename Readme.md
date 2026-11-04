@@ -141,7 +141,7 @@ vars/        shared variables, including the port registry
 inventories/ hosts
 vault/       ansible-vault encrypted secrets
 scripts/     diagnostics: prom.sh, loki.sh, alerts.sh, vault.py, ...
-docs/        architecture, operations runbooks, specs, ADRs
+docs/        architecture, operations runbooks, unbuilt specs and plans
 ```
 
 ## Where to read next
@@ -153,5 +153,5 @@ docs/        architecture, operations runbooks, specs, ADRs
 - [docs/operations/deploy-pattern.md](docs/operations/deploy-pattern.md) is how a
   new side project gets onboarded.
 - [scripts/README.md](scripts/README.md) covers the diagnostic tooling.
-- [docs/adr/0001-tiered-agent-autonomy.md](docs/adr/0001-tiered-agent-autonomy.md)
+- [docs/architecture/agent-autonomy.md](docs/architecture/agent-autonomy.md)
   is the policy for what the agents may do on their own.

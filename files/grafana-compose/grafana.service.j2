@@ -18,24 +18,25 @@ Environment=COMPOSE_PROJECT_NAME={{ service }}
 Environment=COMPOSE_HTTP_TIMEOUT=60
 
 # Pre-start commands (idempotent)
-ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 30
+ExecStartPre=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --remove-orphans --timeout 120
 ExecStartPre=-/usr/bin/docker compose -f {{ home }}/docker-compose.yml pull --quiet
 
 # Start command
 ExecStart=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d
 
-# Stop command  
-ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+# NOTE: compose's default 10s down SIGKILLs MySQL mid-flush and every
+# restart becomes InnoDB crash recovery. TimeoutStopSec must exceed this.
+ExecStop=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --timeout 120
 
 # Reload command - force recreation to pick up new config files
-ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down
+ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml down --timeout 120
 ExecReload=/usr/bin/docker compose -f {{ home }}/docker-compose.yml up -d --force-recreate
 
 # Service behavior
 Restart=on-failure
 RestartSec=30
 TimeoutStartSec=180
-TimeoutStopSec=60
+TimeoutStopSec=180
 
 # Security
 NoNewPrivileges=true

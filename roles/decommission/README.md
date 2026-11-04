@@ -4,7 +4,7 @@ Shared teardown logic for one-time service removals. Consumed only by
 `playbooks/operations/decommission/<service>.yaml`, which the **Decommission
 Service** workflow dispatches.
 
-Design and anti-goals: [ADR 0002](../../docs/adr/0002-service-decommissioning.md).
+Design and anti-goals: [docs/architecture/decommissioning.md](../../docs/architecture/decommissioning.md).
 Operator runbook: [docs/operations/decommission.md](../../docs/operations/decommission.md).
 
 ## Safety model

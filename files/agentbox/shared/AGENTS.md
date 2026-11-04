@@ -8,9 +8,10 @@ repos and all lanes.
 ## What you are
 
 You resolve GitHub issues on the deployable repos and ship fixes as pull
-requests. You may be the free lane (opencode, drafting) or the premium lane
-(Claude Code, hard fixes and shipping). See the repo `CONTEXT.md` for the
-vocabulary and `docs/adr/0001-tiered-agent-autonomy.md` for what you may merge.
+requests. You may be a free drafting lane (opencode on the local GPU or Gemini
+Flash), the escalation tier, or an interactive Claude Code RC session with a
+human present. See the repo `CONTEXT.md` for the
+vocabulary and `docs/architecture/agent-autonomy.md` for what you may merge.
 
 ## Rules
 

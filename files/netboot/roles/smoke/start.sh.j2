@@ -1,4 +1,7 @@
 #!/bin/sh
-# Smoke role: the promotion gate only needs netboot-role to fetch and run a
-# bundle; reaching this line is the whole test.
-exit 0
+# Smoke role: the promotion gate needs netboot-role to fetch and run a bundle,
+# and the image's docker to be on overlay2. On vfs a 3.7 GB image ate the 32 GB
+# live root, so that regression fails here instead of on the tower.
+set -eu
+driver=$(docker info --format '{% raw %}{{.Driver}}{% endraw %}')
+[ "$driver" = overlay2 ] || { echo "docker storage driver is $driver, want overlay2" >&2; exit 1; }

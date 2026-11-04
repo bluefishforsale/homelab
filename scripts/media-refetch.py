@@ -57,11 +57,20 @@ MAX_ATTEMPTS = 3
 GRAB_TIMEOUT = dt.timedelta(hours=12)
 # Inside tdarr.py drive's 7-day horizon, so the flow has had its chance.
 FLOW_TIMEOUT = dt.timedelta(days=3)
+# Marking a grab failed makes the *arr search and grab on its own; give that
+# grab this long to reach the queue before searching ourselves.
+REDOWNLOAD_GRACE = dt.timedelta(minutes=30)
 # With a file on disk every release carries one of these; a release whose only
 # rejections are these is one Radarr would take if the file were gone.
 EXISTING_FILE = "Existing file on disk"
 # Not library content; re-downloading would not fix it and nothing should.
 JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso$|/VIDEO_TS/)", re.I)
+# A bonus disc Sonarr parses as the whole season. It imports nothing, and the
+# season's old files are gone by then.
+EXTRAS = re.compile(r"\bextras\b", re.I)
+# The same disc also comes without the word. An SD DVDRip runs 170-350 MB an
+# episode; under this, the release cannot hold what it would replace.
+MIN_EPISODE_BYTES = 50e6
 TV_SEASON = re.compile(r"^/tv/([^/]+)/Season (\d+)/")
 # NOTE: this Sonarr release profile keeps Sonarr's own searches off season
 # packs. Packs are grabbed past it on purpose, a season at a time; Sonarr puts
@@ -145,8 +154,23 @@ def probe(file):
     return json.loads(out)["streams"]
 
 
+def flowed(file):
+    """Where a file is now: tdarr's flow remuxes an .mp4 or .avi to an .mkv beside it."""
+    mkv = os.path.splitext(file)[0] + ".mkv"
+    out = ssh("sudo -n docker exec tdarr-node ls -d -- " + shlex.quote(file) + " " + shlex.quote(mkv)
+              + " 2>/dev/null; true")
+    return next(iter(out.splitlines()), file)
+
+
 def needs_bump(record):
     return bool(record) and record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
+
+
+def transcoding_now():
+    """Files a tdarr worker is transcoding right now, by tdarr-node path."""
+    nodes = mc.get("tdarr", "/api/v2/get-nodes").values()
+    return {w.get("file") for n in nodes for w in n["workers"].values()
+            if (w.get("workerType") or "").startswith("transcode")}
 
 
 def tdarr_files(mode, **kw):
@@ -228,6 +252,8 @@ def best_tv_release(item):
     else:
         rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
         ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
+    ok = [r for r in ok if not EXTRAS.search(r["title"])
+          and r["size"] >= MIN_EPISODE_BYTES * len(item["episode_ids"])]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
 
@@ -389,6 +415,10 @@ def gave_up(grabbed, downloading):
     return not downloading and now() - grabbed > GRAB_TIMEOUT
 
 
+def awaiting_redownload(item):
+    return "failed_at" in item and now() - dt.datetime.fromisoformat(item["failed_at"]) < REDOWNLOAD_GRACE
+
+
 def import_blocked(downloading):
     """Finished, but the *arr will not import it, so it stays queued and reads as downloading forever."""
     return bool(downloading) and all(q.get("status") == "completed" and q.get("trackedDownloadStatus") == "warning"
@@ -414,6 +444,8 @@ def step(item, yes):
             if yes:
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
+        if awaiting_redownload(item):
+            return False
         rel = best_release(mid)
         if not rel:
             note(item, "no acceptable release found; left as is")
@@ -477,17 +509,20 @@ def step(item, yes):
         latest = max(hist, key=lambda h: h["date"])
         mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
         mc.post("radarr", f"/api/v3/history/failed/{latest['id']}", {})
-        item["state"] = "planned"
+        item.update(state="planned", failed_at=now().isoformat())
         return True
 
     if item["state"] == "imported":
+        item["file"] = flowed(item["file"])
+        item["path"] = item["file"].removeprefix("/media")
         why = conformance.reasons(probe(item["file"]))
         if "no-dialogue-track" in why or "video-not-hevc" in why:
             # NOTE: an item waiting here holds off the next batch. Chamber of
             # Secrets came out of the flow HEVC but with no dialogue track and
             # stalled every batch from 2026-10-14 until this timeout existed.
             imported = dt.datetime.fromisoformat(item.get("imported_at", item["grabbed_at"]))
-            if now() - imported > FLOW_TIMEOUT:
+            # A CPU worker takes a day or more over a remux; one still running is not stalled.
+            if now() - imported > FLOW_TIMEOUT and item["file"] not in transcoding_now():
                 note(item, f"still {','.join(why)} after {FLOW_TIMEOUT}; check the tdarr flow")
                 item["state"] = "stuck"
                 return True
@@ -522,6 +557,8 @@ def step_tv(item, yes, ledger):
             if yes:
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
+        if awaiting_redownload(item):
+            return False
         rel = best_tv_release(item)
         if not rel and item["pack"]:
             note(item, f"no acceptable season pack; searching its {len(item['bad'])} bad episodes one at a time")
@@ -570,6 +607,16 @@ def step_tv(item, yes, ledger):
                 blocklist("sonarr", downloading)
                 item["state"] = "planned"
                 return True
+            # Sonarr imported what it could match and holds the rest of the release as
+            # blocked; clear it so the episodes it lacked get searched.
+            if import_blocked(downloading):
+                note(item, f"Sonarr imported {len(new)} of {len(eps)} from {downloading[0]['title'][:60]}; "
+                           "clearing the rest from the queue")
+                if not yes:
+                    return False
+                for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
+                    mc.delete("sonarr", f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="false")
+                downloading = []
             if not new or downloading:
                 if gave_up(grabbed, downloading):
                     note(item, f"{len(new)} of {len(eps)} imported after {GRAB_TIMEOUT}; check the Sonarr queue")
@@ -606,14 +653,19 @@ def step_tv(item, yes, ledger):
         for fid in {f["id"] for f in new.values()}:
             mc.delete("sonarr", f"/api/v3/episodefile/{fid}")
         mc.post("sonarr", f"/api/v3/history/failed/{latest['id']}", {})
-        item["state"] = "planned"
+        item.update(state="planned", failed_at=now().isoformat())
         return True
 
     if item["state"] == "imported":
+        files = [flowed(f) for f in item["files"]]
+        if files != item["files"]:
+            note(item, f"{sum(a != b for a, b in zip(files, item['files']))} files remuxed to .mkv; Sonarr rescans")
+            item["files"] = files
+            mc.post("sonarr", "/api/v3/command", {"name": "RescanSeries", "seriesId": sid})
         whys = [conformance.reasons(probe(f)) for f in item["files"]]
         waiting = [w for w in whys if "no-dialogue-track" in w or "video-not-hevc" in w]
         if waiting:
-            if now() - when(item["imported_at"]) > FLOW_TIMEOUT:
+            if now() - when(item["imported_at"]) > FLOW_TIMEOUT and not transcoding_now() & set(item["files"]):
                 note(item, f"{len(waiting)} files still {','.join(waiting[0])} after {FLOW_TIMEOUT}; "
                            "check the tdarr flow")
                 item["state"] = "stuck"

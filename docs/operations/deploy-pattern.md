@@ -28,7 +28,7 @@ push main                             repository_dispatch              docker pu
 | | Image-based (paia, my-ta-jose) | Source-pull (example.com, blog.example.com) |
 |---|---|---|
 | External repo builds | Docker image → GHCR | static `dist/` or `public/` → committed back to main |
-| Homelab playbook | `docker login ghcr.io`, compose pull, systemd restart | git clone, rsync `public/` → web_root |
+| Homelab playbook | `docker login ghcr.io`, compose pull, systemd restart | delete and re-clone the repo; nginx serves `repo/public` in place |
 | Runtime on ocean | container on private port (8090–8095) | files under `/data01/services/<svc>/` served by nginx |
 | Refresh trigger | systemd restart pulls `:latest` | git clone replaces files |
 

@@ -114,8 +114,6 @@ Before any of this, an apply dumps the current state to
   container**, replaces the file and removes any stale `-wal` / `-shm`
   sidecars, then starts the container again. Expect a short outage for that one
   service.
-- **tar** (`mysql-atrest`): unpacks the archive over the data directory. Only
-  for the cold at-rest mysql copy.
 
 ## The registry
 
@@ -128,14 +126,11 @@ Service names are exactly these. A name that is not listed is rejected with
 | `wordpress` | mysql | `wordpress/wordpress.sql.gz` | (from `WORDPRESS_DB_CONTAINER`) |  |
 | `jellystat-db` | pg | `jellystat-db/jellystat-db.sql.gz` | `jellystat-db` |  |
 | `mem0-postgres` | pg | `mem0-postgres/mem0-postgres.sql.gz` | `mem0-postgres` |  |
-| `mysql-atrest` | tar | `mysql-atrest/mysql-atrest.tar.gz` | `mysql` | `/data01/services/mysql/data` |
 | `sonarr` | sqlite | `sonarr/sonarr.db.gz` | `sonarr` | `/data01/services/sonarr/sonarr.db` |
 | `radarr` | sqlite | `radarr/radarr.db.gz` | `radarr` | `/data01/services/radarr/radarr.db` |
-| `lidarr` | sqlite | `lidarr/lidarr.db.gz` | `lidarr` | `/data01/services/lidarr/lidarr.db` |
 | `prowlarr` | sqlite | `prowlarr/prowlarr.db.gz` | `prowlarr` | `/data01/services/prowlarr/config/prowlarr.db` |
 | `bazarr` | sqlite | `bazarr/bazarr.db.gz` | `bazarr` | `/data01/services/bazarr/db/bazarr.db` |
 | `jellyfin` | sqlite | `jellyfin/jellyfin.db.gz` | `jellyfin` | `/data01/services/jellyfin/config/data/jellyfin.db` |
-| `navidrome` | sqlite | `navidrome/navidrome.db.gz` | `navidrome` | `/data01/services/navidrome/data/navidrome.db` |
 | `tautulli` | sqlite | `tautulli/tautulli.db.gz` | `tautulli` | `/data01/services/tautulli/config/tautulli.db` |
 | `overseerr` | sqlite | `overseerr/overseerr.db.gz` | `overseerr` | `/data01/services/overseerr/config/db/db.sqlite3` |
 | `homeassistant` | sqlite | `homeassistant/homeassistant.db.gz` | `homeassistant` | `/data01/services/homeassistant/config/home-assistant_v2.db` |

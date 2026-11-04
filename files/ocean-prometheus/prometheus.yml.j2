@@ -60,6 +60,15 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9093']
 
+  # honor_labels: pushed series carry their own job/instance labels (the batch
+  # job that pushed them); without it Prometheus renames them exported_job and
+  # every pushed metric looks like it came from the gateway itself.
+  - job_name: 'pushgateway'
+    honor_labels: true
+    relabel_configs: *dropPortNumber
+    static_configs:
+    - targets: ['ocean.home:{{ service_ports.pushgateway.port }}']
+
   - job_name: 'node_exporter'
     scrape_interval: 30s
     scrape_timeout: 30s
@@ -79,6 +88,19 @@ scrape_configs:
     static_configs:
 {% for name, host in netboot_hosts.items() if name != 'netboot-smoke' %}
     - targets: ['{{ host.ip }}:9100']
+      labels:
+        instance: '{{ name }}-live'
+{% endfor %}
+
+  # GPU netboot roles also run dcgm-exporter (files/netboot/roles/tdarr-gpu),
+  # so the Better NVIDIA DCGM dashboard shows them beside ocean. Its own job,
+  # not netboot-hosts: the netboot alerts read up{job="netboot-hosts"} as "the
+  # machine is up", and a second target there would read as a missing role.
+  - job_name: 'netboot-dcgm'
+    scrape_interval: 30s
+    static_configs:
+{% for name, host in netboot_hosts.items() if host.role == 'tdarr-gpu' %}
+    - targets: ['{{ host.ip }}:9400']
       labels:
         instance: '{{ name }}-live'
 {% endfor %}
