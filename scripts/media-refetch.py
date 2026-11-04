@@ -154,6 +154,14 @@ def probe(file):
     return json.loads(out)["streams"]
 
 
+def flowed(file):
+    """Where a file is now: tdarr's flow remuxes an .mp4 or .avi to an .mkv beside it."""
+    mkv = os.path.splitext(file)[0] + ".mkv"
+    out = ssh("sudo -n docker exec tdarr-node ls -d -- " + shlex.quote(file) + " " + shlex.quote(mkv)
+              + " 2>/dev/null; true")
+    return next(iter(out.splitlines()), file)
+
+
 def needs_bump(record):
     return bool(record) and record["TranscodeDecisionMaker"] == "Queued" and not record["bumped"]
 
@@ -505,6 +513,8 @@ def step(item, yes):
         return True
 
     if item["state"] == "imported":
+        item["file"] = flowed(item["file"])
+        item["path"] = item["file"].removeprefix("/media")
         why = conformance.reasons(probe(item["file"]))
         if "no-dialogue-track" in why or "video-not-hevc" in why:
             # NOTE: an item waiting here holds off the next batch. Chamber of
@@ -647,6 +657,11 @@ def step_tv(item, yes, ledger):
         return True
 
     if item["state"] == "imported":
+        files = [flowed(f) for f in item["files"]]
+        if files != item["files"]:
+            note(item, f"{sum(a != b for a, b in zip(files, item['files']))} files remuxed to .mkv; Sonarr rescans")
+            item["files"] = files
+            mc.post("sonarr", "/api/v3/command", {"name": "RescanSeries", "seriesId": sid})
         whys = [conformance.reasons(probe(f)) for f in item["files"]]
         waiting = [w for w in whys if "no-dialogue-track" in w or "video-not-hevc" in w]
         if waiting:
