@@ -322,6 +322,10 @@ jobs:
       - name: lidarr quality profile
         run: python3 files/ocean-lidarr/test_lidarr_configure.py
 
+      # A slug matched to the wrong indexer pushes one site's key into another's.
+      - name: prowlarr indexer key matching
+        run: python3 files/ocean-prowlarr/test_prowlarr_indexer_keys.py
+
       # Dispatch payloads are attacker-set and the steps consuming them hold the
       # vault password. Fixed on the instance three times and it came back twice,
       # so the pattern gets the guard rather than the file that last broke.
