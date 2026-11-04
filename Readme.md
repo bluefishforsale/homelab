@@ -114,9 +114,10 @@ repo, which owns the host, the compose file, the secrets and the monitoring.
 - **paia**, a personal AI assistant on Discord.
 - **terrac.com**, **blog.terrac.com** and **blog.saetnere.com**: two static sites
   and a WordPress blog.
-- **The log anomaly detector**, an ML pass over the fleet's logs that flagged
-  unusual patterns into Grafana, ran from November 2025 until it was retired in
-  July 2026. Globalview got archived the same way in September. Projects come and go; the playbooks stay in `playbooks/archive/`.
+- **ml-log-analyzer**, an ML pass over the fleet's logs that flagged unusual
+  patterns into Grafana. It ran from November 2025 to July 2026 and is on hold
+  for now, not dead. Globalview was archived in September. Projects come and go;
+  the playbooks stay in `playbooks/archive/`.
 
 ## How a change ships
 
