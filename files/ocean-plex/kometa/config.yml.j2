@@ -2,11 +2,10 @@
 libraries:                                      # This is called out once within the config.yml file                                       
   Movies:                                       # Each library must match the Plex library name
     # Kometa v2 split metadata_path into collection_files and metadata_files.
-    # Everything below is collections, checked rather than assumed: Movies.yml
-    # has top-level `templates:`/`collections:`, config/movies/*.yaml are all
-    # `collections:`, and every `default:` here is a Kometa default collection
-    # file. Nothing edits item metadata, so this is a clean rename with no
-    # entries needing metadata_files.
+    # Everything below is collections: curated.yml (repo-managed, copied by
+    # plex.yaml) is all `collections:`, and every `default:` here is a Kometa
+    # default collection file. Nothing edits item metadata, so nothing needs
+    # metadata_files.
     collection_files:
     - file: config/curated.yml
     - default: seasonal
@@ -136,7 +135,7 @@ sonarr:                                         # Can be individually specified 
   token: {{ media_services.sonarr.api_key }}
   add_missing: false
   add_existing: true
-  root_folder_path: S:/TV Shows
+  root_folder_path: /tv
   monitor: all
   quality_profile: HD-1080p
   language_profile: English
