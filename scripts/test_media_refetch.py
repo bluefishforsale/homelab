@@ -162,6 +162,23 @@ def test_release_a_year_off_the_movie_is_the_same_film():
     assert BEST_RELEASE(1)
 
 
+def test_extras_disc_is_never_the_season():
+    # Star Trek: Voyager S06 and S07 lost all 52 episodes on 2026-11-03: an
+    # EXTRAS.DVDRip pack won the pick, the old files went at grab, and the
+    # featurettes imported nothing.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/releaseprofile":
+                return []
+            return [{"title": t, "fullSeason": True, "downloadAllowed": True, "rejections": [EXISTING],
+                     "releaseWeight": w}
+                    for w, t in enumerate(["Star.Trek.Voyager.S06.EXTRAS.DVDRip.x264-MARS",
+                                           "Star.Trek.Voyager.S06.NTSC.DVD.DD5.1.MPEG-2.REMUX-S0NNY"])]
+    refetch.mc = Fake()
+    item = {"pack": True, "series_id": 1, "season": 6, "episode_ids": [1]}
+    assert "EXTRAS" not in BEST_TV_RELEASE(item)["title"]
+
+
 
 def test_anime_season_search_gets_time_for_every_episode():
     # Sonarr runs an anime season search as the pack query plus one search per
