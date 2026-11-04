@@ -54,6 +54,7 @@ is the same host wherever it appears.
 - [Proxmox](operations/proxmox.md) - VM management, clustering
 - [ZFS Storage](operations/zfs.md) - Storage operations, snapshots
 - [ZFS Disk Replacement](operations/zfs-disk-replacement.md) - Disk failure recovery
+- [Disk Shelf Expansion](operations/disk-shelf-expansion.md) - External SAS shelves on node006, passthrough to ocean, growing data01
 - [GPU Management](operations/gpu-management.md) - NVIDIA RTX 3090 configuration
 - [Dell Hardware](operations/dell-hardware.md) - iDRAC, RAID, firmware
 - [UniFi Network](operations/unifi.md) - Switch and AP configuration
