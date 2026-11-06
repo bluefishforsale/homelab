@@ -202,6 +202,16 @@ def test_pack_of_another_show_sonarr_matched_by_id_is_not_grabbed():
     assert BEST_TV_RELEASE(item)["title"].startswith("Steven.Universe")
 
 
+def test_show_named_for_a_year_does_not_take_another_years_show():
+    # Stripping years would leave 1883 and 1923 both empty, and so the same show.
+    assert not refetch.same_show({"seriesTitle": "1923"}, {"title": "1883"})
+    assert refetch.same_show({"seriesTitle": "1883"}, {"title": "1883"})
+
+
+def test_ampersand_and_and_name_the_same_show():
+    assert refetch.same_show({"seriesTitle": "Law and Order"}, {"title": "Law & Order"})
+
+
 def test_pack_too_small_to_hold_the_season_is_not_grabbed():
     # Voyager S06 then picked the same 0.4 GB disc without EXTRAS in its name:
     # about 15 MB for each of 26 episodes.

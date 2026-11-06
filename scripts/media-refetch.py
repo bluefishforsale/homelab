@@ -245,8 +245,9 @@ EPISODE_SEARCH = 90
 
 def show_name(title):
     """A series title as a person reads it: no case, punctuation, year or leading The."""
-    t = re.sub(r"\b(19|20)\d\d\b", "", title.lower())
-    return re.sub(r"[^a-z0-9]", "", re.sub(r"^\W*the\b", "", t))
+    t = re.sub(r"^\W*the\b", "", title.lower().replace("&", " and "))
+    bare = re.sub(r"\b(19|20)\d\d\b", "", t)
+    return re.sub(r"[^a-z0-9]", "", bare if re.search(r"[a-z0-9]", bare) else t)    # 1883 is all year
 
 
 def same_show(rel, series):
