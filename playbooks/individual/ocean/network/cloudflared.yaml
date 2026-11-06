@@ -865,6 +865,83 @@
     delegate_to: localhost
     become: false
 
+  # photonic_inventory moved to gear.radiantatmospheres.com. The old host keeps
+  # its DNS record (proxied) so the edge can answer with a 301 that carries the
+  # path and query, which keeps bookmarks and already-sent invite links alive.
+  - name: Define inventory.terrac.com redirect rule
+    ansible.builtin.set_fact:
+      inventory_redirect_rule:
+        description: "inventory.terrac.com moved to gear.radiantatmospheres.com"
+        expression: '(http.host eq "inventory.terrac.com")'
+        action: "redirect"
+        action_parameters:
+          from_value:
+            status_code: 301
+            target_url:
+              expression: 'concat("https://gear.radiantatmospheres.com", http.request.uri.path)'
+            preserve_query_string: true
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+
+  - name: Get terrac.com http_request_dynamic_redirect phase ruleset
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+      status_code: [200, 404]
+    register: redirect_entrypoint
+    when:
+      - inventory_hostname == 'ocean'
+      - inventory_redirect_rule is defined
+    delegate_to: localhost
+    become: false
+
+  - name: Create redirect ruleset with the inventory rule (zone has no ruleset yet)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "default"
+        kind: "zone"
+        phase: "http_request_dynamic_redirect"
+        rules:
+          - "{{ inventory_redirect_rule }}"
+      status_code: [200]
+    when:
+      - inventory_hostname == 'ocean'
+      - inventory_redirect_rule is defined
+      - redirect_entrypoint.status == 404
+    delegate_to: localhost
+    become: false
+
+  - name: Replace inventory rule in existing redirect ruleset
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/rulesets/{{ redirect_entrypoint.json.result.id }}"
+      method: PUT
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        rules: "{{ (redirect_entrypoint.json.result.rules | default([]) | rejectattr('description','equalto', inventory_redirect_rule.description) | list) + [inventory_redirect_rule] }}"
+      status_code: [200]
+    when:
+      - inventory_hostname == 'ocean'
+      - inventory_redirect_rule is defined
+      - redirect_entrypoint.status == 200
+    delegate_to: localhost
+    become: false
+
   # Cloudflare Access Application (Zero Trust) for SSH
   - name: Set Access application variables
     ansible.builtin.set_fact:
