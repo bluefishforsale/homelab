@@ -1029,13 +1029,21 @@
     become: yes
     notify: restart ssh
 
+  # Restart now, not at play end: a later task failing would skip the handler,
+  # leaving files at key-only but the running sshd still accepting passwords,
+  # and the next run would see no change and never restart it.
+  - name: Apply sshd config changes now
+    ansible.builtin.meta: flush_handlers
+
   - name: Read effective sshd auth settings
     ansible.builtin.command: /usr/sbin/sshd -T
     register: sshd_effective
     changed_when: false
+    check_mode: false
     become: true
 
   - name: Assert sshd is key-only
+    when: not ansible_check_mode
     ansible.builtin.assert:
       that:
         - "'passwordauthentication no' in sshd_effective.stdout_lines"
