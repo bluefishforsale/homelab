@@ -243,6 +243,19 @@ SEARCH_TIMEOUT = 600
 EPISODE_SEARCH = 90
 
 
+def show_name(title):
+    """A series title as a person reads it: no case, punctuation, year or leading The."""
+    t = re.sub(r"\b(19|20)\d\d\b", "", title.lower())
+    return re.sub(r"[^a-z0-9]", "", re.sub(r"^\W*the\b", "", t))
+
+
+def same_show(rel, series):
+    # NOTE: Sonarr trusts an indexer's TVDB id over the release name, so a release
+    # of another show tagged with this one's id comes back with no rejection.
+    names = {show_name(n) for n in [series["title"], *(a["title"] for a in series.get("alternateTitles", []))]}
+    return show_name(rel.get("seriesTitle") or "") in names
+
+
 def best_tv_release(item):
     if item["pack"]:
         rels = mc.get("sonarr", "/api/v3/release", seriesId=item["series_id"], seasonNumber=item["season"],
@@ -252,7 +265,8 @@ def best_tv_release(item):
     else:
         rels = mc.get("sonarr", "/api/v3/release", episodeId=item["episode_ids"][0], timeout=SEARCH_TIMEOUT)
         ok = [r for r in rels if not r.get("fullSeason") and acceptable(r)]
-    ok = [r for r in ok if not EXTRAS.search(r["title"])
+    series = mc.get("sonarr", f"/api/v3/series/{item['series_id']}")
+    ok = [r for r in ok if not EXTRAS.search(r["title"]) and same_show(r, series)
           and r["size"] >= MIN_EPISODE_BYTES * len(item["episode_ids"])]
     return min(ok, key=lambda r: r.get("releaseWeight", 0)) if ok else None
 
