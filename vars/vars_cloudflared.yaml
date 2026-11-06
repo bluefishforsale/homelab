@@ -100,6 +100,11 @@ cloudflared:
         - hostname: "inventory.terrac.com"
           service_type: "http"
           service_url: "http://192.168.1.143:8095"
+        # Same app on its new home in the radiantatmospheres.com zone. The
+        # terrac host stays until a 301 points it here.
+        - hostname: "gear.radiantatmospheres.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:8095"
 
         # Management services (running on ocean - 192.168.1.143)
         - hostname: "portainer.terrac.com"
