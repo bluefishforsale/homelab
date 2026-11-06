@@ -993,6 +993,26 @@
       enabled: yes
     become: yes
 
+  # NOTE: key-only SSH. sshd is internet-reachable through the ssh-<host> tunnels,
+  # so password auth is attack surface (CVE-2026-123158 needed it, though this
+  # glibc+PAM fleet was not exposed). KbdInteractive is pinned off because with
+  # UsePAM it is a second password path. sshd takes the FIRST value it reads and
+  # Debian includes sshd_config.d/*.conf at the top, so the 00- drop-in is what
+  # actually wins; a later drop-in (cloud-init's 50-cloud-init.conf) cannot
+  # override it, and the sshd -T assert fails the play if anything else does.
+  - name: Enforce key-only SSH auth via a first-sorting drop-in
+    ansible.builtin.copy:
+      dest: /etc/ssh/sshd_config.d/00-key-only.conf
+      content: |
+        PasswordAuthentication no
+        KbdInteractiveAuthentication no
+      owner: root
+      group: root
+      mode: '0644'
+      validate: '/usr/sbin/sshd -t -f %s'
+    become: true
+    notify: restart ssh
+
   - name: Configure SSH for tunnel access
     lineinfile:
       path: /etc/ssh/sshd_config
@@ -1000,9 +1020,6 @@
       line: '{{ item.key }} {{ item.value }}'
       backup: yes
       validate: '/usr/sbin/sshd -t -f %s'
-    # NOTE: key-only. sshd is internet-reachable through the ssh-<host> tunnels,
-    # and password auth is the precondition for CVE-2026-123158 class bypasses.
-    # KbdInteractive is pinned off because with UsePAM it is a second password path.
     with_items:
       - { key: 'PermitRootLogin', value: 'no' }
       - { key: 'PasswordAuthentication', value: 'no' }
@@ -1011,6 +1028,19 @@
       - { key: 'Port', value: '22' }
     become: yes
     notify: restart ssh
+
+  - name: Read effective sshd auth settings
+    ansible.builtin.command: /usr/sbin/sshd -T
+    register: sshd_effective
+    changed_when: false
+    become: true
+
+  - name: Assert sshd is key-only
+    ansible.builtin.assert:
+      that:
+        - "'passwordauthentication no' in sshd_effective.stdout_lines"
+        - "'kbdinteractiveauthentication no' in sshd_effective.stdout_lines"
+      fail_msg: "sshd still allows password auth; check /etc/ssh/sshd_config.d/ for an override"
 
   - name: Verify SSH server is accessible locally
     wait_for:
