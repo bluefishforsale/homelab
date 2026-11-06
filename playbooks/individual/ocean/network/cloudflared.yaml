@@ -243,7 +243,7 @@
   # Define which services need NO authentication (bypass policy)
   - name: Define fully public services list (no authentication required)
     ansible.builtin.set_fact:
-      fully_public_services: ["blog", "terrac", "www", "ta", "llama", "inventory", "ntfy"]
+      fully_public_services: ["blog", "terrac", "www", "ta", "llama", "inventory", "gear", "ntfy"]
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -268,7 +268,7 @@
 
   - name: Add each service to ocean_access_apps
     ansible.builtin.set_fact:
-      ocean_access_apps: "{{ ocean_access_apps + [{'name': item.split('.')[0], 'domain': item, 'access_type': 'fully_public' if item.split('.')[0] in fully_public_services else ('public' if item.split('.')[0] in public_services else 'private'), 'zone_id': cloudflare.saetnere_com if 'saetnere.com' in item else cloudflare.terrac_com}] }}"
+      ocean_access_apps: "{{ ocean_access_apps + [{'name': item.split('.')[0], 'domain': item, 'access_type': 'fully_public' if item.split('.')[0] in fully_public_services else ('public' if item.split('.')[0] in public_services else 'private'), 'zone_id': cloudflare.saetnere_com if item.endswith('saetnere.com') else (cloudflare.radiantatmospheres_com if item.endswith('radiantatmospheres.com') else cloudflare.terrac_com)}] }}"
     loop: "{{ http_hostnames }}"
     when:
       - inventory_hostname == 'ocean'
@@ -312,11 +312,28 @@
     delegate_to: localhost
     become: false
 
-  - name: Combine Access apps from both zones
+  - name: Get existing Cloudflare Access applications for radiantatmospheres.com zone
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.radiantatmospheres_com }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: ocean_cf_access_apps_radiantatmospheres
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+
+  - name: Combine Access apps from all zones
     ansible.builtin.set_fact:
       ocean_cf_access_apps:
         json:
-          result: "{{ (ocean_cf_access_apps_terrac.json.result | default([])) + (ocean_cf_access_apps_saetnere.json.result | default([])) }}"
+          result: "{{ (ocean_cf_access_apps_terrac.json.result | default([])) + (ocean_cf_access_apps_saetnere.json.result | default([])) + (ocean_cf_access_apps_radiantatmospheres.json.result | default([])) }}"
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -386,11 +403,28 @@
     delegate_to: localhost
     become: false
 
-  - name: Re-combine Access apps from both zones (post-create)
+  - name: Re-fetch Access applications (radiantatmospheres.com) after create
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.radiantatmospheres_com }}/access/apps"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: ocean_cf_access_apps_radiantatmospheres_post
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+
+  - name: Re-combine Access apps from all zones (post-create)
     ansible.builtin.set_fact:
       ocean_cf_access_apps:
         json:
-          result: "{{ (ocean_cf_access_apps_terrac_post.json.result | default([])) + (ocean_cf_access_apps_saetnere_post.json.result | default([])) }}"
+          result: "{{ (ocean_cf_access_apps_terrac_post.json.result | default([])) + (ocean_cf_access_apps_saetnere_post.json.result | default([])) + (ocean_cf_access_apps_radiantatmospheres_post.json.result | default([])) }}"
     when:
       - inventory_hostname == 'ocean'
       - cloudflare.api_key is defined
@@ -440,6 +474,23 @@
     delegate_to: localhost
     become: false
 
+  - name: Get existing reusable policies for radiantatmospheres.com zone
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.radiantatmospheres_com }}/access/policies?reusable=true"
+      method: GET
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      status_code: 200
+    register: existing_policies_radiantatmospheres
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+    delegate_to: localhost
+    become: false
+
   - name: Extract existing policy IDs by name (terrac.com)
     ansible.builtin.set_fact:
       existing_admin_policy_id: "{{ (existing_policies_terrac.json.result | selectattr('name', 'equalto', 'Allow admin') | list | first).id | default('') }}"
@@ -457,6 +508,14 @@
       - inventory_hostname == 'ocean'
       - existing_policies_saetnere is defined
       - existing_policies_saetnere.json.result is defined
+
+  - name: Extract existing bypass policy ID (radiantatmospheres.com)
+    ansible.builtin.set_fact:
+      existing_bypass_policy_radiantatmospheres_id: "{{ (existing_policies_radiantatmospheres.json.result | selectattr('name', 'equalto', 'Allow everyone (bypass)') | list | first).id | default('') }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - existing_policies_radiantatmospheres is defined
+      - existing_policies_radiantatmospheres.json.result is defined
 
   # Only create policies if they don't exist
   - name: Create reusable admin policy (if not exists)
@@ -557,6 +616,31 @@
     delegate_to: localhost
     become: false
 
+  - name: Create reusable bypass policy for radiantatmospheres.com (if not exists)
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.radiantatmospheres_com }}/access/policies"
+      method: POST
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "Allow everyone (bypass)"
+        decision: "bypass"
+        include:
+          - everyone: {}
+        reusable: true
+      status_code: [200]
+    register: created_bypass_policy_radiantatmospheres
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - existing_bypass_policy_radiantatmospheres_id | default('') == ''
+    delegate_to: localhost
+    become: false
+
   # Set final policy IDs (use existing or newly created)
   - name: Set final policy IDs
     ansible.builtin.set_fact:
@@ -564,6 +648,7 @@
       reusable_plex_policy_id: "{{ existing_plex_policy_id | default('') or (created_plex_policy.json.result.id | default('')) }}"
       reusable_bypass_policy_id: "{{ existing_bypass_policy_id | default('') or (created_bypass_policy.json.result.id | default('')) }}"
       reusable_bypass_policy_saetnere_id: "{{ existing_bypass_policy_saetnere_id | default('') or (created_bypass_policy_saetnere.json.result.id | default('')) }}"
+      reusable_bypass_policy_radiantatmospheres_id: "{{ existing_bypass_policy_radiantatmospheres_id | default('') or (created_bypass_policy_radiantatmospheres.json.result.id | default('')) }}"
     when:
       - inventory_hostname == 'ocean'
 
@@ -574,6 +659,7 @@
         - "Plex policy ID: {{ reusable_plex_policy_id }}"
         - "Bypass policy ID (terrac): {{ reusable_bypass_policy_id }}"
         - "Bypass policy ID (saetnere): {{ reusable_bypass_policy_saetnere_id }}"
+        - "Bypass policy ID (radiantatmospheres): {{ reusable_bypass_policy_radiantatmospheres_id }}"
     when:
       - inventory_hostname == 'ocean'
 
@@ -592,7 +678,7 @@
         domain: "{{ item.domain }}"
         type: "self_hosted"
         session_duration: "24h"
-        policies: "{{ ([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list }}"
+        policies: "{{ ([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else (reusable_bypass_policy_radiantatmospheres_id if item.zone_id == cloudflare.radiantatmospheres_com else reusable_bypass_policy_id)] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list }}"
       status_code: [200, 400]
     register: replace_policy_result
     loop: "{{ ocean_access_apps }}"
@@ -604,7 +690,7 @@
       # Gate per-app on the policy THIS app needs, not always the admin policy:
       # a fully_public app uses the bypass policy and must not be blocked by a
       # missing admin policy id.
-      - (([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else reusable_bypass_policy_id] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list | length > 0)
+      - (([reusable_bypass_policy_saetnere_id if item.zone_id == cloudflare.saetnere_com else (reusable_bypass_policy_radiantatmospheres_id if item.zone_id == cloudflare.radiantatmospheres_com else reusable_bypass_policy_id)] if item.access_type == 'fully_public' else ([reusable_admin_policy_id] + ([reusable_plex_policy_id] if item.access_type == 'public' else []))) | reject('equalto', '') | list | length > 0)
     delegate_to: localhost
     become: false
     failed_when:
