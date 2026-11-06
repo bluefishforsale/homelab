@@ -172,13 +172,50 @@ def test_extras_disc_is_never_the_season():
         def get(self, app, path, **kw):
             if path == "/api/v3/releaseprofile":
                 return []
-            return [{"title": t, "size": 9e9, "fullSeason": True, "downloadAllowed": True,
+            if path == "/api/v3/series/1":
+                return {"title": "Star Trek: Voyager"}
+            return [{"title": t, "seriesTitle": "Star Trek Voyager", "size": 9e9, "fullSeason": True, "downloadAllowed": True,
                      "rejections": [EXISTING], "releaseWeight": w}
                     for w, t in enumerate(["Star.Trek.Voyager.S06.EXTRAS.DVDRip.x264-MARS",
                                            "Star.Trek.Voyager.S06.NTSC.DVD.DD5.1.MPEG-2.REMUX-S0NNY"])]
     refetch.mc = Fake()
     item = {"pack": True, "series_id": 1, "season": 6, "episode_ids": [1]}
     assert "EXTRAS" not in BEST_TV_RELEASE(item)["title"]
+
+
+def test_pack_of_another_show_sonarr_matched_by_id_is_not_grabbed():
+    # Steven Universe S01 grabbed Universe.2021.S01 on 2026-11-06: the indexer
+    # tagged the nature series with Steven Universe's TVDB id, Sonarr matched it by
+    # id with no rejection, and the season's 49 old files went at grab.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/releaseprofile":
+                return []
+            if path == "/api/v3/series/1":
+                return {"title": "Steven Universe", "alternateTitles": [{"title": "Steven Universe (2014)"}]}
+            return [{"title": t, "seriesTitle": st, "size": 9e9, "fullSeason": True, "downloadAllowed": True,
+                     "rejections": [EXISTING], "releaseWeight": w}
+                    for w, (t, st) in enumerate([("Universe.2021.S01.1080p.BluRay.FLAC2.0.x264-NTb", "Universe 2021"),
+                                                 ("Steven.Universe.S01.1080p.BluRay.x265-iVy", "Steven Universe")])]
+    refetch.mc = Fake()
+    item = {"pack": True, "series_id": 1, "season": 1, "episode_ids": list(range(49))}
+    assert BEST_TV_RELEASE(item)["title"].startswith("Steven.Universe")
+
+
+def test_anime_pack_named_for_its_season_is_the_same_show():
+    # DAN DA DAN S02's pack came as "[DB] Dandadan 2nd Season" (2026-10-24).
+    series = {"title": "DAN DA DAN", "alternateTitles": [{"title": "Dandadan"}]}
+    assert refetch.same_show({"seriesTitle": "Dandadan 2nd Season"}, series)
+
+
+def test_show_named_for_a_year_does_not_take_another_years_show():
+    # Stripping years would leave 1883 and 1923 both empty, and so the same show.
+    assert not refetch.same_show({"seriesTitle": "1923"}, {"title": "1883"})
+    assert refetch.same_show({"seriesTitle": "1883"}, {"title": "1883"})
+
+
+def test_ampersand_and_and_name_the_same_show():
+    assert refetch.same_show({"seriesTitle": "Law and Order"}, {"title": "Law & Order"})
 
 
 def test_pack_too_small_to_hold_the_season_is_not_grabbed():
@@ -188,7 +225,9 @@ def test_pack_too_small_to_hold_the_season_is_not_grabbed():
         def get(self, app, path, **kw):
             if path == "/api/v3/releaseprofile":
                 return []
-            return [{"title": t, "size": s, "fullSeason": True, "downloadAllowed": True, "rejections": [EXISTING],
+            if path == "/api/v3/series/1":
+                return {"title": "Star Trek: Voyager"}
+            return [{"title": t, "seriesTitle": "Star Trek Voyager", "size": s, "fullSeason": True, "downloadAllowed": True, "rejections": [EXISTING],
                      "releaseWeight": w}
                     for w, (t, s) in enumerate([("Star.Trek.Voyager.S06.iNTERNAL.DVDRip.x264-MARS", 0.4e9),
                                                 ("Star.Trek.Voyager.S06.DVDRip.x264-OTHER", 9e9)])]
