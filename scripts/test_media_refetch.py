@@ -202,6 +202,12 @@ def test_pack_of_another_show_sonarr_matched_by_id_is_not_grabbed():
     assert BEST_TV_RELEASE(item)["title"].startswith("Steven.Universe")
 
 
+def test_anime_pack_named_for_its_season_is_the_same_show():
+    # DAN DA DAN S02's pack came as "[DB] Dandadan 2nd Season" (2026-10-24).
+    series = {"title": "DAN DA DAN", "alternateTitles": [{"title": "Dandadan"}]}
+    assert refetch.same_show({"seriesTitle": "Dandadan 2nd Season"}, series)
+
+
 def test_show_named_for_a_year_does_not_take_another_years_show():
     # Stripping years would leave 1883 and 1923 both empty, and so the same show.
     assert not refetch.same_show({"seriesTitle": "1923"}, {"title": "1883"})
