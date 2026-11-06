@@ -999,9 +999,14 @@
       regexp: '^#?{{ item.key }}'
       line: '{{ item.key }} {{ item.value }}'
       backup: yes
+      validate: '/usr/sbin/sshd -t -f %s'
+    # NOTE: key-only. sshd is internet-reachable through the ssh-<host> tunnels,
+    # and password auth is the precondition for CVE-2026-123158 class bypasses.
+    # KbdInteractive is pinned off because with UsePAM it is a second password path.
     with_items:
       - { key: 'PermitRootLogin', value: 'no' }
-      - { key: 'PasswordAuthentication', value: 'yes' }
+      - { key: 'PasswordAuthentication', value: 'no' }
+      - { key: 'KbdInteractiveAuthentication', value: 'no' }
       - { key: 'PubkeyAuthentication', value: 'yes' }
       - { key: 'Port', value: '22' }
     become: yes
