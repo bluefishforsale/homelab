@@ -28,7 +28,7 @@ fetch() {  # url sha256 dest
 
 {% for m in llmeval_models %}
 {% for f in m.files %}
-fetch "{{ f.url }}" "{{ f.sha256 }}" "$MODELS/{% if m.dir | default(false) %}{{ m.name }}/{% endif %}{{ f.url | basename }}"
+fetch "{{ f.url }}" "{{ f.sha256 }}" "$MODELS/{% if m.dir | default(false) %}{{ m.name }}/{% endif %}{{ f.url.split('/')[-1] }}"
 {% endfor %}
 {% endfor %}
 
