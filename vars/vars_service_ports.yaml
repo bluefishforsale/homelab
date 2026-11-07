@@ -116,6 +116,11 @@ service_ports:
   llamacpp:
     port: 8080
 
+  # llmeval VM (playbooks/individual/infrastructure/llmeval.yaml): CPU llama.cpp
+  # router serving the 395 candidates to axiomd's eval. LAN only.
+  llmeval:
+    port: 8080
+
   open_webui:
     port: 3000
 

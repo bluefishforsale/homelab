@@ -1,0 +1,28 @@
+---
+# Models the llmeval VM serves to `axiomd eval` (axiomd config/eval.toml names
+# them; the router exposes each by file or directory name, so these names ARE
+# the model ids). Every one is Q4-class so quantization is not the variable.
+# sha256 is the Hugging Face LFS oid, checked after download, so a truncated
+# or swapped file fails loudly instead of skewing a day of evals.
+# Sharded models list every shard and get their own directory, as router mode
+# requires.
+llmeval_models:
+  - name: Qwen3-Coder-30B-A3B-Instruct-Q4_K_M  # the baseline, what ocean runs
+    files:
+      - url: https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
+        sha256: fadc3e5f8d42bf7e894a785b05082e47daee4df26680389817e2093056f088ad
+  - name: gpt-oss-120b-MXFP4
+    files:
+      - url: https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main/gpt-oss-120b-MXFP4.gguf
+        sha256: 582bd40f6886200101f4c4ed9f25f3fe80cc14c86e9e2b37746cd8904a0c622d
+  - name: Qwen3-Coder-Next-Q4_K_M
+    files:
+      - url: https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF/resolve/main/Qwen3-Coder-Next-Q4_K_M.gguf
+        sha256: 9e6032d2f3b50a60f17ce8bf5a1d85c71af9b53b89c7978020ae7c660f29b090
+  - name: GLM-4.5-Air-Q4_K_M
+    dir: true
+    files:
+      - url: https://huggingface.co/unsloth/GLM-4.5-Air-GGUF/resolve/main/Q4_K_M/GLM-4.5-Air-Q4_K_M-00001-of-00002.gguf
+        sha256: 3e7e5d25a6db33b7c90f8c5203d6f490d6c0a4f04a46f228af0e33727db5df5e
+      - url: https://huggingface.co/unsloth/GLM-4.5-Air-GGUF/resolve/main/Q4_K_M/GLM-4.5-Air-Q4_K_M-00002-of-00002.gguf
+        sha256: ac6e50523d45c53faf3bf72d8fe109f3dd54bc6abe98a7773a3636112ead82a6

@@ -1,0 +1,172 @@
+---
+# llmeval: CPU llama.cpp standing in for a Ryzen AI Max+ 395, so axiomd can
+# grade the models a 395 could hold against ocean's Qwen3-Coder-30B before any
+# money is spent. Only output quality is compared; this box is far slower than
+# a 395 and axiomd estimates the 395's time from published throughput instead.
+#
+# Three units:
+#   llmeval.service         llama.cpp router (compose), one model loaded at a time
+#   llmeval-models.service  downloads and sha256-verifies the GGUFs (~204 GB);
+#                           a systemd job so a CI deploy never waits hours on it
+#   axiomd-eval.service     the eval itself, started only on request:
+#                           main-apply dispatch with extra_vars llmeval_start_eval=true
+# The eval mails a report per finished model and pushes to ntfy, so nobody
+# needs to watch it.
+#
+# Prerequisites:
+#   - VM created via create_llmeval_vm.yaml
+#   - base and docker: main-apply dispatch of 01_base_system + docker_ce, limit=llmeval
+#
+# Backout: systemctl disable --now llmeval axiomd-eval on llmeval, then
+# qm destroy 6100 on node006 once the buy decision is made.
+
+- name: Deploy llmeval
+  hosts: llmeval
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
+    - ../../../vars/vars_llmeval.yaml
+
+  vars:
+    service: llmeval
+    files: "{{ playbook_dir }}/../../../files/llmeval"
+    home: /srv/llmeval
+    port: "{{ service_ports.llmeval.port }}"
+    llama_image: ghcr.io/ggml-org/llama.cpp@sha256:6d581c788abba2dfa23ff78dba37ea0abfc7d838c49bcc98f4be2103df9772b3
+    # axiomd main at the commit that ships eval/tasks in the image (axiomd #12).
+    axiomd_image: ghcr.io/bluefishforsale/axiomd:sha-cdb261f26e31ddfead11ea40c4ac7e19fe5491d5
+    axiomd_uid: 10001  # the image's axiomd user, which writes the eval output
+    llmeval_ntfy_url: http://ntfy.home:8090/homelab  # same topic agentbox alerts on
+    # Changes whenever the model list does, so an edited list re-downloads and
+    # an unchanged one never re-hashes 204 GB on a deploy.
+    llmeval_models_digest: "{{ llmeval_models | to_json | hash('sha1') }}"
+    llmeval_start_eval: false
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart llmeval
+      ansible.builtin.systemd:
+        name: llmeval.service
+        state: restarted
+        daemon_reload: true
+
+  tasks:
+    - name: Require docker, which the limit=llmeval bootstrap installs
+      ansible.builtin.command: docker compose version
+      changed_when: false
+
+    - name: Create llmeval directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner | default('root') }}"
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ home }}", mode: '0755' }
+        - { path: "{{ home }}/models", mode: '0755' }
+        - { path: "{{ home }}/config", mode: '0700' }
+        - { path: "{{ home }}/out", mode: '0750', owner: "{{ axiomd_uid }}" }
+
+    # NOTE: generated on the box, never from the vault. Server and client both
+    # live here, so the key never needs to leave it, and a vaulted llama.cpp key
+    # is in ocean's keys.txt too: leaking it would hand out the 3090.
+    - name: Generate the llama.cpp API key once
+      ansible.builtin.shell: umask 077 && openssl rand -hex 24 > {{ home }}/config/keys.txt
+      args:
+        creates: "{{ home }}/config/keys.txt"
+      notify: Restart llmeval
+
+    - name: Read the llama.cpp API key for the eval client
+      ansible.builtin.slurp:
+        src: "{{ home }}/config/keys.txt"
+      register: llmeval_key_file
+      no_log: true
+
+    - name: Hold the key for the eval environment
+      ansible.builtin.set_fact:
+        llmeval_api_key: "{{ llmeval_key_file.content | b64decode | trim }}"
+      no_log: true
+
+    - name: Install the eval environment
+      ansible.builtin.template:
+        src: "{{ files }}/eval.env.j2"
+        dest: "{{ home }}/config/eval.env"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Install axiomd's GitHub App key
+      ansible.builtin.copy:
+        content: "{{ axiomd.github_app.private_key }}\n"
+        dest: "{{ home }}/config/app-key.pem"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Render the llama.cpp compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart llmeval
+
+    - name: Install the model download script
+      ansible.builtin.template:
+        src: "{{ files }}/llmeval-models.sh.j2"
+        dest: /usr/local/sbin/llmeval-models
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install llmeval units
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - llmeval.service
+        - llmeval-models.service
+        - axiomd-eval.service
+      notify: Reload systemd
+
+    - name: Apply unit changes before starting anything
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start the llama.cpp router
+      ansible.builtin.systemd:
+        name: llmeval.service
+        enabled: true
+        state: started
+
+    - name: Wait for the router to answer
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ port }}/health"
+      register: llmeval_health
+      until: llmeval_health.status == 200
+      retries: 20
+      delay: 6
+
+    # --no-block: a oneshot start waits for the job to finish, and this one
+    # runs for hours. The unit's condition skips it once this model list is
+    # verified on disk.
+    - name: Start the model download in the background
+      ansible.builtin.command: systemctl start --no-block llmeval-models.service
+      changed_when: true
+
+    - name: Start the eval on request
+      ansible.builtin.command: systemctl start --no-block axiomd-eval.service
+      when: llmeval_start_eval | bool
+      changed_when: true

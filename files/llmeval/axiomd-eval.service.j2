@@ -1,0 +1,24 @@
+[Unit]
+Description=axiomd eval: grade the 395 candidates against the baseline
+# Answers need every model on disk; a half-downloaded set would stall the run
+# on the first missing model instead of failing here.
+Requires=llmeval-models.service llmeval.service
+After=llmeval-models.service llmeval.service
+
+[Service]
+Type=oneshot
+# Resumable: finished answers and verdicts in {{ home }}/out are kept, so a
+# restart picks up at the first missing one.
+# The PEM key is multi-line, which no env file can carry, so the shell reads it
+# from its 0600 file. NOTE: it is exported and passed as a bare `-e NAME`, which
+# docker fills from its own environment; `-e NAME=value` would put the key in
+# docker's argv, readable by any local user through ps. $$ is systemd's escape
+# for a literal $, so the shell expands it, not systemd.
+ExecStart=/bin/sh -c 'AXIOMD_APP_PRIVATE_KEY="$$(cat {{ home }}/config/app-key.pem)" \
+  && export AXIOMD_APP_PRIVATE_KEY \
+  && exec /usr/bin/docker run --rm --name axiomd-eval \
+  --env-file {{ home }}/config/eval.env \
+  -e AXIOMD_APP_PRIVATE_KEY \
+  -v {{ home }}/out:/out \
+  {{ axiomd_image }} eval --out /out'
+TimeoutStartSec=infinity

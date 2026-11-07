@@ -1,0 +1,48 @@
+services:
+  llama:
+    # CPU build, pinned: router mode (--models-dir) is recent, and a floating tag
+    # changing mid-eval would change the answers being compared.
+    image: {{ llama_image }}
+    container_name: llmeval-llama
+    restart: unless-stopped
+    # NOTE: the cap is what makes this a 395 stand-in. A 395 gives its GPU about
+    # 96 of its 128 GB; a model plus KV cache that only fits above that here
+    # would look buyable when it is not. An OOM kill here is the right answer.
+    mem_limit: 96g
+    memswap_limit: 96g
+    ports:
+      - "{{ port }}:{{ port }}"
+    volumes:
+      - {{ home }}/models:/models:ro
+      - {{ home }}/config:/config:ro
+    # Router mode: one server, one model loaded at a time, picked by the
+    # request's model name. Every model inherits these args, so all of them get
+    # the same 64k window and 8 threads (the VM's cores).
+    command:
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "{{ port }}"
+      - "--models-dir"
+      - "/models"
+      - "--models-max"
+      - "1"
+      - "--ctx-size"
+      - "65536"
+      - "--threads"
+      - "8"
+      - "--parallel"
+      - "1"
+      - "--jinja"
+      - "--api-key-file"
+      - "/config/keys.txt"
+      - "--no-webui"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    network_mode: bridge
