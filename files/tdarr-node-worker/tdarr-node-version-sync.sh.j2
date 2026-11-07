@@ -1,0 +1,46 @@
+#!/bin/bash
+# Rendered by playbooks/individual/workers/tdarr_node.yaml.
+#
+# The server refuses a node on any other version, and ocean's server is :latest,
+# so docker-refresh (or a recreate) moves it on its own. When it did (11-06,
+# 3.04.00 to 3.06.00) every pinned node sat refused for a day. This follows the
+# server: on a version change, pull the matching node image, repin the compose
+# file and recreate, then step worker limits back, since a node that registers
+# under a new id starts from the server's defaults.
+set -euo pipefail
+
+SERVER_URL={{ tdarr_server_url }}
+COMPOSE={{ home }}/docker-compose.yml
+NODE_NAME={{ inventory_hostname }}.home
+IMAGE=ghcr.io/haveagitgat/tdarr_node
+
+want=$(curl -fsS --max-time 20 "$SERVER_URL/api/v2/status" | jq -r .version)
+# The version goes into an image tag in a YAML file.
+[[ "$want" =~ ^[0-9]+\.[0-9]{2}\.[0-9]{2}$ ]] || { echo "tdarr server reported version '$want'" >&2; exit 1; }
+have=$(sed -n "s|.*$IMAGE:\([0-9.]*\).*|\1|p" "$COMPOSE")
+[[ "$want" == "$have" ]] && exit 0
+
+echo "server is $want, node is ${have:-unknown}: following the server"
+# Pull before touching the compose file, so a failed pull leaves the old node.
+docker pull "$IMAGE:$want"
+sed -i "s|$IMAGE:[0-9.]*|$IMAGE:$want|" "$COMPOSE"
+docker compose -f "$COMPOSE" up -d
+
+NODE_ID=""
+for _ in $(seq 1 30); do
+  NODE_ID=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg n "$NODE_NAME" 'to_entries[] | select(.value.nodeName == $n) | .key' | head -1)
+  [[ -n "$NODE_ID" ]] && break
+  sleep 10
+done
+[[ -n "$NODE_ID" ]] || { echo "tdarr server never listed $NODE_NAME on $want" >&2; exit 1; }
+
+# The API moves a limit one step per call.
+{% for type, want in tdarr_node_worker_limits.items() %}
+have=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg id "$NODE_ID" '.[$id].workerLimits.{{ type }} // 0')
+while (( have != {{ want }} )); do
+  if (( have < {{ want }} )); then process=increase; have=$((have + 1)); else process=decrease; have=$((have - 1)); fi
+  curl -fsS -X POST -H 'Content-Type: application/json' "$SERVER_URL/api/v2/alter-worker-limit" \
+    -d "$(jq -cn --arg id "$NODE_ID" --arg p "$process" '{data:{nodeID:$id,process:$p,workerType:"{{ type }}"}}')" >/dev/null
+done
+{% endfor %}
+echo "$NODE_NAME rejoined tdarr $want as $NODE_ID"
