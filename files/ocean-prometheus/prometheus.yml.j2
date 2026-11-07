@@ -74,8 +74,8 @@ scrape_configs:
     scrape_timeout: 30s
     relabel_configs: *dropPortNumber
     static_configs:
-{# macos hosts join once their node_exporter is installed (macos_runner.yaml) #}
-{% for host in groups['all'] if host not in groups['macos'] %}
+{# macos hosts run node_exporter from macos_runner.yaml #}
+{% for host in groups['all'] %}
     - targets: ['{{ host }}.home:9100']
 {% endfor %}
 

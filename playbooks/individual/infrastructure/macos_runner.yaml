@@ -1,0 +1,250 @@
+---
+# Makes mini-tv signal-agent's macOS release runner: Apple's signing and
+# notarization tools only run on macOS, so the macOS release job needs a Mac.
+#
+# NOTE: signal-agent is public. Only tag pushes and manual dispatches may target
+# this runner (its release.yml keeps pull_request runs on GitHub-hosted Macs),
+# or a fork's pull request could run code here.
+#
+# Bootstrap, by hand once: Remote Login on, GitHub keys in
+# ~tv/.ssh/authorized_keys, passwordless sudo for tv, Homebrew, and Xcode from
+# the App Store, selected with `sudo xcode-select -s /Applications/Xcode.app`
+# and its license accepted (`sudo xcodebuild -license accept`).
+
+- name: GitHub Actions runner for signal-agent on macOS
+  hosts: macos
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - ../../../vars/vars_service_ports.yaml
+    - ../../../vault/secrets.yaml
+
+  vars:
+    macos_files: "{{ playbook_dir }}/../../../files/macos-runner"
+    homebrew_prefix: /opt/homebrew
+    homebrew_user: "{{ ansible_user }}"
+    runner_repo: bluefishforsale/signal-agent
+    runner_user: ghrunner
+    runner_uid: 550
+    runner_home: "/Users/{{ runner_user }}"
+    runner_dir: "{{ runner_home }}/actions-runner"
+    runner_label: com.bluefishforsale.actions-runner
+    # GitHub adds self-hosted, macOS and ARM64 itself.
+    runner_labels: [homelab, "{{ inventory_hostname }}"]
+    runner_path: "{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    # NOTE: only the first install uses this pin. The runner updates itself
+    # after that, and GitHub refuses runners that fall too far behind.
+    runner_version: 2.338.2
+    runner_sha256: 25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388
+    node_exporter_port: "{{ service_ports.node_exporter.port }}"
+    node_exporter_label: com.bluefishforsale.node-exporter
+    node_exporter_textfiles: /usr/local/var/node-exporter/text_files
+    launchd_watched: ["{{ runner_label }}", "{{ node_exporter_label }}"]
+    # The runner comes last: it starts only after it's registered.
+    launchd_daemons:
+      - label: "{{ node_exporter_label }}"
+        src: node-exporter.plist.j2
+      - label: com.bluefishforsale.launchd-metrics
+        src: periodic.plist.j2
+        args: [/usr/local/sbin/launchd-metrics]
+        interval: 60
+      - label: com.bluefishforsale.refresh-authorized-keys
+        src: periodic.plist.j2
+        args:
+          - /usr/local/sbin/refresh-authorized-keys
+          - "{{ ansible_user }}"
+          - "https://github.com/{{ github_user_id }}.keys"
+        interval: 300
+      - label: "{{ runner_label }}"
+        src: actions-runner.plist.j2
+
+  tasks:
+    - name: Only macOS hosts
+      ansible.builtin.assert:
+        that: ansible_facts.os_family == 'Darwin'
+
+    # A Homebrew older than the macOS release refuses to run at all
+    # ("unknown or unsupported macOS version"), so it updates first.
+    - name: Homebrew packages
+      become: false
+      community.general.homebrew:
+        name: [node_exporter, rustup]
+        state: present
+        update_homebrew: true
+        path: "{{ homebrew_prefix }}/bin"
+
+    - name: Runner user, hidden from the login window
+      ansible.builtin.user:
+        name: "{{ runner_user }}"
+        comment: GitHub Actions runner
+        uid: "{{ runner_uid }}"
+        group: staff
+        shell: /bin/zsh
+        home: "{{ runner_home }}"
+        create_home: true
+        hidden: true
+
+    - name: Rust toolchain manager for the runner user
+      become_user: "{{ runner_user }}"
+      environment:
+        HOME: "{{ runner_home }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ homebrew_prefix }}/opt/rustup/bin/rustup-init"
+          - -y
+          - --no-modify-path
+          - --profile
+          - minimal
+        creates: "{{ runner_home }}/.cargo/bin/rustup"
+
+    - name: Runner directory
+      ansible.builtin.file:
+        path: "{{ runner_dir }}"
+        state: directory
+        owner: "{{ runner_user }}"
+        group: staff
+        mode: '0755'
+
+    - name: Download the runner
+      ansible.builtin.get_url:
+        url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-osx-arm64-{{ runner_version }}.tar.gz"
+        dest: "{{ runner_home }}/actions-runner-osx-arm64-{{ runner_version }}.tar.gz"
+        checksum: "sha256:{{ runner_sha256 }}"
+        owner: "{{ runner_user }}"
+        group: staff
+        mode: '0644'
+
+    - name: Unpack the runner
+      ansible.builtin.unarchive:
+        src: "{{ runner_home }}/actions-runner-osx-arm64-{{ runner_version }}.tar.gz"
+        dest: "{{ runner_dir }}"
+        remote_src: true
+        owner: "{{ runner_user }}"
+        group: staff
+        creates: "{{ runner_dir }}/config.sh"
+
+    - name: PATH for jobs (the runner reads .path at startup)
+      ansible.builtin.copy:
+        dest: "{{ runner_dir }}/.path"
+        content: "{{ runner_path }}\n"
+        owner: "{{ runner_user }}"
+        group: staff
+        mode: '0644'
+
+    - name: Is the runner registered
+      ansible.builtin.stat:
+        path: "{{ runner_dir }}/.runner"
+      register: runner_registered
+
+    - name: Registration token
+      when: not runner_registered.stat.exists
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ runner_repo }}/actions/runners/registration-token"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ development.github.token }}"
+          Accept: application/vnd.github+json
+        status_code: 201
+      register: registration
+      no_log: true
+
+    - name: Register the runner
+      when: not runner_registered.stat.exists
+      become_user: "{{ runner_user }}"
+      environment:
+        HOME: "{{ runner_home }}"
+      ansible.builtin.command:
+        argv:
+          - ./config.sh
+          - --unattended
+          - --url
+          - "https://github.com/{{ runner_repo }}"
+          - --token
+          - "{{ registration.json.token }}"
+          - --name
+          - "{{ inventory_hostname }}"
+          - --labels
+          - "{{ runner_labels | join(',') }}"
+          - --work
+          - _work
+          - --replace
+        chdir: "{{ runner_dir }}"
+      no_log: true
+
+    - name: Script directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: wheel
+        mode: '0755'
+      loop: [/usr/local/sbin, "{{ node_exporter_textfiles }}"]
+
+    - name: launchd job metrics script
+      ansible.builtin.template:
+        src: "{{ macos_files }}/launchd-metrics.sh.j2"
+        dest: /usr/local/sbin/launchd-metrics
+        owner: root
+        group: wheel
+        mode: '0755'
+
+    - name: authorized_keys refresh script
+      ansible.builtin.copy:
+        src: "{{ macos_files }}/refresh-authorized-keys.sh"
+        dest: /usr/local/sbin/refresh-authorized-keys
+        owner: root
+        group: wheel
+        mode: '0755'
+
+    - name: launchd daemons
+      ansible.builtin.template:
+        src: "{{ macos_files }}/{{ item.src }}"
+        dest: "/Library/LaunchDaemons/{{ item.label }}.plist"
+        owner: root
+        group: wheel
+        mode: '0644'
+      loop: "{{ launchd_daemons }}"
+      loop_control:
+        label: "{{ item.label }}"
+      register: daemon_plists
+
+    # bootout returns before the job is gone, and bootstrapping too soon fails
+    # with "Input/output error", hence the wait.
+    - name: Load each daemon, reloading any whose plist changed
+      ansible.builtin.shell: |
+        set -eu
+        label='{{ item.item.label }}'
+        {% if item.changed %}
+        launchctl bootout "system/$label" 2>/dev/null || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+          launchctl print "system/$label" >/dev/null 2>&1 || break
+          sleep 1
+        done
+        {% endif %}
+        if ! launchctl print "system/$label" >/dev/null 2>&1; then
+          launchctl bootstrap system "/Library/LaunchDaemons/$label.plist"
+          echo loaded
+        fi
+      register: daemon_load
+      changed_when: "'loaded' in daemon_load.stdout"
+      loop: "{{ daemon_plists.results }}"
+      loop_control:
+        label: "{{ item.item.label }}"
+
+    - name: node_exporter answers
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ node_exporter_port }}/metrics"
+        return_content: false
+      register: node_exporter_up
+      retries: 10
+      delay: 3
+      until: node_exporter_up.status == 200
+
+    # Tauri notarizes with notarytool, which ships with Xcode and not with the
+    # command line tools. Xcode comes from the App Store under an Apple ID, so
+    # it's a bootstrap step this play can only check. Last, so a missing Xcode
+    # never keeps the runner or its monitoring down.
+    - name: Xcode is installed and selected
+      ansible.builtin.command: xcrun --find notarytool
+      changed_when: false

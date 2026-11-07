@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- {{ ansible_managed }} -->
+<!-- A daemon rather than `brew services`, which installs a per-user agent that
+     only runs while that user is logged in. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>{{ node_exporter_label }}</string>
+  <key>UserName</key>
+  <string>nobody</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ homebrew_prefix }}/opt/node_exporter/bin/node_exporter</string>
+    <string>--web.listen-address=:{{ node_exporter_port }}</string>
+    <string>--collector.textfile.directory={{ node_exporter_textfiles }}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardErrorPath</key>
+  <string>/var/log/node-exporter.log</string>
+</dict>
+</plist>

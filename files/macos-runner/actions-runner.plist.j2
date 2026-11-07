@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- {{ ansible_managed }} -->
+<!-- A daemon, not an agent: it runs with nobody logged in. SessionCreate gives
+     it a security session, without which codesign can't use the throwaway
+     keychain the release job builds. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>{{ runner_label }}</string>
+  <key>UserName</key>
+  <string>{{ runner_user }}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ runner_dir }}/run.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>{{ runner_dir }}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>{{ runner_home }}</string>
+    <key>PATH</key>
+    <string>{{ runner_path }}</string>
+  </dict>
+  <key>SessionCreate</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>{{ runner_home }}/actions-runner.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{ runner_home }}/actions-runner.log</string>
+</dict>
+</plist>

@@ -118,6 +118,18 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} failed on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been in the failed state for 5m on {{ "{{ $labels.instance }}" }}"
 
+  # The macOS twin of SystemdUnitFailed: a Mac has no systemd, so a dead
+  # Actions runner on mini-tv is invisible above. Fed by launchd-metrics
+  # (files/macos-runner) through node_exporter's textfile collector.
+  - alert: MacOSLaunchdJobDown
+    expr: macos_launchd_job_running == 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "launchd job {{ "{{ $labels.label }}" }} not running on {{ "{{ $labels.instance }}" }}"
+      description: "{{ "{{ $labels.label }}" }} has not been running for 10m on {{ "{{ $labels.instance }}" }}"
+
   # A unit stuck in `activating` is a restart loop, and SystemdUnitFailed above
   # cannot see it: a unit with Restart=always never settles into `failed`. This
   # is how comfyui and frigate crash-looped 128109 times on ocean without one
