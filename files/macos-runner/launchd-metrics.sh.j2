@@ -1,0 +1,25 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# macOS has no systemd, so SystemdUnitFailed can't see a dead runner here. This
+# publishes whether each managed launchd daemon is running, for
+# MacOSLaunchdJobDown.
+set -eu
+
+out="{{ node_exporter_textfiles }}/launchd.prom"
+tmp="$(mktemp "{{ node_exporter_textfiles }}/.launchd.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+
+echo '# HELP macos_launchd_job_running 1 if the launchd daemon is running.' >"$tmp"
+echo '# TYPE macos_launchd_job_running gauge' >>"$tmp"
+for label in {{ launchd_watched | join(' ') }}; do
+  if launchctl print "system/$label" 2>/dev/null | grep -q '^[[:space:]]*state = running'; then
+    running=1
+  else
+    running=0
+  fi
+  echo "macos_launchd_job_running{label=\"$label\"} $running" >>"$tmp"
+done
+
+chmod 0644 "$tmp"
+mv "$tmp" "$out"
+trap - EXIT
