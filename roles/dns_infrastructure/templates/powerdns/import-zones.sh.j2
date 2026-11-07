@@ -94,6 +94,9 @@ add_record "home." "agentbox" A "192.168.1.31"
 # A records — data01 workers
 add_record "home." "harbor" A "192.168.1.32"
 
+# A records: llmeval, the temporary model-eval VM on node006
+add_record "home." "llmeval" A "192.168.1.36"
+
 # A records: netboot image server (vars/vars_netboot.yaml). Netboot clients
 # themselves get their names from Kea DDNS off their reservations.
 add_record "home." "{{ netboot_server.name }}" A "{{ netboot_server.ip }}"
@@ -183,6 +186,7 @@ add_record "1.168.192.in-addr.arpa." "20" PTR "gh-runner-01.home."
 add_record "1.168.192.in-addr.arpa." "25" PTR "gh-test-vm.home."
 add_record "1.168.192.in-addr.arpa." "31" PTR "agentbox.home."
 add_record "1.168.192.in-addr.arpa." "32" PTR "harbor.home."
+add_record "1.168.192.in-addr.arpa." "36" PTR "llmeval.home."
 add_record "1.168.192.in-addr.arpa." "{{ netboot_server.ip.split('.')[-1] }}" PTR "{{ netboot_server.name }}.home."
 add_record "1.168.192.in-addr.arpa." "35" PTR "mini-tv.home."
 add_record "1.168.192.in-addr.arpa." "51" PTR "kube501.home."
