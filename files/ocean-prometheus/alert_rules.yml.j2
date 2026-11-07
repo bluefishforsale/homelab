@@ -366,6 +366,24 @@ groups:
       summary: "Tdarr metrics have not been readable for 15m"
       description: "tdarr-exporter on ocean cannot read Tdarr's API (or is down). `journalctl -u tdarr-exporter` and `docker logs tdarr-exporter` on ocean show why; the Tdarr dashboard is showing the past."
 
+  # Nodes have no metrics endpoint: everything comes from the server's node list,
+  # and the server refuses a node whose version differs from its own, so a
+  # refused node just vanishes. Keyed on node name (node_id churns on every
+  # reconnect). A retired node keeps this firing until it ages out of the 7d
+  # window. NOTE: gated on tdarr_up so a server restart is TdarrExporterDown's
+  # alone, not one of these per node.
+  - alert: TdarrNodeMissing
+    expr: >
+      (group by (node) (max_over_time(tdarr_node_info[7d]))
+        unless on (node) tdarr_node_info)
+      and on () (tdarr_up == 1)
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tdarr node {{ "{{ $labels.node }}" }} is not registered with the server"
+      description: "{{ "{{ $labels.node }}" }} ran jobs in the last 7 days but the Tdarr server no longer lists it, so it is transcoding nothing. Usual cause is a version split after the server image updated: the node's log says 'Node version X does not match Server version Y'. harbor re-pins on `gh workflow run main-apply.yml -f playbooks=playbooks/individual/workers/tdarr_node.yaml`; gaming re-pins on a restart of netboot-role.service or a reboot."
+
   # A homelab service that exposes no metrics failed its blackbox probe. Keyed
   # on the category label, not a hostname, so anything added to that target
   # group inherits the alert instead of shipping unwatched.
