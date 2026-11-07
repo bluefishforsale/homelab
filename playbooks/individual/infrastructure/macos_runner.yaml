@@ -193,6 +193,19 @@
         mode: '0755'
       loop: [/usr/local/sbin, "{{ node_exporter_textfiles }}"]
 
+    # launchd opens StandardErrorPath as the daemon's user, and nobody can't
+    # create files in /var/log: without this the daemon exits 78 (EX_CONFIG)
+    # before node_exporter ever runs.
+    - name: node_exporter log, writable by nobody
+      ansible.builtin.file:
+        path: /var/log/node-exporter.log
+        state: touch
+        owner: nobody
+        group: wheel
+        mode: '0644'
+        modification_time: preserve
+        access_time: preserve
+
     - name: launchd job metrics script
       ansible.builtin.template:
         src: "{{ macos_files }}/launchd-metrics.sh.j2"
