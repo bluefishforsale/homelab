@@ -32,6 +32,7 @@
     llmeval_vm_disk_size_increase: "+297G"
     llmeval_vm_template_id: 9999  # Debian 12 cloud-init template
     llmeval_vm_onboot: 1
+    llmeval_vm_ciuser: debian
     # Passthrough host CPU features; kvm64 masks AVX, which llama.cpp needs.
     # This E5-2690 v2 has AVX but not AVX2.
     llmeval_vm_cpu: host
@@ -105,6 +106,25 @@
       when: llmeval_vm_status.rc != 0 or llmeval_vm_status.stdout is not search('running')
       changed_when: true
 
+    # NOTE: node006's template 9999 carries `ciuser: terrac` (ocean's login),
+    # while node005's has none, so cloud-init there defaults to debian, which
+    # is what inventory and base/users.yaml expect on every VM. Without this
+    # the VM boots with only a terrac login and every play is UNREACHABLE.
+    # Changing ciuser changes the cloud-init instance-id, so the reboot makes
+    # cloud-init create debian with the keys above.
+    - name: Log in as debian like every other fleet VM
+      ansible.builtin.shell: |
+        set -e
+        if qm config {{ llmeval_vm_id }} | grep -qx 'ciuser: {{ llmeval_vm_ciuser }}'; then exit 0; fi
+        qm set {{ llmeval_vm_id }} --ciuser {{ llmeval_vm_ciuser }}
+        qm cloudinit update {{ llmeval_vm_id }}
+        if qm status {{ llmeval_vm_id }} | grep -q running; then qm reboot {{ llmeval_vm_id }}; fi
+        echo changed
+      args:
+        executable: /bin/bash
+      register: llmeval_ciuser
+      changed_when: "'changed' in llmeval_ciuser.stdout"
+
     - name: Wait for llmeval VM to boot and accept SSH connections (max 5 minutes)
       ansible.builtin.wait_for:
         host: "{{ llmeval_vm_ip }}"
@@ -113,4 +133,7 @@
         timeout: 300
         state: started
         msg: "Waiting for {{ llmeval_vm_ip }}:22 to become available..."
-      when: llmeval_vm_status.rc != 0 or (clone_result is defined and clone_result is changed)
+      when: >-
+        llmeval_vm_status.rc != 0
+        or (clone_result is defined and clone_result is changed)
+        or llmeval_ciuser is changed
