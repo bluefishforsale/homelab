@@ -1,0 +1,13 @@
+[Unit]
+Description=Download and verify llmeval's GGUF models
+Wants=network-online.target
+After=network-online.target
+# Skipped once this exact model list is downloaded and verified.
+ConditionPathExists=!{{ home }}/models/.verified-{{ llmeval_models_digest }}
+
+[Service]
+Type=oneshot
+EnvironmentFile={{ home }}/config/eval.env
+ExecStart=/usr/local/sbin/llmeval-models
+# ~204 GB on a home link.
+TimeoutStartSec=infinity
