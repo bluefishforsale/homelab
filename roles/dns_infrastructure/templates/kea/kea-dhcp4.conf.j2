@@ -179,7 +179,14 @@
                         "client-id": "01:{{ host.mac | lower }}",
                         "ip-address": "{{ host.local_ip }}",
                         "hostname": "{{ name }}-local"
-                    }{% endif %}{% endfor %}
+                    }{% endif %}{% endfor %}{% for name, host in (tdarr_desktop_nodes | default({})).items() %},
+                    {
+                        // Desktop tdarr node's wired NIC (vars/vars_tdarr_desktop.yaml);
+                        // ocean's NFS export trusts this address.
+                        "hw-address": "{{ host.mac | lower }}",
+                        "ip-address": "{{ host.ip }}",
+                        "hostname": "{{ host.dns_name }}"
+                    }{% endfor %}
 
                 ]
             }
