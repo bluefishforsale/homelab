@@ -383,12 +383,16 @@ groups:
   # refused node just vanishes. Keyed on node name (node_id churns on every
   # reconnect). A retired node keeps this firing until it ages out of the 7d
   # window. NOTE: gated on tdarr_up so a server restart is TdarrExporterDown's
-  # alone, not one of these per node.
+  # alone, not one of these per node. A desktop node (vars_tdarr_desktop.yaml)
+  # is down on purpose while its host is off, asleep or on battery, so it
+  # counts only while node-exporter there is up and the charger is in.
   - alert: TdarrNodeMissing
     expr: >
       (group by (node) (max_over_time(tdarr_node_info[7d]))
         unless on (node) tdarr_node_info)
       and on () (tdarr_up == 1)
+      unless on (node) (up{job="tdarr-desktop"} == 0)
+      unless on (node) (node_power_supply_online{job="tdarr-desktop",power_supply="AC"} == 0)
     for: 30m
     labels:
       severity: warning
