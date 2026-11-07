@@ -1,0 +1,29 @@
+---
+# Desktop tdarr nodes: machines someone uses day to day that also run a tdarr
+# node when idle on mains power (playbooks/individual/workers/tdarr_node_desktop.yaml).
+# Kea's reservation, ocean's NFS export and the scrape job render from here.
+#
+# NOTE: not ansible inventory, for the same reason as vars_netboot.yaml:
+# anything in inventory joins groups['all'], and every `hosts: all` play would
+# chase a laptop that is asleep or away much of the day (and runs Arch, not
+# Debian).
+
+tdarr_desktop_nodes:
+  tautog:
+    # ThinkPad T14s Gen 3, Arch (Omarchy). Its only wired NIC is the dock's
+    # USB-C ethernet; on wifi alone it has another address, the NFS export
+    # refuses it, and the node does nothing.
+    mac: "64:4b:f0:2b:91:aa"
+    ip: 192.168.1.42
+    # Not "tautog": that name is the wifi lease's DDNS record.
+    dns_name: tautog-eth
+    ansible_user: terrac
+    # Iris Xe: hevc_qsv through /dev/dri (render group 987, video 983 on the host).
+    gpu_select: qsv
+    render_gid: 987
+    video_gid: 983
+    worker_limits:
+      transcodegpu: 1
+      healthcheckgpu: 0
+      transcodecpu: 0
+      healthcheckcpu: 0
