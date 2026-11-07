@@ -34,7 +34,8 @@
     runner_home: "/Users/{{ runner_user }}"
     runner_dir: "{{ runner_home }}/actions-runner"
     runner_label: com.bluefishforsale.actions-runner
-    runner_job_hook: /usr/local/sbin/actions-runner-job-started
+    # The runner refuses a hook whose name doesn't end in .sh, .ps1 or .js.
+    runner_job_hook: /usr/local/sbin/actions-runner-job-started.sh
     # GitHub adds self-hosted, macOS and ARM64 itself.
     runner_labels: [homelab, "{{ inventory_hostname }}"]
     runner_path: "{{ homebrew_prefix }}/opt/rustup/bin:{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -192,6 +193,19 @@
         group: wheel
         mode: '0755'
       loop: [/usr/local/sbin, "{{ node_exporter_textfiles }}"]
+
+    # launchd opens StandardErrorPath as the daemon's user, and nobody can't
+    # create files in /var/log: without this the daemon exits 78 (EX_CONFIG)
+    # before node_exporter ever runs.
+    - name: node_exporter log, writable by nobody
+      ansible.builtin.file:
+        path: /var/log/node-exporter.log
+        state: touch
+        owner: nobody
+        group: wheel
+        mode: '0644'
+        modification_time: preserve
+        access_time: preserve
 
     - name: launchd job metrics script
       ansible.builtin.template:
