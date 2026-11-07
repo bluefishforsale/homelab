@@ -8,6 +8,7 @@
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
     - "{{ playbook_dir }}/../../../../vars/vars_netboot.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_tdarr_desktop.yaml"
 
   vars:
     image: prom/prometheus

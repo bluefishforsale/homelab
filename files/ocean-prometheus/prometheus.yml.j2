@@ -106,6 +106,18 @@ scrape_configs:
         instance: '{{ name }}-live'
 {% endfor %}
 
+  # Desktop tdarr nodes (vars/vars_tdarr_desktop.yaml). node-exporter is how
+  # alerting tells a laptop that is asleep, away or on battery (node down on
+  # purpose) from a tdarr node that broke. node is the tdarr nodeName.
+  - job_name: 'tdarr-desktop'
+    static_configs:
+{% for name, host in (tdarr_desktop_nodes | default({})).items() %}
+    - targets: ['{{ host.ip }}:9100']
+      labels:
+        instance: '{{ name }}'
+        node: '{{ name }}.home'
+{% endfor %}
+
   - job_name: 'process-exporter'
     relabel_configs: *dropPortNumber
     static_configs:
