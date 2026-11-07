@@ -2,9 +2,10 @@
 # Makes mini-tv signal-agent's macOS release runner: Apple's signing and
 # notarization tools only run on macOS, so the macOS release job needs a Mac.
 #
-# NOTE: signal-agent is public. Only tag pushes and manual dispatches may target
-# this runner (its release.yml keeps pull_request runs on GitHub-hosted Macs),
-# or a fork's pull request could run code here.
+# NOTE: signal-agent is public, and any workflow in it (a fork's pull request
+# can edit one) may ask for this runner. The job-started hook refuses every job
+# but release.yml from a v* tag push or a dispatch; release.yml itself keeps
+# pull_request runs on GitHub-hosted Macs.
 #
 # Bootstrap, by hand once: Remote Login on, GitHub keys in
 # ~tv/.ssh/authorized_keys, passwordless sudo for tv, Homebrew, and Xcode from
@@ -30,6 +31,7 @@
     runner_home: "/Users/{{ runner_user }}"
     runner_dir: "{{ runner_home }}/actions-runner"
     runner_label: com.bluefishforsale.actions-runner
+    runner_job_hook: /usr/local/sbin/actions-runner-job-started
     # GitHub adds self-hosted, macOS and ARM64 itself.
     runner_labels: [homelab, "{{ inventory_hostname }}"]
     runner_path: "{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -185,6 +187,16 @@
       ansible.builtin.template:
         src: "{{ macos_files }}/launchd-metrics.sh.j2"
         dest: /usr/local/sbin/launchd-metrics
+        owner: root
+        group: wheel
+        mode: '0755'
+
+    # NOTE: this gate is what keeps a fork's pull request off this machine
+    # (see the script). Root-owned, so no job can loosen it.
+    - name: Job-started gate
+      ansible.builtin.template:
+        src: "{{ macos_files }}/job-started.sh.j2"
+        dest: "{{ runner_job_hook }}"
         owner: root
         group: wheel
         mode: '0755'

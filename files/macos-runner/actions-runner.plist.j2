@@ -22,6 +22,10 @@
     <string>{{ runner_home }}</string>
     <key>PATH</key>
     <string>{{ runner_path }}</string>
+    <!-- Here, in a root-owned plist, rather than the runner's own .env, which
+         a job running as the runner user could rewrite. -->
+    <key>ACTIONS_RUNNER_HOOK_JOB_STARTED</key>
+    <string>{{ runner_job_hook }}</string>
   </dict>
   <key>SessionCreate</key>
   <true/>
