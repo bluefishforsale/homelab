@@ -317,7 +317,7 @@ collections:
     radarr_search: true
   Arthouse:
     sort_title: "!Arthouse"
-    summary: "Indie and arthouse: Collider's arthouse rankings plus hand-picked indies."
+    summary: "Indie and arthouse: all 35 of Collider's best arthouse movies, their masterpiece and American arthouse lists, plus hand-picked indies."
     tmdb_movie:
       - 254320   # The Lobster (2015)
       - 27064    # Mishima: A Life in Four Chapters (1985)
@@ -329,6 +329,19 @@ collections:
       - 2457     # Children of Paradise (1945)
       - 37903    # The White Ribbon (2009)
       - 499      # Cléo from 5 to 7 (1962)
+      - 269      # Breathless (1960)
+      - 94794    # Blue (1993, Derek Jarman)
+      - 8327     # The Holy Mountain (1973)
+      - 1556     # Funeral Parade of Roses (1969)
+      - 490      # The Seventh Seal (1957)
+      - 1563     # Sans Soleil (1983)
+      - 23160    # Werckmeister Harmonies (2000)
+      - 11645    # Ran (1985)
+      - 2000     # Aguirre, the Wrath of God (1972)
+      - 94528    # Out 1 (1971)
+      - 422      # 8½ (1963)
+      - 5511     # Le Samouraï (1967)
+      - 25538    # Yi Yi (2000)
       - 16       # Dancer in the Dark (2000)
       - 108      # Three Colors: Blue (1993)
       - 8967     # The Tree of Life (2011)
