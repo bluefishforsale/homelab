@@ -1,7 +1,7 @@
 ---
 - name: Configure System Logging
   become: true
-  hosts: all
+  hosts: all:!macos
   strategy: free
   vars:
     SYSLOG: "192.168.1.65"

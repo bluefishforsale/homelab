@@ -1,5 +1,5 @@
 - name: root and system level
-  hosts: all
+  hosts: all:!macos
 
   tasks:
   - name: Tools and Utilities

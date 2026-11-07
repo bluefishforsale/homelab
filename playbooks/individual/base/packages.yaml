@@ -1,7 +1,7 @@
 ---
 - name: root and system level
   become: true
-  hosts: all
+  hosts: all:!macos
   strategy: free
 
   vars:

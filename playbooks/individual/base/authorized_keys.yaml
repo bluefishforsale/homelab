@@ -1,6 +1,6 @@
 ---
 - name: Refresh authorized_keys for Ansible SSH user
-  hosts: all
+  hosts: all:!macos
   become: true
 
   vars:

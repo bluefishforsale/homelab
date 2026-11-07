@@ -1,7 +1,7 @@
 ---
 - name: Configure TZ, Sysctl, and Udev
   become: true
-  hosts: all
+  hosts: all:!macos
   strategy: free
   tasks:
   ########### Date and Time

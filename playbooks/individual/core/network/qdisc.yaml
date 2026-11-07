@@ -1,5 +1,5 @@
 - name: Network QoS Tuning
-  hosts: all
+  hosts: all:!macos
   become: true
 
   tasks:

@@ -1,7 +1,7 @@
 ---
 - name: Unattended Upgrade with Dedicated Cron File
   become: true
-  hosts: all
+  hosts: all:!macos
 
   tasks:
   - name: Handle dpkg locks and repair
