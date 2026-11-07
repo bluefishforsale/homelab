@@ -25,10 +25,10 @@
           "uid": "bf02tpxiz6m0wf"
         },
         "query": {
-          "query": "label_values(tdarr_jobs, node)",
+          "query": "query_result(group by (node) (max_over_time(tdarr_node_info[7d])))",
           "refId": "node"
         },
-        "definition": "label_values(tdarr_jobs, node)",
+        "definition": "query_result(group by (node) (max_over_time(tdarr_node_info[7d])))",
         "refresh": 2,
         "sort": 1,
         "includeAll": true,
@@ -42,7 +42,8 @@
           "value": [
             "$__all"
           ]
-        }
+        },
+        "regex": "/node=\"([^\"]+)\"/"
       }
     ]
   },
@@ -319,7 +320,7 @@
       },
       "targets": [
         {
-          "expr": "tdarr_node_info{node=~\"$node\"}",
+          "expr": "group by (node, version) (tdarr_node_info{node=~\"$node\"})",
           "legendFormat": "{{node}}: {{version}}",
           "datasource": {
             "type": "prometheus",
@@ -327,10 +328,37 @@
           },
           "refId": "A",
           "instant": true
+        },
+        {
+          "expr": "0 * group by (node) (max_over_time(tdarr_node_info{node=~\"$node\"}[7d]) unless on (node) tdarr_node_info)",
+          "legendFormat": "{{node}}: NOT REGISTERED",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B",
+          "instant": true
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -345,7 +373,7 @@
         "graphMode": "none",
         "textMode": "name"
       },
-      "description": "get-nodes carries no version, so this is the version that ran the node's newest job."
+      "description": "get-nodes carries no version, so this is the version that ran the node's newest job. A red NOT REGISTERED node ran jobs in the last 7 days but the server no longer lists it, usually a node/server version split (alert TdarrNodeMissing)."
     },
     {
       "id": 8,
