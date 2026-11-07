@@ -19,6 +19,11 @@ ExecStartPre=-/usr/bin/docker pull {{ exporter_image }}:{{ exporter_version }}
 # `docker run` journaled every line twice. --log-driver=none keeps only the
 # unit's copy (journalctl -u), which also holds pull and startup errors;
 # `docker logs` no longer works for this container.
+# NOTE: no ENABLE_ADDITIONAL_METRICS. It makes exportarr fetch episode,
+# episodefile and qualitydefinition once per series, ~2,550 serial calls at 851
+# series, to add only episode quality and per-episode monitored counts. Measured
+# 2026-11-02: Sonarr ran at ~13 cores during a scrape vs ~1.2 between, the
+# scrape took 68-193s, and one failed call anywhere voided the whole scrape.
 ExecStart=docker run --rm \
     --log-driver=none \
     --name {{ exporter_service }} \
@@ -27,7 +32,6 @@ ExecStart=docker run --rm \
     -e VERSION={{ exporter_version }} \
     -e URL=http://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ sonarr_port }} \
     -e PORT={{ exporter_port }} \
-    -e ENABLE_ADDITIONAL_METRICS=true \
     -p {{ exporter_port }}:{{ exporter_port }} \
     -e API_KEY="{{ media_services.sonarr.api_key }}" \
     {{ exporter_image }}:{{ exporter_version }} \
