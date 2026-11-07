@@ -101,6 +101,10 @@ emit() {
   #   - netboot_image: pulls one image build from GHCR, so it only means
   #     something with the image and sha that netboot-images CI dispatches.
   #     Run on push it has neither and fails its own payload check.
+  #   - dell_perc_raid: creates RAID volumes on node005/node006's PERC
+  #     controllers. Storage on the hypervisors, so like *zfs*: hand-run only.
+  #     On 2026-11-07 an edit auto-applied it, and only a shell syntax error
+  #     kept it from adding virtual disks.
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
@@ -110,6 +114,7 @@ emit() {
     playbooks/archive/*) return 0 ;;
     playbooks/deprecated/*) return 0 ;;
     playbooks/individual/infrastructure/netboot_image.yaml) return 0 ;;
+    playbooks/individual/core/storage/dell_perc_raid.yaml) return 0 ;;
   esac
   if ! grep -qxF "$pb" "$SEEN_FILE" 2>/dev/null; then
     printf '%s\n' "$pb" >> "$SEEN_FILE"

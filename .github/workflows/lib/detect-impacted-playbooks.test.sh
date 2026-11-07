@@ -194,6 +194,9 @@ assert_eq "mixed playbook+workflow commit keeps only the playbook" \
 out=$(printf 'playbooks/individual/ocean/data01_zfs.yaml\n' | bash "$SCRIPT")
 assert_eq "zfs playbook is dispatch-only (never auto-applies)" "[]" "$out"
 
+out=$(printf 'playbooks/individual/core/storage/dell_perc_raid.yaml\n' | bash "$SCRIPT")
+assert_eq "dell_perc_raid creates RAID volumes on the hypervisors, so a push never applies it" "[]" "$out"
+
 out=$(printf 'playbooks/individual/infrastructure/netboot_image.yaml\n' | bash "$SCRIPT")
 assert_eq "netboot_image needs a dispatched sha, so a push never applies it" "[]" "$out"
 
