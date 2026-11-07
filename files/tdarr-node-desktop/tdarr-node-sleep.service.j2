@@ -1,0 +1,16 @@
+# Takes the node down before suspend and brings it back on resume, so a job is
+# cut off cleanly and requeued by the server instead of freezing mid-encode
+# and leaving its workDir behind. Starting again honours ConditionACPower.
+[Unit]
+Description=Stop the tdarr node across suspend
+Before=sleep.target
+StopWhenUnneeded=yes
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/systemctl stop tdarr-node.service
+ExecStop=/usr/bin/systemctl --no-block start tdarr-node.service
+
+[Install]
+WantedBy=sleep.target

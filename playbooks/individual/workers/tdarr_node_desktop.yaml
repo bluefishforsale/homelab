@@ -1,0 +1,202 @@
+---
+# tdarr node on a desktop someone also uses (vars/vars_tdarr_desktop.yaml),
+# joined to ocean's tdarr server. The machine keeps its own OS (tautog runs
+# Arch); this adds a compose project, its units and an NFS automount, and the
+# node only runs on mains power and stops across suspend.
+#
+# Desktop nodes are not inventory (see vars_tdarr_desktop.yaml), so the first
+# play adds them from the vars file.
+- name: Add desktop tdarr nodes
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../../../vars/vars_tdarr_desktop.yaml
+
+  tasks:
+    - name: Add each desktop node as a host
+      ansible.builtin.add_host:
+        name: "{{ item.key }}"
+        groups: tdarr_desktop_nodes
+        ansible_ssh_host: "{{ item.value.ip }}"
+        ansible_user: "{{ item.value.ansible_user }}"
+      loop: "{{ tdarr_desktop_nodes | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+- name: tdarr node on desktops
+  hosts: tdarr_desktop_nodes
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - ../../../vault/secrets.yaml
+    - ../../../vars/vars_service_ports.yaml
+    - ../../../vars/vars_tdarr_desktop.yaml
+
+  vars:
+    name: "{{ inventory_hostname }}"
+    node: "{{ tdarr_desktop_nodes[inventory_hostname] }}"
+    files: "{{ playbook_dir }}/../../../files/tdarr-node-desktop"
+    home: /var/lib/tdarr-node
+    tdarr_server_ip: "{{ hostvars['ocean'].ansible_ssh_host }}"
+    tdarr_server_api_port: 8266
+    tdarr_server_url: "http://{{ tdarr_server_ip }}:{{ service_ports.tdarr.port }}"
+    # Same as the data01 workers and gaming, so a dropped link stalls I/O
+    # instead of handing tdarr a short read.
+    tdarr_desktop_nfs_opts: "nfsvers=4.2,hard,proto=tcp,nconnect=4,rsize=1048576,wsize=1048576,noatime"
+
+  tasks:
+    - name: Install the NFS client and node-exporter
+      community.general.pacman:
+        name:
+          - nfs-utils
+          - prometheus-node-exporter
+          - jq
+        state: present
+
+    - name: Start node-exporter
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter.service
+        enabled: true
+        state: started
+
+    # ufw is on; docker-published ports bypass it, a host service does not.
+    - name: Let ocean's Prometheus reach node-exporter
+      community.general.ufw:
+        rule: allow
+        proto: tcp
+        port: '9100'
+        from_ip: "{{ tdarr_server_ip }}"
+        comment: homelab prometheus
+
+    - name: Read the tdarr server's version
+      ansible.builtin.uri:
+        url: "{{ tdarr_server_url }}/api/v2/status"
+        return_content: true
+      register: tdarr_server_status
+      delegate_to: localhost
+      become: false
+
+    # The version goes into an image tag in a YAML file.
+    - name: Server version looks like a tdarr release tag
+      ansible.builtin.assert:
+        that: tdarr_server_status.json.version is match('^[0-9]+\.[0-9]{2}\.[0-9]{2}$')
+        fail_msg: "tdarr server reported version '{{ tdarr_server_status.json.version }}', not a release tag"
+
+    - name: Pin the node to the server's version
+      ansible.builtin.set_fact:
+        tdarr_node_version: "{{ tdarr_server_status.json.version }}"
+
+    - name: Ensure node dirs exist, owned by media
+      ansible.builtin.file:
+        path: "{{ home }}/{{ item }}"
+        state: directory
+        owner: "{{ system_users.media.uid }}"
+        group: "{{ system_users.media.gid }}"
+        mode: '0755'
+      loop: ["", cache, configs, logs]
+
+    - name: Ensure the library mountpoint exists
+      ansible.builtin.file:
+        path: /data01/complete
+        state: directory
+        mode: '0755'
+
+    - name: Install the library mount units
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - data01-complete.mount
+        - data01-complete.automount
+      register: tdarr_desktop_mount_units
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: tdarr_desktop_compose
+
+    - name: Install node scripts
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.sh.j2"
+        dest: "/usr/local/sbin/{{ item }}"
+        mode: '0755'
+      loop:
+        - tdarr-node-configure
+        - tdarr-node-version-sync
+
+    - name: Install node units
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - tdarr-node.service
+        - tdarr-node-sleep.service
+        - tdarr-node-version-sync.service
+        - tdarr-node-version-sync.timer
+      register: tdarr_desktop_units
+
+    - name: Install the mains-power rule
+      ansible.builtin.template:
+        src: "{{ files }}/99-tdarr-node-power.rules.j2"
+        dest: /etc/udev/rules.d/99-tdarr-node-power.rules
+        mode: '0644'
+      register: tdarr_desktop_udev
+
+    - name: Reload udev rules
+      ansible.builtin.command: udevadm control --reload
+      when: tdarr_desktop_udev is changed
+      changed_when: true
+
+    - name: Enable the library automount
+      ansible.builtin.systemd:
+        name: data01-complete.automount
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Enable the sleep hook and version sync
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+      loop:
+        - tdarr-node-sleep.service
+        - tdarr-node-version-sync.timer
+
+    - name: Start the version-sync timer
+      ansible.builtin.systemd:
+        name: tdarr-node-version-sync.timer
+        state: started
+
+    - name: Read mains power
+      ansible.builtin.command: systemd-ac-power
+      register: tdarr_desktop_ac
+      changed_when: false
+      failed_when: tdarr_desktop_ac.rc not in [0, 1]
+
+    # On battery the unit's ConditionACPower skips it; the udev rule starts it
+    # when the charger is plugged in.
+    - name: Enable and start the node (restart only on compose/unit change)
+      ansible.builtin.systemd:
+        name: tdarr-node.service
+        enabled: true
+        state: "{{ 'restarted' if (tdarr_desktop_compose is changed or tdarr_desktop_units is changed or tdarr_desktop_mount_units is changed) else 'started' }}"
+
+    - name: Wait for the server to list this node
+      ansible.builtin.uri:
+        url: "{{ tdarr_server_url }}/api/v2/get-nodes"
+        return_content: true
+      register: tdarr_nodes
+      until: >-
+        tdarr_nodes.status == 200 and
+        (tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', name ~ '.home') | list | length) > 0
+      retries: 18
+      delay: 10
+      delegate_to: localhost
+      become: false
+      when: tdarr_desktop_ac.rc == 0
