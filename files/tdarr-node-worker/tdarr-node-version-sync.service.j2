@@ -1,0 +1,10 @@
+[Unit]
+Description=Repin {{ service }} to the tdarr server's version
+After=docker.service network-online.target {{ service }}.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tdarr-node-version-sync
+TimeoutStartSec=900

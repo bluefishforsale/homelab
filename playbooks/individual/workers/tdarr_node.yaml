@@ -128,3 +128,27 @@
       loop_control:
         label: "{{ item.process }} {{ item.type }}"
       changed_when: true
+
+    # Between deploys the server can move on its own (it is :latest on ocean);
+    # this timer repins the node to it within 5 minutes.
+    - name: Install the version-sync script
+      ansible.builtin.template:
+        src: "{{ files }}/tdarr-node-version-sync.sh.j2"
+        dest: /usr/local/sbin/tdarr-node-version-sync
+        mode: '0755'
+
+    - name: Install the version-sync units
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: '0644'
+      loop:
+        - tdarr-node-version-sync.service
+        - tdarr-node-version-sync.timer
+
+    - name: Enable the version-sync timer
+      ansible.builtin.systemd:
+        name: tdarr-node-version-sync.timer
+        enabled: true
+        state: started
+        daemon_reload: true
