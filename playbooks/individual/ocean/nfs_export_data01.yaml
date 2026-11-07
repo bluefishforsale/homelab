@@ -35,11 +35,15 @@
     # boundary would be a dataset split, which is a hand-run ZFS change.
     netboot_export_path: /data01/complete
     netboot_export_options: "rw,sync,subtree_check,all_squash,anonuid={{ system_users.media.uid }},anongid={{ system_users.media.gid }},sec=sys,fsid=2"
-    netboot_client_ips: "{{ netboot_hosts.values() | selectattr('nfs', 'defined') | selectattr('nfs') | map(attribute='ip') | list }}"
+    # Desktop tdarr nodes (vars_tdarr_desktop.yaml) get the same squashed
+    # library export: they are someone's own machine, not a fleet host, and
+    # need nothing beyond the library either.
+    netboot_client_ips: "{{ (netboot_hosts.values() | selectattr('nfs', 'defined') | selectattr('nfs') | map(attribute='ip') | list) + (tdarr_desktop_nodes.values() | map(attribute='ip') | list) }}"
 
   vars_files:
     - ../../../vault/secrets.yaml
     - ../../../vars/vars_netboot.yaml
+    - ../../../vars/vars_tdarr_desktop.yaml
 
   tasks:
     # NOTE: an empty client list renders a bare "/data01", which exportfs
