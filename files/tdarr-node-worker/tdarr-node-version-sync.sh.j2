@@ -23,6 +23,10 @@ have=$(sed -n "s|.*$IMAGE:\([0-9.]*\).*|\1|p" "$COMPOSE")
 echo "server is $want, node is ${have:-unknown}: following the server"
 # Pull before touching the compose file, so a failed pull leaves the old node.
 docker pull "$IMAGE:$want"
+# The old node's jobs die with it and leave their workDirs in the cache, which
+# nothing cleans (gaming's filled 38G of 40G after 11-06).
+docker compose -f "$COMPOSE" down --timeout 30
+find {{ home }}/cache -mindepth 1 -delete
 sed -i "s|$IMAGE:[0-9.]*|$IMAGE:$want|" "$COMPOSE"
 docker compose -f "$COMPOSE" up -d
 
