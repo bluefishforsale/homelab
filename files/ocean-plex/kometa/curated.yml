@@ -315,6 +315,65 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  Arthouse:
+    sort_title: "!Arthouse"
+    summary: "Indie and arthouse: Collider's arthouse rankings plus hand-picked indies."
+    tmdb_movie:
+      - 254320   # The Lobster (2015)
+      - 27064    # Mishima: A Life in Four Chapters (1985)
+      - 489412   # It's Such a Beautiful Day (2012)
+      - 4960     # Synecdoche, New York (2008)
+      - 11314    # Koyaanisqatsi (1982)
+      - 11104    # Chungking Express (1994)
+      - 8416     # The Conformist (1970)
+      - 2457     # Children of Paradise (1945)
+      - 37903    # The White Ribbon (2009)
+      - 499      # Cléo from 5 to 7 (1962)
+      - 16       # Dancer in the Dark (2000)
+      - 108      # Three Colors: Blue (1993)
+      - 8967     # The Tree of Life (2011)
+      - 5544     # Hiroshima Mon Amour (1959)
+      - 1398     # Stalker (1979)
+      - 14626    # Beau Travail (1999)
+      - 25237    # Come and See (1985)
+      - 44012    # Jeanne Dielman (1975)
+      - 1923     # Twin Peaks: Fire Walk with Me (1992)
+      - 8051     # Punch-Drunk Love (2002)
+      - 792307   # Poor Things (2023)
+      - 44214    # Black Swan (2010)
+      - 38       # Eternal Sunshine of the Spotless Mind (2004)
+      - 503919   # The Lighthouse (2019)
+      - 1018     # Mulholland Drive (2001)
+      - 64690    # Drive (2011)
+      - 16642    # Days of Heaven (1978)
+      - 843      # In the Mood for Love (2000)
+      - 655      # Paris, Texas (1984)
+      - 144      # Wings of Desire (1987)
+      - 797      # Persona (1966)
+      - 469      # Stranger Than Paradise (1984)
+      - 370755   # Paterson (2016)
+      - 376867   # Moonlight (2016)
+      - 153      # Lost in Translation (2003)
+      - 965150   # Aftersun (2022)
+      - 531428   # Portrait of a Lady on Fire (2019)
+      - 103328   # Holy Motors (2012)
+      - 97370    # Under the Skin (2013)
+      - 38368    # Uncle Boonmee Who Can Recall His Past Lives (2010)
+      - 48303    # Certified Copy (2010)
+      - 414453   # Columbus (2017)
+      - 558582   # First Cow (2019)
+      - 121986   # Frances Ha (2012)
+      - 666277   # Past Lives (2023)
+      - 976893   # Perfect Days (2023)
+      - 758866   # Drive My Car (2021)
+      - 394117   # The Florida Project (2017)
+      - 428449   # A Ghost Story (2017)
+      - 3133     # Badlands (1973)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s
