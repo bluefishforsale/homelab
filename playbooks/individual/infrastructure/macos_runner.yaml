@@ -34,7 +34,8 @@
     runner_home: "/Users/{{ runner_user }}"
     runner_dir: "{{ runner_home }}/actions-runner"
     runner_label: com.bluefishforsale.actions-runner
-    runner_job_hook: /usr/local/sbin/actions-runner-job-started
+    # The runner refuses a hook whose name doesn't end in .sh, .ps1 or .js.
+    runner_job_hook: /usr/local/sbin/actions-runner-job-started.sh
     # GitHub adds self-hosted, macOS and ARM64 itself.
     runner_labels: [homelab, "{{ inventory_hostname }}"]
     runner_path: "{{ homebrew_prefix }}/opt/rustup/bin:{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
