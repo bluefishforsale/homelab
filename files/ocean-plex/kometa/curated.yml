@@ -374,6 +374,75 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  Music Biopics:
+    sort_title: "!Music Biopics"
+    summary: "Lives of musicians on screen, from Yankee Doodle Dandy to Michael, plus the two parodies that roast the genre."
+    tmdb_movie:
+      - 936075   # Michael (2026)
+      - 1230368  # Springsteen: Deliver Me from Nowhere (2025)
+      - 1371185  # Song Sung Blue (2025)
+      - 661539   # A Complete Unknown (2024)
+      - 799766   # Better Man (2024)
+      - 802219   # Bob Marley: One Love (2024)
+      - 998846   # Back to Black (2024)
+      - 523607   # Maestro (2023)
+      - 614934   # Elvis (2022)
+      - 928344   # Weird: The Al Yankovic Story (2022)
+      - 696157   # Whitney Houston: I Wanna Dance with Somebody (2022)
+      - 592863   # Respect (2021)
+      - 566076   # The United States vs. Billie Holiday (2021)
+      - 615667   # Ma Rainey's Black Bottom (2020)
+      - 504608   # Rocketman (2019)
+      - 491283   # Judy (2019)
+      - 327331   # The Dirt (2019)
+      - 424694   # Bohemian Rhapsody (2018)
+      - 426249   # Lords of Chaos (2018)
+      - 315664   # Florence Foster Jenkins (2016)
+      - 316000   # Miles Ahead (2016)
+      - 277216   # Straight Outta Compton (2015)
+      - 271714   # Love & Mercy (2015)
+      - 327528   # Born to Be Blue (2015)
+      - 239566   # Get On Up (2014)
+      - 119675   # Behind the Candelabra (2013)
+      - 27586    # The Runaways (2010)
+      - 31900    # Gainsbourg: A Heroic Life (2010)
+      - 33511    # Nowhere Boy (2009)
+      - 14410    # Notorious (2009)
+      - 14299    # Cadillac Records (2008)
+      - 5708     # Control (2007)
+      - 1407     # La Vie en Rose (2007)
+      - 6575     # Walk Hard: The Dewey Cox Story (2007)
+      - 3902     # I'm Not There (2007)
+      - 69       # Walk the Line (2005)
+      - 1677     # Ray (2004)
+      - 2750     # 24 Hour Party People (2002)
+      - 46435    # Topsy-Turvy (1999)
+      - 16052    # Selena (1997)
+      - 7863     # Shine (1996)
+      - 13701    # Immortal Beloved (1994)
+      - 12635    # Backbeat (1994)
+      - 15765    # What's Love Got to Do with It (1993)
+      - 10537    # The Doors (1991)
+      - 11465    # Great Balls of Fire! (1989)
+      - 24679    # Bird (1988)
+      - 16620    # La Bamba (1987)
+      - 14924    # Sid and Nancy (1986)
+      - 42045    # Sweet Dreams (1985)
+      - 279      # Amadeus (1984)
+      - 16769    # Coal Miner's Daughter (1980)
+      - 40047    # Elvis (1979)
+      - 24153    # The Buddy Holly Story (1978)
+      - 42232    # Bound for Glory (1976)
+      - 23148    # Lady Sings the Blues (1972)
+      - 16085    # Funny Girl (1968)
+      - 43261    # The Benny Goodman Story (1956)
+      - 17729    # The Glenn Miller Story (1954)
+      - 3087     # Yankee Doodle Dandy (1942)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s
