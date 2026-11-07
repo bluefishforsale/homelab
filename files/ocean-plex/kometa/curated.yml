@@ -296,6 +296,25 @@ collections:
   # Moved in from the host-only Movies.yml and config/movies/. These stay views
   # of what is on disk: Best of the 1980s is a 1000-title discover query, and
   # add-missing on it would flood Radarr.
+  John Carney:
+    sort_title: "!John Carney"
+    summary: "Every feature from the Dublin director of Once and Sing Street."
+    tmdb_movie:
+      - 397112   # November Afternoon (1996)
+      - 397111   # Park (1999)
+      - 80070    # On the Edge (2001)
+      - 5723     # Once (2007)
+      - 50598    # Zonad (2009)
+      - 246548   # The Rafters (2012)
+      - 198277   # Begin Again (2013)
+      - 369557   # Sing Street (2016)
+      - 1059811  # Flora and Son (2023)
+      - 1284016  # Power Ballad (2026)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s
