@@ -1,7 +1,7 @@
 ---
 - name: Configure fail2ban for SSH protection
   become: true
-  hosts: all
+  hosts: all:!macos
   strategy: free
 
   tasks:

@@ -2,7 +2,7 @@
 - name: Configure systemd service for cloudflared
   become: true
   gather_facts: true
-  hosts: all  # Can run on any host
+  hosts: all:!macos  # Can run on any host
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"

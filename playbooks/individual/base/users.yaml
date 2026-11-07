@@ -1,5 +1,5 @@
 - name: Install and configure zsh and tools for users
-  hosts: all
+  hosts: all:!macos
   become: true
   vars_files:
     - ../../../vault/secrets.yaml

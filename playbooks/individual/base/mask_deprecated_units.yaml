@@ -8,7 +8,7 @@
 # a VM has no BMC, so the unit can only ever fail.
 # ini host vars arrive as strings, so split on comma rather than expecting a list.
 - name: Mask deprecated/absent systemd units
-  hosts: all
+  hosts: all:!macos
   become: true
   gather_facts: false
   tasks:
