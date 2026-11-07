@@ -6,8 +6,10 @@ set -euo pipefail
 MODELS={{ home }}/models
 
 fail() {
-  curl -sf --max-time 10 -u "$NTFY_USER:$NTFY_PASS" -H "Title: llmeval model download failed" \
-    -H "Priority: high" -d "$1" "$NTFY_URL" >/dev/null || true
+  # Credentials go to curl on stdin (-K -), never in argv, where ps shows them.
+  printf 'user = "%s:%s"\n' "$NTFY_USER" "$NTFY_PASS" \
+    | curl -sf --max-time 10 -K - -H "Title: llmeval model download failed" \
+      -H "Priority: high" -d "$1" "$NTFY_URL" >/dev/null || true
   echo "$1" >&2
   exit 1
 }
