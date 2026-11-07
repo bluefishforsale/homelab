@@ -10,7 +10,10 @@
 # Bootstrap, by hand once: Remote Login on, GitHub keys in
 # ~tv/.ssh/authorized_keys, passwordless sudo for tv, Homebrew, and Xcode from
 # the App Store, selected with `sudo xcode-select -s /Applications/Xcode.app`
-# and its license accepted (`sudo xcodebuild -license accept`).
+# and its license accepted (`sudo xcodebuild -license accept`). The command
+# line tools must also match the macOS release, or Homebrew refuses to install
+# anything: `softwareupdate --list` offers them once
+# /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress exists.
 
 - name: GitHub Actions runner for signal-agent on macOS
   hosts: macos
@@ -34,7 +37,7 @@
     runner_job_hook: /usr/local/sbin/actions-runner-job-started
     # GitHub adds self-hosted, macOS and ARM64 itself.
     runner_labels: [homelab, "{{ inventory_hostname }}"]
-    runner_path: "{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    runner_path: "{{ homebrew_prefix }}/opt/rustup/bin:{{ runner_home }}/.cargo/bin:{{ homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     # NOTE: only the first install uses this pin. The runner updates itself
     # after that, and GitHub refuses runners that fall too far behind.
     runner_version: 2.338.2
@@ -87,18 +90,22 @@
         create_home: true
         hidden: true
 
-    - name: Rust toolchain manager for the runner user
+    # Homebrew's rustup has no rustup-init: rustup and the cargo/rustc shims
+    # live in its keg (on runner_path), and toolchains land in ~/.rustup.
+    - name: Rust toolchain for the runner user
       become_user: "{{ runner_user }}"
       environment:
         HOME: "{{ runner_home }}"
       ansible.builtin.command:
         argv:
-          - "{{ homebrew_prefix }}/opt/rustup/bin/rustup-init"
-          - -y
-          - --no-modify-path
+          - "{{ homebrew_prefix }}/opt/rustup/bin/rustup"
+          - toolchain
+          - install
+          - stable
           - --profile
           - minimal
-        creates: "{{ runner_home }}/.cargo/bin/rustup"
+        chdir: "{{ runner_home }}"
+        creates: "{{ runner_home }}/.rustup/toolchains"
 
     - name: Runner directory
       ansible.builtin.file:
@@ -117,13 +124,16 @@
         group: staff
         mode: '0644'
 
+    # Not unarchive: it needs GNU tar, and macOS ships BSD tar.
     - name: Unpack the runner
-      ansible.builtin.unarchive:
-        src: "{{ runner_home }}/actions-runner-osx-arm64-{{ runner_version }}.tar.gz"
-        dest: "{{ runner_dir }}"
-        remote_src: true
-        owner: "{{ runner_user }}"
-        group: staff
+      become_user: "{{ runner_user }}"
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -xzf
+          - "{{ runner_home }}/actions-runner-osx-arm64-{{ runner_version }}.tar.gz"
+          - -C
+          - "{{ runner_dir }}"
         creates: "{{ runner_dir }}/config.sh"
 
     - name: PATH for jobs (the runner reads .path at startup)
