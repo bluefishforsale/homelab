@@ -1,0 +1,31 @@
+#!/bin/bash
+# Rendered by playbooks/individual/workers/tdarr_node_desktop.yaml.
+#
+# Wait for the server to list this node, then set its encoder and step its
+# worker limits to the committed counts. Worker limits move one step per API
+# call; gpuSelect defaults to '-', which the flow routes to libx265.
+set -euo pipefail
+
+SERVER_URL={{ tdarr_server_url }}
+NODE_NAME={{ name }}.home
+
+NODE_ID=""
+for _ in $(seq 1 30); do
+  NODE_ID=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg n "$NODE_NAME" 'to_entries[] | select(.value.nodeName == $n) | .key' | head -1)
+  [[ -n "$NODE_ID" ]] && break
+  sleep 10
+done
+[[ -n "$NODE_ID" ]] || { echo "tdarr server never listed $NODE_NAME" >&2; exit 1; }
+
+curl -fsS -X POST -H 'Content-Type: application/json' "$SERVER_URL/api/v2/update-node" \
+  -d "$(jq -cn --arg id "$NODE_ID" '{data:{nodeID:$id,nodeUpdates:{gpuSelect:"{{ node.gpu_select }}"}}}')" >/dev/null
+
+{% for type, want in node.worker_limits.items() %}
+have=$(curl -fsS "$SERVER_URL/api/v2/get-nodes" | jq -r --arg id "$NODE_ID" '.[$id].workerLimits.{{ type }} // 0')
+while (( have != {{ want }} )); do
+  if (( have < {{ want }} )); then process=increase; have=$((have + 1)); else process=decrease; have=$((have - 1)); fi
+  curl -fsS -X POST -H 'Content-Type: application/json' "$SERVER_URL/api/v2/alter-worker-limit" \
+    -d "$(jq -cn --arg id "$NODE_ID" --arg p "$process" '{data:{nodeID:$id,process:$p,workerType:"{{ type }}"}}')" >/dev/null
+done
+{% endfor %}
+echo "$NODE_NAME is $NODE_ID with gpuSelect {{ node.gpu_select }}"

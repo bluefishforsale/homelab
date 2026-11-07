@@ -1,0 +1,9 @@
+[Unit]
+Description=ocean's media library over NFS
+
+[Mount]
+What={{ tdarr_server_ip }}:/data01/complete
+Where=/data01/complete
+Type=nfs4
+Options={{ tdarr_desktop_nfs_opts }}
+TimeoutSec=30

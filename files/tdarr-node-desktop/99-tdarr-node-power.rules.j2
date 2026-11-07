@@ -1,0 +1,4 @@
+# Rendered by playbooks/individual/workers/tdarr_node_desktop.yaml.
+# The tdarr node runs on mains power only.
+SUBSYSTEM=="power_supply", KERNEL=="AC", ACTION=="change", ATTR{online}=="1", RUN+="/usr/bin/systemctl --no-block start tdarr-node.service"
+SUBSYSTEM=="power_supply", KERNEL=="AC", ACTION=="change", ATTR{online}=="0", RUN+="/usr/bin/systemctl --no-block stop tdarr-node.service"

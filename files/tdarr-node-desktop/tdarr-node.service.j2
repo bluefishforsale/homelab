@@ -1,0 +1,27 @@
+[Unit]
+Description=tdarr node (runs on mains power only)
+After=docker.service network-online.target data01-complete.automount
+Requires=docker.service data01-complete.automount
+Wants=network-online.target
+# On battery the node never starts; 99-tdarr-node-power.rules starts and stops
+# it as the charger comes and goes.
+ConditionACPower=true
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ home }}
+ExecStart=/usr/bin/docker compose up -d
+# Registers the node's encoder and worker limits; the server forgets both when
+# a node comes back under a new id.
+ExecStartPost=/usr/local/sbin/tdarr-node-configure
+ExecStop=/usr/bin/docker compose down --timeout 30
+# Nothing runs once the node is down, so whatever is left in the cache belongs
+# to a job that just died with it and nothing else would ever remove it
+# (gaming's filled 38G of 40G that way, 2026-11-06).
+ExecStopPost=/usr/bin/find {{ home }}/cache -mindepth 1 -delete
+TimeoutStartSec=600
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

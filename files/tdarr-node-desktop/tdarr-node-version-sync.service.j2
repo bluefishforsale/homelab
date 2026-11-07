@@ -1,0 +1,12 @@
+[Unit]
+Description=Repin the tdarr node to the server's version
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+# On battery the node is down on purpose; a restart here would start it.
+ConditionACPower=true
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tdarr-node-version-sync
+TimeoutStartSec=900

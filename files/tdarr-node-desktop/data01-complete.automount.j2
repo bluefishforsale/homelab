@@ -1,0 +1,9 @@
+[Unit]
+Description=Mount ocean's media library on first use
+
+[Automount]
+Where=/data01/complete
+TimeoutIdleSec=10min
+
+[Install]
+WantedBy=multi-user.target

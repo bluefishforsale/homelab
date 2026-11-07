@@ -1,0 +1,23 @@
+#!/bin/bash
+# Rendered by playbooks/individual/workers/tdarr_node_desktop.yaml.
+#
+# The server refuses a node on any other version, and ocean's server is :latest
+# (11-06: a day refused on 3.04.00 against 3.06.00). On a change, pull the
+# matching image, repin the compose file and restart the unit, which empties
+# the cache and re-registers the encoder and limits.
+set -euo pipefail
+
+SERVER_URL={{ tdarr_server_url }}
+COMPOSE={{ home }}/docker-compose.yml
+IMAGE=ghcr.io/haveagitgat/tdarr_node
+
+want=$(curl -fsS --max-time 20 "$SERVER_URL/api/v2/status" | jq -r .version)
+# The version goes into an image tag in a YAML file.
+[[ "$want" =~ ^[0-9]+\.[0-9]{2}\.[0-9]{2}$ ]] || { echo "tdarr server reported version '$want'" >&2; exit 1; }
+have=$(sed -n "s|.*$IMAGE:\([0-9.]*\).*|\1|p" "$COMPOSE")
+[[ "$want" == "$have" ]] && exit 0
+
+echo "server is $want, node is ${have:-unknown}: following the server"
+docker pull "$IMAGE:$want"
+sed -i "s|$IMAGE:[0-9.]*|$IMAGE:$want|" "$COMPOSE"
+systemctl restart tdarr-node.service
