@@ -1,0 +1,30 @@
+# Bazarr as a compose project, so it gets a weekly refresh timer and a new
+# image like every other service. It was a bare docker run unit whose
+# ExecStartPre deleted and re-pulled the image inside a 60s start timeout, which
+# is how it ended up stuck in "start-pre operation timed out".
+services:
+  bazarr:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID={{ uid }}
+      - PGID={{ gid }}
+    ports:
+      - "{{ port }}:6767"
+    volumes:
+      - {{ home }}:/config
+      - {{ complete }}/movies:/movies
+      - {{ complete }}/tv:/tv
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:6767/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    cpus: '2.0'
+    mem_limit: 1024m
