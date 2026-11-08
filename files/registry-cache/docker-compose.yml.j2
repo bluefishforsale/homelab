@@ -103,6 +103,57 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── ghcr.io private-image cache ───────────────────────────────────────
+  ghcr-private-cache:
+    image: registry:2
+    container_name: ghcr-private-cache
+    restart: unless-stopped
+    ports:
+      - "5005:5000"
+      - "5015:5001"
+    volumes:
+      - {{ home }}/config/ghcr-private.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/ghcr-private:/var/lib/registry
+      - {{ home }}/auth/ghcr-private.htpasswd:/auth/htpasswd:ro
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: ghcr-private-cache
+    security_opt:
+      - no-new-privileges:true
+
+  # ── gcr.io pull-through cache ──────────────────────────────────────────
+  gcr-cache:
+    image: registry:2
+    container_name: gcr-cache
+    restart: unless-stopped
+    ports:
+      - "5006:5000"
+      - "5016:5001"
+    volumes:
+      - {{ home }}/config/gcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/data/gcr:/var/lib/registry
+    environment:
+      TZ: America/Los_Angeles
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: journald
+      options:
+        tag: gcr-cache
+    security_opt:
+      - no-new-privileges:true
+
   # ── Promtail (Loki Log Collector) ──────────────────────────────────────
   promtail:
     image: grafana/promtail:latest
