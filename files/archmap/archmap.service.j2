@@ -27,7 +27,7 @@ ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
 
 Restart=on-failure
 RestartSec=30
-TimeoutStartSec=300
+TimeoutStartSec=1200
 TimeoutStopSec=60
 
 NoNewPrivileges=true
