@@ -61,6 +61,8 @@ services:
     # its multi-threaded SCIP indexers, and polling. ocean's other 22 cores
     # stay with everything else on the host.
     cpus: 8
+    # Each render process holds a few snapshots in memory.
+    mem_limit: 6g
     env_file:
       - {{ home }}/.env
     environment:
