@@ -4,7 +4,15 @@
         "tag": "{{ '{{.Name}}' }}"
     },
     "live-restore": true,
-    "storage-driver": "overlay2"
+    "storage-driver": "overlay2",
+    "insecure-registries": [
+        "registry-cache.home:5001",
+        "registry-cache.home:5002",
+        "registry-cache.home:5003",
+        "registry-cache.home:5004",
+        "registry-cache.home:5005",
+        "registry-cache.home:5006"
+    ]
 {% if registry_cache_mirror | default(true) %}
     ,
     "registry-mirrors": ["http://registry-cache.home:5001"]

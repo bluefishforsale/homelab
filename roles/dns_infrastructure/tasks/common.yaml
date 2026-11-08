@@ -71,12 +71,9 @@
     mode: '0755'
 
 - name: Configure Docker daemon
-  ansible.builtin.copy:
+  template:
+    src: docker/daemon.json.j2
     dest: /etc/docker/daemon.json
-    content: |
-      {
-        "log-driver": "journald"
-      }
     mode: '0644'
 
 - name: Enable and start Docker
