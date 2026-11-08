@@ -1,8 +1,11 @@
 ---
-- name: Configure systemd service for bazarr
+# Bazarr on ocean as a compose project. The state dir from the original install
+# (database, backups, config.yaml) is reused as-is; this play owns only
+# config.ini, the compose file and the unit.
+- name: Bazarr on ocean
   hosts: ocean
   become: true
-  gather_facts: true
+  gather_facts: false
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
@@ -22,54 +25,74 @@
     home: "{{ data }}/services/{{ service }}"
     port: "{{ service_ports.bazarr.port }}"
     user: media
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
+    - name: Ensure config dir exists
+      ansible.builtin.file:
+        path: "{{ home }}/config"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
 
-  - name: Ensure basedir exists
-    ansible.builtin.file:
-      path: "{{ home }}"
-      state: directory
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0755'
+    - name: Template config.ini (holds the API keys)
+      ansible.builtin.template:
+        src: "{{ files }}/config.ini.j2"
+        dest: "{{ home }}/config/config.ini"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0644'
+      register: bazarr_config
 
-  - name: Ensure directory exists with correct ownership and permissions
-    ansible.builtin.file:
-      path: "{{ home }}/{{ item }}"
-      state: directory
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0755'
-    with_items:
-    - config
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: bazarr_compose
 
-  - name: Create config files
-    ansible.builtin.template:
-      src: "{{ files }}/config.ini.j2"
-      dest: "{{ home }}/config/config.ini"
-      mode: '0644'
-    notify:
-    - Reload systemd daemon
-    - Restart service
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/bazarr.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: bazarr_unit
 
-  - name: Create systemd service
-    ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - bazarr.service
-    notify:
-    - Reload systemd daemon
-    - Restart service
+    # NOTE: the old unit ran a bare `docker run --name bazarr`. The new unit's
+    # ExecStop is `compose down`, which never touches a container compose did
+    # not create, so without this the compose up fails on the name conflict.
+    # Only a container with no compose label is removed, so this is a no-op on
+    # every run after the first. The prefix is there because an empty label
+    # prints an empty line, which Ansible strips to the same "" as no container.
+    - name: Find a leftover docker run bazarr container
+      ansible.builtin.command: >-
+        docker ps -a --filter name=^{{ service }}$
+        --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+      register: bazarr_ps
+      changed_when: false
+      check_mode: false
 
-  handlers:
-  - name: Reload systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
+    - name: Remove the docker run container before compose takes the name
+      ansible.builtin.command: docker rm -f {{ service }}
+      register: bazarr_legacy
+      when: bazarr_ps.stdout | trim == 'project='
 
-  - name: Restart service
-    ansible.builtin.systemd:
-      name: bazarr.service
-      state: restarted
-      enabled: true
+    - name: Enable and start bazarr (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (bazarr_config is changed or bazarr_compose is changed or bazarr_unit is changed or bazarr_legacy is changed) else 'started' }}"
+        daemon_reload: true
+
+    - name: Wait for Bazarr's API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ port }}/api/system/status"
+        headers:
+          X-API-KEY: "{{ media_services.bazarr.api_key }}"
+      register: bazarr_status
+      until: bazarr_status.status == 200
+      retries: 30
+      delay: 10
+      changed_when: false
