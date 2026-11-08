@@ -909,9 +909,10 @@ groups:
       description: "archmap_queue_depth has stayed above zero for 30m without shrinking ({{ "{{ $value }}" }} jobs). The worker is stuck or failing every job; check `docker logs archmap-worker`."
 
   # NOTE: assumes the worker rebuilds live at least hourly. If it only builds
-  # when a scoped repo moves, a quiet hour fires this.
+  # when a scoped repo moves, a quiet hour fires this. The gauge reads 0 until
+  # the first build, so a fresh install is not stale.
   - alert: ArchmapLiveBuildStale
-    expr: time() - archmap_last_live_build_timestamp > 3600
+    expr: archmap_last_live_build_timestamp > 0 and time() - archmap_last_live_build_timestamp > 3600
     for: 10m
     labels:
       severity: warning

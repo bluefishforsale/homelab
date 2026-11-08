@@ -23,7 +23,8 @@
     version: latest
     port_ext: "{{ service_ports.archmap.port }}"
     api_port: 8000
-    worker_metrics_port: 9000
+    # Fixed in the image (archmap/worker/main.py METRICS_PORT), not env.
+    worker_metrics_port: 8001
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/archmap"
     home: "{{ data }}/services/{{ service }}"
