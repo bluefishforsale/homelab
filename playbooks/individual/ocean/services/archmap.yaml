@@ -1,0 +1,120 @@
+---
+# archmap: an isometric map of everything bluefishforsale runs and builds,
+# generated from code. The archmap repo's CI builds one image and dispatches
+# `deploy-archmap` here. The compose project runs that image twice (api and
+# worker) beside Postgres, plus an nginx that serves tiles from disk on
+# {{ port_ext }}. archmap.terrac.com is admin-only through Cloudflare Access.
+#
+# All state is on ocean's local ZFS under {{ home }}: Postgres (backed up by
+# db-backup.sh), and derived data (repo clones, SCIP indexes, tiles) that a
+# rebuild from code recreates.
+- name: Deploy archmap using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: archmap
+    image: ghcr.io/bluefishforsale/archmap
+    version: latest
+    port_ext: "{{ service_ports.archmap.port }}"
+    api_port: 8000
+    worker_metrics_port: 9000
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/archmap"
+    home: "{{ data }}/services/{{ service }}"
+
+  tasks:
+
+  - name: Log ocean into GHCR to pull private archmap image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+
+  # Pull here, not only in the unit's tolerant ExecStartPre, so a bad GHCR
+  # credential fails the deploy instead of leaving the old image running.
+  - name: Pull latest archmap image (loud on bad credentials)
+    ansible.builtin.command:
+      cmd: "docker pull {{ image }}:{{ version }}"
+    register: ghcr_pull
+    changed_when: "'Downloaded newer image' in ghcr_pull.stdout"
+
+  - name: Ensure archmap directories exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      mode: '0755'
+    loop:
+      - "{{ home }}"
+      - "{{ home }}/data"
+      - "{{ home }}/data/tiles"
+
+  # Compose carries POSTGRES_PASSWORD, so it is as secret as the .env.
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0600'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap environment file
+    ansible.builtin.template:
+      src: "{{ files }}/archmap.env.j2"
+      dest: "{{ home }}/.env"
+      mode: '0600'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap tile nginx config
+    ansible.builtin.template:
+      src: "{{ files }}/nginx-tiles.conf.j2"
+      dest: "{{ home }}/nginx-tiles.conf"
+      mode: '0644'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/archmap.service.j2"
+      dest: /etc/systemd/system/archmap.service
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart archmap service
+
+  - name: Enable archmap service
+    ansible.builtin.systemd:
+      name: archmap.service
+      enabled: true
+      daemon_reload: true
+
+  # Always restart so a dispatched deploy recreates the containers on the
+  # image pulled above, even when every template was byte-identical.
+  - name: Restart archmap service to pick up latest image
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: restarted
+
+  - name: Wait for archmap api through the tile nginx
+    ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ port_ext }}/healthz"
+      status_code: 200
+    register: archmap_health
+    retries: 20
+    delay: 6
+    until: archmap_health.status == 200
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  - name: Restart archmap service
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: restarted
