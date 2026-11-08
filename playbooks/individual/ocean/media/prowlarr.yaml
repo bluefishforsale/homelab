@@ -1,7 +1,11 @@
 ---
-- name: Configure systemd service for prowlarr
+# Prowlarr and exporter on ocean as a compose project. The state dir from the
+# original install (/data01/services/prowlarr/config) is reused as-is.
+- name: Prowlarr and exporter on ocean
   hosts: ocean
   become: true
+  gather_facts: false
+
   vars_files:
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
@@ -17,97 +21,128 @@
     exporter_port: "{{ service_ports.prowlarr_exporter.port }}"
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-prowlarr"
-    incoming: "{{ data }}/incoming"
-    complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
+    compose_dir: "/opt/compose/{{ service }}"
     user: media
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
 
-  - name: Ensure basedir exists
-    ansible.builtin.file:
-      path: "{{ home }}"
-      state: directory
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0755'
+    - name: Ensure config dir exists
+      ansible.builtin.file:
+        path: "{{ home }}/config"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
 
-  - name: Create prowlarr systemd service
-    ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - prowlarr.service
-    notify:
-    - Reload prowlarr systemd daemon
-    - Restart prowlarr service
+    - name: Ensure root-owned compose dir exists
+      ansible.builtin.file:
+        path: "{{ compose_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
 
-  - name: Create exporter systemd service
-    ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - prowlarr-exporter.service
-    notify:
-    - Reload exporter systemd daemon
-    - Restart exporter service
+    - name: Template compose file (holds the API key)
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0600'
+      register: prowlarr_compose
 
-  - name: Enable and start prowlarr-exporter service
-    ansible.builtin.systemd:
-      name: prowlarr-exporter.service
-      enabled: yes
-      state: started
-      daemon_reload: yes
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/prowlarr.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: prowlarr_unit
 
-  - name: Wait for Prowlarr's API
-    ansible.builtin.uri:
-      url: "http://127.0.0.1:{{ prowlarr_port }}/api/v1/system/status"
-      headers:
-        X-Api-Key: "{{ media_services.prowlarr.api_key }}"
-    register: prowlarr_status
-    until: prowlarr_status.status == 200
-    retries: 30
-    delay: 10
-    changed_when: false
+    # Clean up legacy bare docker run units and containers
+    - name: Stop and disable legacy prowlarr-exporter service if present
+      ansible.builtin.systemd:
+        name: prowlarr-exporter.service
+        state: stopped
+        enabled: false
+      failed_when: false
 
-  # Keys live in media_services.prowlarr.indexers.<slug>.api_key, the slug being
-  # the indexer's Prowlarr name lowercased with punctuation dropped (NZBs.in ->
-  # nzbsin). Sonarr, Radarr and Lidarr need nothing: they reach indexers
-  # through Prowlarr's proxy with Prowlarr's own key.
-  - name: Push indexer API keys from the vault
-    ansible.builtin.script:
-      cmd: "{{ files }}/prowlarr-indexer-keys.py"
-      executable: python3
-    environment:
-      PROWLARR_URL: "http://127.0.0.1:{{ prowlarr_port }}"
-      PROWLARR_API_KEY: "{{ media_services.prowlarr.api_key }}"
-      PROWLARR_DB: "{{ home }}/config/prowlarr.db"
-      INDEXER_KEYS: "{{ media_services.prowlarr.indexers | to_json }}"
-    register: prowlarr_indexer_keys
-    changed_when: "'changed:' in prowlarr_indexer_keys.stdout"
+    - name: Remove legacy prowlarr-exporter service file
+      ansible.builtin.file:
+        path: /etc/systemd/system/prowlarr-exporter.service
+        state: absent
+      register: legacy_exporter_unit
 
-  - name: Show which indexer keys were pushed
-    ansible.builtin.debug:
-      var: prowlarr_indexer_keys.stdout_lines
+    - name: Find leftover bare docker run containers
+      ansible.builtin.command: >-
+        docker ps -a --filter name=^{{ item }}$
+        --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+      register: legacy_containers
+      changed_when: false
+      check_mode: false
+      loop:
+        - "{{ service }}"
+        - "{{ exporter_service }}"
 
-  handlers:
-  - name: Reload prowlarr systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
+    - name: Remove bare docker run containers before compose takes the names
+      ansible.builtin.command: docker rm -f {{ item.item }}
+      register: prowlarr_legacy_rm
+      when: item.stdout | trim == 'project='
+      loop: "{{ legacy_containers.results }}"
 
-  - name: Restart prowlarr service
-    ansible.builtin.systemd:
-      name: prowlarr.service
-      state: restarted
+    - name: Enable and start prowlarr (restart only on config/unit change or legacy cleanup)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (prowlarr_compose is changed or prowlarr_unit is changed or prowlarr_legacy_rm is changed or legacy_exporter_unit is changed) else 'started' }}"
+        daemon_reload: true
 
-  - name: Reload exporter systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
+    - name: Wait for Prowlarr's API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prowlarr_port }}/api/v1/system/status"
+        headers:
+          X-Api-Key: "{{ media_services.prowlarr.api_key }}"
+      register: prowlarr_status
+      until: prowlarr_status.status == 200
+      retries: 30
+      delay: 10
+      changed_when: false
 
-  - name: Restart exporter service
-    ansible.builtin.systemd:
-      name: prowlarr-exporter.service
-      state: restarted
-      enabled: true
+    # Keys live in media_services.prowlarr.indexers.<slug>.api_key, the slug being
+    # the indexer's Prowlarr name lowercased with punctuation dropped (NZBs.in ->
+    # nzbsin). Sonarr, Radarr and Lidarr need nothing: they reach indexers
+    # through Prowlarr's proxy with Prowlarr's own key.
+    - name: Push indexer API keys from the vault
+      ansible.builtin.script:
+        cmd: "{{ files }}/prowlarr-indexer-keys.py"
+        executable: python3
+      environment:
+        PROWLARR_URL: "http://127.0.0.1:{{ prowlarr_port }}"
+        PROWLARR_API_KEY: "{{ media_services.prowlarr.api_key }}"
+        PROWLARR_DB: "{{ home }}/config/prowlarr.db"
+        INDEXER_KEYS: "{{ media_services.prowlarr.indexers | to_json }}"
+      register: prowlarr_indexer_keys
+      changed_when: "'changed:' in prowlarr_indexer_keys.stdout"
+
+    - name: Show which indexer keys were pushed
+      ansible.builtin.debug:
+        var: prowlarr_indexer_keys.stdout_lines
+
+    - name: Wait for the exporter to serve Prowlarr metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ exporter_port }}/metrics"
+        return_content: true
+      register: prowlarr_metrics
+      until: prowlarr_metrics.status == 200 and prowlarr_metrics.content is search('prowlarr_system_status(\\{[^}]*\\})? 1')
+      retries: 12
+      delay: 10
+      changed_when: false
