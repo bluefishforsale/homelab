@@ -43,6 +43,8 @@ push main                             repository_dispatch              docker pu
 value pulled from the homelab vault key `development.github.deploy_dispatch_token`
 (fine-grained PAT with `Contents: write` on `bluefishforsale/homelab`).
 
+**New PATs:** create every GitHub PAT from a pre-filled URL, never by clicking through the form, e.g. `https://github.com/settings/personal-access-tokens/new?name=<svc>&target_name=bluefishforsale&expires_in=none&contents=read&pull_requests=read&statuses=write`, then `pbpaste | uv run --with pyyaml python scripts/vault.py rotate <svc>.github_token -`. A hand-made archmap token missed `pull_requests=read` and every pull on a private repo 403'd.
+
 **Dispatch payload** — always built with `jq -cn --arg`, never string-concatenated:
 
 ```bash
