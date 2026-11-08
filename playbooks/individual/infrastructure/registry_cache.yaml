@@ -33,7 +33,7 @@
       changed_when: false
       failed_when: false
 
-    - name: Install Docker apt prerequisites
+    - name: Install Docker and auth apt prerequisites
       ansible.builtin.apt:
         name:
           - apt-transport-https
@@ -41,6 +41,8 @@
           - curl
           - gnupg
           - lsb-release
+          - python3-passlib
+          - python3-bcrypt
         state: present
         update_cache: yes
         lock_timeout: 600
@@ -124,6 +126,28 @@
         - ghcr
         - gitlab
         - nvcr
+        - ghcr-private
+        - gcr
+
+    - name: Ensure auth directory exists
+      ansible.builtin.file:
+        path: "{{ home }}/auth"
+        state: directory
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Ensure htpasswd file exists for ghcr-private-cache
+      community.general.htpasswd:
+        path: "{{ home }}/auth/htpasswd"
+        name: "{{ development.github.github_owner }}"
+        password: "{{ development.github.packages_read_token }}"
+        crypt_scheme: bcrypt
+        owner: root
+        group: root
+        mode: '0640'
+      notify:
+        - Restart registry-cache service
 
     - name: Render registry configs for each upstream
       ansible.builtin.template:
@@ -137,6 +161,8 @@
         - ghcr
         - gitlab
         - nvcr
+        - ghcr-private
+        - gcr
       notify:
         - Restart registry-cache service
 
@@ -199,7 +225,7 @@
           trap 'rm -f "$TMP"' EXIT
           printf '# HELP registry_cache_size_bytes On-disk size of the registry pull-through cache per upstream.\n' > "$TMP"
           printf '# TYPE registry_cache_size_bytes gauge\n' >> "$TMP"
-          for d in docker-hub ghcr gitlab nvcr; do
+          for d in docker-hub ghcr gitlab nvcr ghcr-private gcr; do
             [ -d "$DATA/$d" ] || continue
             bytes=$(du -sb "$DATA/$d" | cut -f1)
             printf 'registry_cache_size_bytes{upstream="%s"} %s\n' "$d" "$bytes" >> "$TMP"

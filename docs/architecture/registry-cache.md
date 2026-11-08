@@ -1,10 +1,10 @@
 # Registry cache (registry-cache-01)
 
 A pull-through image cache on its own VM, so an image the fleet has pulled once
-can still be pulled while its upstream registry is down. Four `registry:2`
+can still be pulled while its upstream registry is down. Six `registry:2`
 containers each proxy one upstream (Docker Hub, ghcr.io, registry.gitlab.com,
-nvcr.io). Only the Docker Hub one is in any pull path today: dockerd uses it as
-a `registry-mirrors` entry, and nothing points at the other three.
+nvcr.io, private ghcr.io, gcr.io). Only the Docker Hub one is in any pull path today: dockerd uses it as
+a `registry-mirrors` entry, and nothing points at the other five.
 
 The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 `[registry_cache]` in `inventories/production/hosts.ini`. DNS is
@@ -16,7 +16,7 @@ The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 | File | Host | What it owns |
 |---|---|---|
 | `infrastructure/create_registry_cache_vm.yaml` | node005 | VM 7000 `registry-cache-01`, cloned from template 9999: 2 cores, 2048 MB, scsi0 grown `+192G`, onboot, static IP (dig of `registry-cache-01.home`, else 192.168.1.30), single nameserver 192.168.1.2. CPU, memory and network are only set when the VM is not running. |
-| `infrastructure/registry_cache.yaml` | `registry_cache` | Installs Docker inline (not via `docker_ce.yaml`), renders `daemon.json`, the four registry configs, compose file, promtail config and `registry-cache.service`, plus the cache-size metric script and timer. State under `/data01/services/registry-cache/{config,data/<upstream>}`. |
+| `infrastructure/registry_cache.yaml` | `registry_cache` | Installs Docker inline (not via `docker_ce.yaml`), renders `daemon.json`, the six registry configs, compose file, promtail config and `registry-cache.service`, plus the cache-size metric script and timer. State under `/data01/services/registry-cache/{config,data/<upstream>}`. |
 | `.github/workflows/deploy-registry-cache.yml` | runner | `workflow_dispatch` or `repository_dispatch: deploy-registry-cache`; runs `registry_cache.yaml`. Own concurrency group `deploy-registry-cache`, not `deploy-ocean`. |
 | `infrastructure/docker_ce.yaml` | `all:!github_runners`, `serial: 1` | Renders `files/docker/daemon.json.j2` on every other docker host, which is where the mirror line comes from. |
 
@@ -31,6 +31,8 @@ The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 | `ghcr-cache` | `https://ghcr.io` | 5002 | 5012 | none |
 | `gitlab-cache` | `https://registry.gitlab.com` | 5003 | 5013 | none |
 | `nvcr-cache` | `https://nvcr.io` | 5004 | 5014 | none |
+| `ghcr-private-cache` | `https://ghcr.io` | 5005 | 5015 | htpasswd in front (bluefishforsale); upstream vault `development.github.packages_read_token` |
+| `gcr-cache` | `https://gcr.io` | 5006 | 5016 | none |
 
 Host ports map to container `:5000` (registry) and `:5001` (debug/metrics) in
 `files/registry-cache/docker-compose.yml.j2`. Each container is capped at 0.5
@@ -71,7 +73,7 @@ installs on all hosts keeps `registry:2` and `grafana/promtail:latest` current.
 
 ## Monitoring
 
-- Prometheus job `registry-cache` scrapes `registry-cache.home:5011-5014`
+- Prometheus job `registry-cache` scrapes `registry-cache.home:5011-5016`
   (`files/ocean-prometheus/prometheus.yml.j2`) and relabels each port to an
   `upstream` label.
 - No dedicated alert rules. A container that stops answering metrics trips the
@@ -120,4 +122,4 @@ Docker Hub pulls fall back to the upstream when the mirror is unreachable
 `registry-cache.service` should not block Hub pulls. To remove the mirror for
 real, set `registry_cache_mirror=false` for the hosts (or drop the block from
 `daemon.json.j2`) and let `docker_ce.yaml` roll it out. Nothing else in the
-fleet depends on the other three caches.
+fleet depends on the other five caches.
