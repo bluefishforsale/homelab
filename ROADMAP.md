@@ -76,6 +76,13 @@ Status and future plans for the homelab infrastructure.
 - **github_runner_token_check**: Deployed service
 - **github_runner_token_update_vault**: Deployed service
 - **ocean_cpu_host**: Deployed service
+- **create_harbor_vm**: Deployed service
+- **create_netboot_vm**: Deployed service
+- **data01_worker**: Deployed service
+- **db_restore_test**: Deployed service
+- **macos_runner**: Deployed service
+- **netboot**: Deployed service
+- **netboot_image**: Deployed service
 
 ### Media Stack
 
@@ -90,6 +97,8 @@ Status and future plans for the homelab infrastructure.
 - **Kometa**: Library metadata automation
 - **Audible Downloader**: Audiobook acquisition
 - **Jellyfin**: Media server (alternative to Plex)
+- **Lidarr**: Deployed service
+- **tdarr_node_desktop**: Deployed service
 
 ### AI/ML Stack
 
@@ -134,6 +143,8 @@ Status and future plans for the homelab infrastructure.
 - **NVIDIA Exporter**: Metrics exporter
 - **NVIDIA GPU Exporter**: Metrics exporter
 - **NVIDIA Power Limit**: Deployed service
+- **Pushgateway**: Deployed service
+- **Tdarr Exporter**: Deployed service
 
 ### Cloud/CMS Services
 
@@ -151,6 +162,7 @@ Status and future plans for the homelab infrastructure.
 - **blog_terrac_com_static**: Deployed service
 - **globalview_backend**: Deployed service
 - **globalview_stack**: Deployed service
+- **etrading_boy**: Deployed service
 
 ### Automation & Security
 
