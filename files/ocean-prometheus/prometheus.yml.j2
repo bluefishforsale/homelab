@@ -700,6 +700,8 @@ scrape_configs:
         - registry-cache.home:5012
         - registry-cache.home:5013
         - registry-cache.home:5014
+        - registry-cache.home:5015
+        - registry-cache.home:5016
     relabel_configs:
       - source_labels: [__address__]
         regex: '.*:5011'
@@ -717,6 +719,14 @@ scrape_configs:
         regex: '.*:5014'
         target_label: upstream
         replacement: nvcr
+      - source_labels: [__address__]
+        regex: '.*:5015'
+        target_label: upstream
+        replacement: ghcr-private
+      - source_labels: [__address__]
+        regex: '.*:5016'
+        target_label: upstream
+        replacement: gcr
 
   # Internal Service Health Checks
   # Services whose only unauthenticated answer is a 4xx. A 401 here is a pass:

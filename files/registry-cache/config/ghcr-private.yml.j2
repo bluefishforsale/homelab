@@ -1,0 +1,43 @@
+version: 0.1
+log:
+  level: info
+  fields:
+    service: registry
+    upstream: ghcr-private
+# Private bluefishforsale images. The upstream token is read:packages only, and
+# the htpasswd in front is what keeps this from serving those images to
+# anything on the LAN, which is why private images never go through the
+# anonymous ghcr-cache.
+proxy:
+  remoteurl: https://ghcr.io
+  username: bluefishforsale
+  password: "{{ development.github.packages_read_token }}"
+auth:
+  htpasswd:
+    realm: ghcr-private
+    path: /auth/htpasswd
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  maintenance:
+    uploadpurging:
+      enabled: true
+      age: 168h
+      interval: 24h
+      dryrun: false
+  delete:
+    enabled: true
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+  debug:
+    addr: :5001
+    prometheus:
+      enabled: true
+      path: /metrics
+health:
+  storagedriver:
+    enabled: true
+    interval: 30s
+    threshold: 3

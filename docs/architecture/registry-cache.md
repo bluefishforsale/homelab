@@ -1,10 +1,12 @@
 # Registry cache (registry-cache-01)
 
 A pull-through image cache on its own VM, so an image the fleet has pulled once
-can still be pulled while its upstream registry is down. Four `registry:2`
-containers each proxy one upstream (Docker Hub, ghcr.io, registry.gitlab.com,
-nvcr.io). Only the Docker Hub one is in any pull path today: dockerd uses it as
-a `registry-mirrors` entry, and nothing points at the other three.
+can still be pulled while its upstream registry is down. Six `registry:2`
+containers each proxy one upstream (Docker Hub, ghcr.io, ghcr.io for private
+images, registry.gitlab.com, nvcr.io, gcr.io). Only the Docker Hub one is in any
+pull path today: dockerd uses it as a `registry-mirrors` entry, and nothing
+points at the other five yet. Moving every pull onto the cache is the
+docker-weekly rollout in `docs/specs/2026-11-08-docker-weekly-restart-design.md`.
 
 The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 `[registry_cache]` in `inventories/production/hosts.ini`. DNS is
@@ -16,7 +18,7 @@ The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 | File | Host | What it owns |
 |---|---|---|
 | `infrastructure/create_registry_cache_vm.yaml` | node005 | VM 7000 `registry-cache-01`, cloned from template 9999: 2 cores, 2048 MB, scsi0 grown `+192G`, onboot, static IP (dig of `registry-cache-01.home`, else 192.168.1.30), single nameserver 192.168.1.2. CPU, memory and network are only set when the VM is not running. |
-| `infrastructure/registry_cache.yaml` | `registry_cache` | Installs Docker inline (not via `docker_ce.yaml`), renders `daemon.json`, the four registry configs, compose file, promtail config and `registry-cache.service`, plus the cache-size metric script and timer. State under `/data01/services/registry-cache/{config,data/<upstream>}`. |
+| `infrastructure/registry_cache.yaml` | `registry_cache` | Installs Docker inline (not via `docker_ce.yaml`), renders `daemon.json`, the six registry configs and the ghcr-private htpasswd, compose file, promtail config and `registry-cache.service`, plus the cache-size metric script and timer. State under `/data01/services/registry-cache/{config,data/<upstream>}`. |
 | `.github/workflows/deploy-registry-cache.yml` | runner | `workflow_dispatch` or `repository_dispatch: deploy-registry-cache`; runs `registry_cache.yaml`. Own concurrency group `deploy-registry-cache`, not `deploy-ocean`. |
 | `infrastructure/docker_ce.yaml` | `all:!github_runners`, `serial: 1` | Renders `files/docker/daemon.json.j2` on every other docker host, which is where the mirror line comes from. |
 
@@ -31,6 +33,8 @@ The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 | `ghcr-cache` | `https://ghcr.io` | 5002 | 5012 | none |
 | `gitlab-cache` | `https://registry.gitlab.com` | 5003 | 5013 | none |
 | `nvcr-cache` | `https://nvcr.io` | 5004 | 5014 | none |
+| `ghcr-private-cache` | `https://ghcr.io` | 5005 | 5015 | upstream: vault `development.github.packages_read_token` (`read:packages` only); clients: htpasswd from vault `infrastructure.registry_cache.ghcr_private.{username,password}` |
+| `gcr-cache` | `https://gcr.io` | 5006 | 5016 | none |
 
 Host ports map to container `:5000` (registry) and `:5001` (debug/metrics) in
 `files/registry-cache/docker-compose.yml.j2`. Each container is capped at 0.5
@@ -38,8 +42,16 @@ CPU and 512M. None of these ports are in `vars/vars_service_ports.yaml`; they
 are literals in the compose file, `files/docker/daemon.json.j2` and
 `files/ocean-prometheus/prometheus.yml.j2`.
 
+Private `ghcr.io/bluefishforsale/*` images go through `ghcr-private-cache` and
+never through `ghcr-cache`. A `registry:2` proxy holds one upstream credential
+and does no auth of its own, so a token on the anonymous cache would serve
+private images to anything on the LAN. The htpasswd in front is basic auth over
+plain HTTP, same as the rest of the cache, so it keeps casual pulls out rather
+than a sniffer on the LAN.
+
 Registry configs (`files/registry-cache/config/*.yml.j2`) are identical except
-upstream and Hub credentials: upload purging at 168h every 24h, `delete`
+upstream, credentials and the ghcr-private `auth` block. They render 0600
+because two of them hold upstream credentials: upload purging at 168h every 24h, `delete`
 enabled, storage-driver health check every 30s.
 
 ## The mirror
