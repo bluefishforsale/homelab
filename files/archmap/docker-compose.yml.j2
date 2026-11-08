@@ -57,6 +57,10 @@ services:
     hostname: {{ service }}-worker
     restart: unless-stopped
     command: ["archmap-worker"]
+    # 6 render processes (ARCHMAP_RENDER_PROCS default), the build thread with
+    # its multi-threaded SCIP indexers, and polling. ocean's other 22 cores
+    # stay with everything else on the host.
+    cpus: 8
     env_file:
       - {{ home }}/.env
     environment:
