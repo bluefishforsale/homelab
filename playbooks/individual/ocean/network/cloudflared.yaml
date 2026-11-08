@@ -566,6 +566,35 @@
     delegate_to: localhost
     become: false
 
+  # The create above only runs once, so a Plex invite added to the vault list
+  # (scripts/plex-shared-users.py) never reached the live policy without this.
+  - name: Sync plex-users policy emails with the vault list
+    ansible.builtin.uri:
+      url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies/{{ existing_plex_policy_id }}"
+      method: PUT
+      headers:
+        X-Auth-Email: "{{ cloudflare.api_email }}"
+        X-Auth-Key: "{{ cloudflare.api_key }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "Allow plex users"
+        decision: "allow"
+        include: "{{ cloudflare.access_allow_emails['plex-users'] | map('regex_replace', '^(.+)$', '{\"email\": {\"email\": \"\\1\"}}') | map('from_json') | list }}"
+        reusable: true
+      status_code: [200]
+    changed_when: true
+    vars:
+      live_plex_emails: "{{ (existing_policies_terrac.json.result | selectattr('id', 'equalto', existing_plex_policy_id) | first).include | map(attribute='email.email') | map('lower') | sort }}"
+    when:
+      - inventory_hostname == 'ocean'
+      - cloudflare.api_key is defined
+      - cloudflare.api_key != ''
+      - existing_plex_policy_id | default('') != ''
+      - live_plex_emails != (cloudflare.access_allow_emails['plex-users'] | map('lower') | sort)
+    delegate_to: localhost
+    become: false
+
   - name: Create reusable bypass policy for terrac.com (if not exists)
     ansible.builtin.uri:
       url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare.terrac_com }}/access/policies"
