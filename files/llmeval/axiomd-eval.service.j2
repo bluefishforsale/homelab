@@ -22,3 +22,7 @@ ExecStart=/bin/sh -c 'AXIOMD_APP_PRIVATE_KEY="$$(cat {{ home }}/config/app-key.p
   -v {{ home }}/out:/out \
   {{ axiomd_image }} eval --out /out'
 TimeoutStartSec=infinity
+# NOTE: killing the docker client leaves the container running. On 2026-11-08
+# a stop did exactly that, and the orphan kept generating against a restarted
+# router until it mailed a false STALLED.
+ExecStop=/usr/bin/docker stop -t 30 axiomd-eval
