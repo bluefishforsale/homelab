@@ -173,7 +173,7 @@
 
     - name: Write ghcr-private client credential (bcrypt)
       ansible.builtin.command:
-        cmd: htpasswd -c -B -i {{ ghcr_private_htpasswd }} {{ infrastructure.registry_cache.ghcr_private.username }}
+        cmd: htpasswd -c -B -C 10 -i {{ ghcr_private_htpasswd }} {{ infrastructure.registry_cache.ghcr_private.username }}
         stdin: "{{ infrastructure.registry_cache.ghcr_private.password }}"
       when: ghcr_private_htpasswd_check.rc != 0
       no_log: true
