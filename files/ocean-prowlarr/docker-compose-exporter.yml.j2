@@ -1,0 +1,19 @@
+# Rendered by playbooks/individual/ocean/media/prowlarr.yaml.
+#
+# Prowlarr exporter service as a compose project. This replaces the legacy systemd unit
+# that used 'docker run' with RuntimeMaxSec=7d.
+services:
+  prowlarr-exporter:
+    image: "ghcr.io/onedr0p/exportarr:{{ exporter_version }}"
+    container_name: prowlarr-exporter
+    hostname: "prowlarr-exporter-{{ inventory_hostname }}"
+    environment:
+      TZ: America/Los_Angeles
+      VERSION: "{{ exporter_version }}"
+      PORT: "{{ exporter_port }}"
+      URL: "http://ocean.home:{{ prowlarr_port }}"
+      API_KEY: "{{ media_services.prowlarr.api_key }}"
+      ENABLE_ADDITIONAL_METRICS: "true"
+    ports:
+      - "{{ exporter_port }}:9710"
+    restart: unless-stopped

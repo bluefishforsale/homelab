@@ -1,0 +1,18 @@
+# Rendered by playbooks/individual/ocean/media/prowlarr.yaml.
+#
+# Prowlarr service as a compose project. This replaces the legacy systemd unit
+# that used 'docker run' with RuntimeMaxSec=7d.
+services:
+  prowlarr:
+    image: "lscr.io/linuxserver/prowlarr:{{ version }}"
+    container_name: prowlarr
+    hostname: "prowlarr-{{ inventory_hostname }}"
+    environment:
+      TZ: America/Los_Angeles
+      PUID: "{{ system_users.media.uid }}"
+      PGID: "{{ system_users.media.gid }}"
+    volumes:
+      - "{{ home }}/config:/config"
+    ports:
+      - "{{ prowlarr_port }}:9696"
+    restart: unless-stopped
