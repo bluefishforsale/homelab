@@ -23,6 +23,11 @@
     files: "{{ playbook_dir }}/../../../../files/ocean-bazarr"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
+    # NOTE: the compose project lives outside {{ home }} on purpose. home is
+    # mounted read-write at /config, so a compose file there could be rewritten
+    # from inside the container, or joined by an auto-loaded override or .env,
+    # and come back privileged on the next restart.
+    compose_dir: "/opt/compose/{{ service }}"
     port: "{{ service_ports.bazarr.port }}"
     user: media
     uid: "{{ system_users.media.uid }}"
@@ -43,13 +48,23 @@
         dest: "{{ home }}/config/config.ini"
         owner: "{{ user }}"
         group: "{{ user }}"
-        mode: '0644'
+        mode: '0600'
       register: bazarr_config
+
+    - name: Ensure root-owned compose dir exists
+      ansible.builtin.file:
+        path: "{{ compose_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
 
     - name: Template compose file
       ansible.builtin.template:
         src: "{{ files }}/docker-compose.yml.j2"
-        dest: "{{ home }}/docker-compose.yml"
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        owner: root
+        group: root
         mode: '0644'
       register: bazarr_compose
 

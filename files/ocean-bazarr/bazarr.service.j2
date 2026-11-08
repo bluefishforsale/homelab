@@ -11,11 +11,11 @@ RequiresMountsFor=/data01
 # oneshot.
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory={{ home }}
+WorkingDirectory={{ compose_dir }}
 StandardOutput=journal
 StandardError=journal
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down --timeout 30
+ExecStart=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml down --timeout 30
 TimeoutStartSec=300
 TimeoutStopSec=120
 
