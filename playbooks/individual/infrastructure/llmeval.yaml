@@ -61,6 +61,19 @@
       ansible.builtin.command: docker compose version
       changed_when: false
 
+    - name: Log llmeval into GHCR to pull the private axiomd image
+      ansible.builtin.shell: |
+        echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      changed_when: false
+      no_log: true
+
+    # Pulled here, not left to docker run, so a bad GHCR credential fails the
+    # deploy instead of the eval unit hours later.
+    - name: Pull the axiomd image
+      ansible.builtin.command: docker pull {{ axiomd_image }}
+      register: axiomd_pull
+      changed_when: "'Downloaded newer image' in axiomd_pull.stdout"
+
     - name: Create llmeval directories
       ansible.builtin.file:
         path: "{{ item.path }}"

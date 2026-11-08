@@ -9,5 +9,9 @@ ConditionPathExists=!{{ home }}/models/.verified-{{ llmeval_models_digest }}
 Type=oneshot
 EnvironmentFile={{ home }}/config/eval.env
 ExecStart=/usr/local/sbin/llmeval-models
+# NOTE: the router lists /models only at startup, so without this restart it
+# keeps serving the empty list it saw before the download and every eval
+# request 404s on its model name.
+ExecStartPost=/bin/systemctl restart llmeval.service
 # ~204 GB on a home link.
 TimeoutStartSec=infinity
