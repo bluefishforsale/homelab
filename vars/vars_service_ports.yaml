@@ -211,6 +211,10 @@ service_ports:
   photonic_inventory:
     port: 8095
 
+  # archmap's own nginx (tiles from disk, rest proxied to archmap-api).
+  archmap:
+    port: 8091
+
   wordpress:
     port: 8085
 

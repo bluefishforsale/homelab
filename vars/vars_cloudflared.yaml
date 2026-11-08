@@ -129,7 +129,15 @@ cloudflared:
         - hostname: "etrading.terrac.com"
           service_type: "http"
           service_url: "http://192.168.1.143:8093"
-        
+
+        # archmap fleet map. Through nginx, which hides the unauthenticated
+        # metrics paths. Admin-only: it maps the whole fleet and its MCP has
+        # write tools, so it stays out of public_services and
+        # fully_public_services in cloudflared.yaml.
+        - hostname: "archmap.terrac.com"
+          service_type: "http"
+          service_url: "http://192.168.1.143:80"
+
         # SSH Access for all hosts (dynamically generated from inventory)
         # This section will be populated by the template from Ansible inventory
         # Ocean SSH access (local)

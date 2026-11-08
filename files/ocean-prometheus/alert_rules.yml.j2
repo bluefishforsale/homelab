@@ -884,6 +884,43 @@ groups:
       summary: "NFS retransmits on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.instance }}" }} has been retransmitting NFS RPCs to ocean for 10m ({{ "{{ $value | humanize }}" }}/s). Processes on the mount stall rather than fail; check ocean's load and nfsd."
 
+- name: archmap_alerts
+  rules:
+  - alert: ArchmapTargetDown
+    expr: up{job=~"archmap-api|archmap-worker"} == 0
+    for: 5m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "archmap {{ "{{ $labels.job }}" }} is down"
+      description: "Prometheus cannot scrape {{ "{{ $labels.job }}" }} through archmap-web on ocean:{{ service_ports.archmap.port }}. Check `systemctl status archmap` and `docker compose ps` in /data01/services/archmap."
+
+  # Jobs arrive every poll, so a busy queue is normal; one that never empties
+  # and has not shrunk in 30m is a wedged worker.
+  - alert: ArchmapQueueNotDraining
+    expr: min_over_time(archmap_queue_depth[30m]) > 0 and delta(archmap_queue_depth[30m]) >= 0
+    for: 15m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "archmap build queue is not draining"
+      description: "archmap_queue_depth has stayed above zero for 30m without shrinking ({{ "{{ $value }}" }} jobs). The worker is stuck or failing every job; check `docker logs archmap-worker`."
+
+  # NOTE: assumes the worker rebuilds live at least hourly. If it only builds
+  # when a scoped repo moves, a quiet hour fires this. The gauge reads 0 until
+  # the first build, so a fresh install is not stale.
+  - alert: ArchmapLiveBuildStale
+    expr: archmap_last_live_build_timestamp > 0 and time() - archmap_last_live_build_timestamp > 3600
+    for: 10m
+    labels:
+      severity: warning
+      remediation: manual
+    annotations:
+      summary: "archmap live map is over an hour old"
+      description: "The last successful live build was {{ "{{ $value | humanizeDuration }}" }} ago, so the map no longer matches master. Check `docker logs archmap-worker` for failing builds or polls (GitHub token expired?)."
+
 - name: netboot_alerts
   rules:
   # Netboot hosts (vars/vars_netboot.yaml) are diskless and off most of the

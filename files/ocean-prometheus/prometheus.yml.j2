@@ -351,6 +351,30 @@ scrape_configs:
         service: my-ta-jose
         host: ocean
 
+  # archmap api and worker. Both are reached through archmap's own nginx on
+  # the internal host port; the main nginx 404s these paths for the tunnel.
+  - job_name: 'archmap-api'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+      labels:
+        service: archmap
+        host: ocean
+
+  - job_name: 'archmap-worker'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /worker-metrics
+    static_configs:
+    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+      labels:
+        service: archmap
+        host: ocean
+
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
     metrics_path: /probe

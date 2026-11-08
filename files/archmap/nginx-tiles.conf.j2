@@ -1,0 +1,41 @@
+# archmap-web: tiles are immutable files under a per-snapshot path, so nginx
+# serves them from disk with a long cache and everything else goes to the api.
+# Prometheus scrapes the api at /metrics and the worker at /worker-metrics
+# through here (one host port); the main nginx vhost hides both from the tunnel.
+server {
+    listen 80;
+    server_name _;
+
+    location = /nginx-health {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location /tiles/ {
+        alias /srv/tiles/;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location = /worker-metrics {
+        proxy_pass http://worker:{{ worker_metrics_port }}/metrics;
+    }
+
+    location / {
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+
+        # /mcp streams (SSE / streamable HTTP); don't buffer it or cut it at 60s.
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+
+        proxy_pass http://api:{{ api_port }};
+    }
+}

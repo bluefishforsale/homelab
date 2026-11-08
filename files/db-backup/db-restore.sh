@@ -60,6 +60,7 @@ meta(){
     wordpress)              echo "mysql|wordpress.sql.gz|$WORDPRESS_DB_CONTAINER|" ;;
     jellystat-db)           echo "pg|jellystat-db.sql.gz|jellystat-db|" ;;
     mem0-postgres)          echo "pg|mem0-postgres.sql.gz|mem0-postgres|" ;;
+    archmap-postgres)       echo "pg|archmap-postgres.sql.gz|archmap-postgres|" ;;
     sonarr)     echo "sqlite|sonarr.db.gz|sonarr|$SERVICES_DIR/sonarr/sonarr.db" ;;
     radarr)     echo "sqlite|radarr.db.gz|radarr|$SERVICES_DIR/radarr/radarr.db" ;;
     prowlarr)   echo "sqlite|prowlarr.db.gz|prowlarr|$SERVICES_DIR/prowlarr/config/prowlarr.db" ;;
@@ -77,7 +78,7 @@ meta(){
     *) echo "" ;;
   esac
 }
-ALL="grafana-mysql wordpress jellystat-db mem0-postgres sonarr radarr prowlarr bazarr jellyfin tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
+ALL="grafana-mysql wordpress jellystat-db mem0-postgres archmap-postgres sonarr radarr prowlarr bazarr jellyfin tautulli overseerr homeassistant open-webui paia photonic_inventory ntfy my_ta_jose mem0"
 
 # verify registry -> "IMAGE|SQL|MAX_AGE_HOURS". SQL returns the epoch of the newest
 # record; NULL (empty table) fails. MAX_AGE only for services that write on their
@@ -88,6 +89,7 @@ probe(){
     wordpress)     echo "mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
     jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|48' ;;
     mem0-postgres) echo 'ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
+    archmap-postgres) echo 'postgres:16|\connect archmap \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM snapshots|' ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
     bazarr)        echo "|SELECT strftime('%s',MAX(timestamp)) FROM table_history|" ;;
     jellyfin)      echo "|SELECT strftime('%s',substr(MAX(DateCreated),1,19)) FROM ActivityLogs|" ;;
