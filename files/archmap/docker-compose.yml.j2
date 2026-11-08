@@ -57,10 +57,10 @@ services:
     hostname: {{ service }}-worker
     restart: unless-stopped
     command: ["archmap-worker"]
-    # 6 render processes (ARCHMAP_RENDER_PROCS default), the build thread with
-    # its multi-threaded SCIP indexers, and polling. ocean's other 22 cores
-    # stay with everything else on the host.
-    cpus: 8
+    # 6 render processes (ARCHMAP_RENDER_PROCS default), the build thread and
+    # polling share 6 CPUs. ocean runs near 89% with Plex, llama and the
+    # monitoring stack, so archmap renders slower rather than starving them.
+    cpus: 6
     # Each render process holds a few snapshots in memory.
     mem_limit: 6g
     env_file:
