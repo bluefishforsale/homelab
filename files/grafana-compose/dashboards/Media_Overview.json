@@ -1,0 +1,2974 @@
+{
+  "uid": "media-overview",
+  "title": "Media Overview",
+  "tags": [
+    "media",
+    "overview"
+  ],
+  "description": "The whole media stack at a glance: storage, new items, downloads, playback, transcoding and health. Links at the top go to each app's own dashboard.",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": true,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Radarr",
+      "url": "/d/F2vfZUNGz",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Sonarr",
+      "url": "/d/vGjT_QWMk",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Lidarr",
+      "url": "/d/lidarr",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Prowlarr",
+      "url": "/d/axaWCXf4z",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "NZBGet",
+      "url": "/d/ee0kznijnz0g0c",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Plex",
+      "url": "/d/TPZ6-zT4z",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Tautulli",
+      "url": "/d/tautulli-metrics",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Tdarr",
+      "url": "/d/tdarr",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "ZFS",
+      "url": "/d/000000011",
+      "type": "link",
+      "targetBlank": false,
+      "icon": "dashboard",
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "tooltip": ""
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "At a glance",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "/data01 used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "(node_filesystem_size_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"} - node_filesystem_avail_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"}) / node_filesystem_size_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"}",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.85
+              },
+              {
+                "color": "red",
+                "value": 0.92
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Share of the ZFS pool in use, as ocean's node-exporter sees it.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "/data01 free",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "node_filesystem_avail_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"}",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5000000000000.0
+              },
+              {
+                "color": "green",
+                "value": 10000000000000.0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Movies",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 7,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_downloaded_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Movies with a file in Radarr.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Episodes",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_episode_downloaded_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Episodes with a file in Sonarr.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Plex streams",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 1,
+        "w": 2,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tautulli_stream_count)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Transcoded, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_jobs{type=\"transcode\",outcome=\"success\"}) - sum(tdarr_jobs{type=\"transcode\",outcome=\"success\"} offset 24h)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "tdarr transcodes that finished successfully in the last 24 hours.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Saved by tdarr, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_space_saved_bytes) - sum(tdarr_space_saved_bytes offset 24h)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Health issues",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 21,
+        "y": 1,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "count({__name__=~\"(radarr|sonarr|lidarr|prowlarr)_system_health_issues\"} == 1) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Open health checks across the *arr apps. Details are in the Health row at the bottom.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Storage",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Space by collection",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_filesize_total)",
+          "legendFormat": "Movies (Radarr)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        },
+        {
+          "expr": "sum(sonarr_series_filesize_bytes)",
+          "legendFormat": "TV (Sonarr)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B",
+          "instant": true,
+          "range": false
+        },
+        {
+          "expr": "sum(lidarr_artists_filesize_bytes)",
+          "legendFormat": "Music (Lidarr)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C",
+          "instant": true,
+          "range": false
+        },
+        {
+          "expr": "sum((node_filesystem_size_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"} - node_filesystem_avail_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"})) - sum(radarr_movie_filesize_total) - sum(sonarr_series_filesize_bytes) - sum(lidarr_artists_filesize_bytes)",
+          "legendFormat": "Everything else (downloads, services, other libraries)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "D",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Library sizes from the *arr apps; the last bar is the rest of /data01's used space.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "/data01 used vs size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 6,
+        "w": 9,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "(node_filesystem_size_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"} - node_filesystem_avail_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"})",
+          "legendFormat": "used",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "node_filesystem_size_bytes{instance=\"ocean.home\",mountpoint=\"/data01\",fstype=\"zfs\"}",
+          "legendFormat": "size",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Library size growth",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 19,
+        "y": 6,
+        "w": 5,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_filesize_total)",
+          "legendFormat": "Movies",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(sonarr_series_filesize_bytes)",
+          "legendFormat": "TV",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Library and new items",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "bargauge",
+      "title": "Plex libraries (items)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (title) (plex_media_count{type!=\"show\"})",
+          "legendFormat": "{{title}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Item count per Plex library. TV Shows counts episodes.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Net new movies, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_downloaded_total) - sum(radarr_movie_downloaded_total offset 24h)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Net new episodes, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_episode_downloaded_total) - sum(sonarr_episode_downloaded_total offset 24h)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 18,
+      "type": "bargauge",
+      "title": "Plex library change, 7d",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (title) (plex_media_count{type!=\"show\"}) - sum by (title) (plex_media_count{type!=\"show\"} offset 7d)",
+          "legendFormat": "{{title}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Items added (or removed, if negative) per Plex library over the last week.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Net new movies, 7d",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 19,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_downloaded_total) - sum(radarr_movie_downloaded_total offset 7d)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Net new episodes, 7d",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_episode_downloaded_total) - sum(sonarr_episode_downloaded_total offset 7d)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Net items added per day",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_downloaded_total) - sum(radarr_movie_downloaded_total offset 1d)",
+          "legendFormat": "Movies",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(sonarr_episode_downloaded_total) - sum(sonarr_episode_downloaded_total offset 1d)",
+          "legendFormat": "Episodes",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "description": "Rolling 24h difference in files on disk; dips are replacements or deletions.",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Missing movies",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 3,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_missing_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Missing episodes",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 23,
+        "w": 3,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_episode_missing_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "type": "stat",
+      "title": "Below cutoff (movies)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 23,
+        "w": 3,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_movie_cutoff_unmet_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Below cutoff (episodes)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 21,
+        "y": 23,
+        "w": 3,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_episode_cutoff_unmet_total)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 26,
+      "type": "row",
+      "title": "Downloads (NZBGet, Prowlarr, *arr queues)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "NZBGet download speed",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(nzbget_downloaded_total_bytes[5m])",
+          "legendFormat": "speed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "NZBGet queue",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 31,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "nzbget_queue_remaining_bytes",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Downloaded, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 31,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "increase(nzbget_downloaded_total_bytes[24h])",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "NZBGet paused",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 31,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "max(nzbget_download_paused)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 31,
+      "type": "bargauge",
+      "title": "Prowlarr grabs by indexer, 24h",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 19,
+        "y": 31,
+        "w": 5,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (indexer) (increase(prowlarr_indexer_grabs_total[24h])))",
+          "legendFormat": "{{indexer}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "Radarr queue",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 35,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(radarr_queue_total) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 33,
+      "type": "stat",
+      "title": "Sonarr queue",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 35,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(sonarr_queue_total) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 34,
+      "type": "stat",
+      "title": "Indexers unavailable",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 35,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(prowlarr_indexer_unavailable) or vector(0)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 35,
+      "type": "row",
+      "title": "Playback (Plex)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 36,
+      "type": "timeseries",
+      "title": "Streams",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(tautulli_stream_direct_play)",
+          "legendFormat": "direct play",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(tautulli_stream_direct_stream)",
+          "legendFormat": "direct stream",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        },
+        {
+          "expr": "sum(tautulli_stream_count_transcode)",
+          "legendFormat": "transcode",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 37,
+      "type": "timeseries",
+      "title": "Plex bandwidth",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(tautulli_bandwidth_lan) * 1000",
+          "legendFormat": "LAN",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(tautulli_bandwidth_wan) * 1000",
+          "legendFormat": "WAN",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "description": "Tautulli reports kbps.",
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "type": "stat",
+      "title": "Plex up",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 40,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "max(plex_up)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 39,
+      "type": "stat",
+      "title": "Plex transcodes now",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 44,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(plex_video_transcode_sessions_count)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "title": "Transcoding (tdarr)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Transcodes finished per hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_jobs{type=\"transcode\",outcome=\"success\"}) - sum(tdarr_jobs{type=\"transcode\",outcome=\"success\"} offset 1h)",
+          "legendFormat": "success",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A"
+        },
+        {
+          "expr": "sum(tdarr_jobs{type=\"transcode\",outcome=\"error\"}) - sum(tdarr_jobs{type=\"transcode\",outcome=\"error\"} offset 1h)",
+          "legendFormat": "error",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 42,
+      "type": "bargauge",
+      "title": "Active workers by node",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 49,
+        "w": 5,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum by (node) (tdarr_workers_active)",
+          "legendFormat": "{{node}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 43,
+      "type": "stat",
+      "title": "Queued files",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 49,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_files{state=\"pending\"})",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 44,
+      "type": "stat",
+      "title": "Transcode errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 49,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum(tdarr_files{state=\"error\"})",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 45,
+      "type": "stat",
+      "title": "Saved, lifetime",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 21,
+        "y": 49,
+        "w": 3,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "max(tdarr_space_saved_bytes)",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 46,
+      "type": "bargauge",
+      "title": "Queue by codec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 53,
+        "w": 9,
+        "h": 4
+      },
+      "targets": [
+        {
+          "expr": "sum by (codec) (tdarr_queue_files)",
+          "legendFormat": "{{codec}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    },
+    {
+      "id": 47,
+      "type": "row",
+      "title": "Health",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 48,
+      "type": "table",
+      "title": "Open *arr health checks",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 16,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "{__name__=~\"(radarr|sonarr|lidarr|prowlarr)_system_health_issues\"} == 1",
+          "legendFormat": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "One row per open health check, from each app's exporter.",
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "job": true,
+              "instance": true,
+              "url": true,
+              "wikiurl": true,
+              "__name__": false
+            },
+            "renameByName": {
+              "__name__": "app"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "type": "bargauge",
+      "title": "Exporters up",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 58,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "min by (job) (up{job=~\"radarr.*|sonarr.*|lidarr.*|prowlarr.*|nzbget.*|plex.*|tautulli.*|tdarr-exporter\"})",
+          "legendFormat": "{{job}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto"
+      }
+    }
+  ]
+}
