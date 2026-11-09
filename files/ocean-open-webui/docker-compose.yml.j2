@@ -59,7 +59,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      # A release with migrations takes over 3 minutes to start serving (v0.13.2,
+      # 2026-11-08), and docker-refresh's health wait is start_period plus
+      # interval x retries. At 30s that was 180s and the weekly refresh failed
+      # a container that came up fine 20s later.
+      start_period: 300s
     
     # Run as root to avoid permission issues with SQLite
     # user: "{{ uid }}:{{ gid }}"
