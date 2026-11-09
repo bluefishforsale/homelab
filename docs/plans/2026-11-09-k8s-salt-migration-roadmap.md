@@ -47,8 +47,7 @@ Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q1 (CNI), Q2 (node005 RAM timing),
-      Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); signs off D2,
+- [ ] terrac reviews spec and PRD; answers Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); signs off D2,
       D4, D13.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
@@ -62,7 +61,8 @@ Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item.
 - [ ] Debian 13 cloud-init template on both hypervisors (new VMID; 9999 stays
       until nothing uses it).
 
-**Gate:** all Phase 0 boxes checked; Q1 to Q5 answered in the PRD.
+**Gate:** all Phase 0 boxes checked; Q3 to Q5 answered in the PRD (Q1 Cilium and Q2 RAM before
+phase 2 are decided: D15, D16).
 
 ## Phase 1: build, then upgrade three times (2027 Q1)
 
@@ -82,7 +82,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
       covered by `ownership-coverage.test.sh`.
 - [ ] Bootstrap Argo CD with Helm once from the play; from then on Argo CD
       manages itself from `homelab-kube`.
-- [ ] Tier 1 platform via app-of-apps: CNI (per Q1), cert-manager with the
+- [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
+      NetworkPolicy controller disabled), Hubble, cert-manager with the
       Let's Encrypt and homelab-ca issuers, sops-secrets-operator (age),
       ingress controller, local-path, the `/data01` NFS PV, metrics-server.
 - [ ] Ocean's Prometheus scrapes the cluster (kube-state-metrics, kubelet,
@@ -121,7 +122,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 
 ## Phase 2: retire the harbor VM (2027 Q2)
 
-- [ ] node005 RAM upgrade done if Q2 says so.
+- [ ] node005 RAM upgrade installed and verified (D16). Phase 2 does not
+      start without it.
 - [ ] Prove Docker plus k3s coexistence on `k3s-agent01` (spec, "Docker and k3s
       side by side"), including a reboot.
 - [ ] Move the passed-through 870 EVO (by WWN) and nzbget to `k3s-agent01`;

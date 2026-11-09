@@ -35,7 +35,7 @@ own: the hosts themselves.
 
 | Thing | Reality |
 |---|---|
-| node005 | Proxmox 8.1, 56 threads, 125 GiB RAM (92 used, RAM upgrade planned). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
+| node005 | Proxmox 8.1, 56 threads, 125 GiB RAM (92 used; RAM upgrade before phase 2). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
 | node006 | Proxmox 8.4, 40 threads, 660 GiB RAM (498 used, ocean holds 366 GiB). VM disks on `local-lvm` (870 EVO 2TB). Runs dns02, ocean, llmeval. |
 | ocean | Debian 12, kernel 6.1, Docker 29.6, cgroup v2, ~60 containers. RTX 3090 (driver 610.43) and the SAS HBA passed through; owns the `data01` pool (87 TiB raw, 72% used) and exports it over NFSv4.2. nginx on 80/443 is the front door for every service. Docker sets `iptables -P FORWARD DROP`. |
 | GPU today | Already shared: llama-server 19.6 GiB and tdarr-ffmpeg 376 MiB on the one card, via Docker. |
@@ -104,11 +104,20 @@ scheduling and reconciliation stop.
 
 ### Networking
 
-- **CNI**: open question for terrac (PRD Q1). Recommendation: Cilium, because
-  "advanced network control" is one of the reasons for doing this, and swapping
-  the CNI later means rebuilding the cluster. The fallback is k3s's default
-  flannel plus its built-in NetworkPolicy controller. Decided before phase 1,
-  because the upgrade drill must run on the CNI that ships.
+- **CNI**: Cilium (terrac, PRD D15). "Advanced network control" is one of
+  the reasons for doing this, and swapping the CNI later means rebuilding the
+  cluster, so the upgrade drill runs on Cilium from day one.
+  - k3s installs with `--flannel-backend=none` and
+    `--disable-network-policy`; Cilium enforces NetworkPolicy.
+  - Kube-proxy replacement (`--disable-kube-proxy`) is the builder's call,
+    made in phase 1 and recorded. If it is on, Docker coexistence (below) is
+    tested with it on, because that is where Docker's iptables rules and
+    Cilium's eBPF datapath meet.
+  - Cilium is an add-on in the upgrade drill: its supported Kubernetes range
+    is checked on every hop, and a Cilium minor upgrade is part of at least
+    one hop.
+  - Hubble on, so per-flow visibility is available when a NetworkPolicy
+    blocks something.
 - **No new IP ranges, no DNS changes.** Load-balancer IP pools would have to be
   carved out of DHCP, which lives with the DNS pair (an agent hard limit). So:
   - During migration, ocean's nginx stays the front door. Each service cutover

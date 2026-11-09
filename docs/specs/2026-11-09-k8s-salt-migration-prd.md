@@ -81,13 +81,11 @@ where merge is deploy.
 | D12 | Passthrough VMs (ocean, `k3s-agent01`) are replaced by the passthrough swap: build and patch a new VM, stop both, move the devices, start the new one, pods reschedule onto it. | terrac (pattern), design call (details) |
 | D13 | Ocean's first swap, to a clean Debian 13 k8s-only VM, happens once Docker on ocean is empty (end of phase 5), not before. | design call |
 | D14 | Pods pin to node role labels, never to a hostname, so they follow a replaced VM unchanged. | design call |
+| D15 | CNI is Cilium. | terrac |
+| D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). | terrac |
 
 ## Open questions for terrac
 
-- **Q1.** CNI: Cilium (recommended, for network control) or k3s default
-  flannel plus NetworkPolicy. Must be settled before phase 1.
-- **Q2.** RAM upgrade on node005: before phase 2? The harbor VM (32 GiB) and
-  its replacement overlap for at least one cutover; node005 has ~33 GiB free.
 - **Q3.** The dead-man alert target outside ocean and the cluster:
   healthchecks.io (new external service) or a check on agentbox.
 - **Q4.** Do the old 2021 app charts in `homelab-kube` get reused, or replaced
@@ -135,10 +133,10 @@ where merge is deploy.
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q1 to Q4 answered. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q3 to Q5 answered. |
 | 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
-| 2 | harbor VM workloads (nzbget, tdarr-node) run on `k3s-agent01`; harbor VM decommissioned. |
+| 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node) run on `k3s-agent01`; harbor VM decommissioned. |
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
 | 4 | Every Docker service on ocean is a pod or explicitly parked. Docker nginx retired; ingress owns 80/443 on ocean. |
 | 5 | Prometheus, Loki, Grafana and Alertmanager run in cluster; the external dead-man alert fires when the cluster is down (tested). |
