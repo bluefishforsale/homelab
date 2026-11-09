@@ -583,11 +583,11 @@
       },
       {
         "name": "DV",
-        "score": 100
+        "score": -10000
       },
       {
         "name": "DV HDR10",
-        "score": 101
+        "score": -10000
       },
       {
         "name": "Dubs Only",
@@ -603,15 +603,15 @@
       },
       {
         "name": "HDR",
-        "score": 100
+        "score": -10000
       },
       {
         "name": "HDR10",
-        "score": 101
+        "score": -10000
       },
       {
         "name": "HDR10+",
-        "score": 101
+        "score": -10000
       },
       {
         "name": "HMAX",
