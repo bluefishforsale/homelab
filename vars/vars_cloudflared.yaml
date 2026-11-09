@@ -14,6 +14,7 @@ cloudflared:
   # remote config.
   remote_managed_hosts:
     - agentbox
+    - dns01
     - dns02
     - harbor
     - llmeval
