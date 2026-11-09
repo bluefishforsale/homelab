@@ -31,6 +31,7 @@ Specials are left alone.
 """
 import argparse
 import collections
+import concurrent.futures
 import datetime as dt
 import fcntl
 import importlib.util
@@ -364,6 +365,27 @@ def plan_tv(a, refetch, ledger, plex, count):
     print(f"tv: {gb:.0f} GB planned, of {len(seasons)} seasons still to re-download")
 
 
+def arr_hdr_paths(movies, episode_files):
+    """tdarr paths of the files Radarr or Sonarr recorded as HDR or Dolby Vision."""
+    hdr = lambda f: bool((f.get("mediaInfo") or {}).get("videoDynamicRangeType"))
+    out = {"/media" + os.path.join(m["path"], m["movieFile"]["relativePath"])
+           for m in movies if m.get("movieFile") and hdr(m["movieFile"])}
+    return out | {"/media" + f["path"] for f in episode_files if hdr(f)}
+
+
+def with_stripped_hdr(rows, arr_hdr):
+    """Send files the arrs recorded as HDR to refetch, whatever ffprobe says now.
+
+    The old flow encoded HDR sources without carrying their PQ tags, so the
+    result reads as plain 10-bit and plays washed out on an SDR screen. Only the
+    arrs' media info, read before the encode, still knows.
+    """
+    for f in rows:
+        if f["file"] in arr_hdr and "hdr" not in f["reasons"]:
+            f = {**f, "bucket": "refetch", "reasons": f["reasons"] + ["hdr-stripped"]}
+        yield f
+
+
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
@@ -371,7 +393,13 @@ def cmd_plan(a):
     folders = {m["path"].rstrip("/") for m in movies}
     plex = plex_items()
     count = plays()
-    refetch = [f for f in conformance.sweep() if f["bucket"] == "refetch"]
+    # One call per series; serially that ran past 8 minutes on agentbox.
+    with concurrent.futures.ThreadPoolExecutor(8) as pool:
+        episodes = [f for fs in pool.map(lambda s: mc.get("sonarr", "/api/v3/episodefile", seriesId=s["id"]),
+                                         mc.get("sonarr", "/api/v3/series") if a.tv_gb else [])
+                    for f in fs]
+    hdr = arr_hdr_paths(movies, episodes)
+    refetch = [f for f in with_stripped_hdr(conformance.sweep(), hdr) if f["bucket"] == "refetch"]
     # NOTE: by id, not path: a replacement lands at a new path (the name carries
     # the quality), so a movie kept without subtitles would be planned again.
     held = {i["movie_id"] for i in ledger.values() if "movie_id" in i}
