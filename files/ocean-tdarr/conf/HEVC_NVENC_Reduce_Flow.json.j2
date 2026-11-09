@@ -91,7 +91,7 @@
       "pluginName": "customFunction",
       "version": "1.0.0",
       "inputsDB": {
-        "code": "// Pick the encoder for the worker running this file. Before this, CPU workers\n// requeued every encode for NVENC, and the requeued files filled tdarr's\n// 100-file staging limit, so harbor sat idle behind ocean's two GPU slots.\n// A GPU worker encodes with whatever its node's gpuSelect names (nvenc on the\n// NVIDIA nodes, qsv on tautog's Iris Xe); anything else runs libx265.\nconst OUTPUTS = { nvenc: 1, qsv: 3 };\nconst ENCODERS = { 1: 'hevc_nvenc', 2: 'libx265', 3: 'hevc_qsv' };\nmodule.exports = async (args) => {\n  const out = (args.workerType === 'transcodegpu' && OUTPUTS[args.nodeHardwareType]) || 2;\n  args.jobLog(`encoder: ${ENCODERS[out]} (worker ${args.workerType}, hardware ${args.nodeHardwareType})`);\n  return { outputFileObj: args.inputFileObj, outputNumber: out, variables: args.variables };\n};\n"
+        "code": "// Pick the encoder for the worker running this file. Before this, CPU workers\n// requeued every encode for NVENC, and the requeued files filled tdarr's\n// 100-file staging limit, so harbor sat idle behind ocean's two GPU slots.\n// A GPU worker encodes with whatever its node's gpuSelect names (nvenc on the\n// NVIDIA nodes, qsv on tautog's Iris Xe); anything else runs libx265.\n// A node whose container sets TDARR_CUDA_DECODE=1 (ocean) also decodes on\n// NVDEC: CPU decode of 1080p remuxes cost ocean 2-3 cores per job (11-09).\n// ffmpeg falls back to software decode for any codec NVDEC lacks.\nconst OUTPUTS = { nvenc: 1, qsv: 3 };\nconst ENCODERS = { 1: 'hevc_nvenc', 2: 'libx265', 3: 'hevc_qsv', 4: 'hevc_nvenc + cuda decode' };\nmodule.exports = async (args) => {\n  let out = (args.workerType === 'transcodegpu' && OUTPUTS[args.nodeHardwareType]) || 2;\n  if (out === 1 && process.env.TDARR_CUDA_DECODE === '1') out = 4;\n  args.jobLog(`encoder: ${ENCODERS[out]} (worker ${args.workerType}, hardware ${args.nodeHardwareType})`);\n  return { outputFileObj: args.inputFileObj, outputNumber: out, variables: args.variables };\n};\n"
       },
       "fpEnabled": true,
       "id": "routeEncoder",
@@ -143,6 +143,22 @@
       "position": {
         "x": 800,
         "y": 0
+      }
+    },
+    {
+      "name": "Encode Video Only (NVENC, CUDA decode)",
+      "sourceRepo": "Community",
+      "pluginName": "ffmpegCommandCustomArguments",
+      "version": "1.0.0",
+      "inputsDB": {
+        "inputArguments": "-hwaccel cuda",
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
+      },
+      "fpEnabled": true,
+      "id": "encodeNvencCuda",
+      "position": {
+        "x": 800,
+        "y": -100
       }
     },
     {
@@ -392,6 +408,20 @@
       "target": "setContainer",
       "targetHandle": null,
       "id": "e6"
+    },
+    {
+      "source": "routeEncoder",
+      "sourceHandle": "4",
+      "target": "encodeNvencCuda",
+      "targetHandle": null,
+      "id": "e90"
+    },
+    {
+      "source": "encodeNvencCuda",
+      "sourceHandle": "1",
+      "target": "setContainer",
+      "targetHandle": null,
+      "id": "e91"
     },
     {
       "source": "setContainer",
