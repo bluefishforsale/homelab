@@ -1,8 +1,9 @@
 ---
 # agentbox host configuration.
 # Installs the multi-model agent toolchain (Claude Code premium lane + opencode
-# free lanes), renders config/scripts/units, and enables the issue-watcher and
-# escalation timers.
+# free lanes), renders config/scripts/units, and runs the RC sessions, the alert
+# receiver and the media timers. The issue watcher, escalation tier and roadmap
+# reconciler were retired for axiomd; their removal is declared below.
 #
 # ONE-TIME MANUAL BOOTSTRAP (cannot be automated; interactive OAuth):
 #   ssh debian@agentbox
@@ -541,6 +542,42 @@
       enabled: yes
       state: started
 
+  # Retired for axiomd. Deleting a template stops nothing on the box: the timer
+  # stays enabled and keeps firing the last script it was given. Stop and
+  # disable here, before the scripts below are removed, so a timer can't fire
+  # into a missing ExecStart and leave a failed unit.
+  - name: Check for retired agent units
+    ansible.builtin.stat:
+      path: "/etc/systemd/system/{{ item }}"
+    register: retired_units
+    loop:
+      - agentbox-issue-watcher.timer
+      - agentbox-issue-watcher.service
+      - agentbox-escalate.timer
+      - agentbox-escalate.service
+      - agentbox-roadmap-reconcile.timer
+      - agentbox-roadmap-reconcile.service
+
+  - name: Stop and disable retired agent units
+    ansible.builtin.systemd:
+      name: "{{ item.item }}"
+      state: stopped
+      enabled: false
+    loop: "{{ retired_units.results }}"
+    loop_control:
+      label: "{{ item.item }}"
+    when: item.stat.exists
+
+  - name: Remove retired agent unit files
+    ansible.builtin.file:
+      path: "/etc/systemd/system/{{ item.item }}"
+      state: absent
+    loop: "{{ retired_units.results }}"
+    loop_control:
+      label: "{{ item.item }}"
+    when: item.stat.exists
+    notify: Reload systemd daemon
+
   # --- Scripts ---
   - name: Install agent scripts
     ansible.builtin.template:
@@ -548,9 +585,6 @@
       dest: "/usr/local/bin/{{ item.dest }}"
       mode: '0755'
     loop:
-      - { src: issue-watcher.sh, dest: agentbox-issue-watcher.sh }
-      - { src: escalate.sh, dest: agentbox-escalate.sh }
-      - { src: roadmap-reconcile.sh, dest: agentbox-roadmap-reconcile.sh }
       - { src: trust-dir.sh, dest: agentbox-trust-dir.sh }
       - { src: notify-auth-expired.sh, dest: agentbox-notify-auth-expired.sh }
       - { src: rc-launch.sh, dest: agentbox-rc-launch.sh }
@@ -583,6 +617,9 @@
       state: absent
     loop:
       - agentbox-escalate-to-claude.sh   # -> agentbox-escalate.sh (PR #374)
+      - agentbox-issue-watcher.sh        # retired for axiomd
+      - agentbox-escalate.sh             # retired for axiomd
+      - agentbox-roadmap-reconcile.sh    # retired for axiomd
 
   # base/logging.yaml keeps every host's journal in RAM, capped at 100M. agentbox
   # runs three RC lanes plus the media timers, and wants a day of local history;
@@ -622,12 +659,6 @@
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     loop:
-      - agentbox-issue-watcher.service
-      - agentbox-issue-watcher.timer
-      - agentbox-escalate.service
-      - agentbox-escalate.timer
-      - agentbox-roadmap-reconcile.service
-      - agentbox-roadmap-reconcile.timer
       - agentbox-replace-reconcile.service
       - agentbox-replace-reconcile.timer
       - agentbox-alert-receiver.service
@@ -648,9 +679,6 @@
       state: started
       daemon_reload: yes
     loop:
-      - agentbox-issue-watcher.timer
-      - agentbox-escalate.timer
-      - agentbox-roadmap-reconcile.timer
       - agentbox-replace-reconcile.timer
       - agentbox-media-refetch.timer
       - agentbox-tdarr-drive.timer

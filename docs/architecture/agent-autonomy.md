@@ -1,5 +1,9 @@
 # Agent autonomy (agentbox)
 
+Retired 2026-11-08. The issue watcher, escalation tier and roadmap reconciler
+described here no longer run; axiomd replaces them. Kept as the record of what
+the policy was and why. The scripts are in git history before that date.
+
 What an agentbox draft may do once it opens a PR. Every deployable repo deploys
 on merge, so a merge is a production change, and a green check only means it
 built. Autonomy is tiered by blast radius, never blanket. Was ADR 0001

@@ -293,11 +293,6 @@ jobs:
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
 
-      # An issue body is a prompt for an agent that pushes code, so every point
-      # where the fleet picks work up has to check who wrote it.
-      - name: Agent issue-author trust boundary
-        run: bash .github/workflows/lib/agentbox-issue-author.test.sh
-
       # The receiver ships its own defect ledger but nothing ran it, so it sat
       # broken from #378 (which started refusing kernel device names) until
       # 2026-09-08. Env vars are the two it reads at import; it never opens a
@@ -331,21 +326,6 @@ jobs:
       # so the pattern gets the guard rather than the file that last broke.
       - name: "No attacker-reachable values in run: script text"
         run: bash .github/workflows/lib/workflow-run-injection.test.sh
-
-      # A drafting agent may commit its own work. Deciding "did it produce
-      # anything?" from a dirty tree alone threw a correct fix away.
-      - name: Agent draft detection
-        run: bash .github/workflows/lib/agentbox-draft-detection.test.sh
-
-      # A blanket `git add -A` put the agent's own leavings in two PRs months
-      # apart: photonic_inventory#2 (.agent-1.log) and homelab#429 (check.py).
-      - name: Agent commits the fix, not its scratch
-        run: bash .github/workflows/lib/agentbox-scratch-staging.test.sh
-
-      # A collapsed ladder or a paid model creeping in breaks nothing visibly;
-      # it just changes the bill. Assert the shape instead.
-      - name: Agent lane ladder stays local-first and free
-        run: bash .github/workflows/lib/agentbox-lane-ladder.test.sh
 
       # A lane that cannot reclaim its own stale registration 409s on every
       # restart and stays dark for minutes, with the unit looking healthy.

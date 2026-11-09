@@ -78,7 +78,7 @@ runs only those. The model is **explicit ownership**, not best-effort guessing:
   with a classic `repo`-scoped token. `gh pr list --json statusCheckRollup` expands
   to the per-check `contexts` and 403s forever; the GraphQL rollup **aggregate**
   (`commits(last:1){nodes{commit{statusCheckRollup{state}}}}`) needs no extra
-  permission and is what `files/agentbox/issue-watcher.sh` uses.
+  permission and is what the retired agentbox issue watcher used.
 - **`gh`'s `--jq` is not jq.** One expression, no `--arg`. Passing one makes `gh`
   reject the whole command. Pipe to real jq: `gh ... --json ... | jq -r --arg ...`.
 - **`x-accepted-github-permissions`** on any response names the exact permission an
