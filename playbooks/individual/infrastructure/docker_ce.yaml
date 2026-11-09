@@ -85,15 +85,19 @@
       state: present
     when: manage_service_users | default(true) | bool
 
+  # NOTE: shell and the rest of media's groups belong to base/users.yaml, which
+  # sets zsh and adds sudo. This task used to set /bin/bash and a bare
+  # `groups: docker` (no append, so it stripped sudo), and the two plays undid
+  # each other on every run. Here it only makes sure docker is one of them.
   - name: Create media user with UID from vault
     ansible.builtin.user:
       name: media
       uid: "{{ system_users.media.uid }}"
       group: media
       groups: docker
-      shell: /bin/bash
+      append: true
       home: /home/media
-      create_home: yes
+      create_home: true
       state: present
     when: manage_service_users | default(true) | bool
 
