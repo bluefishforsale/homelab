@@ -17,6 +17,7 @@ cloudflared:
     - harbor
     - llmeval
     - netboot01
+    - node005
     - registry-cache-01
 
   # touched to retest cloudflared.yaml from CI with cloudflared now in the runner container
