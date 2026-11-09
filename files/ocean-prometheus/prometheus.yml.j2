@@ -179,12 +179,8 @@ scrape_configs:
     static_configs:
     - targets: ['ocean.home:9594']
 
-  - job_name: 'jellyfin-exporter'
-    relabel_configs: *dropPortNumber
-    scrape_interval: 1m
-    scrape_timeout: 15s
-    static_configs:
-    - targets: ['ocean.home:9027']
+  # jellyfin-exporter (ocean.home:9027) is parked with jellyfin since
+  # 2026-11-09; see playbooks/individual/ocean/media/jellyfin.yaml to restore.
 
   - job_name: 'radarr-exporter'
     relabel_configs: *dropPortNumber

@@ -105,6 +105,9 @@ emit() {
   #     controllers. Storage on the hypervisors, so like *zfs*: hand-run only.
   #     On 2026-11-07 an edit auto-applied it, and only a shell syntax error
   #     kept it from adding virtual disks.
+  #   - jellyfin: parked on 2026-11-09 to give ocean its cores back. Its play
+  #     stops the stack unless dispatched with jellyfin_enabled=true, so an
+  #     auto-apply would either do nothing or undo a deliberate restart.
   case "$pb" in
     playbooks/individual/ocean/ai/terminalbench*.yaml) return 0 ;;
     playbooks/*zfs*.yaml | playbooks/*zfs*.yml) return 0 ;;
@@ -113,6 +116,7 @@ emit() {
     playbooks/operations/decommission/*) return 0 ;;
     playbooks/archive/*) return 0 ;;
     playbooks/deprecated/*) return 0 ;;
+    playbooks/individual/ocean/media/jellyfin.yaml) return 0 ;;
     playbooks/individual/infrastructure/netboot_image.yaml) return 0 ;;
     playbooks/individual/core/storage/dell_perc_raid.yaml) return 0 ;;
   esac

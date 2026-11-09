@@ -87,7 +87,7 @@ probe(){
   case "$1" in
     grafana-mysql) echo "percona/percona-server:5.7|SELECT MAX(last_execution) FROM grafana.server_lock|48" ;;
     wordpress)     echo "mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
-    jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|48' ;;
+    jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|' ;;  # no max age: jellyfin parked 2026-11-09
     mem0-postgres) echo 'ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
     archmap-postgres) echo 'postgres:16|\connect archmap \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM snapshots|' ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
