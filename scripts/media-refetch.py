@@ -31,6 +31,7 @@ Specials are left alone.
 """
 import argparse
 import collections
+import concurrent.futures
 import datetime as dt
 import fcntl
 import importlib.util
@@ -392,8 +393,11 @@ def cmd_plan(a):
     folders = {m["path"].rstrip("/") for m in movies}
     plex = plex_items()
     count = plays()
-    episodes = [f for s in mc.get("sonarr", "/api/v3/series") if a.tv_gb
-                for f in mc.get("sonarr", "/api/v3/episodefile", seriesId=s["id"])]
+    # One call per series; serially that ran past 8 minutes on agentbox.
+    with concurrent.futures.ThreadPoolExecutor(8) as pool:
+        episodes = [f for fs in pool.map(lambda s: mc.get("sonarr", "/api/v3/episodefile", seriesId=s["id"]),
+                                         mc.get("sonarr", "/api/v3/series") if a.tv_gb else [])
+                    for f in fs]
     hdr = arr_hdr_paths(movies, episodes)
     refetch = [f for f in with_stripped_hdr(conformance.sweep(), hdr) if f["bucket"] == "refetch"]
     # NOTE: by id, not path: a replacement lands at a new path (the name carries
