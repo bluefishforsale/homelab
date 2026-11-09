@@ -169,14 +169,13 @@ check_record "uap-ac-pro-garage-1.home." A
 echo ""
 echo -e "${BOLD}── Zone: home. (CNAME) ──${NC}"
 check_record "ocean.home." CNAME
-
-# ---------------------------------------------------------------------------
-# Zone: home. — Wildcard
-# ---------------------------------------------------------------------------
-echo ""
-echo -e "${BOLD}── Zone: home. (Wildcard) ──${NC}"
-check_record "randomtest12345.home." A
-check_record "anything.home." A
+check_record "nginx.home." CNAME
+check_record "ntfy.home." CNAME
+# nginx vhosts, one CNAME each to nginx.home (nginx_lb_vhosts in the
+# dns_infrastructure role). There is no *.home wildcard any more.
+check_record "grafana.home." CNAME
+check_record "plex.home." CNAME
+check_record "llama.home." CNAME
 
 # ---------------------------------------------------------------------------
 # Zone: cluster.local. — SOA/NS and wildcard
