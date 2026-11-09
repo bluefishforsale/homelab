@@ -9,6 +9,9 @@
 #   cf.sh cache-status <url>             show cf-cache-status / content-type / HTTP for a URL
 #   cf.sh dns <zone> [name]              list DNS records (optional name substring filter)
 #   cf.sh dns-add <zone> <type> <name> <content> [ttl]   add a DNS record (ttl default 300)
+#                                        LEGACY, don't use: DNS records belong to
+#                                        bluefishforsale/terraform-root, and one added
+#                                        here is invisible to its drift check
 #   cf.sh purge <zone> [url ...]         purge cache: everything, or just the given URLs
 #
 # Examples:

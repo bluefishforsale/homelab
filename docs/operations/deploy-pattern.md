@@ -55,6 +55,15 @@ curl -f -X POST -H "Authorization: Bearer $HOMELAB_DISPATCH_TOKEN" \
   https://api.github.com/repos/bluefishforsale/homelab/dispatches -d "$PAYLOAD"
 ```
 
+## terraform-root side (`bluefishforsale/terraform-root`), first
+
+The public hostname's cloud pieces are created in terraform-root, not here:
+the proxied CNAME to the tunnel, the Access app, and which reusable Access
+policy it gets (bypass for public, admin plus plex users, or admin only). Open
+that PR first and let it merge and apply. The homelab side below then only
+configures the host. `cloudflared.yaml` still POSTs these objects today, but
+they already exist by then, so its calls are no-ops.
+
 ## Homelab repo side (`bluefishforsale/homelab`)
 
 Five files per new service:
@@ -75,9 +84,12 @@ Five files per new service:
      `<service>.example.com` + `<service>.home` → `proxy_pass http://172.17.0.1:8xxx`
    - `vars/vars_cloudflared.yaml`: ingress
      `<service>.example.com` → `http://192.0.2.143:80`
+     (the tunnel's local routing; the DNS record itself is terraform-root's)
 5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
    of the hostname to `fully_public_services` (Access bypass) for public
    services. `public_services` = admin + plex-users gate. Else admin-only.
+   Keep this in step with the Access policy chosen in terraform-root, since
+   this playbook PUTs policies on Access apps it finds.
 
 **Image refresh requirements (every docker-based service):**
 
@@ -220,6 +232,10 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
 
 ```text
 [ ] Decide hostname (<name>.example.com) and host port (next free 80xx)
+
+terraform-root (merge and apply first):
+[ ] cloudflare_dns_record: proxied CNAME <name> -> <ocean tunnel id>.cfargotunnel.com
+[ ] cloudflare_zero_trust_access_application with the right reusable policy
 
 homelab:
 [ ] playbooks/individual/ocean/services/<name>.yaml      (clone paia.yaml or terrac_com.yaml)
