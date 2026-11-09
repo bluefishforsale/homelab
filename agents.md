@@ -58,19 +58,16 @@ creating cloud resources:
 - Using cloud resources: db-backup writing to `gs://homelab-db-backups`, the
   cloudflare exporter reading analytics.
 
-Legacy code that still creates cloud resources, kept only until it's
-deleted.
+Nothing here creates Cloudflare resources any more. `cloudflared.yaml` only
+looks up the host's `ssh-<host>` tunnel and fetches its token, and it fails if
+the tunnel is missing rather than creating it, so a new host's tunnel, CNAME,
+ingress and Access app come from terraform-root first. The old Cloudflare
+write scripts (`cloudflare-harden.py`, `cloudflare-waf.py`,
+`cloudflare-pages-domain.sh`, `cf.sh dns-add`) are deleted; their settings
+live in terraform-root's `cloudflare-<zone>-config.tf`.
 
-`cloudflared.yaml` no longer writes anything to Cloudflare. It looks up the
-host's `ssh-<host>` tunnel and fetches its token, and it fails if the tunnel is
-missing rather than creating it, so a new host's tunnel, CNAME and Access app
-come from terraform-root first. Remaining legacy pieces: Don't extend it, don't copy it
-into new playbooks, and don't run the scripts:
+Legacy code that's still here, kept only until it's deleted:
 
-- `scripts/cloudflare-harden.py`, `scripts/cloudflare-waf.py`,
-  `scripts/cloudflare-pages-domain.sh`, and `scripts/cf.sh dns-add`. Running
-  them now changes resources Terraform owns, the drift job opens an issue, and
-  the next apply puts things back.
 - `playbooks/individual/infrastructure/gcloud_sdk.yaml` with
   `playbooks/tasks/gcloud.yaml` and `pki_gcloud_kms.yaml`: dead code (its vars
   are defined nowhere). Never run it.

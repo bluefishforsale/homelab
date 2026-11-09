@@ -8,10 +8,6 @@
 #   cf.sh zones                          list known zones + ids
 #   cf.sh cache-status <url>             show cf-cache-status / content-type / HTTP for a URL
 #   cf.sh dns <zone> [name]              list DNS records (optional name substring filter)
-#   cf.sh dns-add <zone> <type> <name> <content> [ttl]   add a DNS record (ttl default 300)
-#                                        LEGACY, don't use: DNS records belong to
-#                                        bluefishforsale/terraform-root, and one added
-#                                        here is invisible to its drift check
 #   cf.sh purge <zone> [url ...]         purge cache: everything, or just the given URLs
 #
 # Examples:
@@ -86,13 +82,6 @@ case "${1:-}" in
       | jq -r '.result[] | "\(.type)\t\(.name)\t\(.content)\tproxied=\(.proxied)"' \
       | { [ -n "$filt" ] && grep -i "$filt" || cat; } \
       | awk -F'\t' '{printf "%-6s %-38s %-40s %s\n", $1,$2,$3,$4}' ;;
-  dns-add)
-    z=$(zone_id "${2:?usage: cf.sh dns-add <zone> <type> <name> <content> [ttl]}")
-    typ=${3:?type}; name=${4:?name}; content=${5:?content}; ttl=${6:-300}
-    body=$(jq -nc --arg t "$typ" --arg n "$name" --arg c "$content" --argjson ttl "$ttl" \
-      '{type:$t,name:$n,content:$c,ttl:$ttl}')
-    cf_api POST "/zones/$z/dns_records" "$body" \
-      | jq -r '"added \(.result.type) \(.result.name) -> \(.result.content) (id \(.result.id))"' ;;
   purge)
     z=$(zone_id "${2:?usage: cf.sh purge <zone> [url ...]}"); shift 2
     if [ $# -eq 0 ]; then

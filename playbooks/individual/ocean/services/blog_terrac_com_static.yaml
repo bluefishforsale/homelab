@@ -28,8 +28,8 @@
     uid: "{{ system_users.media.uid }}"
     gid: "{{ system_users.media.gid }}"
     accept_hostkey: yes
-    # Public identifier, not a secret. Canonical list lives in
-    # scripts/cloudflare-harden.py (ZONES) and monitoring/cloudflare_exporter.yaml (cf_zones).
+    # Public identifier, not a secret. Canonical source is the terrac.com zone
+    # in terraform-root; monitoring/cloudflare_exporter.yaml (cf_zones) has a copy.
     cloudflare_zone_id: f3be74ced16c63d68b522f569ecba43b
 
   tasks:
@@ -166,7 +166,7 @@
     when: not index_file.stat.exists
     tags: [deploy]
 
-  # scripts/cloudflare-harden.py pins these hosts to a 2h edge TTL with
+  # terraform-root's terrac_request_cache_settings ruleset pins these hosts to a 2h edge TTL with
   # mode "override_origin", so Cloudflare ignores any Cache-Control nginx
   # sends and serves stale HTML for up to 2h after a deploy. Purging by host
   # is the only thing that shortens that; adding origin headers does nothing.
