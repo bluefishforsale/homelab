@@ -79,6 +79,7 @@ add_record "home." "unifi" A "192.168.1.10"
 # A records — iDRAC/IPMI
 add_record "home." "node005-idrac" A "192.168.1.15"
 add_record "home." "ocean-idrac" A "192.168.1.16"
+add_record "home." "node006-idrac" A "192.168.1.16"
 
 # A records — GitHub runners
 add_record "home." "gh-runner-01" A "192.168.1.20"
@@ -130,6 +131,15 @@ add_record "home." "ocean-eth0" A "192.168.1.144"
 
 # CNAME — ocean alias
 add_record "home." "ocean" CNAME "ocean-bond0.home."
+
+# CNAME — the nginx reverse proxy on ocean, and every vhost it serves
+add_record "home." "nginx" CNAME "ocean-bond0.home."
+{% for vhost in nginx_lb_vhosts %}
+add_record "home." "{{ vhost }}" CNAME "nginx.home."
+{% endfor %}
+
+# CNAME — services reached directly on an ocean port, not through nginx
+add_record "home." "ntfy" CNAME "ocean-bond0.home."
 
 # A records — networking gear
 add_record "home." "usg-3p" A "192.168.1.1"

@@ -39,3 +39,39 @@ docker_compose_version: "2.40.3"
 # they come from upstream iPXE's release tarball.
 ipxe_version: v2.0.0
 ipxe_sha256: 01a526d4cc791fc30362259c609d6c506cc64a7bdff51b9a5eb788354e17eee1
+
+# Every <name>.home that nginx on ocean serves, each a CNAME to nginx.home so
+# moving the proxy is one record. Kept in step with the server_name lines in
+# files/nginx-compose/proxy_hostname_web_proxy.conf by
+# .github/workflows/lib/nginx-vhosts-have-dns.test.sh.
+# NOTE: once the *.home wildcard is gone, a vhost missing here does not resolve.
+nginx_lb_vhosts:
+  - alertmanager
+  - archmap
+  - bazarr
+  - etrading
+  - grafana
+  - hass
+  - homeassistant
+  - homepage
+  - jellyfin
+  - jellystat
+  - karma
+  - lidarr
+  - llama
+  - loki
+  - nzbget
+  - open-webui
+  - overseerr
+  - paia
+  - plex
+  - portainer
+  - prometheus
+  - prowlarr
+  - radarr
+  - saetnere
+  - sonarr
+  - ta
+  - tautulli
+  - tdarr
+  - unpoller
