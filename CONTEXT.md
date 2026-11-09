@@ -69,28 +69,19 @@ this repo's master, is a production change, not a checkpoint.
 
 ## The agent fleet (agentbox)
 
-`agentbox` is an always-on VM that watches the deployable repos' open issues and
-resolves them, while staying drivable live from the phone. The autonomy policy is
-[agent-autonomy.md](docs/architecture/agent-autonomy.md). Vocabulary:
+`agentbox` is an always-on VM on the homelab network, drivable live from the
+phone. It runs the RC sessions, the Alertmanager receiver (ntfy plus a GitHub
+issue per alert) and the media timers. It no longer drafts fixes for open
+issues on its own: the issue watcher, escalation tier and roadmap reconciler
+were retired on 2026-11-08 in favour of axiomd. Vocabulary:
 
-- **Lane** - a path that work takes through a model tier, all free when
-  unattended: the local GPU (`local-llama`) first, then Gemini Flash, then the
-  escalation tier. Claude Code runs only in RC sessions, with a human present.
-  Lanes are labelled on telemetry (`lane=free|review|escalate|reconcile`) so
-  cost breaks down by tier.
-- **Drafter** - the opencode `build` agent that writes the actual fix, walking
-  `LANES` in `files/agentbox/issue-watcher.sh` cheapest first.
-- **Escalation** - handing an issue from the free lanes to the escalation tier
-  (`escalate.sh`, the strongest free model; relabel `needs-escalation`).
-  Failure-driven: it happens when the draft yields no usable diff, or the opened
-  PR's CI goes red. Not predicted from "complexity."
 - **RC session** - a persistent `claude remote-control` process for one repo,
   run as a systemd template instance (`agentbox-rc@<repo>.service`, cwd
   `repos/<repo>`), drivable live from the Android app or desktop. One per repo
   in the curated interactive set; idle sessions hold a process but spend almost
   nothing until driven.
-- **Deployable repo** - see the deployment model above. The watcher runs against
-  all of them; RC sessions run only for the few actively driven.
+- **Deployable repo** - see the deployment model above. RC sessions run only
+  for the few actively driven.
 
 ## Conventions
 
