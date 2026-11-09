@@ -22,6 +22,7 @@ cloudflared:
     - netboot01
     - node005
     - node006
+    - ocean
     - pihole
     - registry-cache-01
 
