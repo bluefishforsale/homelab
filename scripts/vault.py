@@ -221,6 +221,49 @@ def edit(text, path, value):
     return new
 
 
+def edit_list(text, path, items):
+    """Replace the items of an existing block list, same guards as `edit`."""
+    dotted = ".".join(path)
+    current, ok = resolve(load(text), path)
+    if not ok or not isinstance(current, list):
+        die(f"{dotted} is not an existing list")
+    # NOTE: these lists are allow-lists (Cloudflare Access); empty would lock everyone out
+    if not items:
+        die(f"refusing to empty {dotted}")
+    lines = text.split("\n")
+    _, idx, end, indent = locate(lines, path)
+    while end > idx + 1 and (not lines[end - 1].strip() or lines[end - 1].lstrip().startswith("#")):
+        end -= 1
+    item_indent = " " * (indent + 2)
+    for ln in lines[idx + 1:end]:
+        if ln.strip() and not ln.startswith(item_indent + "- "):
+            die(f"{dotted} is not a flat block list; edit it by hand")
+    lines[idx + 1:end] = [f"{item_indent}- {json.dumps(i)}" for i in items]
+
+    new = "\n".join(lines)
+    before, after = dict(flatten(load(text))), dict(flatten(load(new, "the edited vault")))
+    touched = {k for k in before.keys() | after.keys() if before.get(k, ()) != after.get(k, ())}
+    if touched != {tuple(path)}:
+        die(f"refusing to write: edit would change {sorted('.'.join(t) for t in touched) or 'nothing'}")
+    return new
+
+
+def cmd_replace_list(args):
+    held = lock()  # noqa: F841 - the lock lives as long as this reference does
+    text = read()
+    path = args.path.split(".")
+    items = [ln.strip() for ln in sys.stdin if ln.strip()]
+    current, _ = resolve(load(text), path)
+    if current == items:
+        print(f"{args.path} already holds those {len(items)} items", file=sys.stderr)
+        return 0
+    old = set(current or [])
+    print(f"{args.path}: {len(old)} -> {len(items)} items, "
+          f"+{len(set(items) - old)} -{len(old - set(items))}", file=sys.stderr)
+    write(edit_list(text, path, items))
+    return 0
+
+
 def cmd_list(args):
     prefix = tuple(args.path.split(".")) if args.path else ()
     node, ok = resolve(load(read()), prefix)
@@ -291,6 +334,10 @@ def main():
         s.add_argument("path")
         s.add_argument("value", help="new value, or - to read stdin (keeps it out of shell history and ps)")
         s.set_defaults(fn=cmd_set)
+
+    r = sub.add_parser("replace-list", help="replace an existing list's items with stdin, one per line")
+    r.add_argument("path")
+    r.set_defaults(fn=cmd_replace_list)
 
     args = p.parse_args()
     sys.exit(args.fn(args) or 0)

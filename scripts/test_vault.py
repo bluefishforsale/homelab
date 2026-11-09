@@ -84,6 +84,26 @@ def main():
         except SystemExit:
             pass
 
+    # replace a list's items, keeping its indent and the section after it
+    out = vault.edit_list(DOC, ["lists", "members"], ["b@x.com", "a@x.com"])
+    assert "lists:\n  members:\n    - \"b@x.com\"\n    - \"a@x.com\"\n\n# banner" in out, out
+
+    # replacing with the same items in another order is still a write, not a refusal
+    vault.edit_list(DOC, ["lists", "members"], ["two", "one"])
+
+    for path, items, why in (
+        # a scalar must not be turned into a list
+        (["top"], ["x"], "overwriting a scalar with a list"),
+        # an empty list would lock every user out of whatever reads it
+        (["lists", "members"], [], "an empty list"),
+        (["lists", "nope"], ["x"], "a missing key"),
+    ):
+        try:
+            vault.edit_list(DOC, path, items)
+            raise AssertionError(f"expected refusal: {why}")
+        except SystemExit:
+            pass
+
     print("ok")
 
 
