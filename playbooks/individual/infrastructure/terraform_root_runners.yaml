@@ -5,8 +5,11 @@
 # A separate compose project and systemd unit from github_docker_runners.yaml,
 # so applying this never restarts the homelab runners main-apply runs on, and
 # main-apply can deploy it like any other playbook. Nothing from the homelab
-# runners is mounted: no docker socket, no SSH keys, no cloudflared. These
-# jobs only talk to the Proxmox and UniFi APIs and GCP (state, over WIF).
+# runners is mounted: no docker socket, no SSH keys, no cloudflared, no PAT
+# file, and the PAT is unset from the job env after registration. These jobs
+# only talk to the Proxmox and UniFi APIs and GCP (state, over WIF).
+# NOTE: the PAT is still the shared development.github.token. A fine-grained
+# one limited to terraform-root (Administration write) would shrink it further.
 - name: Configure terraform-root ephemeral runners
   hosts: github_runners
   become: true
@@ -29,6 +32,8 @@
     github_runner_mount_docker_socket: false
     github_runner_mount_cloudflared: false
     github_runner_ssh_key_dir: ""
+    github_runner_mount_token_file: false
+    github_runner_unset_config_vars: true
 
   roles:
     - github_docker_runners

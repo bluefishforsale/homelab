@@ -94,12 +94,14 @@ out=$(printf 'roles/dns_infrastructure/templates/foo.j2\n' | bash "$SCRIPT")
 assert_eq "dns_infrastructure role" \
   '["playbooks/individual/core/services/dns_ha_stack.yaml"]' "$out"
 
-# 11. roles/github_docker_runners/** is self-referential infra (main-apply runs
-#     ON these runners), so it is dispatch-only: a role edit maps to nothing and
-#     can never recreate the runner mid-apply. Hand-applied on the homelab network.
+# 11. github_docker_runners.yaml is self-referential infra (main-apply runs ON
+#     those runners), so a role edit must never map to it and recreate the
+#     runner mid-apply; it is hand-applied on the homelab network. The same role
+#     also drives terraform_root_runners.yaml, a separate compose project and
+#     unit that main-apply doesn't run on, so a role edit deploys only that.
 out=$(printf 'roles/github_docker_runners/defaults/main.yml\n' | bash "$SCRIPT")
-assert_eq "github_docker_runners role is dispatch-only (self-referential)" \
-  '[]' "$out"
+assert_eq "github_docker_runners role never maps to the self-referential playbook" \
+  '["playbooks/individual/infrastructure/terraform_root_runners.yaml"]' "$out"
 
 # 12. README / docs changes are not in the workflow's paths filter,
 #     but if smuggled in (e.g., trailing-doc edit), they should be no-op (fallback skipped — empty).

@@ -37,6 +37,12 @@ github_runner_count: 4
 github_runner_container_prefix: "github-runner"
 github_runner_name_suffix: "runner"
 
+# Keep the PAT away from job steps: drop the token file mount (registration
+# reads ACCESS_TOKEN from the env file, not this) and unset the config env vars
+# after registration. Off by default so the homelab runners render unchanged.
+github_runner_mount_token_file: true
+github_runner_unset_config_vars: false
+
 # Runner Docker image
 # Using myoung34/github-runner - popular community image with excellent ephemeral support
 # Well-documented environment variables and Docker/Ansible capabilities

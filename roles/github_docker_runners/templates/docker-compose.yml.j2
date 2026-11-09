@@ -64,6 +64,11 @@ services:
       EPHEMERAL: "false"
 {% endif %}
       DISABLE_AUTO_UPDATE: "true"
+{% if github_runner_unset_config_vars %}
+      # Unset ACCESS_TOKEN and friends once registered, so job steps can't read
+      # the PAT out of the environment.
+      UNSET_CONFIG_VARS: "true"
+{% endif %}
       
       # Runner scope (for organization-level runners)
 {% if github_scope == 'org' %}
@@ -79,8 +84,10 @@ services:
       ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE: "/action-archive-cache"
 
     volumes:
+{% if github_runner_mount_token_file %}
       # GitHub token file (shared by all runners, read-only)
       - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro
+{% endif %}
       
       # Runner working directory on host
       # Each runner gets its own directory to avoid conflicts
