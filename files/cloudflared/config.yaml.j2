@@ -6,29 +6,4 @@ credentials-file: "{{ cred_file }}"
 # Force IPv4-only connections to Cloudflare Edge
 edge-ip-version: "4"
 
-{% if inventory_hostname not in cloudflared.remote_managed_hosts | default([]) %}
-ingress:
-{% for rule in cloudflared.tunnels[tunnel_name].ingress %}
-- hostname: "{{ rule.hostname }}"
-{% if rule.service_url is defined %}
-  service: "{{ rule.service_url }}"
-{% elif rule.service_type == 'http_status:404' %}
-  service: "http_status:404"
-{% elif rule.port is defined %}
-  service: "{{ rule.service_type }}://{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}:{{ rule.port }}"
-{% else %}
-  service: "{{ rule.service_type }}"
-{% endif %}
-{% if rule.origin_request is defined %}
-  originRequest:
-{% if rule.origin_request.no_tls_verify is defined %}
-    noTLSverify: {{ rule.origin_request.no_tls_verify }}
-{% endif %}
-{% if rule.origin_request.origin_server_name is defined %}
-    originServerName: "{{ rule.origin_request.origin_server_name }}"
-{% endif %}
-{% endif %}
-{% endfor %}
-{% else %}
 # Ingress for this tunnel is managed in bluefishforsale/terraform-root.
-{% endif %}
