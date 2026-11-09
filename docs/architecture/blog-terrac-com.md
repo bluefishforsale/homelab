@@ -39,8 +39,9 @@ There is no `.home` vhost for the blog and no port in
   reused by `mem0.yaml` and `tdarr.yaml` for private clones. If the key is
   missing the play generates one, prints it for a GitHub deploy key, and fails
   on purpose until you add it and re-run.
-- Edge cache. `scripts/cloudflare-harden.py` puts `blog.terrac.com` in
-  `CACHE_HOSTS` with a 7200s edge TTL that overrides origin headers. The
+- Edge cache. terraform-root's `terrac_request_cache_settings` ruleset
+  (`cloudflare-terrac-config.tf`) gives `blog.terrac.com` a 7200s edge TTL
+  that overrides origin headers. The
   playbook's purge (`hosts: [blog.terrac.com]`, vault `cloudflare.api_email` /
   `api_key`, zone id inline) is the only thing that makes a deploy visible
   before 2h. It is skipped when `public/index.html` is missing.
