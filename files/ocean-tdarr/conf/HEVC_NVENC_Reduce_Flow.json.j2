@@ -17,6 +17,33 @@
       }
     },
     {
+      "name": "Skip 4K/HDR",
+      "sourceRepo": "Community",
+      "pluginName": "customFunction",
+      "version": "1.0.0",
+      "inputsDB": {
+        "code": "// The library tops out at 1080p SDR. A 4K or HDR file is replaced by a fresh\n// 1080p download (media-conformance.py flags it for media-refetch.py), so\n// encoding it is wasted work. Worse, an HEVC 2160p remux takes the audio-only\n// branch, which copies ~60 GB of video into gaming's 40G tmpfs cache and fails\n// every job beside it with ENOSPC (Batman 1989, 11-08).\nconst HDR = ['smpte2084', 'arib-std-b67'];\nmodule.exports = async (args) => {\n  const streams = (args.inputFileObj.ffProbeData || {}).streams || [];\n  const v = streams.find((s) => s.codec_type === 'video' && !(s.disposition || {}).attached_pic) || {};\n  const dv = (v.side_data_list || []).some((d) => d.side_data_type === 'DOVI configuration record');\n  const skip = (v.height || 0) > 1088 || HDR.includes(v.color_transfer) || dv;\n  if (skip) args.jobLog(`skipped: ${v.width}x${v.height} ${v.color_transfer || ''}${dv ? ' DV' : ''}, left for refetch`);\n  return { outputFileObj: args.inputFileObj, outputNumber: skip ? 2 : 1, variables: args.variables };\n};\n"
+      },
+      "fpEnabled": true,
+      "id": "skip4kHdr",
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "name": "Set Original (4K/HDR skipped)",
+      "sourceRepo": "Community",
+      "pluginName": "setOriginalFile",
+      "version": "1.0.0",
+      "fpEnabled": true,
+      "id": "skipped4kHdr",
+      "position": {
+        "x": 100,
+        "y": 250
+      }
+    },
+    {
       "name": "Begin Command",
       "sourceRepo": "Community",
       "pluginName": "ffmpegCommandStart",
@@ -278,9 +305,23 @@
     {
       "source": "inputFile",
       "sourceHandle": "1",
-      "target": "beginCmd",
+      "target": "skip4kHdr",
       "targetHandle": null,
       "id": "e1"
+    },
+    {
+      "source": "skip4kHdr",
+      "sourceHandle": "1",
+      "target": "beginCmd",
+      "targetHandle": null,
+      "id": "e32"
+    },
+    {
+      "source": "skip4kHdr",
+      "sourceHandle": "2",
+      "target": "skipped4kHdr",
+      "targetHandle": null,
+      "id": "e33"
     },
     {
       "source": "beginCmd",
