@@ -6,7 +6,7 @@
 # Configures the runner host VM with Docker and deploys ephemeral runner containers
 #
 # Prerequisites:
-# - Runner VM created via create_runner_vm.yaml
+# - Runner VM defined in terraform-root lan/proxmox-node005-vms.tf
 # - VM added to inventory under [github_runners] group
 # - GitHub PAT stored in Vault at development.github.vault_github_pat
 #

@@ -14,7 +14,7 @@
 # needs to watch it.
 #
 # Prerequisites:
-#   - VM created via create_llmeval_vm.yaml
+#   - VM defined in terraform-root lan/proxmox-node006-vms.tf
 #   - base and docker: main-apply dispatch of 01_base_system + docker_ce, limit=llmeval
 #
 # Backout: systemctl disable --now llmeval axiomd-eval on llmeval, then

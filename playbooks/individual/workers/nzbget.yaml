@@ -3,7 +3,7 @@
 # and only finished files cross NFS into ocean's /data01/incoming (#1005). The
 # pool no longer takes the random I/O, which is what let NZBGet run 24/7.
 #
-# Needs create_harbor_vm.yaml's scsi2 (the passed-through 870 EVO) and
+# Needs harbor's scsi2 (the passed-through 870 EVO, terraform-root lan/) and
 # data01_worker.yaml's mounts. Container paths match the ocean install exactly,
 # so Sonarr/Radarr remote path mappings and the queue carried over from ocean
 # resolve unchanged.

@@ -23,13 +23,7 @@
 - name: Configure Dell PERC RAID
   ansible.builtin.import_playbook: individual/core/storage/dell_perc_raid.yaml
 
-# Provision DNS VMs
-- name: Provision dns01 VM on node005
-  ansible.builtin.import_playbook: individual/core/services/dns01_vm.yaml
-
-- name: Provision dns02 VM on node006
-  ansible.builtin.import_playbook: individual/core/services/dns02_vm.yaml
-
+# The dns01/dns02 VMs are terraform-root's (lan/proxmox-node00{5,6}-vms.tf).
 # Deploy HA DNS/DHCP stack to both servers
 - name: Deploy HA DNS/DHCP Stack (PowerDNS + Kea)
   ansible.builtin.import_playbook: individual/core/services/dns_ha_stack.yaml

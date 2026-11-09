@@ -66,6 +66,13 @@ write scripts (`cloudflare-harden.py`, `cloudflare-waf.py`,
 `cloudflare-pages-domain.sh`, `cf.sh dns-add`) are deleted; their settings
 live in terraform-root's `cloudflare-<zone>-config.tf`.
 
+Proxmox VMs are terraform-root's too (`lan/proxmox-node005-vms.tf`,
+`lan/proxmox-node006-vms.tf`, applied from the terraform-lan runners). The
+`qm clone` playbooks, `vm_multiqueue.yaml` and `ocean_cpu_host.yaml` are
+deleted; a new VM, or a CPU, memory, disk or NIC change, is a PR there, and a
+hand `qm set` shows up as lan drift. Homelab configures what runs inside a VM
+once it boots.
+
 The old GCP KMS playbook (`gcloud_sdk.yaml` with `tasks/gcloud.yaml` and
 `tasks/pki_gcloud_kms.yaml`) is deleted too. Its vars were defined nowhere, and
 the empty `homelab-sops-key` ring it left behind is modeled in terraform-root.
