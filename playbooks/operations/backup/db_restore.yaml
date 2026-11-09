@@ -65,11 +65,11 @@
       ansible.builtin.debug:
         var: restore_out.stdout_lines
 
-    - name: Fail unless some host holds the service's container
+    - name: Fail unless exactly one host holds the service's container
       ansible.builtin.assert:
         that: >-
           ansible_play_hosts | map('extract', hostvars, ['restore_out', 'stdout'])
-          | reject('search', 'skipped here') | list | length > 0
-        fail_msg: "No host in ocean:data01_workers has the container for {{ restore_service }}; nothing was restored."
+          | reject('search', 'skipped here') | list | length == 1
+        fail_msg: "{{ restore_service }} must live on exactly one of ocean:data01_workers; zero means nothing was restored, two means both copies were."
       run_once: true
       when: restore_service != 'all'

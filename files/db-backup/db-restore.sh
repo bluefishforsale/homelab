@@ -190,7 +190,7 @@ restore_one(){
   uri="gs://$GCS_BUCKET/$svc/$obj"
   log "=== $svc (engine=$engine) ==="
   # Restore runs on ocean and every data01 worker; only the host holding the container acts.
-  if [ "$MODE" != verify ] && ! docker inspect "$container" >/dev/null 2>&1; then
+  if [ "$MODE" != verify ] && ! docker inspect --type container "$container" >/dev/null 2>&1; then
     log "  $svc: container $container is not on $(hostname -s); skipped here"; return 0
   fi
   if [ "$MODE" != verify ]; then

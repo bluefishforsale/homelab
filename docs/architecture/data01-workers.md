@@ -77,7 +77,10 @@ name and ocean's nginx proxies to the worker.
 
 - **File-level backups of worker state.** Databases on a worker are backed up
   like ocean's: `db-backup.sh` runs on every `data01_workers` host and dumps the
-  containers running there. Everything else under a worker's `/data01/services`
+  Postgres and MySQL containers running there. Workers skip the SQLite set, so a
+  host still holding a moved service's old `.db` can't overwrite the live
+  backup; a SQLite service on a worker is not backed up. Everything else under
+  a worker's `/data01/services`
   (configs, caches, clones) has no copy back onto the pool, so a service whose
   non-DB state isn't rebuildable still doesn't belong on a worker.
 - **A host registry.** A service picks its host by sitting in `workers/` with
