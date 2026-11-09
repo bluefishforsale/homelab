@@ -436,3 +436,28 @@
     changed_when: true
     no_log: true
     tags: [config, plex]
+
+  # Credits and intro detection decode every new file on the CPU (-threads 15,
+  # no hardware decode), and with "asap" they ran around the clock behind the
+  # media churn: plex averaged 8 cores on ocean all day, 02:00 and 23:00 alike,
+  # for ~1.2 concurrent streams (2026-11-09). Scheduled runs them in the
+  # maintenance window, which now covers only the quietest hours on tautulli's
+  # play-duration-by-hour chart. Applies live; no restart.
+  - name: Keep Plex media analysis inside the overnight window
+    ansible.builtin.uri:
+      url: "https://localhost:{{ service_ports.plex.port }}/:/prefs?{{ want | urlencode }}"
+      method: PUT
+      validate_certs: false
+      headers:
+        X-Plex-Token: "{{ plex_api_key }}"
+    vars:
+      want:
+        GenerateCreditsMarkerBehavior: scheduled
+        GenerateIntroMarkerBehavior: scheduled
+        ButlerStartHour: "2"
+        ButlerEndHour: "8"
+      current: "{{ plex_prefs.json.MediaContainer.Setting | items2dict(key_name='id', value_name='value') }}"
+    when: want.keys() | map('extract', current) | map('string') | list != want.values() | list
+    changed_when: true
+    no_log: true
+    tags: [config, plex]
