@@ -57,6 +57,14 @@
     delegate_to: harbor
     register: harbor_marker
 
+  # Catches a tar the in-run delete on harbor's side never got to.
+  - name: Remove a leftover handoff once harbor has it
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop: ["{{ handoff }}", "{{ handoff_sum }}"]
+    when: harbor_marker.stat.exists
+
   # The ocean unit stays (disabled) until harbor is healthy, so a failed move
   # backs out with `systemctl start archmap` on ocean. The marker stops a rerun
   # from handing over again once harbor owns the state.
@@ -310,6 +318,22 @@
 
   # Only now that harbor answers; until here `systemctl start archmap` on ocean
   # was the backout.
+  - name: Read the ocean unit
+    ansible.builtin.stat:
+      path: /etc/systemd/system/archmap.service
+    delegate_to: ocean
+    register: ocean_unit_after
+
+  # Stopped first: a hand backout may have started it again, and deleting the
+  # unit alone leaves its unless-stopped containers running beside harbor's.
+  - name: Stop and disable archmap on ocean
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: stopped
+      enabled: false
+    delegate_to: ocean
+    when: ocean_unit_after.stat.exists
+
   - name: Remove the ocean unit
     ansible.builtin.file:
       path: /etc/systemd/system/archmap.service
