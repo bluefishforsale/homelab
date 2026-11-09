@@ -49,8 +49,9 @@ What terraform-root owns:
 What stays here, because it's host config or runtime operations rather than
 creating cloud resources:
 
-- Running `cloudflared` on each host and its locally-managed ingress config
-  (`vars/vars_cloudflared.yaml` -> `/etc/cloudflared/config.yaml`).
+- Running `cloudflared` on each host. Its rendered `/etc/cloudflared/config.yaml`
+  holds process settings only; every tunnel's ingress is remote config in
+  terraform-root (`cloudflare-tunnel-configs.tf`).
 - The DDNS timer rewriting `home.terrac.com`'s IP (terraform-root ignores that
   record's content on purpose), certbot's short-lived DNS-01 TXT records, and
   cache purges.

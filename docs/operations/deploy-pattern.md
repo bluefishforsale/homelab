@@ -82,9 +82,9 @@ Four files per new service:
    - `vars/vars_service_ports.yaml`: `<service>.port: 8xxx`
    - `files/nginx-compose/proxy_hostname_web_proxy.conf`: vhost
      `<service>.example.com` + `<service>.home` → `proxy_pass http://172.17.0.1:8xxx`
-   - `vars/vars_cloudflared.yaml`: ingress
-     `<service>.example.com` → `http://192.0.2.143:80`
-     (the tunnel's local routing; the DNS record itself is terraform-root's)
+   - terraform-root `cloudflare-tunnel-configs.tf`: ingress rule
+     `<service>.example.com` → `http://192.0.2.143:80`, alongside its CNAME
+     and Access app, merged and applied before the homelab change
 
 **Image refresh requirements (every docker-based service):**
 
@@ -236,7 +236,7 @@ homelab:
 [ ] Service runs as a compose project (bare `docker run` never gets a new image)
 [ ] vars/vars_service_ports.yaml — add <name>.port
 [ ] files/nginx-compose/proxy_hostname_web_proxy.conf — add vhost block
-[ ] vars/vars_cloudflared.yaml — add ingress entry
+[ ] terraform-root — ingress rule, CNAME, Access app (merged and applied first)
 [ ] .github/workflows/deploy-<name>.yml (clone deploy-my-ta-jose.yml)
 [ ] .github/workflows/deploy-ocean-service.yml — add to manual-dispatch enum
 [ ] Push homelab — main-apply runs the affected narrow set.

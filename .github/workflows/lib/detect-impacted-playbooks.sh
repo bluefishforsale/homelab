@@ -13,7 +13,7 @@
 # Rules (first match wins per input line):
 #   playbooks/individual/**/*.ya?ml      -> that playbook
 #   playbooks/0[0-9]_*.ya?ml, operations -> that orchestrator/playbook
-#   files/cloudflared/**, vars_cloudflared -> cloudflared playbook
+#   files/cloudflared/**               -> cloudflared playbook
 #   files/nginx-compose/**               -> nginx playbook
 #   files/<svc>/**                       -> playbook referencing files/<svc>, else
 #                                           the one declaring `service: <svc>`
@@ -302,8 +302,7 @@ while IFS= read -r path; do
   fi
 
   # Cloudflared
-  if [[ "$path" == files/cloudflared/* ]] \
-     || [[ "$path" == vars/vars_cloudflared.yaml ]]; then
+  if [[ "$path" == files/cloudflared/* ]]; then
     emit "$CLOUDFLARED_PB"
     continue
   fi

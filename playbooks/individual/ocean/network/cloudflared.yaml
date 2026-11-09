@@ -1,5 +1,7 @@
 ---
-# Runs cloudflared on every host and renders its local ingress config.
+# Runs cloudflared on every host. Tunnel ingress is remote config owned by
+# terraform-root (cloudflare-tunnel-configs.tf); the rendered config.yaml only
+# carries process settings.
 #
 # Every Cloudflare object this play used to create through the API (tunnels,
 # CNAMEs, Access apps and policies, rulesets, zone settings) is owned by
@@ -15,7 +17,6 @@
 
   vars_files:
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
-    - "{{ playbook_dir }}/../../../../vars/vars_cloudflared.yaml"
 
   vars:
     package: cloudflared

@@ -107,7 +107,7 @@ rerun as written: the runners play has since been excluded from push detection.
 
 - `vars/vars_web_services.yaml` service registry: absent.
 - Generated per-service nginx vhosts: `files/nginx-compose/proxy_hostname_web_proxy.conf` is still one hand-listed file (30 `server_name` lines).
-- Cloudflared ingress from a registry: `vars/vars_cloudflared.yaml` is still the hand list.
+- Cloudflared ingress from a registry: ingress is a hand list in terraform-root `cloudflare-tunnel-configs.tf`.
 - `tests/render_diff.sh` and `pr-render-check.yml`: absent (no `tests/` dir).
 - Vault password as a runner mount: absent; see Vault password.
 - Callable `deploy-service.yml`: absent. The only `workflow_call` is `health-check.yml`.

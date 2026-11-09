@@ -63,9 +63,9 @@ out=$(printf 'files/nginx-compose/proxy_hostname_web_proxy.conf\n' | bash "$SCRI
 assert_eq "nginx vhost" \
   '["playbooks/individual/ocean/network/nginx_compose.yaml"]' "$out"
 
-# 5. vars_cloudflared.yaml → cloudflared playbook
-out=$(printf 'vars/vars_cloudflared.yaml\n' | bash "$SCRIPT")
-assert_eq "vars_cloudflared" \
+# 5. cloudflared template → cloudflared playbook
+out=$(printf 'files/cloudflared/config.yaml.j2\n' | bash "$SCRIPT")
+assert_eq "cloudflared template" \
   '["playbooks/individual/ocean/network/cloudflared.yaml"]' "$out"
 
 # 6. inventories → fallback. Pinned to a missing base, because the real HEAD~1

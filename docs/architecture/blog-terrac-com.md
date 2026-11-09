@@ -14,7 +14,7 @@ here. This doc covers only what is specific to the blog.
 | `.github/workflows/deploy-blog-terrac-com.yml` | runner | `repository_dispatch: deploy-blog-terrac-com` (branch from `client_payload.branch`, default `main`) or `workflow_dispatch`. Runs the playbook with `-e git_branch=...`, then an SSH check that `repo/public/index.html` exists. `deploy-ocean` group. |
 | `ocean/services/blog_terrac_com_static.yaml` | ocean | Deletes and re-clones the repo into `/data01/services/blog_terrac_com/repo` as `terrac`, warns if `public/index.html` is missing, then purges the Cloudflare edge cache for `blog.terrac.com`. |
 | `ocean/network/nginx_compose.yaml` | ocean | Owns the vhost in `files/nginx-compose/proxy_hostname_web_proxy.conf` and the `:ro` mount of `/data01/services/blog_terrac_com` in `files/nginx-compose/docker-compose.yml.j2`. |
-| `ocean/network/cloudflared.yaml` | ocean | Tunnel ingress from `vars/vars_cloudflared.yaml`: `blog.terrac.com` to `http://192.168.1.143:80`. Its Access app in terraform-root uses the bypass policy, so no Access gate. |
+| `ocean/network/cloudflared.yaml` | ocean | Runs the tunnel; its ingress (`blog.terrac.com` to `http://192.168.1.143:80`) is remote config in terraform-root. Its Access app in terraform-root uses the bypass policy, so no Access gate. |
 
 ## Serving path
 
@@ -77,6 +77,6 @@ cloudflared being down.
 
 The site is a git checkout: revert or force a commit in `blog_terrac_com` and
 re-dispatch, or run the workflow with `git_branch` set to a known-good branch.
-To take it offline, drop the `blog.terrac.com` ingress from
-`vars/vars_cloudflared.yaml` and redeploy cloudflared. No state, no database;
+To take it offline, drop the `blog.terrac.com` ingress rule in
+terraform-root's `cloudflare-tunnel-configs.tf` and merge; no homelab deploy. No state, no database;
 deleting `/data01/services/blog_terrac_com/repo` loses nothing the repo lacks.
