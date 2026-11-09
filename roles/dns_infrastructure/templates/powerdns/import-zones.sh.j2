@@ -150,9 +150,6 @@ add_record "home." "uap-ac-pro-home-1" A "192.168.1.243"
 add_record "home." "uap-ac-pro-home-2" A "192.168.1.244"
 add_record "home." "uap-ac-pro-garage-1" A "192.168.1.245"
 
-# Wildcard — resolves undefined *.home to ocean nginx
-add_record "home." "*" A "192.168.1.143"
-
 # TSIG key for DDNS updates and AXFR transfers
 $PDNSUTIL import-tsig-key ddns-key hmac-sha256 '{{ infrastructure.dns_stack.tsig_key }}' 2>/dev/null || true
 $PDNSUTIL set-meta home. TSIG-ALLOW-DNSUPDATE ddns-key
