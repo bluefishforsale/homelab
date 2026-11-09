@@ -31,6 +31,12 @@ github_runner_labels:
 # Number of concurrent runner containers to maintain
 github_runner_count: 4
 
+# Names for a second runner set on the same host (terraform_root_runners.yaml).
+# Containers are <prefix>-N and GitHub shows <hostname>-<suffix>-N. A set
+# sharing the defaults with another would fight over container names.
+github_runner_container_prefix: "github-runner"
+github_runner_name_suffix: "runner"
+
 # Runner Docker image
 # Using myoung34/github-runner - popular community image with excellent ephemeral support
 # Well-documented environment variables and Docker/Ansible capabilities

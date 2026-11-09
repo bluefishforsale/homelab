@@ -1,0 +1,34 @@
+---
+# Ephemeral runners for bluefishforsale/terraform-root's LAN root (lan/:
+# Proxmox and UniFi), which GitHub-hosted runners can't reach.
+#
+# A separate compose project and systemd unit from github_docker_runners.yaml,
+# so applying this never restarts the homelab runners main-apply runs on, and
+# main-apply can deploy it like any other playbook. Nothing from the homelab
+# runners is mounted: no docker socket, no SSH keys, no cloudflared. These
+# jobs only talk to the Proxmox and UniFi APIs and GCP (state, over WIF).
+- name: Configure terraform-root ephemeral runners
+  hosts: github_runners
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../../../vault/secrets.yaml
+
+  vars:
+    github_pat_token: "{{ development.github.token }}"
+    github_scope: "repo"
+    github_repo: "bluefishforsale/terraform-root"
+    github_runner_count: 2
+    github_runner_labels:
+      - self-hosted
+      - terraform-lan
+    github_runner_container_prefix: "terraform-root-runner"
+    github_runner_name_suffix: "terraform-root"
+    github_runners_base_dir: "/opt/github-runners-terraform-root"
+    github_runners_service_name: "github-runners-terraform-root"
+    github_runner_mount_docker_socket: false
+    github_runner_mount_cloudflared: false
+    github_runner_ssh_key_dir: ""
+
+  roles:
+    - github_docker_runners
