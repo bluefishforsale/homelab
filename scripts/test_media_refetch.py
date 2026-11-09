@@ -236,6 +236,35 @@ def test_pack_too_small_to_hold_the_season_is_not_grabbed():
     assert BEST_TV_RELEASE(item)["title"].endswith("-OTHER")
 
 
+def test_hevc_pack_loses_to_one_the_flow_can_encode():
+    # Charmed S04 refetched as Charmed.1998.S04.x265-iVy on 2026-11-09: tdarr only
+    # copies an HEVC source's video, so it kept iVy's ~1 GB an episode where a
+    # remux through NVENC came out near 0.5 GB.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/releaseprofile":
+                return []
+            if path == "/api/v3/series/1":
+                return {"title": "Charmed"}
+            return [{"title": t, "seriesTitle": "Charmed", "size": 20e9, "fullSeason": True, "downloadAllowed": True,
+                     "rejections": [EXISTING], "releaseWeight": w}
+                    for w, t in enumerate(["Charmed.1998.S04.1080p.BluRay.10bit.EAC3.2.0.x265-iVy",
+                                           "Charmed.S04.1080p.BluRay.HEVC.DTS-HD.MA.2.0-OTHER",
+                                           "Charmed.S04.1080p.BluRay.REMUX.AVC.FLAC.2.0-EPSiLON"])]
+    refetch.mc = Fake()
+    item = {"pack": True, "series_id": 1, "season": 4, "episode_ids": list(range(22))}
+    assert BEST_TV_RELEASE(item)["title"].endswith("-EPSiLON")
+
+
+def test_hevc_release_is_still_taken_when_it_is_the_only_one():
+    refetch.mc = fake_movie_search(2004, ["Film.2004.1080p.BluRay.x265-iVy"])
+    assert BEST_RELEASE(1)
+
+
+def test_hevc_movie_release_loses_to_one_the_flow_can_encode():
+    refetch.mc = fake_movie_search(2004, ["Film.2004.1080p.BluRay.H.265-A", "Film.2004.1080p.BluRay.x264-B"])
+    assert BEST_RELEASE(1)["title"].endswith("x264-B")
+
 
 def test_anime_season_search_gets_time_for_every_episode():
     # Sonarr runs an anime season search as the pack query plus one search per
