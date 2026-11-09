@@ -1,0 +1,54 @@
+# Radarr and its exporter, one compose project so docker-refresh@radarr keeps
+# both images current.
+services:
+  radarr:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID={{ uid }}
+      - PGID={{ gid }}
+    extra_hosts:
+      - "home.terrac.com:{{ ansible_default_ipv4.address }}"
+    ports:
+      - "{{ radarr_port }}:7878"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - {{ home }}:/config
+      - {{ incoming }}/movies:/downloads
+      - {{ complete }}/movies:/movies
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7878/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    # No mem_limit: it holds over 2 GiB with the library loaded, and an OOM kill
+    # mid-import is worse than the memory.
+    cpus: '4.0'
+
+  radarr-exporter:
+    image: {{ exporter_image }}:{{ exporter_version }}
+    container_name: {{ exporter_service }}
+    hostname: {{ exporter_service }}
+    restart: unless-stopped
+    command: ["radarr"]
+    environment:
+      - TZ=America/Los_Angeles
+      - URL=http://{{ service }}:7878
+      - API_KEY={{ media_services.radarr.api_key }}
+      - PORT={{ exporter_port }}
+      - ENABLE_ADDITIONAL_METRICS=true
+    ports:
+      - "{{ exporter_port }}:{{ exporter_port }}"
+    # No healthcheck: the image has no shell. up{job="radarr-exporter"} covers it.
+    depends_on:
+      - radarr
+    security_opt:
+      - no-new-privileges:true
+    cpus: '0.5'
+    mem_limit: 256m
