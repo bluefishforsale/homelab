@@ -449,6 +449,28 @@ def test_season_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
     assert {"name": "RescanSeries", "seriesId": 1} in posted, posted
 
 
+def test_hdr_source_encoded_to_untagged_sdr_is_refetched():
+    # Squid Game S01E02: tdarr's encode dropped the PQ tags, so ffprobe sees a
+    # plain 10-bit file and it plays washed out on an SDR screen. Only Sonarr's
+    # media info, read before the encode, still says HDR10.
+    path = "/media/tv/Squid Game/Season 1/Squid Game - S01E02 - Hell WEBDL-1080p.mkv"
+    row = {"file": path, "library": "tv", "bucket": "ok", "reasons": []}
+    [out] = refetch.with_stripped_hdr([row], {path})
+    assert out["bucket"] == "refetch" and "hdr-stripped" in out["reasons"], out
+
+
+def test_arr_hdr_paths_are_the_tdarr_paths_of_files_recorded_as_hdr():
+    movies = [{"path": "/movies/Ballerina (2025)", "movieFile": {"relativePath": "Ballerina.mkv",
+                                                                  "mediaInfo": {"videoDynamicRangeType": "PQ"}}},
+              {"path": "/movies/Heat (1995)", "movieFile": {"relativePath": "Heat.mkv",
+                                                             "mediaInfo": {"videoDynamicRangeType": ""}}},
+              {"path": "/movies/Unreleased (2027)"}]
+    episodes = [{"path": "/tv/Ozark/Season 4/Ozark - S04E01.mkv", "mediaInfo": {"videoDynamicRangeType": "HDR10"}},
+                {"path": "/tv/Ozark/Season 1/Ozark - S01E01.mkv", "mediaInfo": {}}]
+    assert refetch.arr_hdr_paths(movies, episodes) == {
+        "/media/movies/Ballerina (2025)/Ballerina.mkv", "/media/tv/Ozark/Season 4/Ozark - S04E01.mkv"}
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
