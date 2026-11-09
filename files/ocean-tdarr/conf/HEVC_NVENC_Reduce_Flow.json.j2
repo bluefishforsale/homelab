@@ -1,7 +1,7 @@
 {
   "_id": "MinimalHEVC",
   "name": "HEVC NVenc - Minimal Single-Plugin",
-  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); HEVC encode for non-HEVC video: hevc_nvenc on an NVENC GPU worker, libx265 CRF 23 on a CPU worker (harbor), hevc_qsv ICQ 20 on a QSV worker (tautog); all three calibrated to about the same bitrate (~1.2 Mbps on a 1080p TV clip)",
+  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); movie video copied untouched (movies over 12 GB skipped whole); HEVC encode for non-HEVC TV video: hevc_nvenc CQ 30 on an NVENC GPU worker (CUDA decode on ocean), libx265 CRF 23 on a CPU worker (harbor), hevc_qsv ICQ 20 on a QSV worker (tautog); all three calibrated to about the same bitrate (~1.2 Mbps on a 1080p TV clip)",
   "tags": "",
   "flowPlugins": [
     {
@@ -86,6 +86,21 @@
       }
     },
     {
+      "name": "Keep Movie Video",
+      "sourceRepo": "Community",
+      "pluginName": "customFunction",
+      "version": "1.0.0",
+      "inputsDB": {
+        "code": "// Movies keep the release's video untouched: any re-encode here costs film grain\n// and, at 8 bits, bands dark gradients (Dune), and the TV bitrate target\n// (~1.2 Mbps) is far too low for film. Movie quality is picked at grab time by\n// Radarr's TRaSH profile instead.\n// NOTE: the audio-only branch writes a full copy of the file into the node's\n// cache, and gaming's is a 40G tmpfs shared by 5 workers. A remux there fails\n// every job beside it with ENOSPC (Batman 1989, 11-08), so big movies are left\n// alone entirely, lossless audio and all.\nconst MAX_COPY_MB = 12 * 1024;\nmodule.exports = async (args) => {\n  const f = args.inputFileObj;\n  if (!f._id.startsWith('/media/movies/')) return { outputFileObj: f, outputNumber: 2, variables: args.variables };\n  const big = (f.file_size || 0) > MAX_COPY_MB;\n  args.jobLog(big ? `movie: ${Math.round(f.file_size)} MB, left untouched` : 'movie: video copied untouched');\n  return { outputFileObj: f, outputNumber: big ? 3 : 1, variables: args.variables };\n};\n"
+      },
+      "fpEnabled": true,
+      "id": "keepMovieVideo",
+      "position": {
+        "x": 500,
+        "y": 0
+      }
+    },
+    {
       "name": "Route Encoder By Worker",
       "sourceRepo": "Community",
       "pluginName": "customFunction",
@@ -152,7 +167,7 @@
       "version": "1.0.0",
       "inputsDB": {
         "inputArguments": "-hwaccel cuda",
-        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 30 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeNvencCuda",
@@ -349,9 +364,30 @@
     {
       "source": "audioPolicy",
       "sourceHandle": "1",
-      "target": "checkCodec",
+      "target": "keepMovieVideo",
       "targetHandle": null,
       "id": "e3"
+    },
+    {
+      "source": "keepMovieVideo",
+      "sourceHandle": "1",
+      "target": "setContainerAudio",
+      "targetHandle": null,
+      "id": "eMovieCopy"
+    },
+    {
+      "source": "keepMovieVideo",
+      "sourceHandle": "2",
+      "target": "checkCodec",
+      "targetHandle": null,
+      "id": "eMovieTv"
+    },
+    {
+      "source": "keepMovieVideo",
+      "sourceHandle": "3",
+      "target": "skipped4kHdr",
+      "targetHandle": null,
+      "id": "eMovieBig"
     },
     {
       "source": "checkCodec",
