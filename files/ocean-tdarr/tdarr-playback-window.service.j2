@@ -1,0 +1,8 @@
+[Unit]
+Description=Pause tdarr nodes {{ tdarr_pause_start_hour }}:00-{{ tdarr_pause_end_hour }}:00, resume outside it
+After=tdarr.service
+Wants=tdarr.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tdarr-playback-window.sh

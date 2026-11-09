@@ -1,0 +1,9 @@
+[Unit]
+Description=tdarr playback window boundaries
+
+[Timer]
+OnCalendar=*-*-* {{ tdarr_pause_start_hour }},{{ tdarr_pause_end_hour }}:00:05 America/Los_Angeles
+Persistent=true
+
+[Install]
+WantedBy=timers.target

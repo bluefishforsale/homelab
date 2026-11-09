@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Keep every tdarr node paused through the evening playback peak, so plex
+# and jellyfin have ocean's cores and the GPU when most people are watching.
+# Tautulli's 30-day play-duration-by-hour peaks 17:00-21:00 Pacific.
+#
+# The state comes from the clock, not from which timer fired, so a run that
+# systemd catches up at boot (Persistent=true) still lands on the right state.
+# Pausing stops a node taking new files; whatever it is already encoding
+# finishes.
+set -euo pipefail
+
+SERVER="http://localhost:{{ tdarr_port_web }}"
+START={{ tdarr_pause_start_hour }}
+END={{ tdarr_pause_end_hour }}
+
+hour=$((10#$(date +%H)))
+want=false
+(( hour >= START && hour < END )) && want=true
+
+curl -fsS -m 30 "$SERVER/api/v2/get-nodes" \
+  | jq -r --argjson want "$want" 'to_entries[] | select(.value.nodePaused != $want) | "\(.key) \(.value.nodeName)"' \
+  | while read -r id name; do
+      curl -fsS -m 30 -X POST -H 'Content-Type: application/json' "$SERVER/api/v2/update-node" \
+        -d "$(jq -cn --arg id "$id" --argjson p "$want" '{data:{nodeID:$id,nodeUpdates:{nodePaused:$p}}}')" >/dev/null
+      echo "$name paused=$want"
+    done

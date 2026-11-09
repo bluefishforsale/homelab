@@ -27,6 +27,10 @@
     # 3 GPU transcodes plus their CPU-side decode and loudnorm pushed ocean to
     # load 54 on 2026-10-19.
     tdarr_transcode_gpu_workers: 2
+    # Every node pauses for the evening playback peak (tautulli, 30 days of
+    # play duration by hour), Pacific time.
+    tdarr_pause_start_hour: 17
+    tdarr_pause_end_hour: 21
     repo: "bluefishforsale_tdarr_plugins"
     # SSH, not anonymous HTTPS: the plugins repo is private, so an unauthenticated
     # HTTPS clone prompts for a username and fails on ocean ("could not read
@@ -245,6 +249,36 @@
           workerType: transcodegpu
     loop: "{{ range(delta | int | abs) | list }}"
     changed_when: true
+
+  - name: Install the playback-window pause script
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/tdarr-playback-window.sh.j2"
+      dest: /usr/local/bin/tdarr-playback-window.sh
+      mode: '0755'
+
+  - name: Install the playback-window unit and timer
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    loop:
+      - tdarr-playback-window.service
+      - tdarr-playback-window.timer
+    register: tdarr_window_units
+
+  - name: Enable the playback-window timer
+    ansible.builtin.systemd:
+      name: tdarr-playback-window.timer
+      enabled: true
+      state: started
+      daemon_reload: "{{ tdarr_window_units is changed }}"
+
+  # Run once now, so a deploy inside the window pauses the nodes immediately
+  # instead of waiting for the next boundary.
+  - name: Apply the playback window for the current hour
+    ansible.builtin.systemd:
+      name: tdarr-playback-window.service
+      state: started
 
   handlers:
   - name: Reload systemd daemon
