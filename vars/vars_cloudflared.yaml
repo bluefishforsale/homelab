@@ -6,6 +6,15 @@
 # CNAME and Access app in bluefishforsale/terraform-root, merged and applied
 # before this ships. Cloud objects are created there, not by Ansible.
 cloudflared:
+  # Hosts whose tunnel ingress lives in terraform-root
+  # (cloudflare-tunnel-configs.tf, source = "cloudflare"). Their rendered
+  # config.yaml keeps only process settings, no ingress, so there's one source
+  # of truth. Add a host only after terraform-root has flipped its tunnel and
+  # applied; the template change restarts cloudflared, which is what loads the
+  # remote config.
+  remote_managed_hosts:
+    - llmeval
+
   # touched to retest cloudflared.yaml from CI with cloudflared now in the runner container
   tunnels:
     # Main tunnel for ocean - handles all web apps + ocean SSH

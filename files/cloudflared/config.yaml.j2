@@ -6,6 +6,7 @@ credentials-file: "{{ cred_file }}"
 # Force IPv4-only connections to Cloudflare Edge
 edge-ip-version: "4"
 
+{% if inventory_hostname not in cloudflared.remote_managed_hosts | default([]) %}
 ingress:
 {% for rule in cloudflared.tunnels[tunnel_name].ingress %}
 - hostname: "{{ rule.hostname }}"
@@ -28,3 +29,6 @@ ingress:
 {% endif %}
 {% endif %}
 {% endfor %}
+{% else %}
+# Ingress for this tunnel is managed in bluefishforsale/terraform-root.
+{% endif %}
