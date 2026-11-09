@@ -1,4 +1,14 @@
 ---
+# Runs cloudflared on every host and renders its local ingress config. That part
+# stays here.
+#
+# LEGACY: the Cloudflare API calls below (tunnel create / route dns, CNAMEs,
+# Access apps and policies, rulesets, zone settings) predate terraform-root, which
+# now owns all of those objects. They're create-only and tolerate "already
+# exists", so once terraform-root has created a hostname's records they're
+# no-ops. Don't add new API calls here; add the resource in
+# bluefishforsale/terraform-root and merge it before this runs. See agents.md,
+# "Cloud infrastructure lives in terraform-root".
 - name: Configure systemd service for cloudflared
   become: true
   gather_facts: true
@@ -232,6 +242,9 @@
       - inventory_hostname != 'ocean'
 
   # Define which services should be public (everyone else is private)
+  # NOTE: these lists pick the Access policy this play PUTs onto each app. They
+  # must agree with the policy on the app in terraform-root, or this play and
+  # Terraform fight over it on every run.
   - name: Define public services list
     ansible.builtin.set_fact:
       public_services: ["overseerr"]
