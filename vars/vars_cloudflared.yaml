@@ -19,6 +19,7 @@ cloudflared:
     - netboot01
     - node005
     - node006
+    - pihole
     - registry-cache-01
 
   # touched to retest cloudflared.yaml from CI with cloudflared now in the runner container
