@@ -16,6 +16,7 @@ cloudflared:
     - agentbox
     - dns01
     - dns02
+    - gh-runner-01
     - harbor
     - llmeval
     - netboot01
