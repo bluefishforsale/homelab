@@ -2,11 +2,16 @@
 """Print the email of everyone the Plex server is shared with, owner first.
 
 The vault's `cloudflare.access_allow_emails.plex-users` list is meant to be exactly
-these people (it seeds the "Allow plex users" Access policy), and it drifts every time
-someone is invited in the Plex UI. One email per line, so it pipes straight into the vault:
+these people, and it drifts every time someone is invited in the Plex UI. One email per
+line, so it pipes straight into the vault:
 
   scripts/plex-shared-users.py                  # print, e.g. to address a mail to everyone
   scripts/plex-shared-users.py | scripts/vault.py replace-list cloudflare.access_allow_emails.plex-users
+
+The vault alone changes nobody's access. terraform-root applies the "Allow plex users"
+Access policy from its repo secret TF_VAR_ACCESS_PLEX_USER_EMAILS, so after the vault
+edit merges, reset that secret from the vault and apply terraform-root (the command is
+in terraform-root's agents.md, "Where the Access (tunnel) user emails live").
 
 The plex.tv account token comes from the vault (media_services.plex.api_key), or
 PLEX_TV_TOKEN wins if set.
@@ -29,8 +34,9 @@ def plex_tv(path, token):
         return r.read()
 
 
-# NOTE: cloudflared.yaml splices each email into JSON by string templating, so a
-# quote, backslash, brace or space would let one entry rewrite the Access rule.
+# NOTE: these emails become an Access allow rule. A quote, backslash, brace or space
+# in one has no business there and would survive into the secret and the HCL, so
+# refuse the whole list rather than pass it on.
 EMAIL = re.compile(r"[^\s\"\\{}@]+@[^\s\"\\{}@]+\.[^\s\"\\{}@]+")
 
 
