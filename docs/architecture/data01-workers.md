@@ -15,7 +15,7 @@ except its VM play and NZBGet.
 
 | Playbook | Host | What it owns |
 |---|---|---|
-| `infrastructure/create_harbor_vm.yaml` | node005 | VM 6000 at 192.168.1.32: CPU `host`, 24 cores (`cpuunits` 200), 32 GiB, `virtio-scsi-single` with an iothread per disk. scsi0 OS (~64G), scsi1 200G state disk on `vmpool-storage`, scsi2 the passed-through 870 EVO 2TB (`wwn-0x5002538f54b047b7`) as NZBGet scratch. Disk and CPU changes only apply to a stopped VM. |
+| terraform-root `lan/proxmox-node005-vms.tf` (`harbor`) | node005 | VM 6000 at 192.168.1.32: CPU `host`, 24 cores (`cpuunits` 200), 32 GiB, `virtio-scsi-single` with an iothread per disk. scsi0 OS (~64G), scsi1 200G state disk on `vmpool-storage`, scsi2 the passed-through 870 EVO 2TB (`wwn-0x5002538f54b047b7`) as NZBGet scratch. Disk and CPU changes only apply to a stopped VM. |
 | `ocean/nfs_export_data01.yaml` | ocean | NFSv4.2 only (`vers3=n`). One export of all of `/data01` to each worker's IP: `rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1`, no `crossmnt`. Netboot hosts get `/data01/complete` only, `all_squash` to media, `subtree_check`. Refuses an empty client list. Never touches ZFS or restarts anything but nfs-server. |
 | `infrastructure/data01_worker.yaml` | ocean, then workers (`serial: 1`) | Asserts ids match ocean, formats the state disk if blank, migrates existing state onto it on first mount, mounts NFS at `/data01` and the state disk over `/data01/services`, installs the docker guards and a retry timer. |
 | `workers/tdarr_node.yaml` | `data01_workers` | CPU tdarr node joined to ocean's tdarr server. |

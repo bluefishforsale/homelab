@@ -71,7 +71,7 @@ See [`deployment-flow.md`](./deployment-flow.md).
 - 30 cores, 256GB RAM
 - ZFS storage (data01 - 8x 12TB raidz2)
 - RTX 3090 GPU passthrough
-- CPU type `host` (VMID 5000): `kvm64` lacks x86-v2 (SSE4.2, POPCNT), which NumPy 2.x needs. `playbooks/individual/infrastructure/ocean_cpu_host.yaml` is the one-shot that switched it (shutdown, `qm set --cpu host`, start); it restarts ocean, so never run it casually.
+- CPU type `host` (VMID 5000): `kvm64` lacks x86-v2 (SSE4.2, POPCNT), which NumPy 2.x needs. The VM definition, CPU type included, is terraform-root's `lan/proxmox-node006-vms.tf`. A CPU change only takes effect after a full stop and start of ocean, so plan it like an outage.
 - Docker services via systemd
 
 ### Services

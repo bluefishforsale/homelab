@@ -21,9 +21,9 @@
 #     filename order, and survives cloud-init regenerating that file on boot.
 #   - hand-written /etc/resolv.conf (node005, node006): write it directly.
 #
-# NOTE: the VM creation playbooks still pass a single `--nameserver
-# 192.168.1.2` to cloud-init (create_agentbox_vm.yaml, create_runner_vm.yaml,
-# create_registry_cache_vm.yaml), so a rebuilt VM comes back with one resolver
+# NOTE: the VMs' cloud-init still carries a single nameserver (192.168.1.2 or
+# .3, in terraform-root's lan/proxmox-node00{5,6}-vms.tf), so a rebuilt VM
+# comes back with one resolver
 # until this play runs against it again. Fixing that default is deliberately
 # not bundled here: those playbooks create VMs, and editing one puts it in the
 # auto-apply set.

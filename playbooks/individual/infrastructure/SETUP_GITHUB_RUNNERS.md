@@ -75,11 +75,8 @@ rm vault/secrets_plain.yaml
 
 Create the Proxmox VM that will host the runner containers:
 
-```bash
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/infrastructure/create_runner_vm.yaml \
-  --ask-vault-pass
-```
+The VM (gh-runner-01, vmid 5000 on node005) is defined in terraform-root's
+`lan/proxmox-node005-vms.tf`; a new runner VM is a resource there.
 
 **Creates:**
 
