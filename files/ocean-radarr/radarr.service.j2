@@ -1,36 +1,22 @@
 [Unit]
 Description={{ service }}
-After=docker.service zfs-mount.service zfs-import.target
+After=docker.service zfs-mount.service zfs-import.target network-online.target
 Requires=docker.service zfs-mount.service zfs-import.target
+Wants=network-online.target
 RequiresMountsFor=/data01
 
 [Service]
-Type=simple
+# Compose project so the refresh timer sees it; crash recovery is the container's
+# own `restart: unless-stopped`, since Restart= is not valid on a oneshot.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ compose_dir }}
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
-Restart=always
-RestartSec=120s
-TimeoutStartSec=300s
-User={{ user }}
-Group={{ user }}
-ExecStartPre=-docker rm -f {{ service }}
-ExecStartPre=-docker images --filter reference={{ image }}:{{ version }} -q | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull {{ image }}:{{ version }}
-ExecStart=docker run --rm \
-    --name={{ service }} \
-    --hostname={{ service }} \
-    --add-host=home.terrac.com:{{ ansible_default_ipv4.address }} \
-    --cpus=4 \
-    -e TZ="America/Los_Angeles" \
-    -e PUID={{ system_users.media.uid }} -e PGID={{ system_users.media.gid }} \
-    -v /etc/localtime:/etc/localtime:ro \
-    -p {{ radarr_port }}:7878 \
-    -v {{ home }}:/config \
-    -v {{ incoming }}/movies:/downloads \
-    -v {{ complete }}/movies:/movies \
-  {{ image }}:{{ version }}
-ExecStop=docker rm -f %N
+ExecStart=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml down --timeout 30
+TimeoutStartSec=300
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target
