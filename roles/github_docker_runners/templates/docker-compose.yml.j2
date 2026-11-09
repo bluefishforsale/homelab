@@ -18,7 +18,7 @@ services:
 {% for runner_index in range(1, github_runner_count + 1) %}
   runner_{{ runner_index }}:
     image: {{ github_runner_image }}:{{ github_runner_version }}
-    container_name: github-runner-{{ runner_index }}
+    container_name: {{ github_runner_container_prefix }}-{{ runner_index }}
     
     # CRITICAL: restart: always ensures the container restarts after each job
     # This is what makes ephemeral runners work:
@@ -48,7 +48,7 @@ services:
       ACCESS_TOKEN: "${GITHUB_TOKEN}"
       
       # Runner name - unique per container
-      RUNNER_NAME: "{{ ansible_hostname }}-runner-{{ runner_index }}"
+      RUNNER_NAME: "{{ ansible_hostname }}-{{ github_runner_name_suffix }}-{{ runner_index }}"
       
       # Runner labels - determines which workflows can use this runner
       # Workflows target runners using: runs-on: [self-hosted, homelab, ...]
@@ -64,6 +64,11 @@ services:
       EPHEMERAL: "false"
 {% endif %}
       DISABLE_AUTO_UPDATE: "true"
+{% if github_runner_unset_config_vars %}
+      # Unset ACCESS_TOKEN and friends once registered, so job steps can't read
+      # the PAT out of the environment.
+      UNSET_CONFIG_VARS: "true"
+{% endif %}
       
       # Runner scope (for organization-level runners)
 {% if github_scope == 'org' %}
@@ -79,8 +84,10 @@ services:
       ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE: "/action-archive-cache"
 
     volumes:
+{% if github_runner_mount_token_file %}
       # GitHub token file (shared by all runners, read-only)
       - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro
+{% endif %}
       
       # Runner working directory on host
       # Each runner gets its own directory to avoid conflicts
@@ -134,7 +141,7 @@ services:
     logging:
       driver: "journald"
       options:
-        tag: "github-runner-{{ runner_index }}"
+        tag: "{{ github_runner_container_prefix }}-{{ runner_index }}"
         labels: "runner_name,runner_index"
     
     # Network mode
