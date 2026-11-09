@@ -3,8 +3,9 @@
   # inside a container on gh-runner-01 (group github_runners). Restarting docker
   # there kills the running job. Runner-host docker changes are applied manually.
   hosts: 'all:!github_runners'
-  # Roll one host at a time: the daemon.json handler restarts dockerd, which
-  # bounces every container on the host. Never bounce the whole fleet at once.
+  # Roll one host at a time. The handler only reloads dockerd now (SIGHUP, no
+  # container touched), but a package upgrade in this play still restarts it,
+  # so never let that hit the whole fleet at once.
   serial: 1
   max_fail_percentage: 0
   become: yes
@@ -129,7 +130,7 @@
       owner: root
       group: root
       mode: '0644'
-    notify: restart docker
+    notify: reload docker
 
   - name: Ensure docker service override directory exists
     ansible.builtin.file:
@@ -149,7 +150,7 @@
       owner: root
       group: root
       mode: '0644'
-    notify: restart docker
+    notify: reload docker
 
   - name: Create Docker cleanup script
     ansible.builtin.copy:
@@ -323,7 +324,7 @@
       ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
       register: nvidia_runtime_config
       changed_when: nvidia_runtime_config.rc == 0
-      notify: restart docker
+      notify: reload docker
 
     - name: Verify NVIDIA Container Toolkit installation
       ansible.builtin.command: nvidia-ctk --version
@@ -422,8 +423,15 @@
 
 
   handlers:
-  - name: restart docker
+  # NOTE: reload, not restart. dockerd rereads registry-mirrors,
+  # insecure-registries, live-restore and runtimes on SIGHUP, which is every key
+  # this play changes in practice, and a restart is what used to bounce
+  # containers fleet-wide. Keys dockerd cannot reload (storage-driver,
+  # data-root, log-driver, log-opts) land on the file and take effect at the
+  # next real dockerd restart, so changing one of those needs a planned restart
+  # of its own, not this handler.
+  - name: reload docker
     ansible.builtin.systemd:
-      daemon_reload: yes
+      daemon_reload: true
       name: docker
-      state: restarted
+      state: reloaded

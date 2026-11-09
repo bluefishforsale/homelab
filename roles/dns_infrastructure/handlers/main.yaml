@@ -5,6 +5,13 @@
   ansible.builtin.systemd:
     daemon_reload: true
 
+# SIGHUP, so DNS containers keep running: see the handler NOTE in
+# playbooks/individual/infrastructure/docker_ce.yaml.
+- name: Reload docker
+  ansible.builtin.systemd:
+    name: docker
+    state: reloaded
+
 # NOTE: this stops the WHOLE stack. The unit's ExecStop is `docker compose
 # down`, so a restart removes powerdns, dnsdist, pdns-recursor and kea, not just
 # the thing that changed, and the play runs against both dns servers. Reach for

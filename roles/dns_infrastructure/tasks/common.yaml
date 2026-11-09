@@ -70,14 +70,18 @@
     state: directory
     mode: '0755'
 
+# The fleet template, not a dns-only file. The old one held only log-driver and
+# overwrote what docker_ce.yaml wrote, so the mirror and live-restore that
+# dockerd was running with existed only in memory and would have vanished on
+# the next dockerd restart.
 - name: Configure Docker daemon
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: "{{ role_path }}/../../files/docker/daemon.json.j2"
     dest: /etc/docker/daemon.json
-    content: |
-      {
-        "log-driver": "journald"
-      }
+    owner: root
+    group: root
     mode: '0644'
+  notify: Reload docker
 
 - name: Enable and start Docker
   ansible.builtin.systemd:

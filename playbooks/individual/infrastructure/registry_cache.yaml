@@ -98,7 +98,7 @@
         owner: root
         group: root
         mode: '0644'
-      notify: Restart docker
+      notify: Reload docker
 
     - name: Ensure Docker service is started and enabled
       ansible.builtin.systemd:
@@ -302,8 +302,9 @@
         name: registry-cache.service
         state: restarted
 
-    - name: Restart docker
+    # Reload, not restart: see the handler NOTE in docker_ce.yaml.
+    - name: Reload docker
       ansible.builtin.systemd:
         name: docker
-        state: restarted
-        daemon_reload: yes
+        state: reloaded
+        daemon_reload: true
