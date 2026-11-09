@@ -182,7 +182,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "topk(5,(rate(namedprocess_namegroup_cpu_user_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[$interval]) \n+\nrate(namedprocess_namegroup_cpu_system_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[$interval]))\nor \n(irate(namedprocess_namegroup_cpu_user_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[5m])\n+\nirate(namedprocess_namegroup_cpu_system_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[5m])))",
+          "expr": "topk(5,\nsum without (mode) (rate(namedprocess_namegroup_cpu_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[$interval]))\nor\nsum without (mode) (irate(namedprocess_namegroup_cpu_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[5m])))",
           "format": "time_series",
           "interval": "$interval",
           "intervalFactor": 1,
@@ -280,7 +280,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "topk(5,\nrate(namedprocess_namegroup_cpu_system_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[$interval])\nor \n(\nirate(namedprocess_namegroup_cpu_system_seconds_total{groupname=~\"$processes\",instance=~\"$host\"}[5m])))",
+          "expr": "topk(5,\nrate(namedprocess_namegroup_cpu_seconds_total{mode=\"system\",groupname=~\"$processes\",instance=~\"$host\"}[$interval])\nor\nirate(namedprocess_namegroup_cpu_seconds_total{mode=\"system\",groupname=~\"$processes\",instance=~\"$host\"}[5m]))",
           "format": "time_series",
           "interval": "$interval",
           "intervalFactor": 1,
@@ -2357,7 +2357,7 @@
         "multi": true,
         "name": "processes",
         "options": [],
-        "query": "label_values(namedprocess_namegroup_cpu_user_seconds_total{instance=~\"$host\"},groupname)",
+        "query": "label_values(namedprocess_namegroup_num_procs{instance=~\"$host\"},groupname)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
