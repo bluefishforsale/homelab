@@ -49,7 +49,6 @@ Status and future plans for the homelab infrastructure.
 - **deb12_docker**: Deployed service
 - **dell_perc_raid**: Deployed service
 - **dns02_vm**: Deployed service
-- **gcloud_sdk**: Deployed service
 - **pki_tools**: Deployed service
 - **authorized_keys**: Deployed service
 - **gpu_power**: Deployed service

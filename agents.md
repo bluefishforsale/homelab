@@ -66,11 +66,9 @@ write scripts (`cloudflare-harden.py`, `cloudflare-waf.py`,
 `cloudflare-pages-domain.sh`, `cf.sh dns-add`) are deleted; their settings
 live in terraform-root's `cloudflare-<zone>-config.tf`.
 
-Legacy code that's still here, kept only until it's deleted:
-
-- `playbooks/individual/infrastructure/gcloud_sdk.yaml` with
-  `playbooks/tasks/gcloud.yaml` and `pki_gcloud_kms.yaml`: dead code (its vars
-  are defined nowhere). Never run it.
+The old GCP KMS playbook (`gcloud_sdk.yaml` with `tasks/gcloud.yaml` and
+`tasks/pki_gcloud_kms.yaml`) is deleted too. Its vars were defined nowhere, and
+the empty `homelab-sops-key` ring it left behind is modeled in terraform-root.
 
 **Cloudflare Access (tunnel) user emails.** The allow lists live only in
 `vault/secrets.yaml` under `cloudflare.access_allow_emails` (`plex-users` for

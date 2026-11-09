@@ -13,15 +13,6 @@ This directory contains reusable Ansible task files that are included by multipl
   include_tasks: ../../tasks/dpkg_lock.yaml
 ```
 
-### `gcloud.yaml`
-**Purpose**: Google Cloud SDK authentication and setup  
-**Used by**: Infrastructure playbooks requiring GCloud access  
-**Usage**:
-```yaml
-- name: Include GCloud authentication
-  ansible.builtin.include_tasks: ../../tasks/gcloud.yaml
-```
-
 ### `kind.yaml`
 **Purpose**: Kubernetes in Docker (kind) cluster setup  
 **Used by**: Kubernetes deployment playbooks  
@@ -29,15 +20,6 @@ This directory contains reusable Ansible task files that are included by multipl
 ```yaml
 - name: Setup kind cluster
   ansible.builtin.include_tasks: ../../tasks/kind.yaml
-```
-
-### `pki_gcloud_kms.yaml`
-**Purpose**: Manage PKI resources in Google Cloud KMS  
-**Used by**: Infrastructure playbooks with PKI requirements  
-**Usage**:
-```yaml
-- name: Manage KMS resources
-  ansible.builtin.include_tasks: ../../tasks/pki_gcloud_kms.yaml
 ```
 
 ### `pki_tools_apt.yaml`
@@ -85,7 +67,7 @@ include_tasks: ../../tasks/dpkg_lock.yaml
 include_tasks: ../../../tasks/dpkg_lock.yaml
 
 # From playbooks/individual/infrastructure/*.yaml
-include_tasks: ../../tasks/gcloud.yaml
+include_tasks: ../../tasks/dpkg_lock.yaml
 ```
 
 Or use absolute paths from playbook directory:
