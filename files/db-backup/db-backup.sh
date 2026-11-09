@@ -5,6 +5,10 @@
 # after 30 days (a lifecycle daysSinceNoncurrentTime rule):
 #     gs://<bucket>/<service>/<service>.<ext>.gz
 #
+# Runs on every host that keeps service state (ocean and each data01 worker) and
+# dumps only the containers running there, so a service backs up wherever it
+# lives. Each host uploads only its own services' objects.
+#
 # Everything runs through docker: ocean has no host sqlite3/gcloud, and the DB
 # files are owned by container UIDs a normal user can't read. RDBMS get LOGICAL
 # dumps (mysqldump / pg_dumpall via docker exec); SQLite uses the online .backup
@@ -27,9 +31,11 @@ CONF="${DB_BACKUP_ENV:-/data01/services/db-backup/db-backup.env}"
 : "${MYSQL_ROOT_PASSWORD:=}"
 : "${WORDPRESS_DB_CONTAINER:=}"
 : "${WORDPRESS_ROOT_PASSWORD:=}"
+: "${SKIP_SQLITE:=0}"
 
 START=$(date +%s)
-WORK="$STAGING/work-$(date -u +%Y%m%dT%H%M%SZ)"
+# Hostname in the name: ocean and every data01 worker run this at the same minute.
+WORK="$STAGING/work-$(hostname -s)-$(date -u +%Y%m%dT%H%M%SZ)"
 declare -a FAILED=()
 log(){ echo "[db-backup] $*"; }
 fail(){ FAILED+=("$1"); log "FAIL: $1"; }
@@ -68,6 +74,7 @@ SQLITE_DBS=(
   my_ta_jose/data/my_ta_jose.db
   mem0/history/history.db
 )
+[ "$SKIP_SQLITE" = 1 ] && SQLITE_DBS=()
 for rel in "${SQLITE_DBS[@]}"; do
   svc="${rel%%/*}"
   docker run --rm -v "$SERVICES_DIR":/svc:ro "$ALPINE_IMAGE" test -f "/svc/$rel" 2>/dev/null \

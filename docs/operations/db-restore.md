@@ -1,7 +1,13 @@
 # Restoring a service database
 
-Every service database on ocean is dumped nightly and pushed to
+Every service database is dumped nightly and pushed to
 `gs://homelab-db-backups`. This is how you get one back.
+
+Backup and restore run on every host that keeps service state: ocean and each
+data01 worker (harbor). Each host dumps only the containers running on it, and a
+restore acts only on the host that holds the service's container; the other
+hosts log `skipped here`. A single-service restore that no host acted on fails
+the play rather than reporting a restore that never happened.
 
 The whole thing is dry-run by default. You have to say `restore_confirm=RESTORE`
 before anything touches a live database, and even then the script dumps the
@@ -63,7 +69,7 @@ gh workflow run main-apply.yml \
 than guessing, so a dispatch with no target fails fast instead of doing
 something surprising.
 
-The same playbook is what installs `db-restore.sh` on ocean. `db_backup.yaml`
+The same playbook is what installs `db-restore.sh` on ocean and the workers. `db_backup.yaml`
 deploys only the backup half, so on a host that has never run a restore the
 script is simply absent until you dispatch this once.
 
