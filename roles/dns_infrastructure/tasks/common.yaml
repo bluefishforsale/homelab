@@ -70,14 +70,46 @@
     state: directory
     mode: '0755'
 
+# The fleet template, not a dns-only file. The old one held only log-driver and
+# overwrote what docker_ce.yaml wrote, so the mirror and live-restore that
+# dockerd was running with existed only in memory and would have vanished on
+# the next dockerd restart.
 - name: Configure Docker daemon
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: "{{ role_path }}/../../files/docker/daemon.json.j2"
     dest: /etc/docker/daemon.json
-    content: |
-      {
-        "log-driver": "journald"
-      }
+    owner: root
+    group: root
     mode: '0644'
+    validate: dockerd --validate --config-file %s
+  register: dns_daemon_json
+
+# Reloaded here rather than from a handler, so the check below sees the result
+# and so no flush pulls the dns-stack handlers forward. SIGHUP leaves every DNS
+# container running: see the handler NOTE in
+# playbooks/individual/infrastructure/docker_ce.yaml.
+- name: Reload docker to apply daemon.json
+  ansible.builtin.systemd:
+    name: docker
+    state: reloaded
+  when: dns_daemon_json is changed
+
+- name: Read dockerd's live registry config
+  ansible.builtin.command: docker info --format '{{ "{{" }}json .RegistryConfig{{ "}}" }}'
+  register: dns_docker_registry_config
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# failed_when above and the rc guard here: on a first install docker is not
+# running yet at this point, and the role starts it two tasks later with the
+# file already in place.
+- name: Assert dockerd picked up the registry cache
+  when: not ansible_check_mode and dns_docker_registry_config.rc == 0
+  ansible.builtin.assert:
+    that:
+      - "'registry-cache.home:5005' in dns_docker_registry_config.stdout"
+    fail_msg: "dockerd is not running with the insecure-registries in daemon.json; check journalctl -u docker for 'Error reconfiguring'"
 
 - name: Enable and start Docker
   ansible.builtin.systemd:

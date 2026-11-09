@@ -4,8 +4,12 @@
         "tag": "{{ '{{.Name}}' }}"
     },
     "live-restore": true,
-    "storage-driver": "overlay2"
-{% if registry_cache_mirror | default(true) %}
+    "storage-driver": "overlay2",
+    "insecure-registries": [{% for port in range(5001, 5007) %}"registry-cache.home:{{ port }}"{{ "," if not loop.last }}{% endfor %}]
+{# NOTE: | bool matters. hosts.ini sets registry_cache_mirror=false, and an INI
+   host var arrives as the string "false", which is truthy, so without it the
+   cache host mirrored through itself. #}
+{% if registry_cache_mirror | default(true) | bool %}
     ,
     "registry-mirrors": ["http://registry-cache.home:5001"]
 {% endif %}
@@ -13,7 +17,7 @@
     ,
     "data-root": "{{ docker }}"
 {% endif %}
-{% if nvidia_gpu is defined and nvidia_gpu %}
+{% if nvidia_gpu | default(false) | bool %}
     ,
     "runtimes": {
         "nvidia": {
