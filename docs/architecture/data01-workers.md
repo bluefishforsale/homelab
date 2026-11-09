@@ -21,6 +21,7 @@ except its VM play and NZBGet.
 | `workers/tdarr_node.yaml` | `data01_workers` | CPU tdarr node joined to ocean's tdarr server. |
 | `workers/nzbget.yaml` | ocean, then harbor | NZBGet compose project with scratch on the 870 EVO; only finished files cross NFS into `/data01/incoming`. Retires the old ocean units. Prune timer. ocean's nginx proxies it at `192.168.1.32:8901`. |
 | `infrastructure/db_restore_test.yaml` | harbor | Nightly restore test of the DB backups ([`db-restore.md`](../operations/db-restore.md)). |
+| `operations/backup/db_backup.yaml`, `db_restore.yaml` | ocean, `data01_workers` | Nightly backup of whatever DB containers run on each host, staged on the worker's state disk (root is squashed over NFS); restore acts only where the container lives. Dispatch-only. |
 
 ## Mounts
 
@@ -74,11 +75,11 @@ name and ocean's nginx proxies to the worker.
 
 ## Not built
 
-- **Backups of worker state.** `db-backup.sh` runs on ocean through
-  `docker exec` and can't see a worker's containers, and there is no rsync of
-  `/data01/services` back onto the pool. Today that state is NZBGet's and the
-  tdarr node's config, both rebuildable; a service with a real database must not
-  move to a worker until this exists.
+- **File-level backups of worker state.** Databases on a worker are backed up
+  like ocean's: `db-backup.sh` runs on every `data01_workers` host and dumps the
+  containers running there. Everything else under a worker's `/data01/services`
+  (configs, caches, clones) has no copy back onto the pool, so a service whose
+  non-DB state isn't rebuildable still doesn't belong on a worker.
 - **A host registry.** A service picks its host by sitting in `workers/` with
   `hosts:` set to `harbor` or `data01_workers`. Fine at one worker.
 

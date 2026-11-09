@@ -189,6 +189,10 @@ restore_one(){
   IFS='|' read -r engine obj container target <<<"$m"
   uri="gs://$GCS_BUCKET/$svc/$obj"
   log "=== $svc (engine=$engine) ==="
+  # Restore runs on ocean and every data01 worker; only the host holding the container acts.
+  if [ "$MODE" != verify ] && ! docker inspect "$container" >/dev/null 2>&1; then
+    log "  $svc: container $container is not on $(hostname -s); skipped here"; return 0
+  fi
   if [ "$MODE" != verify ]; then
     echo "  available versions (pass the #generation as POINT_IN_TIME):"
     gcs "gcloud storage ls --all-versions --long $uri" 2>/dev/null | sed 's/^/    /' || echo "    (cannot list)"
