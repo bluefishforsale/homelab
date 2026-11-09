@@ -58,8 +58,8 @@ services:
     restart: unless-stopped
     command: ["archmap-worker"]
     # 6 render processes (ARCHMAP_RENDER_PROCS default), the build thread and
-    # polling share 6 CPUs. ocean runs near 89% with Plex, llama and the
-    # monitoring stack, so archmap renders slower rather than starving them.
+    # polling share 6 CPUs. harbor's 24 cores also run the tdarr CPU node, so
+    # archmap renders slower rather than starving transcodes.
     cpus: 6
     # Each render process holds a few snapshots in memory.
     mem_limit: 6g

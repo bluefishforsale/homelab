@@ -894,7 +894,7 @@ groups:
       remediation: manual
     annotations:
       summary: "archmap {{ "{{ $labels.job }}" }} is down"
-      description: "Prometheus cannot scrape {{ "{{ $labels.job }}" }} through archmap-web on ocean:{{ service_ports.archmap.port }}. Check `systemctl status archmap` and `docker compose ps` in /data01/services/archmap."
+      description: "Prometheus cannot scrape {{ "{{ $labels.job }}" }} through archmap-web on harbor:{{ service_ports.archmap.port }}. Check `systemctl status archmap` and `docker compose ps` in /data01/services/archmap on harbor."
 
   # Jobs arrive every poll, so a busy queue is normal; one that never empties
   # and has not shrunk in 30m is a wedged worker.
