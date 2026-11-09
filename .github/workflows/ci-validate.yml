@@ -349,3 +349,8 @@ jobs:
 
       - name: ZFS guardrail self-test
         run: bash .github/workflows/lib/check-no-zfs-mutations.test.sh
+
+      # Every .home vhost nginx serves has its own record, so nothing depends on
+      # the *.home wildcard.
+      - name: nginx vhosts have DNS records
+        run: bash .github/workflows/lib/nginx-vhosts-have-dns.test.sh
