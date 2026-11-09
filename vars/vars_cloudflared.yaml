@@ -14,6 +14,7 @@ cloudflared:
   # remote config.
   remote_managed_hosts:
     - llmeval
+    - netboot01
 
   # touched to retest cloudflared.yaml from CI with cloudflared now in the runner container
   tunnels:
