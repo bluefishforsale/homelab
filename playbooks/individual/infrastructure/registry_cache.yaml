@@ -1,11 +1,14 @@
 ---
 # Docker Registry Pull-Through Cache
-# Four registry:2 containers (docker-hub, ghcr, gitlab, nvcr) + promtail sidecar.
+# Six registry:2 containers (docker-hub, ghcr, ghcr-private, gitlab, nvcr, gcr)
+# + promtail sidecar.
 #
 # Prerequisites:
 #   - VM created via playbooks/individual/infrastructure/create_registry_cache_vm.yaml
 #   - vault/secrets.yaml provides development.docker_registry.username/password
 #     (Docker Hub credentials, used by the docker-hub-cache upstream auth)
+#   - development.github.packages_read_token (ghcr-private-cache upstream) and
+#     infrastructure.registry_cache.ghcr_private.{username,password} (its clients)
 #
 # Docker is bootstrapped inline; no separate docker_ce run required for this host.
 #
@@ -26,6 +29,14 @@
     files: "{{ playbook_dir }}/../../../files/registry-cache"
     data: /data01
     home: "{{ data }}/services/{{ service }}"
+    registry_upstreams:
+      - docker-hub
+      - ghcr
+      - ghcr-private
+      - gitlab
+      - nvcr
+      - gcr
+    ghcr_private_htpasswd: "{{ home }}/auth/ghcr-private.htpasswd"
 
   tasks:
     - name: Wait for cloud-init to finish on first boot
@@ -87,7 +98,8 @@
         owner: root
         group: root
         mode: '0644'
-      notify: Restart docker
+        validate: dockerd --validate --config-file %s
+      notify: Reload docker
 
     - name: Ensure Docker service is started and enabled
       ansible.builtin.systemd:
@@ -119,11 +131,7 @@
         owner: root
         group: root
         mode: '0755'
-      loop:
-        - docker-hub
-        - ghcr
-        - gitlab
-        - nvcr
+      loop: "{{ registry_upstreams }}"
 
     - name: Render registry configs for each upstream
       ansible.builtin.template:
@@ -131,14 +139,55 @@
         dest: "{{ home }}/config/{{ item }}.yml"
         owner: root
         group: root
-        mode: '0644'
-      loop:
-        - docker-hub
-        - ghcr
-        - gitlab
-        - nvcr
+        # docker-hub and ghcr-private hold upstream credentials.
+        mode: '0600'
+      loop: "{{ registry_upstreams }}"
       notify:
         - Restart registry-cache service
+
+    - name: Install htpasswd
+      ansible.builtin.apt:
+        name: apache2-utils
+        state: present
+        lock_timeout: 600
+
+    - name: Ensure auth directory exists
+      ansible.builtin.file:
+        path: "{{ home }}/auth"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    # htpasswd salts every hash, so writing it each run would restart the
+    # cache every deploy. Verify first and rewrite only on a mismatch. The
+    # password goes in on stdin (-i) so it never shows in ps.
+    - name: Check ghcr-private client credential
+      ansible.builtin.command:
+        cmd: htpasswd -v -i {{ ghcr_private_htpasswd }} {{ infrastructure.registry_cache.ghcr_private.username }}
+        stdin: "{{ infrastructure.registry_cache.ghcr_private.password }}"
+      register: ghcr_private_htpasswd_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Write ghcr-private client credential (bcrypt)
+      ansible.builtin.command:
+        cmd: htpasswd -c -B -C 10 -i {{ ghcr_private_htpasswd }} {{ infrastructure.registry_cache.ghcr_private.username }}
+        stdin: "{{ infrastructure.registry_cache.ghcr_private.password }}"
+      when: ghcr_private_htpasswd_check.rc != 0
+      no_log: true
+      notify:
+        - Restart registry-cache service
+
+    - name: Lock down the htpasswd file
+      ansible.builtin.file:
+        path: "{{ ghcr_private_htpasswd }}"
+        owner: root
+        group: root
+        mode: '0600'
+      when: not ansible_check_mode
 
     - name: Render docker-compose.yml
       ansible.builtin.template:
@@ -199,7 +248,7 @@
           trap 'rm -f "$TMP"' EXIT
           printf '# HELP registry_cache_size_bytes On-disk size of the registry pull-through cache per upstream.\n' > "$TMP"
           printf '# TYPE registry_cache_size_bytes gauge\n' >> "$TMP"
-          for d in docker-hub ghcr gitlab nvcr; do
+          for d in {{ registry_upstreams | join(' ') }}; do
             [ -d "$DATA/$d" ] || continue
             bytes=$(du -sb "$DATA/$d" | cut -f1)
             printf 'registry_cache_size_bytes{upstream="%s"} %s\n' "$d" "$bytes" >> "$TMP"
@@ -244,6 +293,24 @@
         state: started
         daemon_reload: yes
 
+    - name: Apply pending handlers so the running dockerd config can be checked
+      ansible.builtin.meta: flush_handlers
+
+    # A reload is a SIGHUP that exits 0 even when dockerd rejects the new config.
+    - name: Read dockerd's live registry config
+      ansible.builtin.command: docker info --format '{{ "{{" }}json .RegistryConfig{{ "}}" }}'
+      register: docker_registry_config
+      changed_when: false
+      check_mode: false
+
+    - name: Assert dockerd runs the new config and does not mirror through itself
+      when: not ansible_check_mode
+      ansible.builtin.assert:
+        that:
+          - "'registry-cache.home:5005' in docker_registry_config.stdout"
+          - "'registry-cache.home:5001/' not in (docker_registry_config.stdout | from_json).Mirrors | default([], true) | join(' ')"
+        fail_msg: "dockerd on the cache host is not running the rendered daemon.json; check journalctl -u docker"
+
   handlers:
     - name: Reload systemd daemon
       ansible.builtin.systemd:
@@ -254,8 +321,9 @@
         name: registry-cache.service
         state: restarted
 
-    - name: Restart docker
+    # Reload, not restart: see the handler NOTE in docker_ce.yaml.
+    - name: Reload docker
       ansible.builtin.systemd:
         name: docker
-        state: restarted
-        daemon_reload: yes
+        state: reloaded
+        daemon_reload: true

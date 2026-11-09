@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Apply static-site edge hardening to Cloudflare zones: TLS enforcement + security headers.
 
+LEGACY, DON'T RUN. These zone settings, transform rules and cache rules are owned by bluefishforsale/terraform-root now.
+Running this changes Terraform-owned resources: the drift job opens
+an issue and the next apply reverts it. Make the change in terraform-root instead.
+
 For static sites (no dynamic surface) the useful hardening is HTTPS/TLS enforcement and
 security response headers, not the WordPress path blocks in cloudflare-waf.py. This sets,
 per zone:

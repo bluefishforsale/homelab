@@ -38,6 +38,7 @@ ENGLISH = {"eng", "en", "und", ""}
 ENGLISH_AUDIO = {"eng", "en"}
 # Stats mkvmerge writes; on a stream ffmpeg re-encoded they describe the source.
 STALE = ("BPS", "NUMBER_OF_BYTES")
+HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}
 
 
 def tags(s):
@@ -68,6 +69,12 @@ def reasons(streams):
     # cover), and a re-download brings it straight back.
     if len({(s.get("width"), s.get("height")) for s in video}) < len(video):
         out.append("double-muxed")
+    if video and (video[0].get("height") or 0) > 1088:
+        out.append("over-1080p")
+    if video and (video[0].get("color_transfer") in HDR_TRANSFERS
+                  or any(d.get("side_data_type") == "DOVI configuration record"
+                         for d in video[0].get("side_data_list") or [])):
+        out.append("hdr")
     if not any((tags(s).get("LANGUAGE") or "").lower() in ENGLISH for s in subs):
         out.append("no-english-subs")
     # The flow keeps the source video when HEVC came out larger (a lean WEB-DL),
@@ -98,7 +105,7 @@ def reasons(streams):
 def bucket(why):
     if not why:
         return "ok"
-    if "double-muxed" in why or "no-english-subs" in why:
+    if any(r in why for r in ("double-muxed", "no-english-subs", "over-1080p", "hdr")):
         return "refetch"
     return "tdarr"
 

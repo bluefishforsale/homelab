@@ -1,0 +1,51 @@
+# Prowlarr and its exporter, one compose project so docker-refresh@prowlarr keeps
+# both images current.
+services:
+  prowlarr:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    environment:
+      - TZ=America/Los_Angeles
+      - PUID={{ uid }}
+      - PGID={{ gid }}
+    ports:
+      - "{{ prowlarr_port }}:9696"
+    volumes:
+      - {{ home }}/config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9696/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    cpus: '2.0'
+    mem_limit: 1024m
+
+  prowlarr-exporter:
+    image: {{ exporter_image }}:{{ exporter_version }}
+    container_name: {{ exporter_service }}
+    hostname: {{ exporter_service }}
+    restart: unless-stopped
+    command: ["prowlarr"]
+    environment:
+      - TZ=America/Los_Angeles
+      - URL=http://{{ service }}:9696
+      - API_KEY={{ media_services.prowlarr.api_key }}
+      - PORT=9710
+      - ENABLE_ADDITIONAL_METRICS=true
+    ports:
+      - "{{ exporter_port }}:9710"
+    # No healthcheck: the image has no shell. up{job="prowlarr-exporter"} covers it.
+    # Start-ordering only: gating on Prowlarr's health would hold the exporter
+    # down for as long as Prowlarr's start_period, and the exporter tolerates
+    # Prowlarr being briefly unavailable on its own.
+    depends_on:
+      - prowlarr
+    security_opt:
+      - no-new-privileges:true
+    cpus: '0.5'
+    mem_limit: 256m

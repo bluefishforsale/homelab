@@ -43,6 +43,8 @@ push main                             repository_dispatch              docker pu
 value pulled from the homelab vault key `development.github.deploy_dispatch_token`
 (fine-grained PAT with `Contents: write` on `bluefishforsale/homelab`).
 
+**New PATs:** create every GitHub PAT from a pre-filled URL, never by clicking through the form, e.g. `https://github.com/settings/personal-access-tokens/new?name=<svc>&target_name=bluefishforsale&expires_in=none&contents=read&pull_requests=read&statuses=write`, then `pbpaste | uv run --with pyyaml python scripts/vault.py rotate <svc>.github_token -`. A hand-made archmap token missed `pull_requests=read` and every pull on a private repo 403'd.
+
 **Dispatch payload** — always built with `jq -cn --arg`, never string-concatenated:
 
 ```bash
@@ -53,9 +55,18 @@ curl -f -X POST -H "Authorization: Bearer $HOMELAB_DISPATCH_TOKEN" \
   https://api.github.com/repos/bluefishforsale/homelab/dispatches -d "$PAYLOAD"
 ```
 
+## terraform-root side (`bluefishforsale/terraform-root`), first
+
+The public hostname's cloud pieces are created in terraform-root, not here:
+the proxied CNAME to the tunnel, the Access app, and which reusable Access
+policy it gets (bypass for public, admin plus plex users, or admin only). Open
+that PR first and let it merge and apply. The homelab side below then only
+configures the host. `cloudflared.yaml` doesn't touch Cloudflare's API any
+more, so nothing here can create or fix those objects.
+
 ## Homelab repo side (`bluefishforsale/homelab`)
 
-Five files per new service:
+Four files per new service:
 
 1. `playbooks/individual/ocean/services/<service>.yaml` — ansible playbook.
    For image-based: templates compose + systemd, ends with an **unconditional**
@@ -73,9 +84,7 @@ Five files per new service:
      `<service>.example.com` + `<service>.home` → `proxy_pass http://172.17.0.1:8xxx`
    - `vars/vars_cloudflared.yaml`: ingress
      `<service>.example.com` → `http://192.0.2.143:80`
-5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
-   of the hostname to `fully_public_services` (Access bypass) for public
-   services. `public_services` = admin + plex-users gate. Else admin-only.
+     (the tunnel's local routing; the DNS record itself is terraform-root's)
 
 **Image refresh requirements (every docker-based service):**
 
@@ -195,11 +204,9 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
    `/usr/local/bin/cloudflared` on gh-runner-01 and bind-mounts it into each
    runner container; without it, all `delegate_to: localhost` cloudflared tasks
    fail in CI.
-7. **First label of hostname drives Access policy.** The classifier in
-   `cloudflared.yaml` splits `host.zone.tld` on `.` and matches the first
-   segment against `fully_public_services` / `public_services`. So `blog.X` and
-   `blog.Y` are both public. Adding a new public service = add its first label
-   to `fully_public_services`.
+7. **Access policy is chosen in terraform-root.** Each Access app there
+   references one reusable policy (bypass, admin plus plex users, or admin
+   only). The old first-label classifier in `cloudflared.yaml` is gone.
 8. **`run_once: true` on tasks that register a per-host fact leaks across
    hosts.** The cloudflared SSH-tunnel-check task had it; one host's positive
    result made all non-ocean hosts try `cloudflared tunnel info ssh-<host>` for
@@ -219,6 +226,10 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
 ```text
 [ ] Decide hostname (<name>.example.com) and host port (next free 80xx)
 
+terraform-root (merge and apply first):
+[ ] cloudflare_dns_record: proxied CNAME <name> -> <ocean tunnel id>.cfargotunnel.com
+[ ] cloudflare_zero_trust_access_application with the right reusable policy
+
 homelab:
 [ ] playbooks/individual/ocean/services/<name>.yaml      (clone paia.yaml or terrac_com.yaml)
 [ ] files/<name>/{docker-compose.yml.j2, .env.j2, .service.j2}
@@ -226,7 +237,6 @@ homelab:
 [ ] vars/vars_service_ports.yaml — add <name>.port
 [ ] files/nginx-compose/proxy_hostname_web_proxy.conf — add vhost block
 [ ] vars/vars_cloudflared.yaml — add ingress entry
-[ ] playbooks/individual/ocean/network/cloudflared.yaml — add to fully_public_services if public
 [ ] .github/workflows/deploy-<name>.yml (clone deploy-my-ta-jose.yml)
 [ ] .github/workflows/deploy-ocean-service.yml — add to manual-dispatch enum
 [ ] Push homelab — main-apply runs the affected narrow set.

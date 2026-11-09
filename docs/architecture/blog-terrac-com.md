@@ -14,7 +14,7 @@ here. This doc covers only what is specific to the blog.
 | `.github/workflows/deploy-blog-terrac-com.yml` | runner | `repository_dispatch: deploy-blog-terrac-com` (branch from `client_payload.branch`, default `main`) or `workflow_dispatch`. Runs the playbook with `-e git_branch=...`, then an SSH check that `repo/public/index.html` exists. `deploy-ocean` group. |
 | `ocean/services/blog_terrac_com_static.yaml` | ocean | Deletes and re-clones the repo into `/data01/services/blog_terrac_com/repo` as `terrac`, warns if `public/index.html` is missing, then purges the Cloudflare edge cache for `blog.terrac.com`. |
 | `ocean/network/nginx_compose.yaml` | ocean | Owns the vhost in `files/nginx-compose/proxy_hostname_web_proxy.conf` and the `:ro` mount of `/data01/services/blog_terrac_com` in `files/nginx-compose/docker-compose.yml.j2`. |
-| `ocean/network/cloudflared.yaml` | ocean | Tunnel ingress from `vars/vars_cloudflared.yaml`: `blog.terrac.com` to `http://192.168.1.143:80`. First label `blog` is in `fully_public_services`, so no Access gate. |
+| `ocean/network/cloudflared.yaml` | ocean | Tunnel ingress from `vars/vars_cloudflared.yaml`: `blog.terrac.com` to `http://192.168.1.143:80`. Its Access app in terraform-root uses the bypass policy, so no Access gate. |
 
 ## Serving path
 

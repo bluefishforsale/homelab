@@ -238,6 +238,11 @@ phase 2 or later.
 - **F4. Signing requires the vault password**, so issuance runs from CI or
   agentbox, never the laptop. Consistent with `CONTEXT.md`.
 - **F5. A host key must never be overwritten** once services depend on it.
+- **F6. Waiting consumer: `ghcr-private-cache` on registry-cache-01 (5005).** Its
+  htpasswd credential crosses the LAN in plain HTTP today, accepted on
+  2026-11-08 until this CA exists (`docs/architecture/registry-cache.md`). Once a
+  registry-cache-01 cert can be issued, put `http.tls` on that listener and drop
+  5005 from `insecure-registries`.
 
 ## Monitoring
 

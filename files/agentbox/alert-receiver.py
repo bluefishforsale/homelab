@@ -6,8 +6,8 @@ Rendered from files/agentbox/alert-receiver.py by the agentbox playbook.
 Alertmanager POSTs its webhook JSON here. For each FIRING alert we:
   - push a notification to ntfy so a human is aware (all severities);
   - open a GitHub issue on the infra repo so it becomes trackable/fixable —
-    critical alerts get `needs-escalation` (premium lane / drive via RC), others get
-    a plain issue. Resolved alerts close the matching tracking issue (by
+    critical alerts get `needs-escalation` (left for a human or axiomd to pick
+    up), others get a plain issue. Resolved alerts close the matching tracking issue (by
     fingerprint) and push a "resolved" ntfy — completing the fire->fix->close loop.
 
 Deliberately dependency-free (stdlib only) and single-file: it reads config from
@@ -27,12 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 NTFY_URL = os.environ["ALERT_NTFY_URL"]           # e.g. http://ntfy.home:8090/homelab
 ISSUE_REPO = os.environ["ALERT_ISSUE_REPO"]       # e.g. bluefishforsale/homelab
 LISTEN_PORT = int(os.environ.get("ALERT_LISTEN_PORT", "9098"))
-# Critical alerts kick an immediate premium-lane remediation. Set 0 to disable
-# unattended infra edits (issue + ntfy still fire).
-REMEDIATE = os.environ.get("ALERT_REMEDIATE", "1") == "1"
 RC_URL = os.environ.get("ALERT_RC_URL", "https://claude.ai/code")  # live RC console
-ESCALATE = "/usr/local/bin/agentbox-escalate.sh"
-REPO_NAME = ISSUE_REPO.split("/")[-1]
 # ntfy is deny-all (public via ntfy.terrac.com); publish with basic auth.
 NTFY_USER = os.environ.get("ALERT_NTFY_USER", "")
 NTFY_PASS = os.environ.get("ALERT_NTFY_PASS", "")
@@ -278,20 +273,6 @@ def open_replace_issue(alert):
         return None
 
 
-def remediate(num):
-    """Kick an immediate premium-lane fix for a critical alert. Detached so a
-    multi-minute claude run never blocks the HTTP handler; it only ever opens a
-    PR (never auto-merges infra), so a human still gates the change.
-    ponytail: child dies if the receiver service restarts mid-run (cgroup kill);
-    acceptable — the needs-escalation issue survives and the periodic drain retries.
-    """
-    if not os.path.exists(ESCALATE):
-        print(f"escalate script missing: {ESCALATE}", flush=True)
-        return
-    print(f"remediating critical alert via issue #{num}", flush=True)
-    subprocess.Popen([ESCALATE, REPO_NAME, str(num)], start_new_session=True)
-
-
 def handle(payload):
     for alert in payload.get("alerts", []):
         labels = alert["labels"]
@@ -325,8 +306,6 @@ def handle(payload):
             ntfy(f"{ident} ({sev})", body, PRIO.get(sev, "default"),
                  "rotating_light,homelab",
                  click=RC_URL if sev == "critical" else issue_url)
-            if num and sev == "critical" and REMEDIATE:
-                remediate(num)
         else:
             if manual:
                 # A replace issue's lifecycle is the physical swap, not the

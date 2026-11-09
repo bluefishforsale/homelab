@@ -15,7 +15,79 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
 - **data01 workers** (harbor: docker hosts on ocean's pool over NFS, local state) ->
   [`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)
 - **Onboarding a new external-repo service** -> [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
+- **Anything in Cloudflare, GCP or Azure** -> not this repo. It lives in
+  [`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root).
+  See [Cloud infrastructure lives in terraform-root](#cloud-infrastructure-lives-in-terraform-root).
 - **Validate:** `make validate`
+
+---
+
+## Cloud infrastructure lives in terraform-root
+
+**Ansible in this repo no longer creates cloud infrastructure.** Cloudflare, GCP
+and Azure resources are owned by
+[`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root)
+(local checkout `../terraform-root`), applied by its GitHub Actions on merge to
+`main`, with a daily drift check. If a change here needs a cloud resource to
+exist, that resource gets added in terraform-root first, merged and applied,
+and only then does the homelab change that depends on it ship.
+
+What terraform-root owns:
+
+- **Cloudflare:** the three zones (terrac.com, saetnere.com,
+  radiantatmospheres.com) and every DNS record in them, Cloudflare Tunnels
+  (the tunnel objects, including the per-host `ssh-<host>` ones), Access apps
+  and the reusable Access policies, the Zero Trust org and identity provider,
+  zone rulesets (rate limits, redirects, cache rules, security header
+  transforms, WAF custom rules), zone TLS/security settings, Email Routing,
+  R2 buckets and Pages projects.
+- **GCP** (`homelab-390805`): service accounts, the `homelab-db-backups`
+  bucket and its IAM, KMS, enabled APIs, project IAM.
+- **Azure:** the Artifact Signing account and app registrations for
+  signal-agent.
+
+What stays here, because it's host config or runtime operations rather than
+creating cloud resources:
+
+- Running `cloudflared` on each host and its locally-managed ingress config
+  (`vars/vars_cloudflared.yaml` -> `/etc/cloudflared/config.yaml`).
+- The DDNS timer rewriting `home.terrac.com`'s IP (terraform-root ignores that
+  record's content on purpose), certbot's short-lived DNS-01 TXT records, and
+  cache purges.
+- Using cloud resources: db-backup writing to `gs://homelab-db-backups`, the
+  cloudflare exporter reading analytics.
+
+Legacy code that still creates cloud resources, kept only until it's
+deleted.
+
+`cloudflared.yaml` no longer writes anything to Cloudflare. It looks up the
+host's `ssh-<host>` tunnel and fetches its token, and it fails if the tunnel is
+missing rather than creating it, so a new host's tunnel, CNAME and Access app
+come from terraform-root first. Remaining legacy pieces: Don't extend it, don't copy it
+into new playbooks, and don't run the scripts:
+
+- `scripts/cloudflare-harden.py`, `scripts/cloudflare-waf.py`,
+  `scripts/cloudflare-pages-domain.sh`, and `scripts/cf.sh dns-add`. Running
+  them now changes resources Terraform owns, the drift job opens an issue, and
+  the next apply puts things back.
+- `playbooks/individual/infrastructure/gcloud_sdk.yaml` with
+  `playbooks/tasks/gcloud.yaml` and `pki_gcloud_kms.yaml`: dead code (its vars
+  are defined nowhere). Never run it.
+
+**Cloudflare Access (tunnel) user emails.** The allow lists live only in
+`vault/secrets.yaml` under `cloudflare.access_allow_emails` (`plex-users` for
+friends, `admin`). That vault entry is the source of truth for terraform-root
+too: its `.envrc` reads it locally, and CI reads a copy in the terraform-root
+repo secret `TF_VAR_ACCESS_PLEX_USER_EMAILS`. They never go in git in either
+repo. Changing who can get in means editing the vault **and** resetting that
+secret (command in terraform-root's agents.md, "Where the Access (tunnel)
+user emails live"); a vault edit alone changes nothing, because terraform-root
+applies the secret's copy. Nothing in this repo reads these keys any more;
+they stay until they move to SOPS in terraform-root.
+
+Proxmox VMs are still created here with `qm clone` playbooks for now. They're
+the next candidate to move to terraform-root (bpg/proxmox, applied from the
+self-hosted runner), so expect that to change.
 
 ---
 
@@ -78,7 +150,7 @@ runs only those. The model is **explicit ownership**, not best-effort guessing:
   with a classic `repo`-scoped token. `gh pr list --json statusCheckRollup` expands
   to the per-check `contexts` and 403s forever; the GraphQL rollup **aggregate**
   (`commits(last:1){nodes{commit{statusCheckRollup{state}}}}`) needs no extra
-  permission and is what `files/agentbox/issue-watcher.sh` uses.
+  permission and is what the retired agentbox issue watcher used.
 - **`gh`'s `--jq` is not jq.** One expression, no `--arg`. Passing one makes `gh`
   reject the whole command. Pipe to real jq: `gh ... --json ... | jq -r --arg ...`.
 - **`x-accepted-github-permissions`** on any response names the exact permission an
