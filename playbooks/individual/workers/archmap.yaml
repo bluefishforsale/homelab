@@ -1,0 +1,358 @@
+---
+# archmap: an isometric map of everything bluefishforsale runs and builds,
+# generated from code. The archmap repo's CI builds one image and dispatches
+# `deploy-archmap` here. The compose project runs that image twice (api and
+# worker) beside Postgres, plus an nginx that serves tiles from disk on
+# {{ port_ext }}. archmap.terrac.com is admin-only through Cloudflare Access;
+# ocean's nginx proxies it and archmap.home to harbor.
+#
+# Runs on harbor so the render worker's CPU comes off ocean. All state is on
+# harbor's local state disk under {{ home }}, never ocean's NFS view: Postgres
+# (backed up by harbor's own db-backup.sh run) and derived data (repo clones,
+# SCIP indexes, tiles) that a rebuild from code recreates.
+
+# NOTE: the first play is `hosts: ocean` on purpose. main-apply picks its
+# concurrency group from a playbook's first hosts line, and this play stops a
+# service on ocean, so it must hold deploy-ocean like the dispatch workflows do.
+- name: Retire archmap on ocean
+  hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    home: /data01/services/archmap
+    handoff: /data01/services/archmap-to-harbor.tar
+    # Root-only and off the export, so harbor can trust the tar it reads over NFS.
+    handoff_sum: /root/archmap-to-harbor.sha256
+    image: ghcr.io/bluefishforsale/archmap
+    version: latest
+
+  tasks:
+  # On harbor before anything stops here, so a cold pull or a bad GHCR
+  # credential fails the deploy with ocean still serving.
+  - name: Log harbor into GHCR to pull private archmap image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    delegate_to: harbor
+    no_log: true
+
+  - name: Pull latest archmap image on harbor (loud on bad credentials)
+    ansible.builtin.command:
+      cmd: "docker pull {{ image }}:{{ version }}"
+    delegate_to: harbor
+    register: ghcr_pull
+    changed_when: "'Downloaded newer image' in ghcr_pull.stdout"
+
+  - name: Read the ocean unit
+    ansible.builtin.stat:
+      path: /etc/systemd/system/archmap.service
+    register: ocean_unit
+
+  - name: Read harbor's migration marker
+    ansible.builtin.stat:
+      path: "{{ home }}/.migrated-from-ocean"
+    delegate_to: harbor
+    register: harbor_marker
+
+  # Catches a tar the in-run delete on harbor's side never got to.
+  - name: Remove a leftover handoff once harbor has it
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop: ["{{ handoff }}", "{{ handoff_sum }}"]
+    when: harbor_marker.stat.exists
+
+  # The ocean unit stays (disabled) until harbor is healthy, so a failed move
+  # backs out with `systemctl start archmap` on ocean. The marker stops a rerun
+  # from handing over again once harbor owns the state.
+  - name: Hand archmap's state to harbor
+    when: ocean_unit.stat.exists and not harbor_marker.stat.exists
+    block:
+    # NOTE: stopped before the tar; a live Postgres copied mid-write is a torn
+    # cluster. The unit's ExecStop is compose down, so no container is left for
+    # db-backup or db-restore to find on ocean.
+    - name: Stop and disable archmap on ocean
+      ansible.builtin.systemd:
+        name: archmap.service
+        state: stopped
+        enabled: false
+
+    # harbor's root is squashed to nobody over NFS, and Postgres's dir is 0700
+    # uid 999, so harbor can't copy the tree itself. One tar keeps numeric
+    # owners; it is handed to nobody, 0400, so only harbor's squashed root and
+    # ocean's root can read it. Clones are left out: the worker refetches them.
+    # Secrets (.env, compose) are re-rendered on harbor from the vault.
+    - name: Tar archmap's state for harbor
+      ansible.builtin.command:
+        cmd: >-
+          tar --numeric-owner -cf {{ handoff }} -C {{ home }}
+          --exclude=./data/clones --exclude=./.env --exclude=./docker-compose.yml .
+      async: 14400
+      poll: 30
+      changed_when: true
+
+    - name: Record the handoff's checksum
+      ansible.builtin.shell: "umask 077 && sha256sum {{ handoff }} | cut -d' ' -f1 > {{ handoff_sum }}"
+      async: 3600
+      poll: 15
+      changed_when: true
+
+    - name: Let harbor's squashed root read the handoff
+      ansible.builtin.file:
+        path: "{{ handoff }}"
+        owner: '65534'
+        group: '65534'
+        mode: '0400'
+
+    rescue:
+    - name: Bring archmap back up on ocean
+      ansible.builtin.systemd:
+        name: archmap.service
+        state: started
+        enabled: true
+
+    - name: Fail the deploy with ocean still serving
+      ansible.builtin.fail:
+        msg: "Handing archmap's state to harbor failed; archmap is running on ocean again."
+
+- name: Deploy archmap on harbor using Docker Compose
+  hosts: harbor
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: archmap
+    image: ghcr.io/bluefishforsale/archmap
+    version: latest
+    port_ext: "{{ service_ports.archmap.port }}"
+    api_port: 8000
+    # Fixed in the image (archmap/worker/main.py METRICS_PORT), not env.
+    worker_metrics_port: 8001
+    data: /data01
+    files: "{{ playbook_dir }}/../../../files/archmap"
+    home: "{{ data }}/services/{{ service }}"
+    ocean_data01: /mnt/ocean-data01
+    # ocean's paths, as the ocean play writes them.
+    ocean_handoff: /data01/services/archmap-to-harbor.tar
+    ocean_handoff_sum: /root/archmap-to-harbor.sha256
+    handoff: "{{ ocean_data01 }}{{ ocean_handoff | regex_replace('^/data01', '') }}"
+    migrated: "{{ home }}/.migrated-from-ocean"
+    # On the local state disk (the tiles outgrow the OS disk), root-only by umask.
+    local_handoff: /data01/services/.archmap-from-ocean.tar
+
+  tasks:
+
+  - name: Read the state mount
+    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+    register: state_mount
+    changed_when: false
+
+  # NOTE: Postgres keeps a WAL; on ocean's NFS view it would corrupt.
+  - name: State lands on the local disk, not ocean's NFS
+    ansible.builtin.assert:
+      that: state_mount.stdout == 'ext4'
+      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+  - name: Read the migration marker
+    ansible.builtin.stat:
+      path: "{{ migrated }}"
+    register: migrated_stat
+
+  # ocean's /data01/services sits under harbor's local disk, so a second
+  # read-only mount is the only way to see the handoff.
+  - name: Take archmap's state from ocean
+    when: not migrated_stat.stat.exists
+    block:
+    - name: Mount ocean's /data01 read-only
+      ansible.builtin.shell: |
+        set -e
+        mkdir -p {{ ocean_data01 }}
+        mountpoint -q {{ ocean_data01 }} || mount -t nfs4 -o ro,nfsvers=4.2,nconnect=4 {{ hostvars['ocean'].ansible_ssh_host }}:/data01 {{ ocean_data01 }}
+      changed_when: true
+
+    - name: Read the handoff
+      ansible.builtin.stat:
+        path: "{{ handoff }}"
+      register: handoff_stat
+
+    - name: The handoff exists
+      ansible.builtin.assert:
+        that: handoff_stat.stat.exists
+        fail_msg: "{{ handoff }} is missing or unreadable to harbor's squashed root; the ocean play makes it when it stops archmap there"
+
+    - name: Read the checksum ocean recorded
+      ansible.builtin.slurp:
+        src: "{{ ocean_handoff_sum }}"
+      delegate_to: ocean
+      register: recorded_sum
+
+    # One local, root-only copy is what gets checked and unpacked, so the file on
+    # the NFS export can't change between the check and the tar.
+    - name: Copy the handoff off NFS
+      ansible.builtin.shell: "umask 077 && cp {{ handoff }} {{ local_handoff }}"
+      async: 14400
+      poll: 30
+      changed_when: true
+
+    - name: Checksum the local copy
+      ansible.builtin.stat:
+        path: "{{ local_handoff }}"
+        checksum_algorithm: sha256
+      register: handoff_check
+
+    - name: The handoff matches ocean's checksum
+      ansible.builtin.assert:
+        that: handoff_check.stat.checksum == (recorded_sum.content | b64decode | trim)
+        fail_msg: "{{ handoff }} does not match ocean's recorded sha256; not unpacking it"
+
+    - name: Ensure archmap home exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    # -p keeps Postgres's 0700 data dir; --numeric-owner keeps its uid 999.
+    - name: Unpack the handoff with its owners
+      ansible.builtin.command:
+        cmd: "tar --numeric-owner -xpf {{ local_handoff }} -C {{ home }}"
+      async: 14400
+      poll: 30
+      changed_when: true
+
+    - name: Mark the migration done
+      ansible.builtin.file:
+        path: "{{ migrated }}"
+        state: touch
+        mode: '0644'
+
+    # The tar holds the database, so it goes as soon as harbor has unpacked it.
+    - name: Remove the handoff and its checksum on ocean
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: ["{{ ocean_handoff }}", "{{ ocean_handoff_sum }}"]
+      delegate_to: ocean
+
+    always:
+    - name: Remove the local copy
+      ansible.builtin.file:
+        path: "{{ local_handoff }}"
+        state: absent
+
+    - name: Unmount ocean's /data01
+      ansible.builtin.shell: "! mountpoint -q {{ ocean_data01 }} || umount {{ ocean_data01 }}"
+      changed_when: false
+
+  - name: Ensure archmap directories exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: directory
+      mode: '0755'
+    loop:
+      - "{{ home }}"
+      - "{{ home }}/data"
+      - "{{ home }}/data/tiles"
+
+  # Compose carries POSTGRES_PASSWORD, so it is as secret as the .env.
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0600'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap environment file
+    ansible.builtin.template:
+      src: "{{ files }}/archmap.env.j2"
+      dest: "{{ home }}/.env"
+      mode: '0600'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap tile nginx config
+    ansible.builtin.template:
+      src: "{{ files }}/nginx-tiles.conf.j2"
+      dest: "{{ home }}/nginx-tiles.conf"
+      mode: '0644'
+    notify:
+    - Restart archmap service
+
+  - name: Create archmap systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/archmap.service.j2"
+      dest: /etc/systemd/system/archmap.service
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart archmap service
+
+  - name: Enable archmap service
+    ansible.builtin.systemd:
+      name: archmap.service
+      enabled: true
+      daemon_reload: true
+
+  # Always restart so a dispatched deploy recreates the containers on the
+  # image pulled above, even when every template was byte-identical.
+  - name: Restart archmap service to pick up latest image
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: restarted
+
+  - name: Wait for archmap api through the tile nginx
+    ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ port_ext }}/healthz"
+      status_code: 200
+    register: archmap_health
+    retries: 20
+    delay: 6
+    until: archmap_health.status == 200
+
+  # Only now that harbor answers; until here `systemctl start archmap` on ocean
+  # was the backout.
+  - name: Read the ocean unit
+    ansible.builtin.stat:
+      path: /etc/systemd/system/archmap.service
+    delegate_to: ocean
+    register: ocean_unit_after
+
+  # Stopped first: a hand backout may have started it again, and deleting the
+  # unit alone leaves its unless-stopped containers running beside harbor's.
+  - name: Stop and disable archmap on ocean
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: stopped
+      enabled: false
+    delegate_to: ocean
+    when: ocean_unit_after.stat.exists
+
+  - name: Remove the ocean unit
+    ansible.builtin.file:
+      path: /etc/systemd/system/archmap.service
+      state: absent
+    delegate_to: ocean
+    register: ocean_unit_removed
+
+  - name: Reload systemd on ocean
+    ansible.builtin.systemd:
+      daemon_reload: true
+    delegate_to: ocean
+    when: ocean_unit_removed is changed
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: true
+
+  - name: Restart archmap service
+    ansible.builtin.systemd:
+      name: archmap.service
+      state: restarted

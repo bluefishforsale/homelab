@@ -9,7 +9,7 @@ nothing with a WAL crosses NFS.
 
 Membership is the `[data01_workers]` inventory group. Adding a host there gets it
 the export, the mounts, the alerts, and a tdarr node; nothing else names harbor
-except its VM play and NZBGet.
+except its VM play, NZBGet and archmap.
 
 ## Playbooks
 
@@ -20,6 +20,7 @@ except its VM play and NZBGet.
 | `infrastructure/data01_worker.yaml` | ocean, then workers (`serial: 1`) | Asserts ids match ocean, formats the state disk if blank, migrates existing state onto it on first mount, mounts NFS at `/data01` and the state disk over `/data01/services`, installs the docker guards and a retry timer. |
 | `workers/tdarr_node.yaml` | `data01_workers` | CPU tdarr node joined to ocean's tdarr server. |
 | `workers/nzbget.yaml` | ocean, then harbor | NZBGet compose project with scratch on the 870 EVO; only finished files cross NFS into `/data01/incoming`. Retires the old ocean units. Prune timer. ocean's nginx proxies it at `192.168.1.32:8901`. |
+| `workers/archmap.yaml` | harbor, ocean, then harbor | The archmap compose project (api, worker, Postgres, tile nginx), moved off ocean to take the render worker's CPU with it. Pulls on harbor first, then stops archmap on ocean and tars its state (minus repo clones) for harbor, which unpacks it once onto the local disk. ocean's old dir stays as the backout. ocean's nginx proxies `archmap.home` and the tunnel at `192.168.1.32:8091`. |
 | `infrastructure/db_restore_test.yaml` | harbor | Nightly restore test of the DB backups ([`db-restore.md`](../operations/db-restore.md)). |
 | `operations/backup/db_backup.yaml`, `db_restore.yaml` | ocean, `data01_workers` | Nightly backup of whatever DB containers run on each host, staged on the worker's state disk (root is squashed over NFS); restore acts only where the container lives. Dispatch-only. |
 

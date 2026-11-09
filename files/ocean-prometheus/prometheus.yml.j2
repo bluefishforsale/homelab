@@ -358,10 +358,10 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: /metrics
     static_configs:
-    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+    - targets: ['harbor.home:{{ service_ports.archmap.port }}']
       labels:
         service: archmap
-        host: ocean
+        host: harbor
 
   - job_name: 'archmap-worker'
     relabel_configs: *dropPortNumber
@@ -369,10 +369,10 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: /worker-metrics
     static_configs:
-    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+    - targets: ['harbor.home:{{ service_ports.archmap.port }}']
       labels:
         service: archmap
-        host: ocean
+        host: harbor
 
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
