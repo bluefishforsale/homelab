@@ -57,15 +57,15 @@ creating cloud resources:
 - Using cloud resources: db-backup writing to `gs://homelab-db-backups`, the
   cloudflare exporter reading analytics.
 
-Legacy code that still creates cloud resources, kept only until the bridge
-from this repo to terraform-root replaces it. Don't extend it, don't copy it
+Legacy code that still creates cloud resources, kept only until it's
+deleted.
+
+`cloudflared.yaml` no longer writes anything to Cloudflare. It looks up the
+host's `ssh-<host>` tunnel and fetches its token, and it fails if the tunnel is
+missing rather than creating it, so a new host's tunnel, CNAME and Access app
+come from terraform-root first. Remaining legacy pieces: Don't extend it, don't copy it
 into new playbooks, and don't run the scripts:
 
-- `playbooks/individual/ocean/network/cloudflared.yaml`: the `uri` calls that
-  POST tunnels, CNAMEs, Access apps and policies, rulesets and zone settings,
-  and `cloudflared tunnel create` / `route dns`. They're create-only and
-  tolerate "already exists", so with terraform-root creating things first they
-  turn into no-ops.
 - `scripts/cloudflare-harden.py`, `scripts/cloudflare-waf.py`,
   `scripts/cloudflare-pages-domain.sh`, and `scripts/cf.sh dns-add`. Running
   them now changes resources Terraform owns, the drift job opens an issue, and
@@ -82,8 +82,8 @@ repo secret `TF_VAR_ACCESS_PLEX_USER_EMAILS`. They never go in git in either
 repo. Changing who can get in means editing the vault **and** resetting that
 secret (command in terraform-root's agents.md, "Where the Access (tunnel)
 user emails live"); a vault edit alone changes nothing, because terraform-root
-applies the secret's copy. `cloudflared.yaml` also reads these keys for its
-legacy policy POSTs, so keep the key names stable.
+applies the secret's copy. Nothing in this repo reads these keys any more;
+they stay until they move to SOPS in terraform-root.
 
 Proxmox VMs are still created here with `qm clone` playbooks for now. They're
 the next candidate to move to terraform-root (bpg/proxmox, applied from the

@@ -61,12 +61,12 @@ The public hostname's cloud pieces are created in terraform-root, not here:
 the proxied CNAME to the tunnel, the Access app, and which reusable Access
 policy it gets (bypass for public, admin plus plex users, or admin only). Open
 that PR first and let it merge and apply. The homelab side below then only
-configures the host. `cloudflared.yaml` still POSTs these objects today, but
-they already exist by then, so its calls are no-ops.
+configures the host. `cloudflared.yaml` doesn't touch Cloudflare's API any
+more, so nothing here can create or fix those objects.
 
 ## Homelab repo side (`bluefishforsale/homelab`)
 
-Five files per new service:
+Four files per new service:
 
 1. `playbooks/individual/ocean/services/<service>.yaml` — ansible playbook.
    For image-based: templates compose + systemd, ends with an **unconditional**
@@ -85,11 +85,6 @@ Five files per new service:
    - `vars/vars_cloudflared.yaml`: ingress
      `<service>.example.com` → `http://192.0.2.143:80`
      (the tunnel's local routing; the DNS record itself is terraform-root's)
-5. `playbooks/individual/ocean/network/cloudflared.yaml`: add the first label
-   of the hostname to `fully_public_services` (Access bypass) for public
-   services. `public_services` = admin + plex-users gate. Else admin-only.
-   Keep this in step with the Access policy chosen in terraform-root, since
-   this playbook PUTs policies on Access apps it finds.
 
 **Image refresh requirements (every docker-based service):**
 
@@ -209,11 +204,9 @@ from laptop via ProxyJump to sync every target's `authorized_keys`. See
    `/usr/local/bin/cloudflared` on gh-runner-01 and bind-mounts it into each
    runner container; without it, all `delegate_to: localhost` cloudflared tasks
    fail in CI.
-7. **First label of hostname drives Access policy.** The classifier in
-   `cloudflared.yaml` splits `host.zone.tld` on `.` and matches the first
-   segment against `fully_public_services` / `public_services`. So `blog.X` and
-   `blog.Y` are both public. Adding a new public service = add its first label
-   to `fully_public_services`.
+7. **Access policy is chosen in terraform-root.** Each Access app there
+   references one reusable policy (bypass, admin plus plex users, or admin
+   only). The old first-label classifier in `cloudflared.yaml` is gone.
 8. **`run_once: true` on tasks that register a per-host fact leaks across
    hosts.** The cloudflared SSH-tunnel-check task had it; one host's positive
    result made all non-ocean hosts try `cloudflared tunnel info ssh-<host>` for
@@ -244,7 +237,6 @@ homelab:
 [ ] vars/vars_service_ports.yaml — add <name>.port
 [ ] files/nginx-compose/proxy_hostname_web_proxy.conf — add vhost block
 [ ] vars/vars_cloudflared.yaml — add ingress entry
-[ ] playbooks/individual/ocean/network/cloudflared.yaml — add to fully_public_services if public
 [ ] .github/workflows/deploy-<name>.yml (clone deploy-my-ta-jose.yml)
 [ ] .github/workflows/deploy-ocean-service.yml — add to manual-dispatch enum
 [ ] Push homelab — main-apply runs the affected narrow set.
