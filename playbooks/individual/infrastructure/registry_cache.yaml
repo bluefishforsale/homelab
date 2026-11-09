@@ -98,6 +98,7 @@
         owner: root
         group: root
         mode: '0644'
+        validate: dockerd --validate --config-file %s
       notify: Reload docker
 
     - name: Ensure Docker service is started and enabled
@@ -291,6 +292,24 @@
         enabled: yes
         state: started
         daemon_reload: yes
+
+    - name: Apply pending handlers so the running dockerd config can be checked
+      ansible.builtin.meta: flush_handlers
+
+    # A reload is a SIGHUP that exits 0 even when dockerd rejects the new config.
+    - name: Read dockerd's live registry config
+      ansible.builtin.command: docker info --format '{{ "{{" }}json .RegistryConfig{{ "}}" }}'
+      register: docker_registry_config
+      changed_when: false
+      check_mode: false
+
+    - name: Assert dockerd runs the new config and does not mirror through itself
+      when: not ansible_check_mode
+      ansible.builtin.assert:
+        that:
+          - "'registry-cache.home:5005' in docker_registry_config.stdout"
+          - "'registry-cache.home:5001/' not in (docker_registry_config.stdout | from_json).Mirrors | default([], true) | join(' ')"
+        fail_msg: "dockerd on the cache host is not running the rendered daemon.json; check journalctl -u docker"
 
   handlers:
     - name: Reload systemd daemon

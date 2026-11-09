@@ -1,11 +1,11 @@
 - name: Install Docker CE on Debian 12
-  # Exclude the CI runner host: this play restarts dockerd, and the deploy runs
-  # inside a container on gh-runner-01 (group github_runners). Restarting docker
-  # there kills the running job. Runner-host docker changes are applied manually.
-  hosts: 'all:!github_runners'
-  # Roll one host at a time. The handler only reloads dockerd now (SIGHUP, no
-  # container touched), but a package upgrade in this play still restarts it,
-  # so never let that hit the whole fleet at once.
+  # Exclude the CI runner host: a fresh docker install restarts dockerd, and the
+  # deploy runs inside a container on gh-runner-01 (group github_runners), so it
+  # would kill the running job. Runner-host docker changes are applied manually.
+  # macos is mini-tv, a Mac: this play is apt and systemd throughout.
+  hosts: 'all:!github_runners:!macos'
+  # Roll one host at a time, so a bad daemon.json or a first install stops at
+  # one host instead of reaching the whole fleet.
   serial: 1
   max_fail_percentage: 0
   become: yes
@@ -103,6 +103,12 @@
       groups: docker
       append: yes
 
+  # NOTE: the template is the only writer of daemon.json. A jq reformat pass
+  # used to rewrite it after the template, so both tasks changed on every run,
+  # and the dns role and registry_cache.yaml (which render the same template
+  # raw) flapped against it. validate stops a file dockerd would reject from
+  # ever landing, since a SIGHUP reload of a bad file fails silently and the
+  # breakage only shows at the next real dockerd start.
   - name: Ensure Docker daemon.json is configured correctly
     ansible.builtin.template:
       src: ../../../files/docker/daemon.json.j2
@@ -110,27 +116,14 @@
       owner: root
       group: root
       mode: '0644'
+      validate: dockerd --validate --config-file %s
+    notify: reload docker
 
   - name: Install jq package
     ansible.builtin.apt:
       name: jq
       state: present
-      update_cache: yes
-
-  - name: Format Docker daemon.json using jq and write it back to /etc/docker/daemon.json
-    ansible.builtin.command:
-      cmd: jq . /etc/docker/daemon.json
-    register: formatted_json
-    changed_when: false
-
-  - name: Overwrite /etc/docker/daemon.json with formatted version
-    ansible.builtin.copy:
-      content: "{{ formatted_json.stdout }}"
-      dest: /etc/docker/daemon.json
-      owner: root
-      group: root
-      mode: '0644'
-    notify: reload docker
+      update_cache: true
 
   - name: Ensure docker service override directory exists
     ansible.builtin.file:
@@ -320,11 +313,8 @@
         state: latest
         update_cache: yes
 
-    - name: Configure NVIDIA Container Runtime for Docker
-      ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
-      register: nvidia_runtime_config
-      changed_when: nvidia_runtime_config.rc == 0
-      notify: reload docker
+    # No `nvidia-ctk runtime configure` here: it rewrites daemon.json in its own
+    # format, and the template already renders the identical nvidia runtime.
 
     - name: Verify NVIDIA Container Toolkit installation
       ansible.builtin.command: nvidia-ctk --version
@@ -421,6 +411,24 @@
           - Container GPU: {{ 'Working' if nvidia_container_test.rc == 0 else 'Failed' }}
           - Ready for llamacpp GPU acceleration: {{ 'Yes' if nvidia_container_test.rc == 0 else 'No' }}
 
+
+  - name: Apply daemon.json now so the running config can be checked
+    ansible.builtin.meta: flush_handlers
+
+  # A reload is a SIGHUP that exits 0 even when dockerd rejects the new config,
+  # so check what dockerd is actually running with.
+  - name: Read dockerd's live registry config
+    ansible.builtin.command: docker info --format '{{ "{{" }}json .RegistryConfig{{ "}}" }}'
+    register: docker_registry_config
+    changed_when: false
+    check_mode: false
+
+  - name: Assert dockerd picked up the registry cache
+    when: not ansible_check_mode
+    ansible.builtin.assert:
+      that:
+        - "'registry-cache.home:5005' in docker_registry_config.stdout"
+      fail_msg: "dockerd is not running with the insecure-registries in daemon.json; check journalctl -u docker for 'Error reconfiguring'"
 
   handlers:
   # NOTE: reload, not restart. dockerd rereads registry-mirrors,

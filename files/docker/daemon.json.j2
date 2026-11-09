@@ -17,7 +17,7 @@
     ,
     "data-root": "{{ docker }}"
 {% endif %}
-{% if nvidia_gpu is defined and nvidia_gpu %}
+{% if nvidia_gpu | default(false) | bool %}
     ,
     "runtimes": {
         "nvidia": {
