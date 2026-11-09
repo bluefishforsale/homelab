@@ -13,6 +13,7 @@ cloudflared:
   # applied; the template change restarts cloudflared, which is what loads the
   # remote config.
   remote_managed_hosts:
+    - harbor
     - llmeval
     - netboot01
     - registry-cache-01
