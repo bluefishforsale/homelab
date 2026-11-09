@@ -53,6 +53,25 @@ def test_cover_encoded_as_video_is_flagged_and_not_counted_as_video():
     assert "cover-as-video" in why and "double-muxed" not in why, why
 
 
+def test_2160p_is_refetched_because_the_library_tops_out_at_1080p():
+    # Batman (1989) 2160p remux: already HEVC, so tdarr's audio-only branch
+    # copied ~60 GB of video into gaming's 40G cache and took down its neighbours.
+    why = conformance.reasons([video(3840, 2160)])
+    assert "over-1080p" in why and conformance.bucket(why) == "refetch", why
+
+
+def test_1080p_hdr_is_refetched_because_the_library_is_sdr_only():
+    # Ballerina WEBDL-1080p in PQ: right size, wrong colour.
+    why = conformance.reasons([{**video(1920, 1080), "color_transfer": "smpte2084"}])
+    assert "hdr" in why and conformance.bucket(why) == "refetch", why
+
+
+def test_dolby_vision_without_a_pq_transfer_tag_is_still_hdr():
+    # DV profile 5 carries its own colour space, so ffprobe reports no PQ transfer.
+    dv = {**video(1920, 1080), "side_data_list": [{"side_data_type": "DOVI configuration record"}]}
+    assert "hdr" in conformance.reasons([dv])
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
