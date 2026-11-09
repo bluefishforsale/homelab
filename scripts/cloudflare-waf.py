@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Apply Cloudflare edge hardening (WAF custom rules + rate limiting) to a zone.
 
+LEGACY, DON'T RUN. These WAF custom rules and rate limits are owned by bluefishforsale/terraform-root now.
+Running this changes Terraform-owned resources: the drift job opens
+an issue and the next apply reverts it. Make the change in terraform-root instead.
+
 Idempotent: each phase entrypoint is fetched, our rules (tagged "homelab:") are
 replaced, any other rules are preserved, then the ruleset is PUT back. Safe to
 re-run.

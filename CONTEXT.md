@@ -13,6 +13,14 @@ inventory under `inventories/production/`, rendered config templates under
 `vault/secrets.yaml`, ansible-vault encrypted, decrypted with the password file
 at `~/.ansible_vault_pass`.
 
+The boundary is hosts versus cloud. This repo configures hosts, VMs and the
+services on them. Cloud resources (Cloudflare DNS, tunnels, Access, rulesets,
+zone settings; GCP; Azure) belong to the sibling
+[`terraform-root`](https://github.com/bluefishforsale/terraform-root) repo, and
+new ones are created there, not by Ansible. A homelab service can depend on
+something terraform-root creates, so that change merges and applies first. The
+details are in [agents.md](agents.md#cloud-infrastructure-lives-in-terraform-root).
+
 Changes reach hosts through CI and a self-hosted runner inside the homelab
 network. Where you run `ansible-playbook` from decides what you may run:
 
@@ -90,7 +98,8 @@ resolves them, while staying drivable live from the phone. The autonomy policy i
 - A host joins fleet-wide monitoring by being in `[vms]` (or `groups['all']`);
   the Prometheus loops pick it up by hostname.
 - Service databases are dumped nightly to `gs://homelab-db-backups`, one
-  versioned object per service. A new service with a database has to be added to
+  versioned object per service. The bucket, its versioning and retention, and
+  the backup service accounts are managed in terraform-root, not here. A new service with a database has to be added to
   **both** `files/db-backup/db-backup.sh` and `files/db-backup/db-restore.sh` or
   it is only half covered. Restoring is dispatch-only and dry-run by default:
   [`docs/operations/db-restore.md`](docs/operations/db-restore.md).

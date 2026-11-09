@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Cloudflare Pages custom-domain setup.
 #
+# LEGACY, DON'T RUN. Pages projects and their custom domains are owned by
+# bluefishforsale/terraform-root (cloudflare_pages_domain). The note below about
+# radiantatmospheres.com DNS living at LMI is stale: the zone is on Cloudflare and
+# its records are in terraform-root too.
+#
 # Attaches a custom domain to a Cloudflare Pages project via the API. This is the
 # "register the domain in Pages FIRST" step: doing it before the DNS record exists
 # means Pages already knows the hostname, so when the CNAME resolves the cert

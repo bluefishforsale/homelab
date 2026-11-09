@@ -15,7 +15,68 @@ Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthroug
 - **data01 workers** (harbor: docker hosts on ocean's pool over NFS, local state) ->
   [`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)
 - **Onboarding a new external-repo service** -> [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
+- **Anything in Cloudflare, GCP or Azure** -> not this repo. It lives in
+  [`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root).
+  See [Cloud infrastructure lives in terraform-root](#cloud-infrastructure-lives-in-terraform-root).
 - **Validate:** `make validate`
+
+---
+
+## Cloud infrastructure lives in terraform-root
+
+**Ansible in this repo no longer creates cloud infrastructure.** Cloudflare, GCP
+and Azure resources are owned by
+[`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root)
+(local checkout `../terraform-root`), applied by its GitHub Actions on merge to
+`main`, with a daily drift check. If a change here needs a cloud resource to
+exist, that resource gets added in terraform-root first, merged and applied,
+and only then does the homelab change that depends on it ship.
+
+What terraform-root owns:
+
+- **Cloudflare:** the three zones (terrac.com, saetnere.com,
+  radiantatmospheres.com) and every DNS record in them, Cloudflare Tunnels
+  (the tunnel objects, including the per-host `ssh-<host>` ones), Access apps
+  and the reusable Access policies, the Zero Trust org and identity provider,
+  zone rulesets (rate limits, redirects, cache rules, security header
+  transforms, WAF custom rules), zone TLS/security settings, Email Routing,
+  R2 buckets and Pages projects.
+- **GCP** (`homelab-390805`): service accounts, the `homelab-db-backups`
+  bucket and its IAM, KMS, enabled APIs, project IAM.
+- **Azure:** the Artifact Signing account and app registrations for
+  signal-agent.
+
+What stays here, because it's host config or runtime operations rather than
+creating cloud resources:
+
+- Running `cloudflared` on each host and its locally-managed ingress config
+  (`vars/vars_cloudflared.yaml` -> `/etc/cloudflared/config.yaml`).
+- The DDNS timer rewriting `home.terrac.com`'s IP (terraform-root ignores that
+  record's content on purpose), certbot's short-lived DNS-01 TXT records, and
+  cache purges.
+- Using cloud resources: db-backup writing to `gs://homelab-db-backups`, the
+  cloudflare exporter reading analytics.
+
+Legacy code that still creates cloud resources, kept only until the bridge
+from this repo to terraform-root replaces it. Don't extend it, don't copy it
+into new playbooks, and don't run the scripts:
+
+- `playbooks/individual/ocean/network/cloudflared.yaml`: the `uri` calls that
+  POST tunnels, CNAMEs, Access apps and policies, rulesets and zone settings,
+  and `cloudflared tunnel create` / `route dns`. They're create-only and
+  tolerate "already exists", so with terraform-root creating things first they
+  turn into no-ops.
+- `scripts/cloudflare-harden.py`, `scripts/cloudflare-waf.py`,
+  `scripts/cloudflare-pages-domain.sh`, and `scripts/cf.sh dns-add`. Running
+  them now changes resources Terraform owns, the drift job opens an issue, and
+  the next apply puts things back.
+- `playbooks/individual/infrastructure/gcloud_sdk.yaml` with
+  `playbooks/tasks/gcloud.yaml` and `pki_gcloud_kms.yaml`: dead code (its vars
+  are defined nowhere). Never run it.
+
+Proxmox VMs are still created here with `qm clone` playbooks for now. They're
+the next candidate to move to terraform-root (bpg/proxmox, applied from the
+self-hosted runner), so expect that to change.
 
 ---
 
