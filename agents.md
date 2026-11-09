@@ -74,6 +74,17 @@ into new playbooks, and don't run the scripts:
   `playbooks/tasks/gcloud.yaml` and `pki_gcloud_kms.yaml`: dead code (its vars
   are defined nowhere). Never run it.
 
+**Cloudflare Access (tunnel) user emails.** The allow lists live only in
+`vault/secrets.yaml` under `cloudflare.access_allow_emails` (`plex-users` for
+friends, `admin`). That vault entry is the source of truth for terraform-root
+too: its `.envrc` reads it locally, and CI reads a copy in the terraform-root
+repo secret `TF_VAR_ACCESS_PLEX_USER_EMAILS`. They never go in git in either
+repo. Changing who can get in means editing the vault **and** resetting that
+secret (command in terraform-root's agents.md, "Where the Access (tunnel)
+user emails live"); a vault edit alone changes nothing, because terraform-root
+applies the secret's copy. `cloudflared.yaml` also reads these keys for its
+legacy policy POSTs, so keep the key names stable.
+
 Proxmox VMs are still created here with `qm clone` playbooks for now. They're
 the next candidate to move to terraform-root (bpg/proxmox, applied from the
 self-hosted runner), so expect that to change.
