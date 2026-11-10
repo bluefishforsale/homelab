@@ -64,4 +64,8 @@ Read off the drive labels 2026-11-10. All three were ST12000NM001G, PN 2MV103-00
 
 - ZJV4M3HE (swap 11): failed at 85 days in service, FARM shows ~51,000 hours before SMART was reset. Claim goes to the Amazon renewed seller on `114-9912532-0411436`, not goharddrive.
 - ZTM09X76 (swap 13): wrong part number shipped against Amazon `111-1354260-2167440`.
-- goharddrive `19-15026-15078`: a message about ZJV4M3HE was sent to them by mistake on 2026-11-10 and needs a retraction. All 4 drives from that order are the listed model, so there is no wrong-model claim against them. The real question is the ~38,000 hidden hours on ZL203PMM, plus whatever FARM shows on the 3 spares.
+- goharddrive `19-15026-15078`: a message about ZJV4M3HE was sent to them by mistake on 2026-11-10 and was retracted the same day. All 4 drives are the listed model. On the hidden hours (~38,000 to ~40,000 h per drive by FARM) the seller replied 2026-11-10: sold as refurbished, SMART reset is part of their recert, and they offered either $15 per drive ($60 total) to keep them or a return for a full refund. Keeping the drives and taking the $60, since all four test clean and an 18TB upgrade is not worth it yet. The drives carry goharddrive's 5-year seller warranty from purchase (2026-08), so a failure in one of these goes back to them under warranty.
+
+## Plan
+
+Run the two remaining spares down as the older ST12000NM0127s fail. When the last spare goes into the pool, plan the upgrade (larger drives, or the disk shelf) rather than buying more 12TB used drives.
