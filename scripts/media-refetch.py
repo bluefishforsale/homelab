@@ -69,9 +69,6 @@ JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso
 # A bonus disc Sonarr parses as the whole season. It imports nothing, and the
 # season's old files are gone by then.
 EXTRAS = re.compile(r"\bextras\b", re.I)
-# tdarr copies an HEVC source's video untouched, so its size is whatever the
-# release group chose; any other codec goes through the flow's encode.
-HEVC = re.compile(r"\b(x265|hevc|h\.?265)\b", re.I)
 # The same disc also comes without the word. An SD DVDRip runs 170-350 MB an
 # episode; under this, the release cannot hold what it would replace.
 MIN_EPISODE_BYTES = 50e6
@@ -205,8 +202,12 @@ def bump(item, files, yes):
 
 
 def pick(rels):
-    """The release Radarr or Sonarr ranks first, passing over HEVC while anything else is left."""
-    return min(rels, key=lambda r: (bool(HEVC.search(r["title"])), r.get("releaseWeight", 0))) if rels else None
+    """The release Radarr or Sonarr ranks first.
+
+    The codec preference lives in their custom formats (files/ocean-recyclarr):
+    TV ranks x265 10-bit SDR first, movies rank x265 last. A second opinion here
+    would fight them."""
+    return min(rels, key=lambda r: r.get("releaseWeight", 0)) if rels else None
 
 
 def same_film(title, year):
@@ -394,6 +395,16 @@ def with_stripped_hdr(rows, arr_hdr):
         yield f
 
 
+# What a grab under the 1080p, 12 Mbps Radarr profile can't bring back, so a
+# movie the ledger already refetched is planned again for these.
+REGRAB = {"over-1080p", "hdr", "over-bitrate"}
+
+
+def held_back(movie_id, reasons, held):
+    """A movie refetched before is left alone unless its file is now over the size or SDR cap."""
+    return movie_id in held and not REGRAB & set(reasons)
+
+
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
@@ -430,7 +441,7 @@ def cmd_plan(a):
         if why:
             skipped.setdefault(why, []).append(path)
             continue
-        if movie["id"] in held:
+        if held_back(movie["id"], f["reasons"], held):
             continue
         rk, added, _ = plex[path]
         todo.append({"file": f["file"], "path": path, "reasons": f["reasons"], "size_gb": f["size_gb"],
