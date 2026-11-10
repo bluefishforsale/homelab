@@ -520,3 +520,30 @@ def test_movie_kept_without_subs_is_not_planned_again():
     # it again would loop on the same releases forever.
     assert refetch.held_back(7, ["no-english-subs"], {7})
     assert not refetch.held_back(8, ["no-english-subs"], {7})
+
+
+def _movie(i, title, rel):
+    return {"id": i, "title": title, "year": 2016, "path": f"/movies/{title} (2016)",
+            "movieFile": {"relativePath": rel, "size": 2.6e9}}
+
+
+def test_listed_movie_is_planned_though_it_conforms():
+    # Arrival came out of tdarr's 8-bit squeeze with subtitles and the dialogue
+    # track, so conformance calls it clean; the banding is only visible on screen.
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    todo = refetch.listed_movies([m], {1}, plex, {500: 2}, {})
+    assert [(t["title"], t["reasons"], t["plays"], t["file"]) for t in todo] == [
+        ("Arrival (2016)", ["listed"], 2, "/media/movies/Arrival (2016)/Arrival.mkv")]
+
+
+def test_listed_movie_already_in_flight_is_not_planned_twice():
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    ledger = {"/media/movies/Arrival (2016)/Old.mkv": {"movie_id": 1, "state": "grabbed"}}
+    assert refetch.listed_movies([m], {1}, plex, {}, ledger) == []
+
+
+def test_listed_movie_missing_from_plex_is_skipped():
+    # Without a Plex rating key the added date can't be put back afterwards.
+    assert refetch.listed_movies([_movie(1, "Arrival", "Arrival.mkv")], {1}, {}, {}, {}) == []

@@ -404,9 +404,46 @@ def held_back(movie_id, reasons, held):
     return movie_id in held and not REGRAB & set(reasons)
 
 
+def listed_movies(movies, ids, plex, count, ledger):
+    """Movies picked by hand (Radarr ids), planned whatever conformance says.
+
+    tdarr's old 8-bit squeeze left films like Arrival conformant on paper and
+    banded on screen; only a person watching can tell, so they come as a list."""
+    busy = {i["movie_id"] for i in ledger.values() if "movie_id" in i and i.get("state") != "done"}
+    todo = []
+    for m in movies:
+        if m["id"] not in ids or m["id"] in busy:
+            continue
+        path = os.path.join(m["path"].rstrip("/"), m["movieFile"]["relativePath"])
+        if path not in plex:
+            continue
+        rk, added, _ = plex[path]
+        todo.append({"file": "/media" + path, "path": path, "reasons": ["listed"],
+                     "size_gb": round(m["movieFile"]["size"] / 1e9, 2), "movie_id": m["id"],
+                     "title": f"{m['title']} ({m['year']})", "rating_key": rk, "added_at": added,
+                     "plays": count.get(rk, 0)})
+    return todo
+
+
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
+    if a.ids:
+        with open(a.ids) as f:
+            ids = {int(x.split("#")[0]) for x in f if x.split("#")[0].strip()}
+        todo = sorted(listed_movies(movies, ids, plex_items(), plays(), ledger), key=lambda t: (-t["plays"], t["title"]))
+        batch, gb = [], 0.0
+        for t in todo:
+            if len(batch) >= a.movies or gb + t["size_gb"] > a.max_gb:
+                break
+            batch.append(t)
+            gb += t["size_gb"]
+        for t in batch:
+            print(f"plan   {t['title']}: listed, {t['plays']} plays")
+            ledger[t["file"]] = {**t, "state": "planned", "attempts": 0, "log": []}
+        print(f"{len(batch)} planned from {a.ids} ({gb:.0f} GB on disk now), {len(todo) - len(batch)} more waiting")
+        save(ledger)
+        return
     radarr = {os.path.join(m["path"].rstrip("/"), m["movieFile"]["relativePath"]): m for m in movies}
     folders = {m["path"].rstrip("/") for m in movies}
     plex = plex_items()
@@ -817,6 +854,7 @@ def main():
     p.add_argument("--max-gb", type=float, default=2000)
     p.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
     p.add_argument("--show-skipped", action="store_true", help="list every skipped path")
+    p.add_argument("--ids", help="plan only these Radarr movie ids, one per line (# comments), whatever conformance says")
     p.set_defaults(fn=cmd_plan)
     r = sub.add_parser("run")
     r.add_argument("--yes", action="store_true")
