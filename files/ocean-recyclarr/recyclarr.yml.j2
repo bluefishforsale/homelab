@@ -45,7 +45,12 @@ sonarr:
         - trash_id: 74aff4168620ed49dcc67e92b2c2a5b4  # [Optional] Language Profiles
         - trash_id: 85fae4a2294965b75710ef2989c850eb  # [Streaming Services] HD/UHD boost
         - trash_id: 59c3af66780d08332fdc64e68297098f  # [Unwanted] Unwanted Formats
-    # No Golden Rule group here: both its options score 1080p SDR x265 -10000.
+      # NOTE: Golden Rule HD is a default group of TRaSH's WEB-1080p profile, so
+      # leaving it out of `add` still syncs it. Both its options score 1080p SDR
+      # x265 at -10000, which outweighs "x265 10-bit SDR" (+2000) and sinks the
+      # releases TV now prefers. Skipping it lets the score reset zero x265 (HD).
+      skip:
+        - 158188097a58d7687dee647e04af0da3  # [Optional] Golden Rule HD
 
     custom_formats:
       # files/ocean-recyclarr/custom-formats/sonarr/x265-10bit-sdr.json
