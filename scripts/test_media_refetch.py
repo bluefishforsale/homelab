@@ -505,3 +505,18 @@ if __name__ == "__main__":
         if name.startswith("test_"):
             fn()
             print("ok  ", name)
+
+
+def test_movie_refetched_into_4k_is_planned_again():
+    # Batman (1989) was refetched for subtitles on 11-08 and came back a 72 GB
+    # 2160p DV remux. The ledger held it as already refetched, so the 1080p
+    # cap never saw it again.
+    assert not refetch.held_back(7, ["over-1080p", "hdr"], {7})
+    assert not refetch.held_back(7, ["over-bitrate"], {7})
+
+
+def test_movie_kept_without_subs_is_not_planned_again():
+    # A refetch that found no English subtitles keeps the last download; planning
+    # it again would loop on the same releases forever.
+    assert refetch.held_back(7, ["no-english-subs"], {7})
+    assert not refetch.held_back(8, ["no-english-subs"], {7})

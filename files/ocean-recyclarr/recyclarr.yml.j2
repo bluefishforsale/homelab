@@ -45,8 +45,23 @@ radarr:
     base_url: http://127.0.0.1:{{ service_ports.radarr.port }}
     api_key: !env_var RADARR_API_KEY
 
+    # Movies play as grabbed (tdarr leaves their video alone), so the size is
+    # the stream and the disk: prefer ~10 Mbps and cap at 12 (MB/min = Mbps x
+    # 7.5). At 10 the 6000-hour movie library is ~27 TB; Tier 01 BluRay encodes
+    # run 12-20 Mbps (20 GB for Dune) and don't fit, so this lands on WEB-DLs
+    # and streaming-sized BluRay encodes instead.
     quality_definition:
       type: movie
+      qualities:
+        - name: Bluray-1080p
+          max: 90
+          preferred: 75
+        - name: WEBDL-1080p
+          max: 90
+          preferred: 75
+        - name: WEBRip-1080p
+          max: 90
+          preferred: 75
 
     quality_profiles:
       # HD Bluray + WEB: tier-01 BluRay encodes keep film grain, and tdarr leaves
