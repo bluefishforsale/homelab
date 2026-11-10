@@ -217,7 +217,7 @@ def same_film(title, year):
 
 
 def best_release(movie_id):
-    rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
+    rels = mc.get("radarr", "/api/v3/release", movieId=movie_id, timeout=SEARCH_TIMEOUT)
     year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
           and r.get("downloadAllowed") and same_film(r["title"], year)]
