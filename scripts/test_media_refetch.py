@@ -14,6 +14,8 @@ refetch = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(refetch)
 # No test reaches a live host: a path lookup finds nothing and keeps the path it had.
 refetch.ssh = lambda cmd, stdin=None: ""
+# Some tests stub this out for the rest of the run; keep the real one.
+BEST_RELEASE = refetch.best_release
 
 PACK_TERM = r"Contains these ignored terms: /\bS\d+\b(?!E\d+\b)/i"
 
@@ -499,6 +501,22 @@ def test_movie_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
         refetch.ssh, refetch.subs = saved
     assert probed == [mkv] and item["file"] == mkv, (probed, item.get("file"))
     assert item["path"] == mkv.removeprefix("/media") and item["state"] == "imported"
+
+
+def test_movie_search_gets_the_same_time_as_a_season_search():
+    # Gladiator II, Django Unchained, Crimes of Grindelwald (2026-11-10): Radarr's
+    # interactive search for a popular film ran past the 120s default, so they
+    # "timed out" every tick and were never grabbed.
+    seen = []
+
+    class Fake:
+        def get(self, app, path, timeout=120, **kw):
+            seen.append((path, timeout))
+            return [] if path.endswith("/release") else {"year": 2024}
+
+    refetch.mc = Fake()
+    BEST_RELEASE(1)
+    assert ("/api/v3/release", refetch.SEARCH_TIMEOUT) in seen, seen
 
 
 def test_hdr_source_encoded_to_untagged_sdr_is_refetched():
