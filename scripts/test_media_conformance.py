@@ -72,6 +72,23 @@ def test_dolby_vision_without_a_pq_transfer_tag_is_still_hdr():
     assert "hdr" in conformance.reasons([dv])
 
 
+
+def test_movie_over_12_mbps_is_refetched_because_movies_play_as_grabbed():
+    # A Touch of Zen (1970) remux: 40.1 GB over 180 minutes, ~30 Mbps. tdarr
+    # leaves movie video alone, so the only way down to ~10 Mbps is a new grab.
+    why = conformance.size_reasons("movies", 40.1 * 1024, 180 * 60)
+    assert why == ["over-bitrate"] and conformance.bucket(why) == "refetch", why
+
+
+def test_movie_at_10_mbps_is_within_the_limit():
+    assert conformance.size_reasons("movies", 8.2 * 1024, 110 * 60) == []
+
+
+def test_tv_bitrate_is_left_to_the_tdarr_encode():
+    # A 1080p remux episode at ~30 Mbps gets one 10-bit encode to ~3.5 Mbps.
+    assert conformance.size_reasons("tv", 9.0 * 1024, 42 * 60) == []
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

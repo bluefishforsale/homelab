@@ -102,10 +102,23 @@ def reasons(streams):
     return out
 
 
+# Movies play as grabbed (tdarr copies their video), so the file's bitrate is
+# the stream's and the disk's. Radarr's quality definition caps grabs at the same
+# 12 Mbps (files/ocean-recyclarr/recyclarr.yml.j2).
+MOVIE_MAX_MBPS = 12
+
+
+def size_reasons(library, size_mib, seconds):
+    """A movie over the bitrate cap; TV is brought down by tdarr's encode instead."""
+    if library != "movies" or not seconds:
+        return []
+    return ["over-bitrate"] if size_mib * 1048576 * 8 / seconds / 1e6 > MOVIE_MAX_MBPS else []
+
+
 def bucket(why):
     if not why:
         return "ok"
-    if any(r in why for r in ("double-muxed", "no-english-subs", "over-1080p", "hdr")):
+    if any(r in why for r in ("double-muxed", "no-english-subs", "over-1080p", "hdr", "over-bitrate")):
         return "refetch"
     return "tdarr"
 
@@ -116,7 +129,9 @@ def sweep():
             lib = tdarr.library_of(r.get("file", ""))
             if lib == "other":
                 continue
-            why = reasons(((r.get("ffProbeData") or {}).get("streams")) or [])
+            probe = r.get("ffProbeData") or {}
+            why = reasons(probe.get("streams") or [])
+            why += size_reasons(lib, r.get("file_size") or 0, float((probe.get("format") or {}).get("duration") or 0))
             yield {"file": r["file"], "library": lib, "size_gb": round((r.get("file_size") or 0) / 1024, 2),
                    "bucket": bucket(why), "reasons": why}
 
