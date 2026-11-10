@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish Seagate FARM log counters to the node_exporter textfile collector
+After=smart-exporter.service
+Documentation=file://{{ node_exporter_files | default('files/node-exporter') }}/farm-metrics.sh
+
+[Service]
+Type=oneshot
+# Read-only collector: runs `smartctl -l farm` (a log read) via the smart-exporter
+# container and writes smart_farm.prom. Short-lived; the timer re-runs it.
+ExecStart=/usr/local/bin/farm-metrics.sh {{ node_exporter_textfiles }}
+Nice=10
+IOSchedulingClass=idle
