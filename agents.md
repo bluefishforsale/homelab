@@ -200,6 +200,10 @@ is the worst possible outcome. So storage is exempt from "merge = deploy":
   Both are stable by-id paths so no data was at risk, but anything matching on a `wwn-`
   prefix skips that disk. `disk_wwn_info` (`files/node-exporter/zpool-metrics.sh`) now maps
   kernel name -> wwn -> serial for every disk, so monitoring is no longer blind to it.
+- **Every part swap gets a row in [`docs/operations/hardware-repair-log.md`](docs/operations/hardware-repair-log.md)**
+  in the same change: part number, serial, WWN, date, vendor, order, price, and FARM vs SMART
+  hours for used Seagate drives. It is the source of truth for hardware history; don't
+  reconstruct that history from `zpool history`, Prometheus or email when the log can say it.
   Full record and the rename options: [`docs/operations/zfs-disk-replacement.md`](docs/operations/zfs-disk-replacement.md).
 
 ### Nothing with a write-ahead log goes over NFS
