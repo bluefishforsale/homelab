@@ -42,16 +42,17 @@ hard limits so a phase plan cannot quietly drop one.
 | 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Master and minions |
 | 2027 Q2 | Phase 2 (harbor), Phase 3 (ocean joins, GPU gate) | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W1 to W5) | | k3s install moves to Salt |
-| 2027 Q4 | Phase 5 (monitoring, ingress); 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
+| 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
 | 2028 H1 | | | Phase 6 done, Phase 7 archive |
 
 Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item. It
-is not tied to phase 4 or 5: it can run any time after phase 3, mid-waves.
+runs only after Docker on ocean is drained (end of phase 5), so phases 4 and 5
+must leave room for it.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); D2 and D4 signed off,
-      D13 revised (2026-11-09).
+- [ ] terrac reviews spec and PRD; answers Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); D2, D4 and D13 signed off
+      (2026-11-09).
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
 - [ ] `homelab-kube`: sops from GPG to age; age private key into the vault at
@@ -184,14 +185,13 @@ GCS object name, verified with `db_restore_test.yaml`.
       cert-manager; Docker nginx retires.
 - [ ] Docker removed from ocean.
 
-## Phase 5b: ocean passthrough swap to Debian 13 (after phase 3, by end of 2027)
+## Phase 5b: ocean passthrough swap to Debian 13 (after phase 5, by end of 2027)
 
-Runs whenever it is ready, independent of how far the waves have got (D13).
-The new VM carries Docker for every service still in Docker plus the k3s agent.
+Starts only once Docker on ocean is drained and removed (D13). The new VM is
+k3s-only.
 
 - [ ] Build and patch the replacement ocean VM (spec, "Passthrough swap
-      procedure", before the window), Docker installed and disabled, every
-      remaining compose project's files in place.
+      procedure", before the window).
 - [ ] `terraform-root` swap PR and its revert PR prepared.
 - [ ] Window, with terrac hand-running the ZFS steps.
 - [ ] 14-day backout period; then delete the old VM.

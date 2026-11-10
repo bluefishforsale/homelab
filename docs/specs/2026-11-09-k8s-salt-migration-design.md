@@ -197,12 +197,11 @@ move one at a time (D4). That is the least downtime per service: each cutover
 is one container stopping and one pod starting on the same host, against the
 same state directory and the same GPU.
 
-The k3s join is in place and additive (no OS upgrade). OS majors still never
-happen in place, so ocean's OS moves by **passthrough swap** (below), and a swap
-does not wait for the migration to finish (D13): the replacement VM carries
-**both** runtimes, Docker with every compose project not yet migrated and the
-k3s agent, so the migration carries on across the swap unchanged. Once Docker
-is empty, later swaps carry only k3s.
+The k3s join is in place and additive (no OS upgrade). OS majors never happen
+in place, so once Docker on ocean is completely drained, the first
+**passthrough swap** (below) moves the GPU, the HBA and the pool to a clean
+Debian 13 VM that runs only k3s (D13). From then on ocean is a k8s-only node,
+rebuilt by swap, never upgraded in place.
 
 **Step 1: prepare (no downtime).**
 
@@ -248,12 +247,12 @@ above. Waves, lowest risk first:
 
 At the end of W7, Docker on ocean is empty and is removed.
 
-**Swaps during the migration.** Ocean is on Debian 12, which left regular
-security support in June 2026 and is on LTS until June 2028. Its first swap, to
-Debian 13, happens whenever it is ready after the phase 3 join is proven, and
-in any case by the end of 2027, wherever the waves have got to. The swap is the
-same procedure whether Docker holds forty services or none; only the list of
-Docker services to bring up on the new VM changes.
+**Step 5: first passthrough swap.** After W7, with Docker drained and
+removed, ocean is rebuilt as a clean Debian 13 k8s-only node using the
+passthrough swap procedure below. This is also ocean's OS major upgrade: it is
+on Debian 12, which left regular security support in June 2026 and is on LTS
+until June 2028, so the waves have to finish in time for this swap to land by
+the end of 2027.
 
 ### OS lifecycle: patch continuously, never upgrade a major in place
 
@@ -317,23 +316,15 @@ for ocean, the hardest case; `k3s-agent01` is the same without the pool and GPU.
    flags need, NFS server config, node-exporter, k3s agent installed at the
    pinned version but **not started**. The GPU and pool cannot be tested yet;
    check `dkms status`, `modinfo nvidia`, `modinfo zfs`.
-3. While Docker still has services: install Docker and apply every remaining
-   ocean service play, so each compose project's files are in place, but with
-   `docker.service` **disabled and stopped**. Nothing may start before the pool
-   is imported, or containers write into the empty `/data01` mountpoint on the
-   root disk and the data is invisible after the import (the side effect
-   `agents.md` warns about). Plays that start containers run with a variable
-   that skips the start, or run after the swap.
-4. Prepare the `terraform-root` swap PR (not merged yet): passthrough devices
+3. Prepare the `terraform-root` swap PR (not merged yet): passthrough devices
    moved from old to new VM, old VM's `net0` MAC on the new VM (so DHCP and ARP
    do not change), new VM at full RAM and CPU and the final IP, old VM
    `onboot = false`.
-5. Written checklist signed off: versions, held packages, labels, taint, the
-   list of Docker services to bring up.
+4. Written checklist signed off: versions, held packages, labels, taint.
 
 **The window (target under 30 minutes of ocean-hosted downtime):**
 
-1. Cordon and drain the old node; stop Docker on it. Scale down pods on other
+1. Cordon and drain the old node. Scale down pods on other
    nodes that hold the `/data01` NFS mount (tdarr-node, nzbget) so nothing
    parks in D state.
 2. Hand-run, per the ZFS rules in `agents.md`: `zfs snapshot -r` of
@@ -345,13 +336,11 @@ for ocean, the hardest case; `k3s-agent01` is the same without the pool and GPU.
    **without `-f`**; if it asks for `-f`, stop and find out why (hostid, an
    unclean export) before forcing. Never `zpool upgrade` in the window. Start
    the NFS server; NFS clients recover on their own (`hard` mounts).
-6. Enable and start Docker; the remaining compose projects come up against the
-   imported pool.
-7. Delete the old Node object and its `ocean.node-password.k3s` secret in
+6. Delete the old Node object and its `ocean.node-password.k3s` secret in
    `kube-system`, then start the k3s agent. The node rejoins as `ocean`, so
    monitoring names do not change, with the same labels and taint.
-8. Uncordon. Pods reschedule onto it by label. Verify GPU pods, every Docker
-   service and every blackbox probe, and the NFS-dependent pods scaled back up.
+7. Uncordon. Pods reschedule onto it by label. Verify GPU pods, every
+   blackbox probe, and the NFS-dependent pods scaled back up.
 
 **Backout (any time until the old VM is deleted):** stop the new VM, hand-run
 `zpool export`, revert the `terraform-root` swap PR (devices and MAC back), start
