@@ -51,12 +51,16 @@ Every disk in the pool arrived with its SMART counters reset. FARM keeps the rea
 
 ## Spares on hand
 
-| Model | Serial | Vendor, order, unit price | FARM h | Notes |
-|---|---|---|---|---|
-| ST12000NM001G (expected) | unknown | eBay goharddrive `19-15026-15078`, $349.95 | unknown | 3 of 4 from that order, assuming none went elsewhere. Read model, serial and FARM before use and fill these rows in. |
+Read off the drive labels 2026-11-10. All three are ST12000NM001G, PN 2MV103-003, firmware SN03, the same build as ZL203PMM (swap 14), and the remaining 3 of the 4 from the goharddrive order (inferred: model and count match, no other ST12000NM001G purchase). PSIDs are on the labels but deliberately not recorded here: a PSID lets anyone with the drive factory-reset its encryption.
+
+| Model | Serial | WWN | Vendor, order, unit price | FARM h | Notes |
+|---|---|---|---|---|---|
+| ST12000NM001G | ZLW0T9XR | `0x5000c500c5d784ee` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
+| ST12000NM001G | ZLW0RKG6 | `0x5000c500c5d216f1` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
+| ST12000NM001G | ZLW0VNXQ | `0x5000c500c5da3030` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
 
 ## Open claims
 
 - ZJV4M3HE (swap 11): failed at 85 days in service, FARM shows ~51,000 hours before SMART was reset. Claim goes to the Amazon renewed seller on `114-9912532-0411436`, not goharddrive.
 - ZTM09X76 (swap 13): wrong part number shipped against Amazon `111-1354260-2167440`.
-- goharddrive `19-15026-15078`: a message about ZJV4M3HE was sent to them by mistake on 2026-11-10 and needs a retraction. The real question for them is the ~38,000 hidden hours on ZL203PMM, plus whatever the 3 spares show.
+- goharddrive `19-15026-15078`: a message about ZJV4M3HE was sent to them by mistake on 2026-11-10 and needs a retraction. All 4 drives from that order are the listed model, so there is no wrong-model claim against them. The real question is the ~38,000 hidden hours on ZL203PMM, plus whatever FARM shows on the 3 spares.
