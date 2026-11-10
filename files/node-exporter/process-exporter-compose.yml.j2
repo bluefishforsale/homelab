@@ -1,0 +1,21 @@
+# process-exporter as a compose project so docker-refresh@process-exporter keeps
+# the image current on every host.
+services:
+  process-exporter:
+    image: {{ process_exporter_image }}:{{ process_exporter_version }}
+    container_name: {{ process_exporter_service }}
+    hostname: {{ process_exporter_service }}
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - TZ=America/Los_Angeles
+    ports:
+      - "{{ process_exporter_port }}:9256"
+    volumes:
+      - /proc:/host/proc
+    command:
+      - --procfs
+      - /host/proc
+      - -procnames
+      - docker,dockerd,containerd,prometheus,grafana-server,nginx,mysqld,Plex,cloudflared,node_exporter,cadvisor,loki
+    # No healthcheck: the image has no shell. up{job="process-exporter"} covers it.

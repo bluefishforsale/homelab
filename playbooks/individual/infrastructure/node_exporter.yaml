@@ -45,6 +45,7 @@
     process_exporter_image: ncabatoff/process-exporter
     process_exporter_version: latest
     process_exporter_port: "{{ service_ports.process_exporter.port }}"
+    process_exporter_compose_dir: /opt/compose/process-exporter
     # NVIDIA GPU Exporter (Docker Compose deployment)
     nvidia_gpu_exporter_service: nvidia-gpu-exporter
     nvidia_gpu_exporter_image: utkuozdemir/nvidia_gpu_exporter
@@ -263,6 +264,58 @@
     ansible.builtin.systemd:
       daemon_reload: true
 
+  # Before the project enumeration below, so a first deploy also gets
+  # process-exporter its refresh timer instead of waiting for the next apply.
+  - name: Create process-exporter compose dir
+    ansible.builtin.file:
+      path: "{{ process_exporter_compose_dir }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    when: docker_check.rc == 0
+
+  - name: Create process-exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter-compose.yml.j2"
+      dest: "{{ process_exporter_compose_dir }}/docker-compose.yml"
+      owner: root
+      group: root
+      mode: '0644'
+    when: docker_check.rc == 0
+    register: process_exporter_compose
+
+  - name: Create process-exporter systemd service
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter.service.j2"
+      dest: /etc/systemd/system/process-exporter.service
+      mode: '0644'
+    when: docker_check.rc == 0
+    register: process_exporter_unit
+
+  - name: Find a leftover bare docker run process-exporter
+    ansible.builtin.command: >-
+      docker ps -a --filter name=^{{ process_exporter_service }}$
+      --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+    register: process_exporter_legacy
+    changed_when: false
+    check_mode: false
+    failed_when: false
+    when: docker_check.rc == 0
+
+  - name: Remove the bare docker run process-exporter before compose takes the name
+    ansible.builtin.command: docker rm -f {{ process_exporter_service }}
+    register: process_exporter_legacy_rm
+    when: docker_check.rc == 0 and process_exporter_legacy.stdout | default('') | trim == 'project='
+
+  - name: Start and enable process-exporter (restart only on change)
+    ansible.builtin.systemd:
+      name: process-exporter.service
+      enabled: true
+      daemon_reload: true
+      state: "{{ 'restarted' if (process_exporter_compose is changed or process_exporter_unit is changed or process_exporter_legacy_rm is changed) else 'started' }}"
+    when: docker_check.rc == 0
+
   # Read-only, and it has to run in check mode too or the dry run would loop
   # over an undefined list.
   #
@@ -437,16 +490,6 @@
       mode: '0644'
     when: (nvidia_gpu | default(false) | bool)
 
-  - name: Create process-exporter systemd service (non-compose)
-    ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter.service.j2"
-      dest: "/etc/systemd/system/process-exporter.service"
-      mode: '0644'
-    when: docker_check.rc == 0
-    notify:
-    - Reload systemd daemon
-    - Restart services
-
   - name: Create cadvisor Docker Compose systemd service
     ansible.builtin.template:
       src: "{{ cadvisor_files }}/cadvisor.service.j2"
@@ -575,7 +618,6 @@
     when: (nvidia_gpu | default(false) | bool) and docker_check.rc == 0
     notify:
     - Reload systemd daemon
-    - Restart services
     - Restart GPU services
 
   - name: Show GPU configuration status
@@ -592,13 +634,6 @@
       echo "GPU container recreation completed"
     when: (nvidia_gpu | default(false) | bool) and docker_check.rc == 0 and (gpu_docker_compose_config.changed or gpu_env_config.changed)
     
-  - name: Start and enable process-exporter (non-compose service)
-    ansible.builtin.systemd:
-      name: process-exporter.service
-      state: started
-      enabled: true
-    when: docker_check.rc == 0
-
   - name: Start and enable cadvisor Docker Compose service
     ansible.builtin.systemd:
       name: cadvisor.service
@@ -642,11 +677,6 @@
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
-
-  - name: Restart services
-    ansible.builtin.systemd:
-      name: process-exporter.service
-      state: restarted
 
   - name: Restart cadvisor service
     ansible.builtin.systemd:
