@@ -294,9 +294,19 @@ def when(stamp):
     return dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
 
 
-def plan_tv(a, refetch, ledger, plex, count):
+def tv_held(ledger, relist=False):
+    """Episode ids and season keys a TV plan leaves alone.
+
+    A hand-made list (relist) re-plans finished items: Charmed S03 was refetched,
+    then squeezed by the 1.2 Mbps flow before the 10-bit target landed."""
+    live = [(k, i) for k, i in ledger.items() if i.get("kind") == "tv" and not (relist and i.get("state") == "done")]
+    return ({e for _, i in live for e in i["episode_ids"]},
+            {k for k, i in live if k.startswith("tv:")})
+
+
+def plan_tv(a, refetch, ledger, plex, count, relist=False):
     series = {os.path.basename(s["path"].rstrip("/")): s for s in mc.get("sonarr", "/api/v3/series")}
-    held = {e for i in ledger.values() if i.get("kind") == "tv" for e in i["episode_ids"]}
+    held, held_seasons = tv_held(ledger, relist)
     groups, skipped = {}, collections.Counter()
     for f in refetch:
         if f["library"] != "tv":
@@ -309,7 +319,7 @@ def plan_tv(a, refetch, ledger, plex, count):
             skipped["specials, or not in a season folder"] += 1
         elif m.group(1) not in series:
             skipped["not in Sonarr"] += 1
-        elif f"tv:{series[m.group(1)]['id']}:{m.group(2)}" in ledger:
+        elif f"tv:{series[m.group(1)]['id']}:{m.group(2)}" in held_seasons:
             pass                                       # the season is already in a batch
         else:
             groups.setdefault((m.group(1), int(m.group(2))), []).append({**f, "path": path})
@@ -429,6 +439,15 @@ def listed_movies(movies, ids, plex, count, ledger):
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
+    if a.tv_files:
+        # Episode paths as tdarr sees them (/media/tv/...), one per line.
+        with open(a.tv_files) as f:
+            listed = [{"file": x.split("#")[0].strip(), "library": "tv", "reasons": ["listed"], "size_gb": 0.0}
+                      for x in f if x.split("#")[0].strip()]
+        a.tv_gb = a.tv_gb or float("inf")
+        plan_tv(a, listed, ledger, plex_items(), plays(), relist=True)
+        save(ledger)
+        return
     if a.ids:
         with open(a.ids) as f:
             ids = {int(x.split("#")[0]) for x in f if x.split("#")[0].strip()}
@@ -855,6 +874,7 @@ def main():
     p.add_argument("--max-gb", type=float, default=2000)
     p.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
     p.add_argument("--show-skipped", action="store_true", help="list every skipped path")
+    p.add_argument("--tv-files", help="plan only these episode files (/media/tv/... paths, one per line), even ones refetched before")
     p.add_argument("--ids", help="plan only these Radarr movie ids, one per line (# comments), whatever conformance says")
     p.set_defaults(fn=cmd_plan)
     r = sub.add_parser("run")

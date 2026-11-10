@@ -542,3 +542,19 @@ def test_listed_movie_already_in_flight_is_not_planned_twice():
 def test_listed_movie_missing_from_plex_is_skipped():
     # Without a Plex rating key the added date can't be put back afterwards.
     assert refetch.listed_movies([_movie(1, "Arrival", "Arrival.mkv")], {1}, {}, {}, {}) == []
+
+
+def test_finished_tv_refetch_can_be_listed_again():
+    # Charmed S03 came back as x264-BORDURE and finished, then the 1.2 Mbps flow
+    # (#1370) squeezed it before the 10-bit target landed. Listing it must not be
+    # blocked by the done ledger entry.
+    ledger = {"tv:5:3": {"kind": "tv", "state": "done", "episode_ids": [11, 12]},
+              "/media/tv/X/Season 1/a.mkv": {"kind": "tv", "state": "grabbed", "episode_ids": [21]}}
+    eps, seasons = refetch.tv_held(ledger, relist=True)
+    assert eps == {21} and seasons == set()
+
+
+def test_tv_refetch_in_flight_or_done_holds_by_default():
+    ledger = {"tv:5:3": {"kind": "tv", "state": "done", "episode_ids": [11, 12]}}
+    eps, seasons = refetch.tv_held(ledger, relist=False)
+    assert eps == {11, 12} and seasons == {"tv:5:3"}
