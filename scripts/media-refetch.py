@@ -609,8 +609,10 @@ def step(item, yes):
                 item["state"] = "stuck"
                 return True
             return False
-        path = movie["path"] + "/" + mf["relativePath"]
-        langs = subs("/media" + path)
+        # Radarr may still name the .mp4 the flow already remuxed to .mkv.
+        file = flowed("/media" + movie["path"] + "/" + mf["relativePath"])
+        path = file.removeprefix("/media")
+        langs = subs(file)
         item["attempts"] += 1
         if any(lang in conformance.ENGLISH for lang in langs):
             note(item, f"imported {mf['relativePath']} with subtitles {sorted(set(langs))}")
@@ -750,9 +752,9 @@ def step_tv(item, yes, ledger):
             mc.post("sonarr", "/api/v3/command", {"name": "EpisodeSearch", "episodeIds": missing})
             item["episode_ids"] = eps = sorted(new)
         paths = sorted({f["path"] for f in new.values()})
-        bare = [p for p in paths if not any(lang in conformance.ENGLISH for lang in subs("/media" + p))]
+        files = [flowed("/media" + p) for p in paths]
+        bare = [f for f in files if not any(lang in conformance.ENGLISH for lang in subs(f))]
         item["attempts"] += 1
-        files = ["/media" + p for p in paths]
         if not bare:
             note(item, f"imported {len(paths)} files with English subtitles")
             item.update(state="imported", imported_at=now().isoformat(), files=files)
