@@ -68,10 +68,10 @@ where merge is deploy.
 | # | Decision | Made by |
 |---|---|---|
 | D1 | k3s with SQLite via kine. No etcd. | terrac |
-| D2 | One cluster. No management cluster; tier 0 VMs cover the break-glass role. | design call, needs terrac's sign-off |
+| D2 | One cluster. No management cluster; tier 0 VMs cover the break-glass role. | design call, signed off by terrac |
 | D3 | Cluster installed and upgraded by Ansible until proven, then by Salt. | terrac |
-| D4 | Ocean joins as the GPU agent in phase 3, alongside Docker, not at the end, because the GPU cannot move to another VM. | design call, needs terrac's sign-off |
-| D5 | New small server VM on node006; new agent VM on node005 replaces the harbor VM. | terrac (server VM), design call (server is not ocean) |
+| D4 | Ocean joins as the GPU agent in phase 3 and runs Docker and k3s side by side for the whole migration; services move one at a time (least downtime per service). | design call, signed off by terrac |
+| D5 | New small server VM on node006; new agent VM on node005 replaces the harbor VM. Both defined in `terraform-root`. | terrac (server VM), design call (server is not ocean) |
 | D6 | Argo CD, Helm charts, app-of-apps, in `homelab-kube` brought up to date. | terrac |
 | D7 | Salt master outside the cluster, on its own VM. | design call (resolves chicken-and-egg) |
 | D8 | Upgrade drill: start three minors behind stable, upgrade three times with Argo CD and test apps running, before any real service moves. | terrac |
@@ -79,7 +79,7 @@ where merge is deploy.
 | D10 | No new IP ranges and no DNS changes; ocean's IP stays the front door. | design call |
 | D11 | OS majors by VM replacement only. Patches and package upgrades continuous, for CVEs. | terrac |
 | D12 | Passthrough VMs (ocean, `k3s-agent01`) are replaced by the passthrough swap: build and patch a new VM, stop both, move the devices, start the new one, pods reschedule onto it. | terrac (pattern), design call (details) |
-| D13 | Ocean's first swap, to a clean Debian 13 k8s-only VM, happens once Docker on ocean is empty (end of phase 5), not before. | design call |
+| D13 | Ocean's passthrough swap does not wait for Docker to be empty. The replacement VM carries both Docker (every service not yet migrated) and k3s, so the migration continues across the swap. First swap to Debian 13 after the phase 3 join is proven, by end of 2027. | terrac (both runtimes), design call (timing) |
 | D14 | Pods pin to node role labels, never to a hostname, so they follow a replaced VM unchanged. | design call |
 | D15 | CNI is Cilium. | terrac |
 | D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). | terrac |
@@ -140,7 +140,7 @@ where merge is deploy.
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
 | 4 | Every Docker service on ocean is a pod or explicitly parked. Docker nginx retired; ingress owns 80/443 on ocean. |
 | 5 | Prometheus, Loki, Grafana and Alertmanager run in cluster; the external dead-man alert fires when the cluster is down (tested). |
-| 5b | Passthrough swap rehearsed on `k3s-agent01`, then ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
+| 5b | Passthrough swap rehearsed on `k3s-agent01`, then ocean swapped to a Debian 13 VM carrying Docker and k3s, every service healthy afterwards; old VM deleted after 14 days with no backout. |
 | 6 | Every host is a Salt minion; every Ansible role and play is deleted or ported. |
 | 7 | `homelab` archived. |
 

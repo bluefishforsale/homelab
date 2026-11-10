@@ -60,7 +60,7 @@ stands; the reason is fsync latency, not rotation.
 
 | Tier | What | Runs on | Managed by |
 |---|---|---|---|
-| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, Salt master, registry-cache, k3s server, gh-runner, agentbox, the external dead-man alert | Plain VMs and hosts | Ansible now, Salt later |
+| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, Salt master, registry-cache, k3s server, gh-runner, agentbox, the external dead-man alert | Plain VMs and hosts | VM definitions: `terraform-root`. Inside the VM: Ansible now, Salt later |
 | 1: platform | Argo CD, cert-manager, secrets operator, ingress controller, NVIDIA device plugin, NFS and local storage classes, kube-prometheus-stack, Alloy | The cluster | Argo CD |
 | 2: apps | Every service that runs as a container today | The cluster | Argo CD |
 
@@ -192,11 +192,17 @@ minutes), not zero.
 
 ### Ocean to k8s node: the full strategy
 
-Ocean becomes a cluster node in two moves. The first is in place and additive
-(no OS upgrade): a k3s agent joins next to Docker so services can move one at a
-time. The second is the first **passthrough swap** (below): once Docker on ocean
-is empty, a clean Debian 13 VM takes over the GPU, the HBA and the pool, and
-from then on ocean is a k8s-only node rebuilt, never upgraded in place.
+Ocean runs Docker and k3s side by side for the whole migration, and services
+move one at a time (D4). That is the least downtime per service: each cutover
+is one container stopping and one pod starting on the same host, against the
+same state directory and the same GPU.
+
+The k3s join is in place and additive (no OS upgrade). OS majors still never
+happen in place, so ocean's OS moves by **passthrough swap** (below), and a swap
+does not wait for the migration to finish (D13): the replacement VM carries
+**both** runtimes, Docker with every compose project not yet migrated and the
+k3s agent, so the migration carries on across the swap unchanged. Once Docker
+is empty, later swaps carry only k3s.
 
 **Step 1: prepare (no downtime).**
 
@@ -242,10 +248,12 @@ above. Waves, lowest risk first:
 
 At the end of W7, Docker on ocean is empty and is removed.
 
-**Step 5: first passthrough swap.** Ocean is rebuilt as a clean Debian 13 k8s
-node using the passthrough swap procedure below. This is also ocean's OS major
-upgrade: it is on Debian 12, which left regular security support in June 2026
-and is on LTS until June 2028.
+**Swaps during the migration.** Ocean is on Debian 12, which left regular
+security support in June 2026 and is on LTS until June 2028. Its first swap, to
+Debian 13, happens whenever it is ready after the phase 3 join is proven, and
+in any case by the end of 2027, wherever the waves have got to. The swap is the
+same procedure whether Docker holds forty services or none; only the list of
+Docker services to bring up on the new VM changes.
 
 ### OS lifecycle: patch continuously, never upgrade a major in place
 
@@ -280,8 +288,9 @@ Two different things, handled differently:
 
 **OS majors: replace the VM, never `do-release-upgrade` in place.** Every VM
 moves to a new Debian major within 6 months of its release, and always before
-the old major's regular security support ends. The Proxmox template (VMID
-9999, Debian 12 today) is rebuilt for each new major and point release. Three
+the old major's regular security support ends. The base image new VMs are
+cloned from (template VMID 9999, Debian 12 today) is rebuilt for each new major
+and point release, wherever `terraform-root` sources it. Three
 replacement patterns:
 
 | VM kind | Examples | Pattern |
@@ -298,42 +307,55 @@ for ocean, the hardest case; `k3s-agent01` is the same without the pool and GPU.
 
 **Before the window (no downtime, can take days):**
 
-1. Create the new VM (new VMID, for example 5001) from the current template,
-   on node006, with a temporary IP and **small RAM** (node006 cannot run two
-   366 GiB VMs). No `hostpci` devices yet.
+1. Create the new VM (new VMID, for example 5001) on node006 with a
+   temporary IP and **small RAM** (node006 cannot run two 366 GiB VMs), no
+   passthrough devices. VMs are defined in `terraform-root`
+   (`lan/proxmox-node006-vms.tf`), so this is a PR there, applied by its
+   runners. Never a hand `qm` command: that shows up as lan drift.
 2. Apply all host config and patches: base system, NVIDIA driver at the same
    or newer version, ZFS at the same or newer version than the pool's feature
    flags need, NFS server config, node-exporter, k3s agent installed at the
    pinned version but **not started**. The GPU and pool cannot be tested yet;
    check `dkms status`, `modinfo nvidia`, `modinfo zfs`.
-3. Copy the old VM's `net0` MAC to the new VM's config (applied at the swap),
-   so DHCP reservations and ARP do not change. Set the target RAM and CPU so
-   the VM boots at full size after the swap.
-4. Written checklist signed off: versions, held packages, labels, taint.
+3. While Docker still has services: install Docker and apply every remaining
+   ocean service play, so each compose project's files are in place, but with
+   `docker.service` **disabled and stopped**. Nothing may start before the pool
+   is imported, or containers write into the empty `/data01` mountpoint on the
+   root disk and the data is invisible after the import (the side effect
+   `agents.md` warns about). Plays that start containers run with a variable
+   that skips the start, or run after the swap.
+4. Prepare the `terraform-root` swap PR (not merged yet): passthrough devices
+   moved from old to new VM, old VM's `net0` MAC on the new VM (so DHCP and ARP
+   do not change), new VM at full RAM and CPU and the final IP, old VM
+   `onboot = false`.
+5. Written checklist signed off: versions, held packages, labels, taint, the
+   list of Docker services to bring up.
 
 **The window (target under 30 minutes of ocean-hosted downtime):**
 
-1. Cordon and drain the old node. Scale down pods on other nodes that hold the
-   `/data01` NFS mount (tdarr-node, nzbget) so nothing parks in D state.
+1. Cordon and drain the old node; stop Docker on it. Scale down pods on other
+   nodes that hold the `/data01` NFS mount (tdarr-node, nzbget) so nothing
+   parks in D state.
 2. Hand-run, per the ZFS rules in `agents.md`: `zfs snapshot -r` of
    `data01/services`, then `zpool export data01`. **Not in any committed play.**
 3. Shut down the old VM.
-4. On node006: remove `hostpci*` from the old VM, add them to the new one;
-   give the new VM the final IP (192.168.1.143) and the old MAC; give the old
-   VM a dead network config and `onboot: 0`. A dispatch-only play may do this
-   Proxmox step; the ZFS steps stay manual.
+4. Merge and apply the prepared `terraform-root` swap PR (both VMs are
+   stopped, so the hardware changes apply). The ZFS steps stay manual.
 5. Start the new VM. Check `nvidia-smi`. Hand-run `zpool import data01`
    **without `-f`**; if it asks for `-f`, stop and find out why (hostid, an
    unclean export) before forcing. Never `zpool upgrade` in the window. Start
    the NFS server; NFS clients recover on their own (`hard` mounts).
-6. Delete the old Node object and its `ocean.node-password.k3s` secret in
+6. Enable and start Docker; the remaining compose projects come up against the
+   imported pool.
+7. Delete the old Node object and its `ocean.node-password.k3s` secret in
    `kube-system`, then start the k3s agent. The node rejoins as `ocean`, so
    monitoring names do not change, with the same labels and taint.
-7. Uncordon. Pods reschedule onto it by label. Verify GPU pods, every blackbox
-   probe, and the NFS-dependent pods scaled back up.
+8. Uncordon. Pods reschedule onto it by label. Verify GPU pods, every Docker
+   service and every blackbox probe, and the NFS-dependent pods scaled back up.
 
 **Backout (any time until the old VM is deleted):** stop the new VM, hand-run
-`zpool export`, move `hostpci*` and the MAC back, start the old VM, rejoin.
+`zpool export`, revert the `terraform-root` swap PR (devices and MAC back), start
+the old VM, rejoin. Revert PR prepared before the window.
 The old VM is kept stopped and untouched for 14 days, then deleted.
 
 ### Platform components
@@ -375,8 +397,10 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 
 ## What stays in Ansible until Salt replaces it
 
-VM creation (`create_*_vm.yaml`), the k3s install and upgrade play, `data01`
-export, ZFS read-only checks, DNS, runners, agentbox. Once Salt owns all of it
+The k3s install and upgrade play, `data01` export, ZFS read-only checks, DNS,
+runners, agentbox. Proxmox VM definitions (CPU, RAM, disks, NICs, passthrough
+devices) are not Ansible's or Salt's: they are `terraform-root`'s, and stay
+there. Once Salt owns all of it
 and the last service has left ocean's Docker, `homelab` is archived.
 
 ## Left to the builder

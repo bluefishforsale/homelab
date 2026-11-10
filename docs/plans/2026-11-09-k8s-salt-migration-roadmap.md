@@ -29,8 +29,10 @@ hard limits so a phase plan cannot quietly drop one.
 - Pods select node role labels (`homelab.role/*`), never hostnames.
 - Every migrated service ships with a health check, blackbox probe, metrics
   scrape (if it has metrics), and a default-deny NetworkPolicy.
-- Repos: cluster config in `homelab-kube`; VM creation and the k3s play in
-  `homelab` until Salt takes them; Salt states in `homelab-salt` (new).
+- Repos: cluster config in `homelab-kube`; the k3s play in `homelab` until
+  Salt takes it; Salt states in `homelab-salt` (new). Proxmox VM definitions
+  (create, resize, passthrough devices, MAC) are PRs in `terraform-root`, never
+  a hand `qm` command.
 
 ## Timeline (target, not commitment)
 
@@ -40,15 +42,16 @@ hard limits so a phase plan cannot quietly drop one.
 | 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Master and minions |
 | 2027 Q2 | Phase 2 (harbor), Phase 3 (ocean joins, GPU gate) | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W1 to W5) | | k3s install moves to Salt |
-| 2027 Q4 | Phase 5 (monitoring, ingress), 5b (ocean swap) | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
+| 2027 Q4 | Phase 5 (monitoring, ingress); 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
 | 2028 H1 | | | Phase 6 done, Phase 7 archive |
 
-Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item.
+Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item. It
+is not tied to phase 4 or 5: it can run any time after phase 3, mid-waves.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); signs off D2,
-      D4, D13.
+- [ ] terrac reviews spec and PRD; answers Q3 (dead-man target), Q4 (old charts), Q5 (reboot window); D2 and D4 signed off,
+      D13 revised (2026-11-09).
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
 - [ ] `homelab-kube`: sops from GPG to age; age private key into the vault at
@@ -58,8 +61,8 @@ Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item.
       for Alloy.
 - [ ] Agree the branch and merge policy for `homelab-kube` (merge is deploy
       under Argo CD auto-sync); add it to `docs/architecture/agent-autonomy.md`.
-- [ ] Debian 13 cloud-init template on both hypervisors (new VMID; 9999 stays
-      until nothing uses it).
+- [ ] Debian 13 base image for new VMs on both hypervisors, wherever
+      `terraform-root` sources it (9999 stays until nothing uses it).
 
 **Gate:** all Phase 0 boxes checked; Q3 to Q5 answered in the PRD (Q1 Cilium and Q2 RAM before
 phase 2 are decided: D15, D16).
@@ -71,9 +74,9 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [ ] `vars/vars_k3s.yaml`: `k3s_version` (stable minus 3 minors at build time;
       on 2026-11-09 stable is v1.37, so v1.34), node labels, taints,
       `registries.yaml` mirrors to registry-cache-01.
-- [ ] `create_k3s_server_vm.yaml` (node006) and `create_k3s_agent_vm.yaml`
-      (node005), Debian 13 template, static IPs from the free infrastructure
-      range. Inventory PR merged by terrac.
+- [ ] `terraform-root` PR: `k3s-server01` (node006) and `k3s-agent01`
+      (node005), Debian 13, static IPs from the free infrastructure range.
+      Then the `homelab` inventory PR, merged by terrac.
 - [ ] `k3s.yaml` install and upgrade play: server first, then agents with
       cordon, drain, upgrade, uncordon, `serial: 1`. Added to the
       never-auto-apply list, with a pinned test in
@@ -181,10 +184,15 @@ GCS object name, verified with `db_restore_test.yaml`.
       cert-manager; Docker nginx retires.
 - [ ] Docker removed from ocean.
 
-## Phase 5b: ocean passthrough swap to Debian 13 (2027 Q4)
+## Phase 5b: ocean passthrough swap to Debian 13 (after phase 3, by end of 2027)
+
+Runs whenever it is ready, independent of how far the waves have got (D13).
+The new VM carries Docker for every service still in Docker plus the k3s agent.
 
 - [ ] Build and patch the replacement ocean VM (spec, "Passthrough swap
-      procedure", before the window).
+      procedure", before the window), Docker installed and disabled, every
+      remaining compose project's files in place.
+- [ ] `terraform-root` swap PR and its revert PR prepared.
 - [ ] Window, with terrac hand-running the ZFS steps.
 - [ ] 14-day backout period; then delete the old VM.
 
@@ -201,7 +209,6 @@ GCS object name, verified with `db_restore_test.yaml`.
       runners, agentbox.
 - [ ] k3s install and upgrade (after phase 3, using the play that survived the
       drill as the reference).
-- [ ] VM creation on Proxmox.
 - [ ] Proxmox hosts.
 - [ ] DNS pair: terrac, by hand.
 
