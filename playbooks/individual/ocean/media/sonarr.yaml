@@ -1,10 +1,13 @@
 ---
-- name: Configure systemd service for sonarr
+# Sonarr and exporter on ocean as a compose project. The state dir from the
+# original install (/data01/services/sonarr, mounted as /config) is reused as-is.
+- name: Sonarr and exporter on ocean
   hosts: ocean
   become: true
+
   vars_files:
-    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
     service: sonarr
@@ -20,10 +23,12 @@
     incoming: "{{ data }}/incoming"
     complete: "{{ data }}/complete"
     home: "{{ data }}/services/{{ service }}"
+    compose_dir: "/opt/compose/{{ service }}"
     user: media
+    uid: "{{ system_users.media.uid }}"
+    gid: "{{ system_users.media.gid }}"
 
   tasks:
-
     - name: Ensure basedir exists
       ansible.builtin.file:
         path: "{{ home }}"
@@ -37,57 +42,103 @@
         src: "{{ files }}/config.xml.j2"
         dest: "{{ home }}/config.xml"
         mode: '0644'
-      notify:
-        - Reload sonarr systemd daemon
-        - Restart sonarr service
+      register: sonarr_config
 
-    - name: Create sonarr systemd service 
+    - name: Ensure root-owned compose dir exists
+      ansible.builtin.file:
+        path: "{{ compose_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Template compose file (holds the API key)
       ansible.builtin.template:
-        src: "{{ files }}/{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ item }}"
-        mode: '0644'
-      with_items:
-      - sonarr.service
-      notify:
-        - Reload sonarr systemd daemon
-        - Restart sonarr service
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0600'
+      register: sonarr_compose
 
-    - name: Create exporter systemd service 
+    - name: Install systemd unit
       ansible.builtin.template:
-        src: "{{ files }}/{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ item }}"
+        src: "{{ files }}/sonarr.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
         mode: '0644'
-      with_items:
-      - sonarr-exporter.service
-      notify:
-        - Reload exporter systemd daemon
-        - Restart exporter service
+      register: sonarr_unit
 
-    - name: Enable and start sonarr-exporter service
+    # Clean up legacy bare docker run units and containers
+    - name: Stop and disable legacy sonarr-exporter service if present
       ansible.builtin.systemd:
         name: sonarr-exporter.service
-        enabled: yes
-        state: started
-        daemon_reload: yes
+        state: stopped
+        enabled: false
+      failed_when: false
 
-    - name: Ensure Sonarr is responding before API call
+    - name: Remove legacy sonarr-exporter service file
+      ansible.builtin.file:
+        path: /etc/systemd/system/sonarr-exporter.service
+        state: absent
+      register: legacy_exporter_unit
+
+    - name: Find leftover bare docker run containers
+      ansible.builtin.command: >-
+        docker ps -a --filter name=^{{ item }}$
+        --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+      register: legacy_containers
+      changed_when: false
+      check_mode: false
+      loop:
+        - "{{ service }}"
+        - "{{ exporter_service }}"
+
+    - name: Remove bare docker run containers before compose takes the names
+      ansible.builtin.command: docker rm -f {{ item.item }}
+      register: sonarr_legacy_rm
+      when: item.stdout | trim == 'project='
+      loop: "{{ legacy_containers.results }}"
+
+    - name: Enable and start sonarr (restart only on config/unit change or legacy cleanup)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (sonarr_config is changed or sonarr_compose is changed or sonarr_unit is changed or sonarr_legacy_rm is changed or legacy_exporter_unit is changed) else 'started' }}"
+        daemon_reload: true
+
+    # Stopping a `docker run --rm` unit kills its client with 137, so the removed
+    # unit lingers as "not-found failed" until reboot (prowlarr-exporter did).
+    - name: Clear the removed exporter unit's failed state
+      ansible.builtin.command: systemctl reset-failed sonarr-exporter.service
+      when: legacy_exporter_unit is changed
+      failed_when: false
+
+    - name: Wait for Sonarr's API
       ansible.builtin.uri:
-        url: "http://localhost:{{ sonarr_port }}/api/v3/system/status"
-        method: GET
+        url: "http://127.0.0.1:{{ sonarr_port }}/api/v3/system/status"
         headers:
           X-Api-Key: "{{ media_services.sonarr.api_key }}"
-        status_code: 200
       register: sonarr_status
-      retries: 10
-      delay: 5
       until: sonarr_status.status == 200
+      retries: 30
+      delay: 10
       changed_when: false
-      tags: [rss]
+
+    - name: Wait for the exporter to serve Sonarr metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ exporter_port }}/metrics"
+        return_content: true
+        # One scrape walks every series, under 10s at 851 series.
+        timeout: 60
+      register: sonarr_metrics
+      until: sonarr_metrics.status == 200 and sonarr_metrics.content is search('sonarr_system_status(\\{[^}]*\\})? 1')
+      retries: 12
+      delay: 10
+      changed_when: false
 
     - name: Get current Sonarr indexer config
       ansible.builtin.uri:
-        url: "http://localhost:{{ sonarr_port }}/api/v3/config/indexer"
-        method: GET
+        url: "http://127.0.0.1:{{ sonarr_port }}/api/v3/config/indexer"
         headers:
           X-Api-Key: "{{ media_services.sonarr.api_key }}"
         return_content: true
@@ -97,7 +148,7 @@
 
     - name: Set Sonarr RSS sync interval to 10 minutes
       ansible.builtin.uri:
-        url: "http://localhost:{{ sonarr_port }}/api/v3/config/indexer"
+        url: "http://127.0.0.1:{{ sonarr_port }}/api/v3/config/indexer"
         method: PUT
         headers:
           X-Api-Key: "{{ media_services.sonarr.api_key }}"
@@ -106,23 +157,3 @@
         status_code: [200, 202]
       when: sonarr_indexer_config.json.rssSyncInterval != 10
       tags: [rss]
-
-  handlers:
-    - name: Reload sonarr systemd daemon
-      ansible.builtin.systemd:
-        daemon_reload: yes
-
-    - name: Restart sonarr service
-      ansible.builtin.systemd:
-        name: sonarr.service
-        state: restarted
-
-    - name: Reload exporter systemd daemon
-      ansible.builtin.systemd:
-        daemon_reload: yes
-
-    - name: Restart exporter service
-      ansible.builtin.systemd:
-        name: sonarr-exporter.service
-        state: restarted
-        enabled: true
