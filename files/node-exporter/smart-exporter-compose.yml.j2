@@ -7,18 +7,23 @@ services:
     hostname: {{ inventory_hostname }}
     restart: unless-stopped
 
-    # NOTE: the exporter's exclude regex only matches kernel names (sdf), and
-    # those move across reboots, so a hardcoded name would eventually drop a
-    # healthy disk instead. Resolving the stable by-id names at container start
-    # follows the device, and a by-id absent on this host resolves to nothing.
+    # NOTE: the exporter's exclude regex matches the device label, which is
+    # the kernel name for plain disks (sdf), and those move across reboots,
+    # so a hardcoded name would eventually drop a healthy disk instead.
+    # Resolving the stable by-id names at container start follows the device,
+    # and a by-id absent on this host resolves to nothing.
+    # NOTE: _megaraid_ drops the controller-path copy (bus_0_megaraid_N) of
+    # every disk behind node005's PERC, which the scan also finds as /dev/sdX,
+    # so each disk was reported twice. A host whose disks are visible ONLY
+    # through megaraid would lose them from monitoring here.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        ex=""
+        ex="_megaraid_"
         for id in {{ smart_exporter_exclude_by_id | join(' ') }}; do
-          [ -e "/dev/disk/by-id/$$id" ] && ex="$${ex:+$$ex|}$$(basename "$$(readlink -f "/dev/disk/by-id/$$id")")"
+          [ -e "/dev/disk/by-id/$$id" ] && ex="$$ex|^$$(basename "$$(readlink -f "/dev/disk/by-id/$$id")")\$$"
         done
-        exec /bin/smartctl_exporter $${ex:+--smartctl.device-exclude=^($$ex)\$$}
+        exec /bin/smartctl_exporter --smartctl.device-exclude="$$ex"
     
     # Networking
     ports:
