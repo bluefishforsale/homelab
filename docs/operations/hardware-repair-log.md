@@ -55,7 +55,7 @@ Read off the drive labels 2026-11-10. All three are ST12000NM001G, PN 2MV103-003
 
 | Model | Serial | WWN | Vendor, order, unit price | FARM h | Notes |
 |---|---|---|---|---|---|
-| ST12000NM001G | ZLW0T9XR | `0x5000c500c5d784ee` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
+| ST12000NM001G | ZLW0T9XR | `0x5000c500c5d784ee` | eBay goharddrive `19-15026-15078`, $349.95 | 40,021 | Read 2026-11-10 in data01 slot 1 (not added to pool). SMART and device statistics zeroed; FARM shows 40,021 h, 19 power cycles, 47.8 TB written, 41.2 TB read. Third drive with identical hours and cycles. 0 reallocated, 0 pending, 0 uncorrectable, 0 CRC lifetime. Short self-test passed. |
 | ST12000NM001G | ZLW0RKG6 | `0x5000c500c5d216f1` | eBay goharddrive `19-15026-15078`, $349.95 | 40,021 | Read 2026-11-10 in data01 slot 1 (not added to pool). SMART and device statistics zeroed; FARM shows 40,021 h, 19 power cycles, 47.6 TB written, 41.1 TB read. Identical hours and cycles to ZLW0VNXQ, so likely retired from the same array. 0 reallocated, 0 pending, 0 uncorrectable, 0 CRC lifetime. Short self-test passed. |
 | ST12000NM001G | ZLW0VNXQ | `0x5000c500c5da3030` | eBay goharddrive `19-15026-15078`, $349.95 | 40,021 | Read 2026-11-10 in data01 slot 1 (not added to pool). SMART and device statistics zeroed (0 h, 1 power cycle, 0 written); FARM shows 40,021 h, 19 power cycles, 47.7 TB written, 40.3 TB read. 0 reallocated, 0 pending, 0 uncorrectable, 0 CRC lifetime. Short self-test passed. |
 
