@@ -354,3 +354,8 @@ jobs:
       # the *.home wildcard.
       - name: nginx vhosts have DNS records
         run: bash .github/workflows/lib/nginx-vhosts-have-dns.test.sh
+
+      # A play aimed at all has to subtract the Macs, which have no apt,
+      # systemd or docker.
+      - name: Plays aimed at all exclude macos
+        run: bash .github/workflows/lib/playbooks-exclude-macos.test.sh

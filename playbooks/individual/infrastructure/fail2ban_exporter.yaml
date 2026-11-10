@@ -1,6 +1,6 @@
 ---
 - name: Configure fail2ban-exporter systemd service
-  hosts: all
+  hosts: all:!macos
   become: true
   gather_facts: true
 

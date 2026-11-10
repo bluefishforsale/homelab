@@ -33,7 +33,7 @@
 #     playbooks/individual/base/fleet_resolvers.yaml
 
 - name: Give every host both resolvers
-  hosts: all:!dns_servers
+  hosts: all:!dns_servers:!macos
   become: true
   gather_facts: true
   # NOTE: serial plus any_errors_fatal is what makes this safe to run against
