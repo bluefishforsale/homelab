@@ -1,0 +1,126 @@
+# TV episodes the 1.2 Mbps 8-bit flow (#1370, 11-09 17:59 to the pause) encoded below
+# the 3.5 Mbps 10-bit target. Re-grab, don't re-encode: a second lossy pass
+# from 1.2 Mbps can't put back what the first took.
+# media-refetch.py plan --tv-files scripts/refetch-lists/tv-low-encodes.txt
+/media/tv/24 Hours in A&E/Season 36/24 Hours in A&E - S36E02 - Episode 2 WEBDL-1080p.mkv
+/media/tv/24 Hours in A&E/Season 36/24 Hours in A&E - S36E03 - Episode 3 WEBDL-1080p.mkv
+/media/tv/Charmed/Season 2/Charmed - S02E18 - Chick Flick Bluray-1080p Remux.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E01 - The Honeymoon's Over Bluray-1080p.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E02 - Magic Hour Bluray-1080p.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E03 - Once Upon a Time Bluray-1080p.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E04 - All Halliwell's Eve Bluray-1080p.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E05 - Sight Unseen Bluray-1080p.mkv
+/media/tv/Charmed/Season 3/Charmed - S03E06 - Primrose Empath Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E03 - Hell Hath No Fury Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E04 - Enter the Demon Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E05 - Size Matters Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E07 - Brain Drain Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E08 - Black as Cole Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E09 - Muse to My Ears Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E10 - A Paige from the Past Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E11 - Trial by Magic Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E12 - Lost and Bound Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E13 - Charmed and Dangerous Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E14 - The Three Faces of Phoebe Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E15 - Marry-Go-Round Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E16 - The Fifth Halliwell Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E17 - Saving Private Leo Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E19 - We're Off to See the Wizard Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E20 - Long Live the Queen Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E21 - Womb Raider Bluray-1080p.mkv
+/media/tv/Charmed/Season 4/Charmed - S04E22 - Witch Way Now Bluray-1080p.mkv
+/media/tv/Charmed/Season 5/Charmed - S05E13 - House Call Bluray-1080p.mkv
+/media/tv/Charmed/Season 5/Charmed - S05E14 - Sand Francisco Dreamin' Bluray-1080p.mkv
+/media/tv/Charmed/Season 5/Charmed - S05E20 - Sense and Sense Ability Bluray-1080p.mkv
+/media/tv/Charmed/Season 5/Charmed - S05E21 - Necromancing the Stone Bluray-1080p.mkv
+/media/tv/Charmed/Season 5/Charmed - S05E22-23 - Oh My Goddess! Bluray-1080p.mkv
+/media/tv/Criminal Minds/Season 19/Criminal Minds - S19E06 - Proxy WEBDL-1080p.mkv
+/media/tv/Criminal Minds/Season 19/Criminal Minds - S19E07 - The Furies WEBDL-1080p.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E01 - Kǫ' Tsiitáá Álnééh (Baptism by Fire) Bluray-1080p Remux.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E02 - Bikéé' Doo Éédahoozįįdę́ę́góó (Toward Their Unknown Paths) Bluray-1080p Remux.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E04 - Ni' Ániidí (The New World) Bluray-1080p Remux.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E06 - Shíká Nidanitáhą́ą́ (Those who were searching for me) Bluray-1080p Remux.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E07 - Nániikai (We Came Back) Bluray-1080p Remux.mkv
+/media/tv/Dark Winds/Season 4/Dark Winds - S04E08 - Ni' Hodisxǫs (The Glittering World) Bluray-1080p Remux.mkv
+/media/tv/Doctor Who (2005)/Season 1/Doctor Who (2005) - S01E10 - The Doctor Dances (2) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 1/Doctor Who (2005) - S01E12 - Bad Wolf (1) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E01 - The Pilot Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E02 - Smile Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E04 - Knock Knock Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E05 - Oxygen Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E06 - Extremis Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E08 - The Lie of the Land Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E09 - Empress of Mars Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E10 - The Eaters of Light Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 10/Doctor Who (2005) - S10E11 - World Enough and Time (1) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E01 - The Woman Who Fell to Earth WEBDL-720p Proper.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E02 - The Ghost Monument WEBDL-720p Proper.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E03 - Rosa WEBDL-720p Proper.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E05 - The Tsuranga Conundrum WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E06 - Demons of the Punjab WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E07 - Kerblam! WEBRip-720p.mkv
+/media/tv/Doctor Who (2005)/Season 11/Doctor Who (2005) - S11E10 - The Battle of Ranskoor Av Kolos WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 2/Doctor Who (2005) - S02E07 - The Idiot's Lantern Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 2/Doctor Who (2005) - S02E13 - Doomsday (2) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 3/Doctor Who (2005) - S03E06 - The Lazarus Experiment Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 3/Doctor Who (2005) - S03E12 - The Sound of Drums (2) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 4/Doctor Who (2005) - S04E13 - Journey's End (2) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 7/Doctor Who (2005) - S07E04 - The Power of Three Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 7/Doctor Who (2005) - S07E12 - Nightmare in Silver Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 8/Doctor Who (2005) - S08E05 - Time Heist Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 8/Doctor Who (2005) - S08E06 - The Caretaker Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 8/Doctor Who (2005) - S08E07 - Kill the Moon Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 8/Doctor Who (2005) - S08E08 - Mummy on the Orient Express Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 8/Doctor Who (2005) - S08E12 - Death in Heaven (2) Bluray-720p.mkv
+/media/tv/Doctor Who (2005)/Season 9/Doctor Who (2005) - S09E07 - The Zygon Invasion (1) WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 9/Doctor Who (2005) - S09E08 - The Zygon Inversion (2) WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 9/Doctor Who (2005) - S09E09 - Sleep No More WEBDL-720p.mkv
+/media/tv/Doctor Who (2005)/Season 9/Doctor Who (2005) - S09E11 - Heaven Sent WEBDL-720p.mp4
+/media/tv/Interview with the Vampire/Season 3/Interview With The Vampire - S03E03 - Toronto WEBDL-1080p Proper.mkv
+/media/tv/Maximum Pleasure Guaranteed/Season 1/Maximum Pleasure Guaranteed - S01E07 - Flighting WEBDL-1080p.mkv
+/media/tv/My Adventures with Superman/Season 3/My Adventures with Superman - S03E02 - Mobile Suit Toyman WEBDL-1080p.mkv
+/media/tv/My Adventures with Superman/Season 3/My Adventures with Superman - S03E03 - All's Fair in Love and W.O.R.M.S WEBDL-1080p.mkv
+/media/tv/NEEDY GIRL OVERDOSE/Season 1/NEEDY GIRL OVERDOSE - S01E12 - INTERNET YAMERO WEBDL-1080p.mkv
+/media/tv/One Piece/Season 23/One Piece - S23E12 - Shamrock Appears - Commander of the Knights of God WEBDL-720p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E03 - Episode 3 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E04 - Episode 4 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E05 - Episode 5 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E06 - Episode 6 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E07 - Episode 7 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E08 - Episode 8 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E10 - Episode 10 WEBDL-1080p.mkv
+/media/tv/Pegasus Market/Season 1/Pegasus Market - S01E12 - Episode 12 WEBDL-1080p.mkv
+/media/tv/Star City/Season 1/Star City - S01E05 - Bite Your Elbow WEBDL-1080p.mkv
+/media/tv/Star City/Season 1/Star City - S01E06 - Awl in a Sack WEBDL-1080p.mkv
+/media/tv/Sugar (2024)/Season 2/Sugar (2024) - S02E01 - Home Away from Home WEBDL-1080p.mkv
+/media/tv/Sugar (2024)/Season 2/Sugar (2024) - S02E02 - Downer Town WEBDL-1080p.mkv
+/media/tv/The Agency (2024)/Season 2/The Agency (2024) - S02E03 - Spymaster WEBDL-1080p.mkv
+/media/tv/The Agency (2024)/Season 2/The Agency (2024) - S02E07 - Drown Him Then Throw Him a Lifejacket WEBDL-1080p.mkv
+/media/tv/The Agency (2024)/Season 2/The Agency (2024) - S02E10 - King Sacrifice WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E01 - Soda WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E02 - Lamb WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E03 - Mint WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E04 - Ribs WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E05 - Raspberries WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E06 - Foccacia WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E07 - Caramel WEBDL-1080p.mkv
+/media/tv/The Bear/Season 5/The Bear - S05E08 - The Original Beef of Chicagoland WEBDL-1080p.mkv
+/media/tv/The Expanse/Season 5/The Expanse - S05E10 - Nemesis Games Bluray-1080p Remux.mkv
+/media/tv/The Repair Shop/Season 16/The Repair Shop - S16E06 - Episode 6 WEBDL-1080p.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E01 - The Bonfire of the Manatees Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E02 - The Girl Who Slept Too Little Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E03 - Milhouse of Sand and Fog Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E04 - Treehouse of Horror XVI Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E05 - Marge's Son Poisoning Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E06 - See Homer Run Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E07 - The Last of the Red Hat Mamas Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E08 - The Italian Bob Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E09 - Simpsons Christmas Stories Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E11 - We're on the Road to D'ohwhere Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E12 - My Fair Laddy Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E14 - Bart Has Two Mommies Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E16 - Million Dollar Abie Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E18 - The Wettest Stories Ever Told Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E19 - Girls Just Want to Have Sums Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E20 - Regarding Margie Bluray-1080p Remux.mkv
+/media/tv/The Simpsons/Season 17/The Simpsons - S17E21 - The Monkey Suit Bluray-1080p Remux.mkv
