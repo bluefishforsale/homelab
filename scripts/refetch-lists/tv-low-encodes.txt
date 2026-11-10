@@ -2,8 +2,6 @@
 # the 3.5 Mbps 10-bit target. Re-grab, don't re-encode: a second lossy pass
 # from 1.2 Mbps can't put back what the first took.
 # media-refetch.py plan --tv-files scripts/refetch-lists/tv-low-encodes.txt
-/media/tv/24 Hours in A&E/Season 36/24 Hours in A&E - S36E02 - Episode 2 WEBDL-1080p.mkv
-/media/tv/24 Hours in A&E/Season 36/24 Hours in A&E - S36E03 - Episode 3 WEBDL-1080p.mkv
 /media/tv/Charmed/Season 2/Charmed - S02E18 - Chick Flick Bluray-1080p Remux.mkv
 /media/tv/Charmed/Season 3/Charmed - S03E01 - The Honeymoon's Over Bluray-1080p.mkv
 /media/tv/Charmed/Season 3/Charmed - S03E02 - Magic Hour Bluray-1080p.mkv
@@ -34,8 +32,6 @@
 /media/tv/Charmed/Season 5/Charmed - S05E20 - Sense and Sense Ability Bluray-1080p.mkv
 /media/tv/Charmed/Season 5/Charmed - S05E21 - Necromancing the Stone Bluray-1080p.mkv
 /media/tv/Charmed/Season 5/Charmed - S05E22-23 - Oh My Goddess! Bluray-1080p.mkv
-/media/tv/Criminal Minds/Season 19/Criminal Minds - S19E06 - Proxy WEBDL-1080p.mkv
-/media/tv/Criminal Minds/Season 19/Criminal Minds - S19E07 - The Furies WEBDL-1080p.mkv
 /media/tv/Dark Winds/Season 4/Dark Winds - S04E01 - Kǫ' Tsiitáá Álnééh (Baptism by Fire) Bluray-1080p Remux.mkv
 /media/tv/Dark Winds/Season 4/Dark Winds - S04E02 - Bikéé' Doo Éédahoozįįdę́ę́góó (Toward Their Unknown Paths) Bluray-1080p Remux.mkv
 /media/tv/Dark Winds/Season 4/Dark Winds - S04E04 - Ni' Ániidí (The New World) Bluray-1080p Remux.mkv
