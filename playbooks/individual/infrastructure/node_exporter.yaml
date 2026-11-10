@@ -159,6 +159,36 @@
       enabled: true
       daemon_reload: yes
 
+  # Seagate FARM log -> node_exporter textfile collector. Read-only log read via
+  # the smart-exporter container. FARM keeps the true lifetime hours that
+  # resellers zero out of SMART. Skips drives without a FARM log.
+  - name: Install farm-metrics collector script
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/farm-metrics.sh"
+      dest: /usr/local/bin/farm-metrics.sh
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create farm-metrics systemd service
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/farm-metrics.service.j2"
+      dest: /etc/systemd/system/farm-metrics.service
+      mode: '0644'
+
+  - name: Create farm-metrics systemd timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/farm-metrics.timer.j2"
+      dest: /etc/systemd/system/farm-metrics.timer
+      mode: '0644'
+
+  - name: Start and enable farm-metrics timer
+    ansible.builtin.systemd:
+      name: farm-metrics.timer
+      state: started
+      enabled: true
+      daemon_reload: true
+
   # Floating tags (:latest, :main, :stable) never update on their own: compose
   # pulls only when an image is missing. Without this the fleet runs whatever it
   # first pulled, which is how prometheus sat on a June image while restarting
