@@ -31,6 +31,7 @@ When a field is genuinely unknown write `unknown`, and when it was reconstructed
 | 12 | 2026-08-18 08:29 | `0x5000c500b38b622b` / ZJV2Y4FQ | ST12000NM0127 / ZJV3KB10 / `0x5000c500b43e1c50` | Amazon `114-9912532-0411436` (Renewed), $239.99 (inferred) | Second drive of that pair. Imported as `ata-ST12000NM0127_ZJV3KB10`, see zfs-disk-replacement.md. |
 | 13 | 2026-08-20 11:38 | `0x5000c500b6a075dd` / ZJV5DS4J | ST14000NM005G / ZTM09X76 / `0x5000c500dbf44985` | Amazon `111-1354260-2167440` (Renewed), $399.99 | Wrong part: listed as Exos X16 14TB **ST14000NM001G**, drive reports **ST14000NM005G**. Delivered overnight 2026-08-20. Runs as 12TB in this vdev. |
 | 14 | 2026-08-28 08:23 | `0x5000c500b2281882` / ZJV1QG9S | ST12000NM001G / ZL203PMM / `0x5000c500c5f18ac7` | eBay goharddrive `19-15026-15078`, $349.95 | Order was 4 x Exos X16 ST12000NM001G, $1,550.28 total, picked up from UPS 2026-08-27 11:23. Model matches listing. FARM 39,759 h vs SMART 1,774 h (2026-11-10). |
+| 15 | 2026-11-10 10:12 | `0x5000c500b5bde8e2` / ZJV4M3HE | ST12000NM001G / ZLW0T9XR / `0x5000c500c5d784ee` | eBay goharddrive `19-15026-15078`, $349.95 | Replaces swap 11 after it FAULTED. Slot 1. Added by WWN after a clean scrub (0 errors, 2026-11-10 09:07). At install: SMART 0 h, FARM 40,021 h, 19 power cycles, short self-test passed. ZJV4M3HE kept as evidence for the Amazon claim. |
 
 Rows 1 to 14 were reconstructed on 2026-11-10 from `zpool history data01`, the Prometheus `smartctl_device` series (which tie a serial to a WWN by when each one appeared and disappeared, 30 minute resolution, retained from 2026-05-14), and order and UPS emails. Removed-disk serials before 2026-05-14 are not recoverable.
 
@@ -48,16 +49,16 @@ Every disk in the pool arrived with its SMART counters reset. FARM keeps the rea
 | ZJV3KB10 | ST12000NM0127 | 12 | 2,014 | 55,168 | ~53,150 | 0 |
 | ZTM09X76 | ST14000NM005G | 13 | 1,965 | 16,080 | ~14,100 | 0 |
 | ZL203PMM | ST12000NM001G | 14 | 1,774 | 39,759 | ~38,000 | 0 |
+| ZLW0T9XR | ST12000NM001G | 15 | 0 | 40,021 | ~40,000 | 0 (47.8 TB written before reset) |
 
 ## Spares on hand
 
-Read off the drive labels 2026-11-10. All three are ST12000NM001G, PN 2MV103-003, firmware SN03, the same build as ZL203PMM (swap 14), and the remaining 3 of the 4 from the goharddrive order (inferred: model and count match, no other ST12000NM001G purchase). PSIDs are on the labels but deliberately not recorded here: a PSID lets anyone with the drive factory-reset its encryption.
+Read off the drive labels 2026-11-10. All three were ST12000NM001G, PN 2MV103-003, firmware SN03, the same build as ZL203PMM (swap 14), and the remaining 3 of the 4 from the goharddrive order (inferred: model and count match, no other ST12000NM001G purchase). PSIDs are on the labels but deliberately not recorded here: a PSID lets anyone with the drive factory-reset its encryption.
 
 | Model | Serial | WWN | Vendor, order, unit price | FARM h | Notes |
 |---|---|---|---|---|---|
-| ST12000NM001G | ZLW0T9XR | `0x5000c500c5d784ee` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
-| ST12000NM001G | ZLW0RKG6 | `0x5000c500c5d216f1` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
-| ST12000NM001G | ZLW0VNXQ | `0x5000c500c5da3030` | eBay goharddrive `19-15026-15078`, $349.95 | unknown | Read FARM before use. |
+| ST12000NM001G | ZLW0RKG6 | `0x5000c500c5d216f1` | eBay goharddrive `19-15026-15078`, $349.95 | 40,021 | Read 2026-11-10 in data01 slot 1 (not added to pool). SMART and device statistics zeroed; FARM shows 40,021 h, 19 power cycles, 47.6 TB written, 41.1 TB read. Identical hours and cycles to ZLW0VNXQ, so likely retired from the same array. 0 reallocated, 0 pending, 0 uncorrectable, 0 CRC lifetime. Short self-test passed. |
+| ST12000NM001G | ZLW0VNXQ | `0x5000c500c5da3030` | eBay goharddrive `19-15026-15078`, $349.95 | 40,021 | Read 2026-11-10 in data01 slot 1 (not added to pool). SMART and device statistics zeroed (0 h, 1 power cycle, 0 written); FARM shows 40,021 h, 19 power cycles, 47.7 TB written, 40.3 TB read. 0 reallocated, 0 pending, 0 uncorrectable, 0 CRC lifetime. Short self-test passed. |
 
 ## Open claims
 
