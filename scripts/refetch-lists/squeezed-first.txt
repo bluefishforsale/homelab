@@ -318,3 +318,9 @@
 15874  # Toy Story 5 (2026)
 11454  # Turning Red (2022)
 16028  # Wicked (2024)
+
+# Guillermo del Toro: all of his, for the gothic colour, smoke and candlelight.
+# Nightmare Alley's DP credit didn't match the atmosphere list; Pacific Rim is a
+# 62 GB 2160p DV remux the over-1080p pass would catch anyway.
+11381  # Nightmare Alley (2021)
+1363  # Pacific Rim (2013)
