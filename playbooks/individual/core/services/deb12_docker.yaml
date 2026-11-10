@@ -1,6 +1,6 @@
 ---
 - name: Install Docker on Debian 12
-  hosts: all
+  hosts: all:!macos
   become: yes
   tasks:
     - name: Update apt cache

@@ -1,7 +1,7 @@
 ---
 - name: GPU Power Management
   become: true
-  hosts: all
+  hosts: all:!macos
   strategy: free
   tasks:
     - name: Check if nvidia-smi exists

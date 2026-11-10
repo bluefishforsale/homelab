@@ -1,6 +1,6 @@
 ---
 - name: Configure host-exporter systemd services
-  hosts: all
+  hosts: all:!macos
   become: true
   gather_facts: yes
 
