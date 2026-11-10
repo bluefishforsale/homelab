@@ -1,5 +1,7 @@
 ---
-- name: Configure systemd service for overseerr
+# Overseerr on ocean as a compose project. The state dir from the original
+# install (/data01/services/overseerr/config) is reused as-is.
+- name: Overseerr on ocean
   hosts: ocean
   become: true
   gather_facts: true
@@ -15,45 +17,70 @@
     data: /data01
     home: "{{ data }}/services/{{ service }}"
     port: "{{ service_ports.overseerr.port }}"
+    compose_dir: "/opt/compose/{{ service }}"
     user: media
 
   tasks:
-
-  - name: Ensure basedir exists
+  - name: Ensure state dirs exist
     ansible.builtin.file:
-      path: "{{ home }}"
+      path: "{{ item }}"
       state: directory
       owner: "{{ user }}"
       group: "{{ user }}"
       mode: '0755'
+    loop:
+    - "{{ home }}"
+    - "{{ home }}/config"
 
-  - name: Ensure directory exists with correct ownership and permissions
+  - name: Ensure root-owned compose dir exists
     ansible.builtin.file:
-      path: "{{ home }}/{{ item }}"
+      path: "{{ compose_dir }}"
       state: directory
-      owner: "{{ user }}"
-      group: "{{ user }}"
+      owner: root
+      group: root
       mode: '0755'
-    with_items:
-    - config
 
-  - name: Create systemd service
+  - name: Template compose file
     ansible.builtin.template:
-      src: "{{ files }}/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ compose_dir }}/docker-compose.yml"
+      owner: root
+      group: root
       mode: '0644'
-    with_items:
-    - overseerr.service
-    notify:
-    - Reload systemd daemon
-    - Restart service
+    register: overseerr_compose
 
-  handlers:
-  - name: Reload systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
+  - name: Install systemd unit
+    ansible.builtin.template:
+      src: "{{ files }}/overseerr.service.j2"
+      dest: "/etc/systemd/system/{{ service }}.service"
+      mode: '0644'
+    register: overseerr_unit
 
-  - name: Restart service
+  - name: Find a leftover bare docker run container
+    ansible.builtin.command: >-
+      docker ps -a --filter name=^{{ service }}$
+      --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+    register: legacy_container
+    changed_when: false
+    check_mode: false
+
+  - name: Remove the bare docker run container before compose takes the name
+    ansible.builtin.command: docker rm -f {{ service }}
+    register: overseerr_legacy_rm
+    when: legacy_container.stdout | trim == 'project='
+
+  - name: Enable and start overseerr (restart only on compose/unit change or legacy cleanup)
     ansible.builtin.systemd:
-      name: overseerr.service
-      state: restarted
+      name: "{{ service }}.service"
+      enabled: true
+      state: "{{ 'restarted' if (overseerr_compose is changed or overseerr_unit is changed or overseerr_legacy_rm is changed) else 'started' }}"
+      daemon_reload: true
+
+  - name: Wait for Overseerr's API
+    ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ port }}/api/v1/status"
+    register: overseerr_status
+    until: overseerr_status.status == 200
+    retries: 18
+    delay: 10
+    changed_when: false
