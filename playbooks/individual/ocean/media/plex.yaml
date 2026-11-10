@@ -90,6 +90,15 @@
     - "config/Library/Application Support/Plex Media Server"
     tags: [always, setup, plex]
 
+  - name: Ensure home-only 4K movie library dir exists
+    ansible.builtin.file:
+      path: "{{ complete }}/movies-4k"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    tags: [setup, plex]
+
   - name: Remove old lowercase preferences file if it exists
     ansible.builtin.file:
       path: "{{ plex_home }}/config/Library/Application Support/Plex Media Server/preferences.xml"
