@@ -32,9 +32,12 @@ docker exec smart-exporter true 2>/dev/null || exit 0
   echo "# TYPE smart_farm_reallocated_sectors gauge"
   echo "# HELP smart_farm_unrecoverable_read_errors Unrecoverable read errors from the Seagate FARM log"
   echo "# TYPE smart_farm_unrecoverable_read_errors gauge"
+  shopt -s nullglob
   for b in /sys/block/sd*; do
     dev=$(basename "$b")
-    docker exec smart-exporter smartctl --json=c -l farm "/dev/$dev" 2>/dev/null \
+    # -n standby: never spin up a sleeping disk just to read a counter.
+    # timeout: a dying disk can stall a log read; one drive must not hang the run.
+    timeout 60 docker exec smart-exporter smartctl --json=c -n standby -l farm "/dev/$dev" 2>/dev/null \
       | jq -r --arg dev "$dev" '
           .seagate_farm_log // empty
           | select(.page_1_drive_information.poh != null)
