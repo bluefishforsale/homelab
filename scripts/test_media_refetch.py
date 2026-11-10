@@ -473,6 +473,34 @@ def test_season_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
     assert {"name": "RescanSeries", "seriesId": 1} in posted, posted
 
 
+def test_movie_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
+    # Tenet (2020-11-10): the audio pass turned the imported BHDStudio .mp4 into
+    # an .mkv before Radarr rescanned, so the grabbed check probed the gone .mp4
+    # and failed with an ssh error every tick.
+    mp4 = "/media/movies/Tenet (2020)/Tenet.mp4"
+    mkv = "/media/movies/Tenet (2020)/Tenet.mkv"
+    probed = []
+
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"hasFile": True, "path": "/movies/Tenet (2020)",
+                    "movieFile": {"id": 5, "relativePath": "Tenet.mp4",
+                                  "dateAdded": refetch.now().isoformat()}}
+
+    saved = refetch.ssh, refetch.subs
+    refetch.mc = Fake()
+    refetch.ssh = lambda cmd, stdin=None: mkv + "\n" if mkv in cmd else ""
+    refetch.subs = lambda file: probed.append(file) or ["eng"]
+    item = {"movie_id": 1, "state": "grabbed", "attempts": 0, "title": "t", "log": [],
+            "grabbed_at": (refetch.now() - refetch.dt.timedelta(hours=1)).isoformat()}
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.ssh, refetch.subs = saved
+    assert probed == [mkv] and item["file"] == mkv, (probed, item.get("file"))
+    assert item["path"] == mkv.removeprefix("/media") and item["state"] == "imported"
+
+
 def test_hdr_source_encoded_to_untagged_sdr_is_refetched():
     # Squid Game S01E02: tdarr's encode dropped the PQ tags, so ffprobe sees a
     # plain 10-bit file and it plays washed out on an SDR screen. Only Sonarr's
