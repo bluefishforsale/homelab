@@ -1,0 +1,7 @@
+# Recyclarr settings: a local folder of our own custom formats beside the
+# official TRaSH ones. Paths are inside the container.
+resource_providers:
+  - name: homelab-sonarr
+    type: custom-formats
+    path: /config/custom-formats/sonarr
+    service: sonarr

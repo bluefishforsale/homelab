@@ -1,7 +1,7 @@
 {
   "_id": "MinimalHEVC",
   "name": "HEVC NVenc - Minimal Single-Plugin",
-  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); movie video copied untouched (movies over 12 GB skipped whole); HEVC encode for non-HEVC TV video: hevc_nvenc CQ 30 on an NVENC GPU worker (CUDA decode on ocean), libx265 CRF 23 on a CPU worker (harbor), hevc_qsv ICQ 20 on a QSV worker (tautog); all three calibrated to about the same bitrate (~1.2 Mbps on a 1080p TV clip)",
+  "description": "Audio policy on every file (files/ocean-tdarr/conf/audio-policy.js); movie video copied untouched (movies over 12 GB skipped whole); HEVC Main10 (10-bit, no banding) encode for non-HEVC TV video: hevc_nvenc CQ 23 on an NVENC GPU worker (CUDA decode on ocean), libx265 CRF 16 on a CPU worker (harbor), hevc_qsv ICQ 12 on a QSV worker (tautog); all three calibrated to about the same bitrate (~2.7 Mbps video, ~3.5 Mbps with audio, on a 1080p TV clip)",
   "tags": "",
   "flowPlugins": [
     {
@@ -121,7 +121,7 @@
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "inputsDB": {
-        "outputArguments": "-c:V libx265 -preset:V medium -crf:V 23 -maxrate:V 40M -bufsize:V 50M -x265-params:V log-level=error -disposition:V:0 +default -dn"
+        "outputArguments": "-c:V libx265 -preset:V medium -crf:V 16 -pix_fmt:V yuv420p10le -maxrate:V 40M -bufsize:V 50M -x265-params:V log-level=error -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeCpu",
@@ -136,7 +136,7 @@
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "inputsDB": {
-        "outputArguments": "-c:V hevc_qsv -preset:V slow -global_quality:V 20 -disposition:V:0 +default -dn"
+        "outputArguments": "-c:V hevc_qsv -preset:V slow -global_quality:V 12 -profile:V main10 -pix_fmt:V p010le -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeQsv",
@@ -151,7 +151,7 @@
       "pluginName": "ffmpegCommandCustomArguments",
       "version": "1.0.0",
       "inputsDB": {
-        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 30 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -profile:V main10 -pix_fmt:V p010le -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeAll",
@@ -167,7 +167,7 @@
       "version": "1.0.0",
       "inputsDB": {
         "inputArguments": "-hwaccel cuda",
-        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 30 -b:V 30M -maxrate:V 40M -bufsize:V 50M -disposition:V:0 +default -dn"
+        "outputArguments": "-c:V hevc_nvenc -preset:V p7 -rc:V vbr -cq:V 23 -b:V 30M -maxrate:V 40M -bufsize:V 50M -profile:V main10 -pix_fmt:V p010le -disposition:V:0 +default -dn"
       },
       "fpEnabled": true,
       "id": "encodeNvencCuda",

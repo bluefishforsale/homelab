@@ -17,28 +17,41 @@ sonarr:
     quality_profiles:
       - trash_id: 72dae194fc92bf828f32cde7744e51a1  # WEB-1080p
         name: HD-1080p
-        # TRaSH's WEB-1080p allows only WEB. Older shows (Charmed) have nothing
-        # but Bluray, and tdarr re-encodes TV anyway, so a disc source is fine.
+        # TV targets ~3.5 Mbps as 10-bit HEVC. TRaSH's WEB-1080p allows only
+        # WEB, and Sonarr ranks quality before score, so a WEB-DL would always
+        # beat a BluRay x265. One group puts every 1080p source on equal footing
+        # and the custom format scores pick: x265 10-bit SDR (played as-is),
+        # then the WEB tiers, then disc sources (one 10-bit tdarr encode).
+        # The series quality definition's 15 MB/min floor (2 Mbps) rejects
+        # starved encodes.
         qualities:
-          - name: WEB 1080p
+          - name: HD 1080p
             qualities:
               - WEBDL-1080p
               - WEBRip-1080p
-          - name: Bluray-1080p Remux
-          - name: Bluray-1080p
+              - Bluray-1080p
+              - Bluray-1080p Remux
           - name: HDTV-1080p
+        upgrade:
+          allowed: true
+          until_quality: HD 1080p
+          until_score: 10000
         reset_unmatched_scores:
           enabled: true
           except: [DV, DV HDR10, DV HDR10+, DV HLG, DV SDR, HDR, HDR (undefined), HDR10, HDR10+, HLG, PQ]
 
     custom_format_groups:
       add:
-        # x265 (HD) at -10000: tdarr copies an HEVC source's video untouched,
-        # so an x265 release keeps whatever size its group chose.
-        - trash_id: 158188097a58d7687dee647e04af0da3  # [Optional] Golden Rule HD
         - trash_id: 74aff4168620ed49dcc67e92b2c2a5b4  # [Optional] Language Profiles
         - trash_id: 85fae4a2294965b75710ef2989c850eb  # [Streaming Services] HD/UHD boost
         - trash_id: 59c3af66780d08332fdc64e68297098f  # [Unwanted] Unwanted Formats
+    # No Golden Rule group here: both its options score 1080p SDR x265 -10000.
+
+    custom_formats:
+      # files/ocean-recyclarr/custom-formats/sonarr/x265-10bit-sdr.json
+      - trash_ids: [291fa856bb7709e01cb88da6cbc7ecbe]  # x265 10-bit SDR
+        assign_scores_to:
+          - name: HD-1080p
 
 radarr:
   radarr:
