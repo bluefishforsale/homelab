@@ -38,7 +38,11 @@ ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
 # Service behavior
 Restart=on-failure
 RestartSec=30
-TimeoutStartSec=300
+# `up -d` pulls when the image isn't on disk, and the stable image from ghcr
+# takes longer than five minutes (registry-cache only mirrors Docker Hub). At
+# 300s systemd killed that pull mid-layer on every attempt and HA stayed down
+# until it was pulled by hand (2026-11-09).
+TimeoutStartSec=1800
 TimeoutStopSec=60
 
 # Security
