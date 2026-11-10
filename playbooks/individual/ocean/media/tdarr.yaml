@@ -22,6 +22,7 @@
     path_data01: /data01/services
     path_home: "{{ path_data01 }}/{{ service }}"
     transcode: /transcode
+    compose_dir: "/opt/compose/{{ service }}"
     # A quarter of the host's cores, shared by the server and node containers.
     tdarr_cpu_quota_pct: "{{ ansible_processor_vcpus * 25 }}"
     # 3 GPU transcodes plus their CPU-side decode and loudnorm pushed ocean to
@@ -89,9 +90,7 @@
     loop_control:
       label: "{{ item.item }}"
     when: live | combine(desired) != live
-    notify:
-    - Reload systemd daemon
-    - Restart tdarr service
+    register: tdarr_conf
 
   - name: Git clone plugins and flows
     ansible.builtin.git:
@@ -112,39 +111,79 @@
       src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/tdarr.slice.j2"
       dest: /etc/systemd/system/tdarr.slice
       mode: '0644'
-    notify:
-    - Reload systemd daemon
+    register: tdarr_slice
 
-  - name: Create tdarr service
+  - name: Ensure root-owned compose dir exists
+    ansible.builtin.file:
+      path: "{{ compose_dir }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Template compose file
     ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/docker-compose.yml.j2"
+      dest: "{{ compose_dir }}/docker-compose.yml"
+      owner: root
+      group: root
       mode: '0644'
-    with_items:
-    - tdarr.service
-    - tdarr_node.service
-    notify:
-    - Reload systemd daemon
-    - Restart tdarr service
+    register: tdarr_compose
 
-  # NOTE: the unit edits above only reach systemd through handlers. Without this
-  # flush, a stopped unit starts on the stale definition (2026-10-23: PUID 1001
-  # after the renumber, readonly DB) and the API tasks below fail before any
-  # handler runs.
-  - name: Apply unit changes before starting
-    ansible.builtin.meta: flush_handlers
+  - name: Install systemd unit
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../../files/ocean-tdarr/tdarr.service.j2"
+      dest: /etc/systemd/system/tdarr.service
+      mode: '0644'
+    register: tdarr_unit
 
-  - name: Enable and start tdarr service
+  # The node used to be its own docker-run unit; compose owns it now.
+  - name: Stop and disable legacy tdarr_node service if present
+    ansible.builtin.systemd:
+      name: tdarr_node.service
+      state: stopped
+      enabled: false
+    failed_when: false
+
+  - name: Remove legacy tdarr_node service file
+    ansible.builtin.file:
+      path: /etc/systemd/system/tdarr_node.service
+      state: absent
+    register: legacy_node_unit
+
+  - name: Find leftover bare docker run containers
+    ansible.builtin.command: >-
+      docker ps -a --filter name=^{{ item }}$
+      --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+    register: legacy_containers
+    changed_when: false
+    check_mode: false
+    loop:
+      - "{{ service }}"
+      - "{{ service_node }}"
+
+  - name: Remove bare docker run containers before compose takes the names
+    ansible.builtin.command: docker rm -f {{ item.item }}
+    register: tdarr_legacy_rm
+    when: item.stdout | trim == 'project='
+    loop: "{{ legacy_containers.results }}"
+
+  # NOTE: a restart kills every running transcode, so it happens only when
+  # something here changed. tdarr rewrites its own config files on start, which
+  # is why tdarr_conf compares as data above instead of as a template.
+  - name: Enable and start tdarr (restart only on config/unit change or legacy cleanup)
     ansible.builtin.systemd:
       name: tdarr.service
       enabled: true
-      state: started
+      state: "{{ 'restarted' if (tdarr_conf is changed or tdarr_slice is changed or tdarr_compose is changed or tdarr_unit is changed or tdarr_legacy_rm is changed or legacy_node_unit is changed) else 'started' }}"
+      daemon_reload: true
 
-  - name: Enable and start tdarr_node service
-    ansible.builtin.systemd:
-      name: tdarr_node.service
-      enabled: true
-      state: started
+  # Stopping a `docker run --rm` unit kills its client with 137, so the removed
+  # unit lingers as "not-found failed" until reboot (prowlarr-exporter did).
+  - name: Clear the removed node unit's failed state
+    ansible.builtin.command: systemctl reset-failed tdarr_node.service
+    when: legacy_node_unit is changed
+    failed_when: false
 
   # The flow lives in tdarr's own DB, so until this task the committed JSON was
   # only documentation and the live flow drifted from it unseen. Push it through
@@ -175,7 +214,8 @@
           mode: getById
           docID: "{{ tdarr_flow._id }}"
     register: tdarr_live_flow
-    retries: 12
+    # Up to the server's 300s start_period after a restart.
+    retries: 30
     delay: 10
     until: tdarr_live_flow.status == 200
 
@@ -230,7 +270,7 @@
       url: "http://localhost:{{ tdarr_port_web }}/api/v2/get-nodes"
       method: GET
     register: tdarr_nodes
-    retries: 12
+    retries: 30
     delay: 10
     until: tdarr_nodes.status == 200 and (tdarr_nodes.json | dict2items | selectattr('value.nodeName', 'equalto', inventory_hostname ~ '.home') | list | length) > 0
 
@@ -279,23 +319,3 @@
     ansible.builtin.systemd:
       name: tdarr-playback-window.service
       state: started
-
-  handlers:
-  - name: Reload systemd daemon
-    ansible.builtin.systemd:
-      daemon_reload: yes
-
-  - name: Restart tdarr service
-    ansible.builtin.systemd:
-      name: tdarr.service
-      state: restarted
-
-  # NOTE: each unit pulls :latest on start, and the node refuses to work for a
-  # server of another version. Restarting the server alone split them 3.00.00
-  # vs 2.94.03 on 2026-10-12 and stopped all transcoding, so they restart together.
-  - name: Restart tdarr node service
-    listen: Restart tdarr service
-    ansible.builtin.systemd:
-      name: tdarr_node.service
-      state: restarted
-      enabled: true

@@ -30,6 +30,7 @@
     mtr_exporter_image: dragoonaethis/mtr-exporter
     mtr_exporter_version: "0.3.0"
     mtr_exporter_port: "{{ service_ports.mtr_exporter.port }}"
+    probe_exporters: [blackbox-exporter, mtr-exporter]
     # Alertmanager (Docker Compose deployment)
     alertmanager_service: alertmanager
     alertmanager_image: prom/alertmanager
@@ -94,8 +95,7 @@
       owner: nobody
       group: nogroup
       mode: '0644'
-    notify:
-    - Restart blackbox-exporter service
+    register: blackbox_conf
 
   - name: Create mtr-exporter jobs config
     ansible.builtin.template:
@@ -104,8 +104,7 @@
       owner: nobody
       group: nogroup
       mode: '0644'
-    notify:
-    - Restart mtr-exporter service
+    register: mtr_jobs
 
   - name: Create prometheus docker-compose.yml
     ansible.builtin.template:
@@ -320,27 +319,52 @@
     - Reload systemd daemon
     - Restart pushgateway service
 
-  - name: Create blackbox-exporter.service
-    ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
-      mode: '0644'
-    with_items:
-    - blackbox-exporter.service
-    notify:
-    - Reload systemd daemon
-    - Restart blackbox-exporter service
+  # The two probe exporters are compose projects so docker-refresh@<name>
+  # covers them. Each restarts only when its own compose file, unit or config
+  # changed, or when the bare docker-run container it replaces is removed.
+  - name: Ensure probe exporter compose dirs exist
+    ansible.builtin.file:
+      path: "/opt/compose/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    loop: "{{ probe_exporters }}"
 
-  - name: Create systemd mtr-exporter.service
+  - name: Template probe exporter compose files
     ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../../files/ocean-prometheus/{{ item }}.j2"
-      dest: "/etc/systemd/system/{{ item }}"
+      src: "{{ prometheus_files }}/{{ item }}-compose.yml.j2"
+      dest: "/opt/compose/{{ item }}/docker-compose.yml"
+      owner: root
+      group: root
       mode: '0644'
-    with_items:
-    - mtr-exporter.service
-    notify:
-    - Reload systemd daemon
-    - Restart mtr-exporter service
+    loop: "{{ probe_exporters }}"
+    register: probe_compose
+
+  - name: Install probe exporter units
+    ansible.builtin.template:
+      src: "{{ prometheus_files }}/{{ item }}.service.j2"
+      dest: "/etc/systemd/system/{{ item }}.service"
+      mode: '0644'
+    loop: "{{ probe_exporters }}"
+    register: probe_unit
+
+  - name: Find leftover bare docker run probe exporter containers
+    ansible.builtin.command: >-
+      docker ps -a --filter name=^{{ item }}$
+      --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+    loop: "{{ probe_exporters }}"
+    register: probe_legacy
+    changed_when: false
+    check_mode: false
+
+  - name: Remove bare docker run probe exporter containers before compose takes the names
+    ansible.builtin.command: docker rm -f {{ item.item }}
+    loop: "{{ probe_legacy.results }}"
+    loop_control:
+      label: "{{ item.item }}"
+    when: item.stdout | trim == 'project='
+    register: probe_legacy_rm
 
   - name: Start and enable prometheus Docker Compose service
     ansible.builtin.systemd:
@@ -349,17 +373,19 @@
       enabled: true
       daemon_reload: yes
 
-  - name: Start and enable blackbox-exporter service
+  - name: Start and enable probe exporters (restart only on change)
     ansible.builtin.systemd:
-      name: blackbox-exporter.service
-      state: started
+      name: "{{ item }}.service"
       enabled: true
-
-  - name: Start and enable mtr-exporter service
-    ansible.builtin.systemd:
-      name: mtr-exporter.service
-      state: started
-      enabled: true
+      daemon_reload: true
+      state: "{{ 'restarted' if item in probe_changed else 'started' }}"
+    loop: "{{ probe_exporters }}"
+    vars:
+      probe_changed: >-
+        {{ (probe_compose.results + probe_unit.results) | selectattr('changed') | map(attribute='item') | list
+           + (probe_legacy_rm.results | selectattr('changed') | map(attribute='item.item') | list)
+           + (['blackbox-exporter'] if blackbox_conf is changed else [])
+           + (['mtr-exporter'] if mtr_jobs is changed else []) }}
 
   - name: Start and enable alertmanager Docker Compose service
     ansible.builtin.systemd:
@@ -405,14 +431,4 @@
   - name: Restart pushgateway service
     ansible.builtin.systemd:
       name: pushgateway.service
-      state: restarted
-
-  - name: Restart blackbox-exporter service
-    ansible.builtin.systemd:
-      name: blackbox-exporter.service
-      state: restarted
-
-  - name: Restart mtr-exporter service
-    ansible.builtin.systemd:
-      name: mtr-exporter.service
       state: restarted
