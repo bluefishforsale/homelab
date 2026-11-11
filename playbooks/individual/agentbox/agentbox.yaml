@@ -667,6 +667,8 @@
       - agentbox-media-refetch.timer
       - agentbox-tdarr-drive.service
       - agentbox-tdarr-drive.timer
+      - agentbox-x265-watch.service
+      - agentbox-x265-watch.timer
     notify: Reload systemd daemon
 
   - name: Flush handlers so units are registered before enabling
@@ -682,6 +684,7 @@
       - agentbox-replace-reconcile.timer
       - agentbox-media-refetch.timer
       - agentbox-tdarr-drive.timer
+      - agentbox-x265-watch.timer
 
   - name: Enable and start the alert receiver
     ansible.builtin.systemd:
