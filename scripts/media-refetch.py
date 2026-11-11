@@ -431,7 +431,8 @@ def listed_movies(movies, ids, plex, count, ledger):
 
     tdarr's old 8-bit squeeze left films like Arrival conformant on paper and
     banded on screen; only a person watching can tell, so they come as a list."""
-    busy = {i["movie_id"] for i in ledger.values() if "movie_id" in i and i.get("state") != "done"}
+    busy = {i["movie_id"] for i in ledger.values()
+            if "movie_id" in i and (i.get("state") != "done" or "listed" in i.get("reasons", []))}
     todo = []
     for m in movies:
         if m["id"] not in ids or m["id"] in busy:
