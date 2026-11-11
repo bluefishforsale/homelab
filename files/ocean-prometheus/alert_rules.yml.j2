@@ -974,3 +974,61 @@ groups:
     annotations:
       summary: "{{ "{{ $labels.instance }}" }} restarted"
       description: "{{ "{{ $labels.instance }}" }} came back up with a new boot time. Its journal from before the restart is in Loki: {job=\"netboot\"} for the 15 minutes before the boot. Log lines that stop mid-stream with no shutdown point at a hard reset (power, RAM tuning); a clean shutdown sequence means something asked for it."
+
+- name: mem0_quality_alerts
+  rules:
+  # The mem0 nightly LOCOMO benchmark (.github/workflows/mem0-nightly-quality.yml)
+  # pushes mem0_locomo_* to the Pushgateway once a day. These guard the fork
+  # against shipping a change that answers worse or stuffs more text into agent
+  # context. The per-PR gate in the mem0 repo catches retrieval regressions
+  # deterministically; this catches what needs a real LLM (extraction, answers).
+  #
+  # NOTE: thresholds come from measured noise, not taste. Six runs on identical
+  # code (mem0 c7cb52da, 2026-11-04..09) scored 87.1-91.4 overall, a 4.3 point
+  # spread from the extraction model and the llama.cpp judge alone, and one
+  # night dropped 3.8 with no code change. So the score alert compares a 3-day
+  # median against the 7-day median and needs a 6 point gap; a single-night or
+  # tighter rule would page on noise. Per-category scores are not alerted on:
+  # open-domain has 13 questions, so one answer moves it 7.7 points.
+  - alert: Mem0LocomoScoreDropped
+    expr: quantile_over_time(0.5, mem0_locomo_score{category="overall"}[3d]) < quantile_over_time(0.5, mem0_locomo_score{category="overall"}[7d]) - 6
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "mem0 LOCOMO score fell more than 6 points below its weekly median"
+      description: "The 3-day median overall LOCOMO score is {{ "{{ printf `%.1f` $value }}" }}, more than 6 points under the 7-day median. Same-code noise is about 4 points, so this is likely a real regression. Compare mem0_locomo_run_info{commit} across recent nights and the metrics.json artifacts of the mem0-nightly-quality runs."
+
+  # Extraction writing longer memories inflates every later search result an
+  # agent reads. Mean length held 32.7-33.2 tokens across the same six runs.
+  - alert: Mem0LocomoMemoriesGrewLonger
+    expr: mem0_locomo_memory_tokens_mean > 1.10 * quantile_over_time(0.5, mem0_locomo_memory_tokens_mean[7d])
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "mem0 extracted memories are over 10% longer than their weekly median"
+      description: "Mean extracted memory length is {{ "{{ printf `%.1f` $value }}" }} tokens, more than 10% above the 7-day median. Look for an extraction prompt or model change in the commits since the last quiet night."
+
+  # Tokens a search hands back at cutoff 10, i.e. what lands in an agent's
+  # context per recall. Ranged 349-361 across the same six runs.
+  - alert: Mem0LocomoReturnedContextGrew
+    expr: mem0_locomo_returned_tokens_mean > 1.10 * quantile_over_time(0.5, mem0_locomo_returned_tokens_mean[7d])
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "mem0 search returns over 10% more context than its weekly median"
+      description: "Searches return {{ "{{ printf `%.0f` $value }}" }} tokens on average at cutoff 10, more than 10% above the 7-day median. Check ranking, threshold and extraction changes since the last quiet night."
+
+  # 36h: GitHub starts the scheduled run 6-10h late and a run takes ~2.5h, so
+  # the longest gap between successes in the first week was 28h. absent()
+  # covers a Pushgateway restart that lost its persistence file.
+  - alert: Mem0LocomoNightlyStale
+    expr: time() - mem0_locomo_last_success_timestamp_seconds > 129600 or absent(mem0_locomo_last_success_timestamp_seconds)
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "No successful mem0 nightly LOCOMO run in over 36h"
+      description: "The mem0-nightly-quality workflow in the homelab repo has not pushed a success in 36h. Check its latest run (gh run list -R bluefishforsale/homelab -w mem0-nightly-quality.yml): the runner, the OpenAI key, ocean's llama.cpp, and the Pushgateway on ocean:9091 are the usual suspects."
