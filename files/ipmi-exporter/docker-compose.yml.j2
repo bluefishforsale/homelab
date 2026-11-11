@@ -1,0 +1,31 @@
+# ipmi-exporter as a compose project so docker-refresh@ipmi-exporter keeps the
+# image current.
+services:
+  ipmi-exporter:
+    image: {{ docker_image }}:{{ docker_tag }}
+    container_name: {{ service }}
+    hostname: {{ inventory_hostname }}
+    restart: unless-stopped
+    # NOTE: user root + SYS_RAWIO are load-bearing. The image drops to a non-root
+    # user, but /dev/ipmi0 is 0600 root:root, so freeipmi (ipmi-sensors/-dcmi/-sel)
+    # gets "permission denied" without them and every collector reports ipmi_up=0.
+    user: root
+    devices:
+      - /dev/ipmi0:/dev/ipmi0
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RAWIO
+    environment:
+      - TZ=America/Los_Angeles
+    ports:
+      - "{{ exporter_port }}:9290"
+    volumes:
+      - {{ home }}/config.yml:/config.yml:ro
+    command: ["--config.file=/config.yml"]
+    # The landing page, not /metrics: /metrics runs the slow freeipmi collection.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9290/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

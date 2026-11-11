@@ -26,17 +26,22 @@ scrape_configs:
     - source_labels: [__address__]
       regex: "([^:]+):\\d+"
       target_label: instance
+    # target is the PVE host the exporter queries over the API; without it the
+    # exporter has no host to talk to and returns 500. node005 and node006 are
+    # separate PVE installs, not a cluster, so each node's exporter queries its
+    # own mgmt IP and neither node's metrics depend on the other being up.
     static_configs:
-    - targets:
-        - node005.home:9221
+    - targets: ['node005.home:9221']
+      labels:
+        __param_target: '192.168.1.105'
+    - targets: ['node006.home:9221']
+      labels:
+        __param_target: '192.168.1.106'
     metrics_path: /pve
     params:
       module: [default]
       cluster: ['1']
       node: ['1']
-      # target is the PVE host the exporter queries over the API; without it the
-      # exporter has no host to talk to and returns 500. node005 mgmt IP is stable.
-      target: ['192.168.1.105']
 
   # In-band IPMI on the Dell bare-metal hosts (PSU/fan/temp/voltage/SEL). freeipmi
   # collection is slow, so a long interval/timeout keeps scrapes from overlapping.

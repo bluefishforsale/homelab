@@ -1,0 +1,21 @@
+# pve-exporter as a compose project so docker-refresh@pve-exporter keeps the
+# image current.
+services:
+  pve-exporter:
+    image: {{ docker_image }}:{{ docker_tag }}
+    container_name: {{ service }}
+    hostname: {{ inventory_hostname }}
+    restart: unless-stopped
+    environment:
+      - TZ=America/Los_Angeles
+    ports:
+      - "{{ exporter_port }}:9221"
+    volumes:
+      - {{ home }}/pve.yaml:/etc/prometheus/pve.yml:ro
+    # The landing page, not /pve: /pve needs a target and calls the Proxmox API.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9221/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

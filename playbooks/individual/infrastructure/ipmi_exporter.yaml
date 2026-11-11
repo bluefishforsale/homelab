@@ -18,6 +18,7 @@
     docker_image: "prometheuscommunity/ipmi-exporter"
     docker_tag: "latest"
     exporter_port: 9290
+    compose_dir: "/opt/compose/{{ service }}"
 
   tasks:
     - name: Assert the BMC device is present
@@ -41,29 +42,48 @@
         src: "{{ files }}/config.yml"
         dest: "{{ home }}/config.yml"
         mode: '0644'
-      notify: Restart ipmi-exporter
+      register: svc_conf
+
+    - name: Create compose dir
+      ansible.builtin.file:
+        path: "{{ compose_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy docker-compose.yml
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      register: svc_compose
 
     - name: Deploy systemd service
       ansible.builtin.template:
-        src: "{{ files }}/ipmi-exporter.service.j2"
+        src: "{{ files }}/{{ service }}.service.j2"
         dest: "/etc/systemd/system/{{ service }}.service"
         mode: '0644'
-      notify:
-        - Reload systemd daemon
-        - Restart ipmi-exporter
+      register: svc_unit
 
-    - name: Enable and start ipmi-exporter service
+    - name: Find a leftover bare docker run container
+      ansible.builtin.command: >-
+        docker ps -a --filter name=^{{ service }}$
+        --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+      register: svc_legacy
+      changed_when: false
+      check_mode: false
+
+    - name: Remove the bare docker run container before compose takes the name
+      ansible.builtin.command: docker rm -f {{ service }}
+      register: svc_legacy_rm
+      when: svc_legacy.stdout | trim == 'project='
+
+    - name: Start and enable {{ service }} (restart only on change)
       ansible.builtin.systemd:
         name: "{{ service }}.service"
         enabled: true
-        state: started
-
-  handlers:
-    - name: Reload systemd daemon
-      ansible.builtin.systemd:
         daemon_reload: true
-
-    - name: Restart ipmi-exporter
-      ansible.builtin.systemd:
-        name: "{{ service }}.service"
-        state: restarted
+        state: "{{ 'restarted' if (svc_conf is changed or svc_compose is changed or svc_unit is changed or svc_legacy_rm is changed) else 'started' }}"
