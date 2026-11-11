@@ -7,13 +7,16 @@ walks the "refetch" bucket from media-conformance.py a batch at a time. Every
 item goes through a ledger, so a run can stop anywhere and resume:
 
   planned   Plex rating key and original added date recorded
-  grabbed   the old file deleted and the best acceptable release grabbed
+  grabbed   the best acceptable release grabbed (a movie's old file held, a show's deleted)
   imported  Radarr/Sonarr imported files that have an English subtitle; a release
             without one is blocklisted and the next is tried, up to 3, after
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
-The old file is only deleted once Radarr or Sonarr has accepted a grab to replace it.
+A movie's old file stays in the library until its replacement imports, and a
+hardlink under HOLD keeps it until the replacement passes, so a failed attempt
+puts it back. A TV file is only deleted once Sonarr has accepted a grab to
+replace it.
 
   media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do
@@ -81,6 +84,14 @@ PACK_PROFILE = "No season packs"
 # episodes are searched, since a pack also replaces the good ones.
 PACK_SHARE = 0.5
 PLEX_MOVIE, PLEX_EPISODE = 1, 4
+# The old file stays in the library until its replacement passes; a hardlink
+# here (same pool, no space) survives Radarr deleting it on an upgrade import,
+# so a replacement that fails the checks can be put back.
+HOLD = "/data01/complete/.refetch-hold"
+# Radarr's /movies is this on ocean.
+MOVIES_HOST = "/data01/complete/movies"
+# An import Radarr refuses only because the old file is still there.
+NO_UPGRADE = re.compile(r"Not an? (Custom Format )?upgrade", re.I)
 
 
 def now():
@@ -544,6 +555,34 @@ def import_blocked(downloading):
                                      for q in downloading)
 
 
+def hold(item, movie):
+    """Hardlink the movie's current file aside, so losing it to an import is undoable."""
+    if not movie.get("hasFile"):
+        return
+    src = MOVIES_HOST + movie["path"].removeprefix("/movies") + "/" + movie["movieFile"]["relativePath"]
+    dst = f"{HOLD}/{item['movie_id']}/{os.path.basename(src)}"
+    ssh(f"sudo -n mkdir -p {shlex.quote(os.path.dirname(dst))} && sudo -n ln -f {shlex.quote(src)} {shlex.quote(dst)}")
+    item["held"] = [[src, dst]]
+
+
+def drop_hold(item):
+    for _, dst in item.pop("held", []):
+        ssh(f"sudo -n rm -f {shlex.quote(dst)}")
+
+
+def put_back(item):
+    """Return the held file to its place and let Radarr adopt it again."""
+    for src, dst in item.get("held", []):
+        ssh(f"sudo -n mkdir -p {shlex.quote(os.path.dirname(src))} && sudo -n ln -f {shlex.quote(dst)} {shlex.quote(src)}")
+    if item.get("held"):
+        mc.post("radarr", "/api/v3/command", {"name": "RescanMovie", "movieIds": [item["movie_id"]]})
+
+
+def no_upgrade(downloading):
+    return any(NO_UPGRADE.search(m) for q in downloading for sm in q.get("statusMessages") or []
+               for m in sm.get("messages") or [])
+
+
 def blocklist(app, downloading):
     for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
         mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true",
@@ -561,6 +600,7 @@ def step(item, yes):
         if queued:
             note(item, f"already downloading {queued[0]['title']}; following it")
             if yes:
+                hold(item, mc.get("radarr", f"/api/v3/movie/{mid}"))
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
         if awaiting_redownload(item):
@@ -574,11 +614,10 @@ def step(item, yes):
         if not yes:
             return False
         movie = mc.get("radarr", f"/api/v3/movie/{mid}")
-        # Grab first: a refused grab must leave the old file, and the download
-        # takes minutes, long before Radarr would import over it.
+        # The old file stays playable through the download; it only leaves when
+        # the new one is imported, and the held link can bring it back.
         mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
-        if movie.get("hasFile"):
-            mc.delete("radarr", f"/api/v3/moviefile/{movie['movieFile']['id']}")
+        hold(item, movie)
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -597,11 +636,23 @@ def step(item, yes):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            if import_blocked(downloading) and movie.get("hasFile") and no_upgrade(downloading):
+                note(item, f"Radarr will not import {downloading[0]['title'][:60]} over the old file; "
+                           "removing the old file (held) and importing")
+                if not yes:
+                    return False
+                mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
+                for q in {q["downloadId"]: q for q in downloading}.values():
+                    mc.post("radarr", "/api/v3/command", {"name": "DownloadedMoviesScan", "path": q["outputPath"],
+                                                          "downloadClientId": q["downloadId"], "importMode": "auto"})
+                return True
             if import_blocked(downloading):
                 note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
                 if not yes:
                     return False
                 blocklist("radarr", downloading)
+                if not movie.get("hasFile"):
+                    put_back(item)
                 item["state"] = "planned"
                 return True
             if gave_up(grabbed, downloading):
@@ -616,10 +667,12 @@ def step(item, yes):
         item["attempts"] += 1
         if any(lang in conformance.ENGLISH for lang in langs):
             note(item, f"imported {mf['relativePath']} with subtitles {sorted(set(langs))}")
+            drop_hold(item)
             item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path)
             return True
         if item["attempts"] >= MAX_ATTEMPTS:
             note(item, f"attempt {item['attempts']} still has no English subtitle; keeping it")
+            drop_hold(item)
             item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path,
                         no_subs=True)
             return True
@@ -630,6 +683,7 @@ def step(item, yes):
         latest = max(hist, key=lambda h: h["date"])
         mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
         mc.post("radarr", f"/api/v3/history/failed/{latest['id']}", {})
+        put_back(item)
         item.update(state="planned", failed_at=now().isoformat())
         return True
 
