@@ -1,0 +1,13 @@
+[Unit]
+Description=Run plex-transcode-metrics every 15min
+
+[Timer]
+# A rolling 30-day ratio does not move minute to minute, and each run is an
+# HTTP call to Tautulli, so this is deliberately slower than the 60s system
+# collectors (zpool, sas-phy) that read local sysfs.
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

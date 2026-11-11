@@ -66,6 +66,16 @@
     ramdisk: /mnt/ramdisk
     user: media
     uid: "{{ system_users.media.uid }}"
+    # Per-client transcode ratios, from Tautulli history. A client can be "up"
+    # and still transcode everything it plays: one Roku did 164 of 164 over
+    # five months with nothing to alert on, because the plex-exporter and
+    # tautulli-exporter transcode metrics are instantaneous session gauges with
+    # no player label. Rolling window so a client whose owner fixes their
+    # settings ages back out.
+    plex_transcode_window_days: 30
+    plex_transcode_tautulli_url: "http://localhost:{{ service_ports.tautulli.port }}"
+    plex_transcode_tautulli_cfg: "{{ data }}/services/tautulli/config/config.ini"
+    node_exporter_textfiles: "{{ data }}/services/node-exporter/text_files"
 
   tasks:
 
@@ -364,6 +374,37 @@
       state: started
       daemon_reload: true
     tags: [service, kometa]
+
+  # Per-client transcode ratios -> node_exporter textfile collector. Read-only:
+  # one Tautulli get_history call. Availability alerts (PlexDown,
+  # PlexPathDegraded) say nothing about a client that plays everything through
+  # the transcoder.
+  - name: Deploy the Plex transcode metrics collector
+    ansible.builtin.copy:
+      src: "{{ files }}/plex-transcode-metrics.sh"
+      dest: "{{ plex_home }}/plex-transcode-metrics.sh"
+      mode: '0755'
+    tags: [config, plex]
+
+  - name: Install the Plex transcode metrics timer
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    vars:
+      home: "{{ plex_home }}"
+    loop:
+      - plex-transcode-metrics.service
+      - plex-transcode-metrics.timer
+    tags: [service, plex]
+
+  - name: Enable the Plex transcode metrics timer
+    ansible.builtin.systemd:
+      name: plex-transcode-metrics.timer
+      enabled: true
+      state: started
+      daemon_reload: true
+    tags: [service, plex]
 
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:
