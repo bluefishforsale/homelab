@@ -76,9 +76,10 @@ def observe(results):
     for film, (runtime, rels) in results.items():
         for r in rels:
             t = tier(r)
-            if t is None or not candidate(r, runtime):
+            # No parsed group means no stable key; a title would read as new every week.
+            if t is None or not r.get("releaseGroup") or not candidate(r, runtime):
                 continue
-            g = seen.setdefault(r.get("releaseGroup") or r["title"], {"tier": t, "films": []})
+            g = seen.setdefault(r["releaseGroup"], {"tier": t, "films": []})
             g["tier"] = min(g["tier"], t)
             if film not in g["films"]:
                 g["films"].append(film)
@@ -96,8 +97,10 @@ def changes(before, after):
             continue
         if now["tier"] < was["tier"]:
             out.append(f"{group} moved up to Tier 0{now['tier']} (was 0{was['tier']})")
-        if now["tier"] <= 2 and len(now["films"]) >= 2 > len(was["films"]):
-            out.append(f"{group} (Tier 0{now['tier']}) now has x265 SDR on {len(now['films'])} reference films")
+        # Against the union: indexers age posts out, so two films may never show in one week.
+        films = set(was["films"]) | set(now["films"])
+        if now["tier"] <= 2 and len(films) >= 2 > len(was["films"]):
+            out.append(f"{group} (Tier 0{now['tier']}) now has x265 SDR on {len(films)} reference films")
     return out
 
 

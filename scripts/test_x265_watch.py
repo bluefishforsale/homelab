@@ -75,6 +75,11 @@ def test_top_tier_group_reaching_two_films_is_loud():
     assert watch.changes(before, after)
 
 
+def test_top_tier_group_reaching_two_films_across_weeks_is_loud():
+    # Indexers drop old posts: week 1 shows X on A, week 2 only on B. Two films all the same.
+    assert watch.changes({"X": {"tier": 1, "films": ["A"]}}, {"X": {"tier": 1, "films": ["B"]}})
+
+
 def test_low_tier_group_spreading_is_quiet():
     # Tier 03 on more films is drift, not the wind changing.
     assert watch.changes({"X": {"tier": 3, "films": ["A"]}}, {"X": {"tier": 3, "films": ["A", "B"]}}) == []
