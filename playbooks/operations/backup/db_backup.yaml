@@ -10,9 +10,9 @@
 # .github/workflows/lib/detect-impacted-playbooks.sh emit() guard. Recurring runs
 # come from the installed systemd timer, not the deploy pipeline.
 #
-# Until the GCS SA key exists in the vault (backup_storage.gcs.service_account_key),
-# the job runs local-only with a 2-tarball retention; add the key and re-run to
-# activate uploads.
+# ocean uploads with backup_storage.gcs.service_account_key; a worker uploads only
+# with its own backup_storage.gcs.<host>_service_account_key. A host without a key
+# runs local-only with a 2-tarball retention.
 - name: Configure homelab database backup to GCS
   hosts: ocean:data01_workers
   become: true
@@ -26,6 +26,9 @@
     home: "/data01/services/{{ service }}"
     files: "{{ playbook_dir }}/../../../files/{{ service }}"
     backup_gcs_bucket: homelab-db-backups
+    gcs_key_name: "{{ 'service_account_key' if inventory_hostname == 'ocean' else inventory_hostname + '_service_account_key' }}"
+    # Dispatch with db_backup_run_now=true to take a backup at the end of the run.
+    db_backup_run_now: false
 
   tasks:
     - name: Ensure base + staging directories exist
@@ -50,12 +53,22 @@
         dest: "{{ home }}/db-backup.env"
         mode: '0600'
 
-    - name: Land the GCS service-account key (skipped until vaulted - Phase 1)
+    # NOTE: each host gets its own key, scoped in terraform-root to the dumps it
+    # makes. A worker with no vaulted key loses its file and uploads nothing,
+    # rather than falling back to ocean's bucket-wide key.
+    - name: Land this host's GCS service-account key
       ansible.builtin.copy:
-        content: "{{ backup_storage.gcs.service_account_key | default('') }}"
+        content: "{{ backup_storage.gcs[gcs_key_name] | default('') }}"
         dest: "{{ home }}/gcs-sa.json"
         mode: '0600'
-      when: (backup_storage.gcs.service_account_key | default('')) | length > 100
+      when: (backup_storage.gcs[gcs_key_name] | default('')) | length > 100
+      no_log: true
+
+    - name: Remove a key this host has no vaulted copy of
+      ansible.builtin.file:
+        path: "{{ home }}/gcs-sa.json"
+        state: absent
+      when: (backup_storage.gcs[gcs_key_name] | default('')) | length <= 100
 
     - name: Deploy systemd service + timer
       ansible.builtin.template:
@@ -73,6 +86,32 @@
         enabled: true
         state: started
         daemon_reload: true
+
+    # Oneshot: this waits for the script. A failed run still falls through to the
+    # metrics below, which say what failed, before the play fails on it.
+    - name: Take a backup now
+      ansible.builtin.systemd:
+        name: db-backup.service
+        state: started
+      register: db_backup_run
+      failed_when: false
+      when: db_backup_run_now | bool
+
+    - name: Read the backup's result
+      ansible.builtin.slurp:
+        src: /data01/services/node-exporter/text_files/db_backup.prom
+      register: db_backup_prom
+      when: db_backup_run_now | bool
+
+    - name: Show the backup's result
+      ansible.builtin.debug:
+        msg: "{{ db_backup_prom.content | b64decode | split('\n') | select('match', '^homelab_') | list }}"
+      when: db_backup_run_now | bool
+
+    - name: Fail if the backup failed
+      ansible.builtin.fail:
+        msg: "db-backup.service failed: {{ db_backup_run.msg | default('see journalctl -u db-backup') }}"
+      when: db_backup_run_now | bool and db_backup_run is failed
 
   handlers:
     - name: Reload systemd daemon
