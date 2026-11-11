@@ -100,7 +100,9 @@ scheduling and reconciliation stop.
   server token and `server/tls/`, to GCS beside the DB dumps. Restore is
   rehearsed in phase 1.
 - **Images**: k3s `registries.yaml` mirrors docker.io, ghcr.io, gcr.io and
-  nvcr.io through registry-cache-01.
+  nvcr.io through registry-cache-01. A mirror is a preference, not a
+  dependency: containerd falls back to the upstream registry when the cache is
+  down, and phase 1 tests that by stopping the cache and pulling.
 
 ### Networking
 
@@ -122,15 +124,29 @@ scheduling and reconciliation stop.
   carved out of DHCP, which lives with the DNS pair (an agent hard limit). So:
   - During migration, ocean's nginx stays the front door. Each service cutover
     repoints one nginx upstream from the Docker container to the k8s service
-    (NodePort or ingress on a node IP).
-  - At the end, the ingress controller takes ports 80/443 on ocean
-    (`hostNetwork`), after the Docker nginx retires. Ocean's IP stays the front
-    door. No DNS record changes.
+    (a NodePort on a node IP).
+  - At the end, Cilium's Gateway API implementation takes ports 80/443 on
+    ocean in host-network mode, after the Docker nginx retires. Ocean's IP
+    stays the front door. No DNS record changes.
+  - Not ingress-nginx: the project was retired in March 2026 and gets no more
+    fixes. The `ingress-nginx` chart in `homelab-kube` is archived, not reused.
+    Cilium is already the CNI, so its Gateway is one less component.
+- **Public traffic** arrives through `cloudflared` tunnels whose ingress rules
+  are remote config in `terraform-root`. `cloudflared` stays a host service on
+  ocean. Any tunnel rule that points straight at a container port, not at
+  nginx, needs a `terraform-root` PR as part of that service's cutover, merged
+  first. The `cloudflare-tunnel-ingress-controller` and MetalLB charts in
+  `homelab-kube` are archived: the first would fight `terraform-root` over
+  tunnel config, the second needs an IP pool this design does not have.
 - **hostNetwork pods** where the app needs the LAN: Home Assistant (discovery),
   Plex (GDM discovery, real client IPs for local-network detection).
 - **Ports lockdown**: a default-deny NetworkPolicy per app namespace, with
   explicit allows. `vars/vars_service_ports.yaml` entries retire with their
-  service.
+  service. Limit: NetworkPolicy does not apply to `hostNetwork` pods (Plex,
+  Home Assistant, the Gateway). Those, and the node's own ports, are locked
+  down with Cilium's host firewall, turned on in audit mode first and enforced
+  only after a clean week, because a wrong host rule can drop SSH (hard limit:
+  port 22 rules are terrac's to approve).
 
 ### Storage
 
@@ -143,6 +159,24 @@ Grafana's MySQL, Prometheus TSDB, Loki) must be on a node-local disk.
 | Media (read/write, hardlinks) | `/data01` | One static NFS PV of the whole pool, `ReadWriteMany`, `Retain`, mounted on `k3s-agent01`. On ocean, a `hostPath` of `/data01` (no NFS loopback). One mount of the whole pool so *arr hardlinks do not hit `EXDEV`. |
 | App state on ocean | `/data01/services/<svc>` | `hostPath` (or a static local PV) pinned to ocean, pointing at the same directory the Docker container uses today. Zero data copy at cutover. |
 | App state on k3s-agent01 | its local state disk | `local-path` provisioner on the local disk. |
+
+Two guards the charts and hosts must carry:
+
+- **No pod may start on ocean before the pool is mounted.** A `hostPath` into
+  an unmounted `/data01` writes onto the root disk, and the data disappears
+  from view when the pool mounts (the trap `agents.md` describes). So the k3s
+  agent unit on ocean gets a systemd drop-in that refuses to start unless
+  `/data01` is a mountpoint (the same idea as today's Docker guards), and state
+  `hostPath` volumes use `type: Directory` on `/data01/services/<svc>`, which
+  does not exist when the pool is absent.
+- **`local-path` volumes are tied to a node name.** Their PVs carry node
+  affinity on `kubernetes.io/hostname`. A replaced VM therefore rejoins under
+  the same node name and gets the old VM's state disk re-attached, or its
+  volumes never bind.
+
+The NFS export on ocean only admits listed client IPs with `root_squash`, so
+`k3s-agent01` joins `data01_workers` (or its successor) before any pod there
+mounts `/data01`, and pods run with the media uid and gid.
 
 ### GPU
 
@@ -166,9 +200,13 @@ phase 4. Known risks: Docker's `FORWARD DROP` policy against pod traffic, two
 container runtimes each needing the NVIDIA runtime configured, and host port
 collisions. Mitigations:
 
-1. Prove the exact coexistence on `k3s-agent01` first (install Docker there,
-   run a container and pods, verify pod-to-pod, pod-to-service and NodePort
-   traffic, then reboot and verify again).
+1. Prove the exact coexistence on `k3s-agent01` first: install Docker there,
+   run a bridge-network container with a published port and pods, then verify
+   pod-to-pod, pod-to-service, NodePort from another host, **a Docker
+   container reaching a NodePort on its own host** (the nginx flip depends on
+   exactly this path, and it is where Cilium's eBPF load balancing and
+   Docker's bridge meet), and the published Docker port still reachable from
+   the LAN. Reboot and verify all of it again.
 2. Join ocean in a maintenance window, with a written backout (`k3s-agent-uninstall.sh`, restart docker).
 3. Fallback if coexistence cannot be made clean: k3s's `--docker` mode on ocean
    only (one runtime, cri-dockerd), revisited once Docker is empty.
@@ -183,8 +221,13 @@ collisions. Mitigations:
 3. Window: stop the Docker container (`docker compose down` via the retire
    play), scale the Deployment to 1, repoint the nginx upstream, verify with the
    service's health check and blackbox probe.
-4. Retire: the Ansible play, its `files/<svc>`, its port entry and its vault
-   keys are removed in one `homelab` PR.
+4. Retire: the Ansible play, its `files/<svc>`, its port entry, its vault
+   keys, its `docker-refresh@` and `docker-restart@` timers and any host timer
+   that belongs to it are removed in one `homelab` PR.
+
+A cutover can touch up to four repos, in this order: `terraform-root` (only if
+a tunnel rule or bucket changes), the service's own repo (only for home-grown
+images, to switch its dispatch target), `homelab-kube`, then `homelab`.
 
 Never run the container and the pod at the same time against the same state
 directory. Downtime per service is the stop-to-healthy window (target under 5
@@ -209,6 +252,20 @@ rebuilt by swap, never upgraded in place.
 - Inventory every ocean container into a migration table: class (stateless,
   WAL-bearing state, GPU, hostNetwork, platform), state path, ports, inbound
   dependants, external repo that deploys it. This table is the wave plan.
+- Inventory the host's own units and timers the same way; containers are not
+  the whole of ocean. Probed 2026-11-10, each needs a named destination:
+
+  | Host unit or timer | Destination |
+  |---|---|
+  | `nfs-server`, `zfs-zed`, `zpool-metrics`, `sas-phy-metrics`, `farm-metrics`, `nvidia-persistenced`, `fail2ban` | Stay on the host for good (Salt). They are the storage and GPU node itself. |
+  | `cloudflared` | Stays on the host (Salt); config in `terraform-root`. |
+  | `exim4` smarthost | Stays on the host until Alertmanager moves; then tier 0 (see dead-man alert). |
+  | `cloudflare_ddns`, `certbot-renew` | Retire into the cluster: a CronJob and cert-manager. |
+  | `db-backup` | Per-database CronJobs. |
+  | `plex-autoheal`, `kometa-metrics`, `mem0-metrics`, `tdarr-playback-window`, `wordpress-cron`, `wordpress-update`, `audible-download` | Move with their service, as CronJobs or sidecars, in that service's cutover. |
+  | `promtail` | Replaced by Alloy. |
+  | `avahi-daemon`, `netatalk`, `glances` | terrac decides: keep on host or drop. |
+  | host exporter containers (node, smart, process, fail2ban, cadvisor, nvidia-gpu, dcgm) | DaemonSets on cluster nodes. On tier 0 VMs they stay as they are, owned by Salt. |
 - Node labels and taint chosen up front, so pods pin to a role, not a host
   name: label `homelab.role/data01=local`, `homelab.role/gpu=rtx3090`; taint
   `homelab.role/ocean=true:NoSchedule`. Workloads that belong on ocean tolerate
@@ -237,7 +294,7 @@ above. Waves, lowest risk first:
 
 | Wave | Services | Notes |
 |---|---|---|
-| W1 | exporters, homepage, ntfy, languagetool, karma, pushgateway, blackbox, mtr, ndt | stateless; learn the nginx flip |
+| W1 | app exporters, homepage, languagetool, karma, pushgateway, blackbox, mtr, ndt | stateless; learn the nginx flip |
 | W2 | sonarr, radarr, lidarr, prowlarr, bazarr, overseerr, tautulli, kometa | WAL state via `hostPath` on ocean; hardlinks need the one whole-pool mount |
 | W3 | archmap, photonic_inventory, my_ta_jose, paia, etrading_boy, blog_saetnere_com_wp | external repos; each repo switches its deploy pattern in the same cutover |
 | W4 | tdarr server and nodes, llama.cpp, open-webui, mem0 stack, plex | GPU; plex in quiet hours; mem0 is the agents' shared memory, so cut it over with no agent run in flight |
@@ -270,8 +327,10 @@ Two different things, handled differently:
   does not import on boot.
 - Reboots on k8s nodes: kured, in a weekly window that does not overlap the
   Sunday 08:00 to 14:00 Pacific image refresh, one node at a time, drain first.
-  Ocean is in the rota; its reboot is a few minutes of downtime for the GPU and
-  local-state pods, and that is accepted inside the window.
+- **Ocean is not in kured's rota.** An unattended reboot would skip the
+  `dkms status` check above, and during the overlap it would also take down
+  every Docker service. Ocean reboots only in the supervised monthly window.
+  Its `reboot-required` alert still fires, so a pending reboot is visible.
 - Reboots on tier 0 VMs: one at a time in the same window, driven by the
   patch play (Ansible now, Salt later). **The DNS pair is excluded from any
   automation an agent writes or runs**; terrac patches it, never both at once.
@@ -303,6 +362,9 @@ replacement patterns:
 
 Applies to any VM that owns hardware only one VM can hold at a time. Written
 for ocean, the hardest case; `k3s-agent01` is the same without the pool and GPU.
+On `k3s-agent01` the "devices" include its local state disk (a virtual disk,
+moved between VMs in the same `terraform-root` PR), because its `local-path`
+volumes live there. In every swap the new VM rejoins under the old node name.
 
 **Before the window (no downtime, can take days):**
 
@@ -352,15 +414,74 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 | Concern | Today | Target |
 |---|---|---|
 | Deploy | `main-apply` runs a playbook | Argo CD app-of-apps from `homelab-kube` `master`. Auto-sync; `prune: true`, `allowEmpty: false`. |
-| External repo deploys | `repository_dispatch` to `homelab`, playbook pulls `:latest` | CI commits a tag bump to `homelab-kube` (or Argo CD Image Updater writes back). `docs/operations/deploy-pattern.md` gets a k8s section. |
-| Weekly image refresh | `docker-refresh@<project>` timers | Renovate on `homelab-kube`, against pinned tags. |
+| Home-grown images | `repository_dispatch` to `homelab`, playbook pulls `:latest` | See "Keeping images current" below: the repo's CI pushes an immutable tag and dispatches to `homelab-kube`, which commits the tag into the chart values. |
+| Third-party images | `docker-refresh@<project>` timers pull floating tags weekly | See "Keeping images current": Renovate watches registries and opens PRs that bump the pinned tag. |
 | Secrets | ansible-vault | SOPS with age, decrypted in-cluster by sops-secrets-operator (already in `homelab-kube`, switched from GPG to age). The age private key is the one bootstrap secret; it stays in the vault and the bootstrap play installs it. |
 | Public cert | certbot on ocean, Cloudflare DNS-01 | cert-manager `ClusterIssuer` for Let's Encrypt, Cloudflare DNS-01, same token. |
-| Internal TLS | `homelab-ca` (spec 2026-10-14) | cert-manager `CA` issuer backed by the same root. The CA key handling rules from that spec apply unchanged. |
-| Metrics | Prometheus on ocean, file-based scrape config | Phases 1 to 4: ocean's Prometheus also scrapes the cluster (kube-state-metrics, kubelet). Phase 5: kube-prometheus-stack in cluster, TSDB on ocean local disk, ServiceMonitors per app. |
-| Logs | Loki plus promtail | Loki in cluster plus Alloy (promtail is end of life). |
-| Dead-man alert | none outside ocean | An Alertmanager Watchdog to something outside both the cluster and ocean. Open question (PRD Q3). |
+| Internal TLS | `homelab-ca` (spec 2026-10-14, not yet implemented) | Unresolved, PRD Q6. That spec's root never expires, has no revocation, and is `pathlen:0`, so it cannot sign an intermediate for the cluster; the only way cert-manager could issue from it is to hold the root key itself in a cluster Secret. Its name constraints also exclude pod and service IPs. Until Q6 is answered, internal TLS in the cluster is out of scope and pods use the public cert at the Gateway. |
+| Metrics | Prometheus on ocean, file-based scrape config | Phases 1 to 4: an Alloy (or Prometheus agent) in the cluster discovers ServiceMonitors and remote-writes to ocean's Prometheus, because pod IPs are not reachable from outside the cluster and a migrated service must not lose its metrics. Phase 5: kube-prometheus-stack in cluster, TSDB at the path it uses today on ocean, the agent retires. |
+| Logs | Loki plus promtail | Alloy in the cluster pushes pod logs to ocean's Loki from phase 1. Phase 5: Loki moves in cluster. Promtail is end of life and is not carried over. |
+| Dead-man alert | none outside ocean | "Cluster is down" goes to email and ntfy (terrac, D17). Both of those run on ocean today (exim smarthost, ntfy container), so neither can be allowed to depend on the thing being reported dead. See "Dead-man alert" below. |
 | DB backups | `files/db-backup/db-backup.sh` | Per-database CronJobs writing the same GCS object names, so `db-restore.sh` keeps working. Both remain authoritative until the last database moves. |
+
+### Keeping images current
+
+Two paths, split by who builds the image (terrac, D18).
+
+**Third-party images: a bot opens PRs.** Renovate runs on a schedule as a
+GitHub Actions workflow in `homelab-kube`, on the self-hosted runner (not the
+hosted Renovate app, so no outside service holds a token for the repo). It
+reads the image tags in the chart values, asks the registries for newer ones,
+and opens a PR per update that changes the tag (and digest).
+
+- Every third-party image is pinned to a version tag plus digest. Floating
+  tags (`latest`, `nightly`) get a digest pin, so even those change only by PR.
+- A merge is a deploy (Argo CD syncs it), so the merge policy is the control:
+  - patch and minor updates for stateless apps auto-merge once CI passes
+    (`helm template` plus schema validation), batched into the Sunday 08:00 to
+    14:00 Pacific window so the weekly rhythm stays what it is today;
+  - majors, anything with a database or WAL state, and every tier 1 platform
+    chart (Cilium, Argo CD, cert-manager) wait for terrac.
+- Helm chart versions are updated by the same bot under the same rules.
+- Renovate ignores `ghcr.io/bluefishforsale/*`.
+
+**Home-grown images: push, then dispatch.** The repo's CI builds the image,
+pushes it to `ghcr.io/bluefishforsale/<name>` under an immutable tag (the
+commit sha), then sends a `repository_dispatch` to `homelab-kube` with the
+image name and tag. A workflow there writes the tag into that app's values file
+and commits it; Argo CD syncs. Same trigger as today, different target: the
+dispatch updates a chart, it no longer runs a playbook.
+
+- `:latest` is never what the cluster runs; the sha tag is, so a rollback is a
+  revert of one commit.
+- The dispatch workflow may only edit the values file of the app named in the
+  payload, and only its image tag.
+- Shape B static sites (built assets cloned onto a host and served by nginx)
+  have no image today. Design call: each becomes a small nginx image built by
+  its repo's CI and takes this same path.
+- `docs/operations/deploy-pattern.md` gets the new pattern before the first W3
+  cutover.
+
+### Dead-man alert
+
+Requirement (D17): when the cluster is down, terrac gets an email and an ntfy
+push. Today Alertmanager, the exim smarthost and ntfy all run on ocean, and
+ntfy and Alertmanager are scheduled to move into the cluster. A notification
+path that runs on the thing that died sends nothing.
+
+- A watchdog on agentbox (tier 0, already runs the Alertmanager receiver)
+  probes the k3s API `/readyz`, ocean, and Alertmanager's own Watchdog
+  heartbeat.
+- It sends email through a relay that does not pass through ocean or the
+  cluster (agentbox's own smarthost config to the same upstream relay).
+- ntfy: design call, **ntfy moves to tier 0 (agentbox) and never into the
+  cluster**. It comes out of wave W1. Otherwise the push half of D17 cannot
+  work when it is needed.
+- It exists and is tested (stop the API, get both notifications) before
+  Alertmanager leaves Docker in phase 5.
+- agentbox is on node005 and the server and ocean are on node006, so the
+  watcher and the watched do not share a hypervisor. If node005 itself dies
+  nothing reports it; that gap exists today and stays out of scope.
 
 ### Salt
 
@@ -379,6 +500,10 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
   owned the same concern.
 - **Hard limits carry over**: DNS, sshd, `authorized_keys`, the fleet key and
   port 22 firewall rules may be ported to Salt only by terrac, by hand.
+- **Secrets**: host secrets move from ansible-vault to Salt pillar encrypted
+  with the same sops/age scheme. The vault cannot be archived until every key
+  has a new home, including the cluster's age key and the Cloudflare Access
+  email lists that `terraform-root` still reads from it.
 - **Order**: base system first (packages, users, node-exporter, docker on the
   remaining Docker hosts), then the k3s install and upgrade (after phase 3, so
   the playbook that survived three upgrades is the reference), then Proxmox

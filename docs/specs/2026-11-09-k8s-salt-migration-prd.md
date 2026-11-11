@@ -83,15 +83,37 @@ where merge is deploy.
 | D14 | Pods pin to node role labels, never to a hostname, so they follow a replaced VM unchanged. | design call |
 | D15 | CNI is Cilium. | terrac |
 | D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). | terrac |
+| D17 | "Cluster is down" is reported by email and ntfy. | terrac |
+| D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
+| D19 | The dead-man watchdog and ntfy live on agentbox (tier 0); ntfy never moves into the cluster. Email leaves by a relay that does not pass through ocean. | design call, needs terrac's sign-off |
+| D20 | North-south traffic uses Cilium's Gateway API in host-network mode on ocean. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call |
+| D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, needs terrac's sign-off |
+| D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
+| D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, needs terrac's sign-off |
 
 ## Open questions for terrac
 
-- **Q3.** The dead-man alert target outside ocean and the cluster:
-  healthchecks.io (new external service) or a check on agentbox.
 - **Q4.** Do the old 2021 app charts in `homelab-kube` get reused, or replaced
   by upstream/community charts per app (recommendation: replace, case by case)?
 - **Q5.** Weekly reboot window for kured: proposal Tuesday 03:00 to 05:00
   Pacific (clear of the Sunday image refresh).
+- **Q6.** Internal TLS in the cluster. The `homelab-ca` root (never expires,
+  no revocation, `pathlen:0`, names limited to `home`, `cluster.local` and
+  192.168.1.0/24) cannot sign an intermediate, so cert-manager could only use
+  it by holding the root key in the cluster. Options: (a) change the CA design
+  before it is built, to `pathlen:1` with a cluster intermediate that can be
+  replaced; (b) keep it for hosts only and give the cluster its own CA;
+  (c) no internal TLS in the cluster for 2027. Recommendation: (a), because
+  the CA is not implemented yet and this is the cheap moment to change it.
+- **Q7.** Is Salt still worth it? After this migration, services are in
+  Kubernetes and VMs are in `terraform-root`. What is left for a host tool is
+  small: base packages, users, exporters, the k3s install, NFS and drivers, on
+  about a dozen hosts. Salt adds a master VM, a minion on every host, a new
+  repo and a new CI path for that. The alternative is a slimmed-down Ansible
+  in a renamed repo. Salt stays in the plan as decided; this asks for a
+  deliberate yes before phase 6 work starts.
+- **Q8.** `avahi-daemon`, `netatalk` and `glances` run on ocean outside any
+  container: keep on the host or drop.
 
 ## Requirements
 
@@ -109,7 +131,9 @@ where merge is deploy.
   allows, a health check, a blackbox probe, and a metrics scrape if it exposes
   metrics.
 - **R7.** One service per cutover. Each cutover is one `homelab-kube` PR (chart,
-  values, secrets) and one `homelab` PR (retire play, files, port, vault keys).
+  values, secrets) and one `homelab` PR (retire play, files, port, vault keys,
+  timers), preceded where needed by a `terraform-root` PR (tunnel rule, bucket)
+  and a PR in the service's own repo (dispatch target).
 - **R8.** Upgrade log: each upgrade records add-on compatibility checked,
   removed APIs found, what broke, what the play missed, API downtime and app
   downtime.
@@ -120,7 +144,15 @@ where merge is deploy.
   kernel packages held on passthrough and module-building hosts, and moved in
   a supervised monthly window.
 - **R11.** kured reboots k8s nodes one at a time in the agreed window, draining
-  first.
+  first. Ocean is excluded (D22).
+- **R15.** Every image the cluster runs is pinned to an immutable tag or
+  digest. Nothing runs `:latest`. Tags change only by commit to `homelab-kube`.
+- **R16.** Metrics and logs for a migrated service keep flowing to the existing
+  Prometheus and Loki from the day it moves (in-cluster agent with remote
+  write), not from phase 5.
+- **R17.** No pod starts on ocean unless `/data01` is a mountpoint.
+- **R18.** Every host unit and timer on ocean has a named destination before
+  phase 4 starts (spec table), not only the containers.
 - **R12.** Pending-security-update and reboot-required metrics on every host,
   alerting at 7 and 14 days.
 - **R13.** Every VM on a Debian major within 6 months of its release and before
@@ -133,16 +165,16 @@ where merge is deploy.
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q3 to Q5 answered. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q4 to Q6 and Q8 answered, D19, D21 and D23 signed off. |
 | 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
-| 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node) run on `k3s-agent01`; harbor VM decommissioned. |
+| 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
-| 4 | Every Docker service on ocean is a pod or explicitly parked. Docker nginx retired; ingress owns 80/443 on ocean. |
-| 5 | Prometheus, Loki, Grafana and Alertmanager run in cluster; the external dead-man alert fires when the cluster is down (tested). |
+| 4 | Every Docker service on ocean is a pod or explicitly parked. |
+| 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
 | 5b | Passthrough swap rehearsed on `k3s-agent01`, then, with Docker drained, ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
 | 6 | Every host is a Salt minion; every Ansible role and play is deleted or ported. |
-| 7 | `homelab` archived. |
+| 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). `homelab` archived. |
 
 ## Success measures
 
