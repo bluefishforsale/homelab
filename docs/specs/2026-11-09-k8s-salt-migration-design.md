@@ -60,8 +60,8 @@ stands; the reason is fsync latency, not rotation.
 
 | Tier | What | Runs on | Managed by |
 |---|---|---|---|
-| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, Salt master, registry-cache, k3s server, gh-runner, agentbox, the external dead-man alert | Plain VMs and hosts | VM definitions: `terraform-root`. Inside the VM: Ansible now, Salt later |
-| 1: platform | Argo CD, cert-manager, secrets operator, ingress controller, NVIDIA device plugin, NFS and local storage classes, kube-prometheus-stack, Alloy | The cluster | Argo CD |
+| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, Salt master, registry-cache, k3s server, gh-runner, agentbox, ntfy and the dead-man watchdog (both on agentbox) | Plain VMs and hosts | VM definitions: `terraform-root`. Inside the VM: Ansible now, Salt later |
+| 1: platform | Argo CD, cert-manager, secrets operator, Cilium Gateway, NVIDIA device plugin, NFS and local storage classes, kube-prometheus-stack, Alloy | The cluster | Argo CD |
 | 2: apps | Every service that runs as a container today | The cluster | Argo CD |
 
 Rule: anything you need to repair the cluster lives in tier 0. Nothing in tier 0
@@ -300,7 +300,7 @@ above. Waves, lowest risk first:
 | W4 | tdarr server and nodes, llama.cpp, open-webui, mem0 stack, plex | GPU; plex in quiet hours; mem0 is the agents' shared memory, so cut it over with no agent run in flight |
 | W5 | homeassistant | hostNetwork |
 | W6 | prometheus, loki, grafana, alertmanager | this is phase 5, after the external dead-man alert exists |
-| W7 | nginx | ingress controller takes 80/443 on ocean via hostNetwork; certbot retires to cert-manager |
+| W7 | nginx | Cilium Gateway takes 80/443 on ocean in host-network mode; certbot retires to cert-manager |
 
 At the end of W7, Docker on ocean is empty and is removed.
 
