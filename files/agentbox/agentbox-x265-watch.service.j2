@@ -1,0 +1,21 @@
+[Unit]
+Description=Watch for vetted disc-sourced x265 movie encodes (x265-watch.py run)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ user }}
+Environment=HOME={{ home }}
+Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=MEDIA_HOST=ocean.home
+# ntfy publish creds (ALERT_NTFY_URL/USER/PASS) for the pushes.
+EnvironmentFile={{ home }}/.config/agentbox/agentbox.env
+WorkingDirectory={{ media_tools }}
+# Same clone and pull lock as the other media timers, so a fix merged to
+# scripts/ lands on the next run without a redeploy.
+ExecStartPre=/usr/bin/flock {{ media_tools }}/.git/pull.lock /usr/bin/git -C {{ media_tools }} pull --ff-only --quiet
+ExecStart=/usr/bin/python3 scripts/x265-watch.py run
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentbox-x265-watch

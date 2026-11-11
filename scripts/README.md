@@ -28,6 +28,7 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 | `plex-playback.py` | what actually plays and what it costs, from Tautulli: `summary` / `clients` / `audio` / `video` / `why` / `languages` / `users` | `plex-playback.py audio -s 500` |
 | `media-conformance.py` | which files meet the media standard (HEVC, audio policy, English subs) and whether each needs a tdarr pass or a re-download: summary / `--list <bucket>` / `--json <bucket>` | `media-conformance.py --list refetch` |
 | `media-refetch.py` | re-download non-conforming movies in batches through Radarr, retrying releases without English subs and restoring Plex's added date: `plan` / `run [--yes]` / `status` (dry run by default) | `media-refetch.py plan --movies 25` |
+| `x265-watch.py` | weekly agentbox timer: ntfy-push at top priority when TRaSH-vetted groups ship disc-sourced x265 SDR movie encodes near 10 Mbps, or TRaSH edits its x265/tier formats; quiet monthly digest | `x265-watch.py run --dry` |
 | `tdarr.py` | Tdarr without the web UI: `status` / `errors` / `survey` / `libraries` / `flows` / `flow-get` / `flow-put` / `library-flow` / `requeue` / `probe` | `tdarr.py errors -n 5` |
 
 ## DNS & mail-auth (external / public domains)
