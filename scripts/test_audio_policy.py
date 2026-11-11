@@ -129,6 +129,46 @@ def test_subtitle_ffmpeg_cannot_identify_is_dropped():
     assert [s["index"] for s in out if s["removed"]] == [2], out
 
 
+
+def dialogue_source(streams):
+    for s in run(streams):
+        if "title=Stereo (dialogue boost)" in s["outputArgs"]:
+            return s["mapArgs"][1], s["outputArgs"][s["outputArgs"].index("-metadata:s:{outputIndex}", s["outputArgs"].index("title=Stereo (dialogue boost)")) + 1]
+    raise AssertionError("no dialogue track built")
+
+
+def test_audio_description_does_not_become_the_dialogue_track():
+    # Amelie (2026-11-11): French 5.1 plus two English stereo tracks, an audio
+    # description and the director's commentary. English wins, so the narration
+    # for blind viewers became the default track.
+    assert dialogue_source([
+        stream(0, "video", "hevc", width=1920, height=1080),
+        stream(1, "audio", "ac3", channels=6, tags={"language": "fre"}, disposition={"default": 1}),
+        stream(2, "audio", "ac3", channels=2, tags={"language": "eng", "title": "Audio.Description"}),
+        stream(3, "audio", "ac3", channels=2, tags={"language": "eng", "title": "Director's.Commentary"}),
+    ]) == ("0:1", "language=fre")
+
+
+def test_audio_description_flagged_only_by_disposition_is_skipped():
+    assert dialogue_source([
+        stream(0, "video", "hevc", width=1920, height=1080),
+        stream(1, "audio", "ac3", channels=6, tags={"language": "jpn"}, disposition={"default": 1}),
+        stream(2, "audio", "aac", channels=2, tags={"language": "eng"}, disposition={"visual_impaired": 1}),
+    ]) == ("0:1", "language=jpn")
+
+
+def test_dialogue_track_built_from_a_side_track_is_rebuilt():
+    # Files the old policy already did: an English dialogue track from the audio
+    # description, next to the French original.
+    out = run([
+        stream(0, "video", "hevc", width=1920, height=1080),
+        stream(1, "audio", "aac", channels=2, tags={"language": "eng", "title": "Stereo (dialogue boost)"}),
+        stream(2, "audio", "ac3", channels=6, tags={"language": "fre"}),
+        stream(3, "audio", "ac3", channels=2, tags={"language": "eng", "title": "Audio.Description"}),
+    ])
+    assert [s["index"] for s in out if s["removed"]] == [1], out
+    assert any(s["mapArgs"] == ["-map", "0:2"] and "title=Stereo (dialogue boost)" in s["outputArgs"] for s in out)
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
