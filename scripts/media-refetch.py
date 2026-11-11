@@ -574,7 +574,9 @@ def drop_hold(item):
 def put_back(item):
     """Return the held file to its place and let Radarr adopt it again."""
     for src, dst in item.get("held", []):
-        ssh(f"sudo -n mkdir -p {shlex.quote(os.path.dirname(src))} && sudo -n ln -f {shlex.quote(dst)} {shlex.quote(src)}")
+        # NOTE: Radarr runs as media; a folder made by root's mkdir blocks its next delete there.
+        ssh(f"sudo -n install -d -o media -g media -m 755 {shlex.quote(os.path.dirname(src))}"
+            f" && sudo -n ln -f {shlex.quote(dst)} {shlex.quote(src)}")
     if item.get("held"):
         mc.post("radarr", "/api/v3/command", {"name": "RescanMovie", "movieIds": [item["movie_id"]]})
 

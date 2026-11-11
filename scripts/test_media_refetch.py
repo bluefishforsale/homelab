@@ -721,6 +721,21 @@ def test_movie_new_file_without_english_puts_the_old_file_back():
     assert item["state"] == "planned" and item["held"] == [[OLD, HOLD]]
 
 
+def test_put_back_recreates_the_movie_folder_as_media():
+    # A.I. (2026-11-11): Radarr removed the emptied folder, `sudo mkdir -p` made
+    # it again as root, and every later delete Radarr tried there was
+    # "Access to the path is denied" (HTTP 500), so the swap looped forever.
+    cmds = []
+    saved = refetch.ssh, refetch.mc
+    refetch.ssh, refetch.mc = (lambda cmd, stdin=None: cmds.append(cmd) or ""), FakeRadarr()
+    try:
+        refetch.put_back({"movie_id": 1, "held": [[OLD, HOLD]]})
+    finally:
+        refetch.ssh, refetch.mc = saved
+    assert not any("mkdir" in c for c in cmds), cmds
+    assert any("install -d -o media -g media" in c for c in cmds), cmds
+
+
 def test_movie_kept_after_the_last_attempt_drops_the_held_copy():
     item = grabbed_item(attempts=refetch.MAX_ATTEMPTS - 1)
     cmds = run_step(item, FakeRadarr(new=True), subs=())
