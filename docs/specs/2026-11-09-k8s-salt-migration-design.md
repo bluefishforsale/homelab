@@ -48,6 +48,11 @@ Defects in `homelab-kube` to fix before reuse:
 - `ocean-nfs-pvc.yaml` gives the 18T `/data01` PV `persistentVolumeReclaimPolicy: Delete`. Must be `Retain`.
 - `charts/argocd-applications/values.yaml` sync policy has `prune: true` with `allowEmpty: true`: an empty render prunes everything. Must be `allowEmpty: false`.
 - sops via GPG, promtail (end of life), chart dependencies four years stale.
+- The app charts (plex, sonarr, radarr, lidarr, tdarr, tautulli, overseerr,
+  nzbget) each depend on a `k8s-at-home` chart. That project was archived in
+  August 2022; its chart index still answers but nothing in it has been
+  updated since, and the `ghcr.io/k8s-at-home/*` images are frozen at 2021
+  versions. See "App charts" below for what upgrading them means.
 
 A note on etcd: the original reason for avoiding it was spinning disks. VM disks
 are on consumer SSDs, not spinning disks. Consumer SSDs without power-loss
@@ -423,6 +428,46 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 | Logs | Loki plus promtail | Alloy in the cluster pushes pod logs to ocean's Loki from phase 1. Phase 5: Loki moves in cluster. Promtail is end of life and is not carried over. |
 | Dead-man alert | none outside ocean | "Cluster is down" goes to email and ntfy (terrac, D17). Both of those run on ocean today (exim smarthost, ntfy container), so neither can be allowed to depend on the thing being reported dead. See "Dead-man alert" below. |
 | DB backups | `files/db-backup/db-backup.sh` | Per-database CronJobs writing the same GCS object names, so `db-restore.sh` keeps working. Both remain authoritative until the last database moves. |
+
+### App charts
+
+The 2021 app charts are upgraded, not replaced, and they set the style for
+every new app chart (terrac, D24).
+
+The style, as it exists in `homelab-kube` today:
+
+- One directory per app, `charts/<app>/`, holding a thin wrapper chart: a
+  `Chart.yaml` at `version: 1.0.0` with exactly one dependency, and a
+  `values.yaml` whose top-level key is that dependency's name.
+- All app config lives in that one values file, in the common-library layout:
+  `image`, `env`, `service`, `ingress`, `probes`, `persistence`, with the
+  `# --` doc comments kept.
+- Local templates only for what the dependency cannot express.
+- One entry per app in `charts/argocd-applications/values.yaml`.
+
+What "upgrade" has to mean, because the upstream is gone: the dependency
+changes from the dead `k8s-at-home/<app>` chart to `bjw-s-labs/app-template`
+(v5.3.0 on 2026-11-10), the maintained descendant of the same common library.
+The wrapper layout and the one-values-file habit carry over unchanged. What
+does change inside the values:
+
+- The schema: app-template nests the same settings under `controllers` and
+  `containers`. Each chart's values are rewritten once to the new schema.
+- Images: from frozen `ghcr.io/k8s-at-home/*` tags to maintained images,
+  pinned by tag and digest (R15). Where the Docker service on ocean already
+  runs a given image, the chart uses that same image, so the cutover does not
+  change the app version and the container at the same moment.
+- `ingress` with `ingressClassName: nginx` becomes a `route` (HTTPRoute) on
+  the Cilium Gateway.
+- Persistence follows the storage rules above (`hostPath` state on ocean,
+  the whole-pool `/data01` mount), not the 2021 Ceph and NFS claims.
+- Each chart gains what the PRD requires of every service: NetworkPolicy,
+  probes, ServiceMonitor where there are metrics.
+
+New apps with no 2021 chart (the *arr exporters, homepage, archmap and the
+rest) get a wrapper chart in the same style on the same dependency. Platform
+components (Cilium, Argo CD, cert-manager, kube-prometheus-stack) keep using
+their own upstream charts, wrapped the same way.
 
 ### Keeping images current
 

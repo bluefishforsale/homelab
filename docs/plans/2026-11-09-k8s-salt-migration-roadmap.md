@@ -55,8 +55,7 @@ must leave room for it.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q4 (old charts), Q5 (reboot
-      window), Q6 (internal CA), Q8 (stray host daemons); signs off D19, D21,
+- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons); signs off D19, D21,
       D23. Q7 (is Salt still worth it) answered before phase 6 work starts.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
@@ -66,6 +65,11 @@ must leave room for it.
       pods, consul, vault, kubernetes-dashboard, ingress-nginx, MetalLB,
       cloudflare-tunnel-ingress-controller) to `archive/`; drop promtail for
       Alloy.
+- [ ] `homelab-kube`: write `docs/chart-style.md` from the 2021 charts (D24),
+      then upgrade one chart end to end as the reference (sonarr: wrapper on
+      `app-template`, new values schema, pinned image, HTTPRoute, NetworkPolicy)
+      and render it in CI. The other seven are upgraded in their own wave, each
+      just before its cutover, so no chart sits upgraded and untested.
 - [ ] `homelab-kube`: Renovate workflow on the self-hosted runner (D21) and
       the `repository_dispatch` workflow that writes a home-grown image tag
       into one app's values (D18). CI: `helm template` plus schema validation.

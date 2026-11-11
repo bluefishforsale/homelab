@@ -37,7 +37,8 @@ where merge is deploy.
 - Replacing the DNS pair, DHCP, Proxmox, or the ZFS pool layout.
 - Moving `/data01` off ocean, or replacing NFS with a distributed storage
   system (Ceph, Longhorn).
-- Rewriting app charts that work; use upstream charts where they exist.
+- Inventing a new chart style. The 2021 wrapper charts are upgraded and are
+  the style every new app chart follows (D24).
 
 ## Anti-goals (failure even if it technically works)
 
@@ -90,11 +91,10 @@ where merge is deploy.
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, needs terrac's sign-off |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, needs terrac's sign-off |
+| D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
 
 ## Open questions for terrac
 
-- **Q4.** Do the old 2021 app charts in `homelab-kube` get reused, or replaced
-  by upstream/community charts per app (recommendation: replace, case by case)?
 - **Q5.** Weekly reboot window for kured: proposal Tuesday 03:00 to 05:00
   Pacific (clear of the Sunday image refresh).
 - **Q6.** Internal TLS in the cluster. The `homelab-ca` root (never expires,
@@ -165,7 +165,7 @@ where merge is deploy.
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q4 to Q6 and Q8 answered, D19, D21 and D23 signed off. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5, Q6 and Q8 answered, D19, D21 and D23 signed off. |
 | 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
 | 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
