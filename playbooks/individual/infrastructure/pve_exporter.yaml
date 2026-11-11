@@ -3,7 +3,7 @@
 #
 # Available tags:
 #   --tags setup    Create directories and deploy configuration
-#   --tags deploy   Deploy systemd service and start exporter
+#   --tags deploy   Deploy the compose project and start exporter
 #
 # Usage:
 #   ansible-playbook -i inventories/production/hosts.ini playbooks/individual/infrastructure/pve_exporter.yaml
@@ -23,12 +23,11 @@
     docker_image: "prompve/prometheus-pve-exporter"
     docker_tag: "latest"
     exporter_port: 9221
+    compose_dir: "/opt/compose/{{ service }}"
     # Proxmox credentials from vault
     # Append @pam realm if not already present
     proxmox_user: "{{ proxmox.username }}{% if '@' not in proxmox.username %}@pam{% endif %}"
     proxmox_password: "{{ proxmox.password }}"
-    # Use host IP address to reach Proxmox API from Docker container
-    proxmox_target: "https://{{ ansible_default_ipv4.address }}:8006"
 
   tasks:
     - name: Display deployment information
@@ -48,32 +47,55 @@
         src: "{{ files }}/pve.yaml.j2"
         dest: "{{ home }}/pve.yaml"
         mode: '0644'
-      notify: Restart pve-exporter
-      tags: [setup, config]
+      register: svc_conf
+      tags: [setup, config, deploy]
+
+    - name: Create compose dir
+      ansible.builtin.file:
+        path: "{{ compose_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [deploy]
+
+    - name: Deploy docker-compose.yml
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        owner: root
+        group: root
+        mode: '0644'
+      register: svc_compose
+      tags: [deploy]
 
     - name: Deploy systemd service
       ansible.builtin.template:
-        src: "{{ files }}/pve-exporter.service.j2"
+        src: "{{ files }}/{{ service }}.service.j2"
         dest: "/etc/systemd/system/{{ service }}.service"
         mode: '0644'
-      notify:
-        - Reload systemd daemon
-        - Restart pve-exporter
+      register: svc_unit
       tags: [deploy]
 
-    - name: Enable and start pve-exporter service
-      ansible.builtin.systemd:
-        name: "{{ service }}.service"
-        enabled: yes
-        state: started
+    - name: Find a leftover bare docker run container
+      ansible.builtin.command: >-
+        docker ps -a --filter name=^{{ service }}$
+        --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+      register: svc_legacy
+      changed_when: false
+      check_mode: false
       tags: [deploy]
 
-  handlers:
-    - name: Reload systemd daemon
-      ansible.builtin.systemd:
-        daemon_reload: yes
+    - name: Remove the bare docker run container before compose takes the name
+      ansible.builtin.command: docker rm -f {{ service }}
+      register: svc_legacy_rm
+      when: svc_legacy.stdout | trim == 'project='
+      tags: [deploy]
 
-    - name: Restart pve-exporter
+    - name: Start and enable {{ service }} (restart only on change)
       ansible.builtin.systemd:
         name: "{{ service }}.service"
-        state: restarted
+        enabled: true
+        daemon_reload: true
+        state: "{{ 'restarted' if (svc_conf is changed or svc_compose is changed or svc_unit is changed or svc_legacy_rm is changed) else 'started' }}"
+      tags: [deploy]
