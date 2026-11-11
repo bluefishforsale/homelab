@@ -578,6 +578,25 @@ def test_listed_movie_already_in_flight_is_not_planned_twice():
     assert refetch.listed_movies([m], {1}, plex, {}, ledger) == []
 
 
+def test_listed_movie_already_refetched_from_a_list_is_not_planned_again():
+    # 2026-11-11: the third 100 from squeezed-first.txt re-planned ~80 films the
+    # first two hundred had already finished (Empire of the Sun, 12 Years a
+    # Slave), mostly grabbing the very release they already had.
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    ledger = {"/media/movies/Arrival (2016)/Old.mkv": {"movie_id": 1, "state": "done", "reasons": ["listed"]}}
+    assert refetch.listed_movies([m], {1}, plex, {}, ledger) == []
+
+
+def test_listed_movie_refetched_for_another_reason_can_be_listed():
+    # A REMUX refetched for its size in October is squeezed and banded now;
+    # the list is how it gets its second pass.
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    ledger = {"/media/movies/Arrival (2016)/Old.mkv": {"movie_id": 1, "state": "done", "reasons": ["over-bitrate"]}}
+    assert [t["movie_id"] for t in refetch.listed_movies([m], {1}, plex, {}, ledger)] == [1]
+
+
 def test_listed_movie_missing_from_plex_is_skipped():
     # Without a Plex rating key the added date can't be put back afterwards.
     assert refetch.listed_movies([_movie(1, "Arrival", "Arrival.mkv")], {1}, {}, {}, {}) == []
