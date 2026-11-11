@@ -87,10 +87,14 @@
         state: started
         daemon_reload: true
 
+    # Oneshot: this waits for the script. A failed run still falls through to the
+    # metrics below, which say what failed, before the play fails on it.
     - name: Take a backup now
       ansible.builtin.systemd:
         name: db-backup.service
         state: started
+      register: db_backup_run
+      failed_when: false
       when: db_backup_run_now | bool
 
     - name: Read the backup's result
@@ -103,6 +107,11 @@
       ansible.builtin.debug:
         msg: "{{ db_backup_prom.content | b64decode | split('\n') | select('match', '^homelab_') | list }}"
       when: db_backup_run_now | bool
+
+    - name: Fail if the backup failed
+      ansible.builtin.fail:
+        msg: "db-backup.service failed: {{ db_backup_run.msg | default('see journalctl -u db-backup') }}"
+      when: db_backup_run_now | bool and db_backup_run is failed
 
   handlers:
     - name: Reload systemd daemon
