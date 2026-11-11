@@ -1,0 +1,18 @@
+[Unit]
+Description=Publish per-client Plex transcode ratios to the node_exporter textfile collector
+Documentation=file://{{ home }}/plex-transcode-metrics.sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Read-only collector: one Tautulli get_history call, aggregated into
+# plex_transcode.prom. It never changes a session, a client setting or the
+# library. Short-lived; the timer re-runs it.
+Environment=TEXTFILE_DIR={{ node_exporter_textfiles | default('/data01/services/node-exporter/text_files') }}
+Environment=TAUTULLI_URL={{ plex_transcode_tautulli_url }}
+Environment=TAUTULLI_CFG={{ plex_transcode_tautulli_cfg }}
+Environment=WINDOW_DAYS={{ plex_transcode_window_days }}
+ExecStart={{ home }}/plex-transcode-metrics.sh
+Nice=10
+IOSchedulingClass=idle
