@@ -343,26 +343,21 @@
     ansible.builtin.apt:
       deb: "/tmp/otelcol-contrib_{{ otelcol_version }}.deb"
 
-  # --- Host metrics: native node_exporter (agentbox runs no docker) ---
-  - name: Install Prometheus node exporter
+  # --- Host metrics ---
+  # NOTE: node_exporter.yaml's compose node-exporter owns :9100 on every docker
+  # host, agentbox included, with the systemd and processes collectors the lane
+  # liveness checks read. The package one held the port and left the compose
+  # one crash-looping on "bind: address already in use".
+  - name: Remove the package node exporter
     ansible.builtin.apt:
       name: prometheus-node-exporter
-      state: present
+      state: absent
+      purge: true
 
-  - name: Enable systemd + processes collectors (lane liveness via node_systemd_unit_state)
-    ansible.builtin.copy:
-      dest: /etc/default/prometheus-node-exporter
-      content: |
-        # Managed by ansible (agentbox.yaml)
-        ARGS="--collector.systemd --collector.processes"
-      mode: '0644'
-    notify: Restart node exporter
-
-  - name: Enable and start node exporter
-    ansible.builtin.systemd:
-      name: prometheus-node-exporter
-      enabled: yes
-      state: started
+  - name: The compose node exporter took :9100
+    ansible.builtin.wait_for:
+      port: 9100
+      timeout: 120
 
   # --- Directories ---
   - name: Ensure agentbox directories exist
@@ -992,11 +987,6 @@
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
-
-  - name: Restart node exporter
-    ansible.builtin.systemd:
-      name: prometheus-node-exporter
-      state: restarted
 
   - name: Restart otelcol
     ansible.builtin.systemd:
