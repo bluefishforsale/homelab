@@ -5,27 +5,144 @@
 # reach is memory the agentbox lanes never see, and a second instance is not an
 # option. mem0's add() rewrites the existing facts with an LLM instead of
 # appending, so two stores fed the same input diverge immediately and cannot be
-# merged back. One writer on ocean, everything else is a client.
+# merged back. One writer on harbor, everything else is a client.
 #
-# Reached over the LAN, or from off-site through an ssh port-forward to
-# {{ ansible_default_ipv4.address }}:8888. Deliberately NOT on cloudflared:
-# conversation memory is the most personal data in the fleet and the CF edge
-# terminates TLS.
+# Runs on harbor, with Postgres on the passed-through 870 EVO and everything
+# else on harbor's local state disk. Clients still say ocean.home:8888 and
+# :8766; a TCP forwarder on ocean carries those to harbor, so no agent config
+# had to change. Reached over the LAN, or from off-site through an ssh
+# port-forward. Deliberately NOT on cloudflared: conversation memory is the most
+# personal data in the fleet and the CF edge terminates TLS.
 #
 # The API image comes from GHCR, built and smoke-tested by the mem0 repo's
 # build-and-push workflow, which dispatches deploy-mem0 here on merge. The
-# bridge still builds from a source clone: it publishes no image at all.
+# bridge still builds from source: it publishes no image at all.
 #
 # The published mem0/mem0-api-server image on Docker Hub is not an option: last
 # pushed 2025-09-10, well before the API-key auth this deploy depends on.
-- name: Deploy mem0 shared agent memory using Docker Compose
+
+# NOTE: the first play is `hosts: ocean` on purpose. main-apply and the dispatch
+# workflows take the concurrency group from a playbook's first hosts line, and
+# this play stops a service on ocean, so it must hold deploy-ocean.
+- name: Retire mem0 on ocean
   hosts: ocean
+  become: true
+  gather_facts: false
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    home: /data01/services/mem0
+    handoff: /data01/services/mem0-to-harbor.tar
+    # Root-only and off the export, so harbor can trust the tar it reads over NFS.
+    handoff_sum: /root/mem0-to-harbor.sha256
+
+  tasks:
+  # On harbor before anything stops here, so a bad GHCR credential or a cold
+  # 2GB ollama pull fails or finishes with ocean still serving. The API image is
+  # pulled by the harbor play, which owns the pinned version.
+  - name: Log harbor into GHCR to pull the private mem0 image
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    delegate_to: harbor
+    no_log: true
+    changed_when: false
+
+  - name: Pull mem0's public images on harbor
+    ansible.builtin.command:
+      cmd: "docker pull {{ item }}"
+    loop:
+      - ankane/pgvector:v0.5.1
+      - ollama/ollama:latest
+    delegate_to: harbor
+    register: harbor_pull
+    changed_when: "'Downloaded newer image' in harbor_pull.stdout"
+
+  - name: Read the ocean unit
+    ansible.builtin.stat:
+      path: /etc/systemd/system/mem0.service
+    register: ocean_unit
+
+  - name: Read harbor's migration marker
+    ansible.builtin.stat:
+      path: "{{ home }}/.migrated-from-ocean"
+    delegate_to: harbor
+    register: harbor_marker
+
+  # Catches a tar the in-run delete on harbor's side never got to.
+  - name: Remove a leftover handoff once harbor has it
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop: ["{{ handoff }}", "{{ handoff_sum }}"]
+    when: harbor_marker.stat.exists
+
+  # ocean's dir stays as the backout: `systemctl start mem0` on ocean until the
+  # last play removes the unit. Writes made while mem0 is down wait in the
+  # clients' capture outbox.
+  - name: Hand mem0's state to harbor
+    when: ocean_unit.stat.exists and not harbor_marker.stat.exists
+    block:
+    # NOTE: stopped before the tar; a live Postgres copied mid-write is a torn
+    # cluster. The unit's ExecStop is compose down.
+    - name: Stop and disable mem0 on ocean
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - mem0-metrics.timer
+        - mem0.service
+
+    # harbor's root is squashed to nobody over NFS, and Postgres's dir is 0700
+    # uid 999, so harbor can't copy the tree itself. One tar keeps numeric
+    # owners and goes to nobody, 0400. The bridge source is refetched on harbor;
+    # secrets (.env, compose, the bridge token) are re-rendered from the vault.
+    - name: Tar mem0's state for harbor
+      ansible.builtin.command:
+        cmd: >-
+          tar --numeric-owner -cf {{ handoff }} -C {{ home }}
+          --exclude=./src-bridge --exclude=./.env --exclude=./docker-compose.yml .
+      async: 7200
+      poll: 15
+      changed_when: true
+
+    - name: Record the handoff's checksum
+      ansible.builtin.shell: "umask 077 && sha256sum {{ handoff }} | cut -d' ' -f1 > {{ handoff_sum }}"
+      async: 3600
+      poll: 15
+      changed_when: true
+
+    - name: Let harbor's squashed root read the handoff
+      ansible.builtin.file:
+        path: "{{ handoff }}"
+        owner: '65534'
+        group: '65534'
+        mode: '0400'
+
+    rescue:
+    - name: Bring mem0 back up on ocean
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - mem0.service
+        - mem0-metrics.timer
+
+    - name: Fail the deploy with ocean still serving
+      ansible.builtin.fail:
+        msg: "Handing mem0's state to harbor failed; mem0 is running on ocean again."
+
+- name: Deploy mem0 on harbor using Docker Compose
+  hosts: harbor
   become: true
   gather_facts: true
 
   vars_files:
-    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
-    - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
 
   vars:
     service: mem0
@@ -60,14 +177,21 @@
     # client: agentbox's config pointed at a working service that could not
     # answer it. Naming the hosts opts into exactly these and no others.
     # Setting this REPLACES the SDK defaults, hence localhost is listed too.
+    # ocean's names stay: clients reach harbor through ocean's forwarder, which
+    # passes the Host header through untouched.
     mem0_bridge_allowed_hosts:
       - "ocean.home:{{ service_ports.mem0.mcp }}"
       - "192.168.1.143:{{ service_ports.mem0.mcp }}"
+      - "harbor.home:{{ service_ports.mem0.mcp }}"
+      - "192.168.1.32:{{ service_ports.mem0.mcp }}"
       - "localhost:{{ service_ports.mem0.mcp }}"
       - "127.0.0.1:{{ service_ports.mem0.mcp }}"
-    # terrac's key is what ocean already clones private repos with
-    # (playbooks/individual/ocean/services/blog_terrac_com_static.yaml).
+    # harbor holds no GitHub key, so ocean clones the private bridge repo with
+    # terrac's key (as blog_terrac_com_static.yaml does) and harbor gets a
+    # git archive of the pinned commit through the controller.
     git_ssh_key: /home/terrac/.ssh/id_ed25519
+    ocean_bridge_clone: /root/mem0-mcp-bridge
+    bridge_archive: "/tmp/mem0-mcp-bridge-{{ mem0_bridge_version }}.tar.gz"
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
     # What gets pulled, and what mem0 actually calls. They differ because
@@ -87,10 +211,147 @@
     embedder_model: nomic-embed-homelab
     embedder_threads: 6
     data: /data01
-    files: "{{ playbook_dir }}/../../../../files/ocean-mem0"
+    files: "{{ playbook_dir }}/../../../files/ocean-mem0"
     home: "{{ data }}/services/{{ service }}"
+    # The passed-through 870 EVO. nzbget.yaml formats and mounts it; mem0 only
+    # keeps a dir beside NZBGet's scratch areas, which its prune never touches
+    # (nzbget-prune.py works only in intermediate/ and tmp/).
+    ssd: /srv/nzbget
+    ssd_label: nzbget-scratch
+    pg_home: "{{ ssd }}/{{ service }}"
+    pg_data: "{{ pg_home }}/postgres-data"
+    ocean_data01: /mnt/ocean-data01
+    # ocean's paths, as the ocean play writes them.
+    ocean_handoff: /data01/services/mem0-to-harbor.tar
+    ocean_handoff_sum: /root/mem0-to-harbor.sha256
+    handoff: "{{ ocean_data01 }}{{ ocean_handoff | regex_replace('^/data01', '') }}"
+    migrated: "{{ home }}/.migrated-from-ocean"
+    local_handoff: /data01/services/.mem0-from-ocean.tar
 
   tasks:
+
+  - name: Read the state mount
+    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+    register: state_mount
+    changed_when: false
+
+  # NOTE: Postgres keeps a WAL and history.db is SQLite; on ocean's NFS view
+  # either would corrupt.
+  - name: State lands on the local disk, not ocean's NFS
+    ansible.builtin.assert:
+      that: state_mount.stdout == 'ext4'
+      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+  - name: Read the SSD mount
+    ansible.builtin.command: "findmnt -n -o FSTYPE,LABEL {{ ssd }}"
+    register: ssd_mount
+    changed_when: false
+    failed_when: false
+
+  # Without the mount, Postgres would land on harbor's OS disk under an empty
+  # mountpoint and vanish from view the next time the SSD mounts over it.
+  - name: Postgres lands on the 870 EVO
+    ansible.builtin.assert:
+      that: ssd_mount.stdout.split() == ['ext4', ssd_label]
+      fail_msg: "{{ ssd }} is '{{ ssd_mount.stdout }}', not the ext4 870 EVO labelled {{ ssd_label }}; run workers/nzbget.yaml first"
+
+  - name: Read the migration marker
+    ansible.builtin.stat:
+      path: "{{ migrated }}"
+    register: migrated_stat
+
+  # ocean's /data01/services sits under harbor's local disk, so a second
+  # read-only mount is the only way to see the handoff.
+  - name: Take mem0's state from ocean
+    when: not migrated_stat.stat.exists
+    block:
+    - name: Mount ocean's /data01 read-only
+      ansible.builtin.shell: |
+        set -e
+        mkdir -p {{ ocean_data01 }}
+        mountpoint -q {{ ocean_data01 }} || mount -t nfs4 -o ro,nfsvers=4.2,nconnect=4 {{ hostvars['ocean'].ansible_ssh_host }}:/data01 {{ ocean_data01 }}
+      changed_when: true
+
+    - name: Read the handoff
+      ansible.builtin.stat:
+        path: "{{ handoff }}"
+      register: handoff_stat
+
+    - name: The handoff exists
+      ansible.builtin.assert:
+        that: handoff_stat.stat.exists
+        fail_msg: "{{ handoff }} is missing or unreadable to harbor's squashed root; the ocean play makes it when it stops mem0 there"
+
+    - name: Read the checksum ocean recorded
+      ansible.builtin.slurp:
+        src: "{{ ocean_handoff_sum }}"
+      delegate_to: ocean
+      register: recorded_sum
+
+    # One local, root-only copy is what gets checked and unpacked, so the file on
+    # the NFS export can't change between the check and the tar.
+    - name: Copy the handoff off NFS
+      ansible.builtin.shell: "umask 077 && cp {{ handoff }} {{ local_handoff }}"
+      async: 7200
+      poll: 15
+      changed_when: true
+
+    - name: Checksum the local copy
+      ansible.builtin.stat:
+        path: "{{ local_handoff }}"
+        checksum_algorithm: sha256
+      register: handoff_check
+
+    - name: The handoff matches ocean's checksum
+      ansible.builtin.assert:
+        that: handoff_check.stat.checksum == (recorded_sum.content | b64decode | trim)
+        fail_msg: "{{ handoff }} does not match ocean's recorded sha256; not unpacking it"
+
+    - name: Ensure mem0's homes exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: ["{{ home }}", "{{ pg_home }}"]
+
+    # -p keeps Postgres's 0700 data dir; --numeric-owner keeps its uid 999.
+    - name: Unpack everything but Postgres onto the state disk
+      ansible.builtin.command:
+        cmd: "tar --numeric-owner -xpf {{ local_handoff }} -C {{ home }} --exclude=./postgres-data"
+      async: 7200
+      poll: 15
+      changed_when: true
+
+    - name: Unpack Postgres onto the SSD
+      ansible.builtin.command:
+        cmd: "tar --numeric-owner -xpf {{ local_handoff }} -C {{ pg_home }} ./postgres-data"
+      async: 7200
+      poll: 15
+      changed_when: true
+
+    - name: Mark the migration done
+      ansible.builtin.file:
+        path: "{{ migrated }}"
+        state: touch
+        mode: '0644'
+
+    # The tar holds the whole memory store, so it goes as soon as harbor has it.
+    - name: Remove the handoff and its checksum on ocean
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: ["{{ ocean_handoff }}", "{{ ocean_handoff_sum }}"]
+      delegate_to: ocean
+
+    always:
+    - name: Remove the local copy
+      ansible.builtin.file:
+        path: "{{ local_handoff }}"
+        state: absent
+
+    - name: Unmount ocean's /data01
+      ansible.builtin.shell: "! mountpoint -q {{ ocean_data01 }} || umount {{ ocean_data01 }}"
+      changed_when: false
 
   - name: Ensure service directories exist
     ansible.builtin.file:
@@ -99,32 +360,90 @@
       mode: '0755'
     loop:
       - "{{ home }}"
-      - "{{ home }}/postgres-data"
+      - "{{ pg_home }}"
       - "{{ home }}/ollama"
       - "{{ home }}/history"
       - "{{ home }}/bridge-data/mem0-mcp-bridge"
 
   # The API image is private, so the pull below needs credentials. Read-only
   # token, the same vault key paia.yaml uses.
-  - name: Log ocean into GHCR to pull the private mem0 image
+  - name: Log harbor into GHCR to pull the private mem0 image
     ansible.builtin.shell: |
       echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
     no_log: true
     changed_when: false
 
-  # Stays root (the rest of {{ home }} is root-owned) and borrows terrac's key
-  # rather than running as terrac, which would need the clone dir chowned and
-  # then chowned back for the docker build.
-  - name: Clone mem0-mcp-bridge source
-    ansible.builtin.git:
-      repo: "{{ mem0_bridge_repo }}"
-      dest: "{{ home }}/src-bridge"
-      version: "{{ mem0_bridge_version }}"
-      force: true
-      accept_hostkey: true
-    environment:
-      GIT_SSH_COMMAND: "ssh -i {{ git_ssh_key }} -o StrictHostKeyChecking=no"
-    register: bridge_clone
+  - name: Read the bridge source version on harbor
+    ansible.builtin.slurp:
+      src: "{{ home }}/src-bridge/.version"
+    register: bridge_have
+    failed_when: false
+
+  # Only when the pin moves. ocean clones as root with terrac's key, archives the
+  # pinned commit, and the controller carries it to harbor.
+  - name: Fetch the pinned bridge source through ocean
+    when: (bridge_have.content | default('') | b64decode | trim) != mem0_bridge_version
+    block:
+    - name: Clone mem0-mcp-bridge on ocean
+      ansible.builtin.git:
+        repo: "{{ mem0_bridge_repo }}"
+        dest: "{{ ocean_bridge_clone }}"
+        version: "{{ mem0_bridge_version }}"
+        force: true
+        accept_hostkey: true
+      environment:
+        GIT_SSH_COMMAND: "ssh -i {{ git_ssh_key }} -o StrictHostKeyChecking=no"
+      delegate_to: ocean
+
+    - name: Archive the pinned commit on ocean
+      ansible.builtin.command:
+        cmd: "git -C {{ ocean_bridge_clone }} archive --format=tar.gz -o {{ bridge_archive }} {{ mem0_bridge_version }}"
+      delegate_to: ocean
+      changed_when: true
+
+    - name: Bring the archive to the controller
+      ansible.builtin.fetch:
+        src: "{{ bridge_archive }}"
+        dest: "{{ bridge_archive }}"
+        flat: true
+      delegate_to: ocean
+
+    - name: Clear harbor's old bridge source
+      ansible.builtin.file:
+        path: "{{ home }}/src-bridge"
+        state: absent
+
+    - name: Create harbor's bridge source dir
+      ansible.builtin.file:
+        path: "{{ home }}/src-bridge"
+        state: directory
+        mode: '0755'
+
+    - name: Unpack the bridge source on harbor
+      ansible.builtin.unarchive:
+        src: "{{ bridge_archive }}"
+        dest: "{{ home }}/src-bridge"
+
+    - name: Record the bridge source version
+      ansible.builtin.copy:
+        content: "{{ mem0_bridge_version }}\n"
+        dest: "{{ home }}/src-bridge/.version"
+        mode: '0644'
+      register: bridge_clone
+
+    always:
+    - name: Remove the archive on ocean
+      ansible.builtin.file:
+        path: "{{ bridge_archive }}"
+        state: absent
+      delegate_to: ocean
+
+    - name: Remove the archive on the controller
+      ansible.builtin.file:
+        path: "{{ bridge_archive }}"
+        state: absent
+      delegate_to: localhost
+      become: false
 
   - name: Supply the bridge with a Dockerfile
     ansible.builtin.copy:
@@ -185,7 +504,7 @@
       chdir: "{{ home }}"
     environment:
       COMPOSE_PROJECT_NAME: "{{ service }}"
-    when: bridge_clone.changed or bridge_dockerfile.changed
+    when: (bridge_clone.changed | default(false)) or bridge_dockerfile.changed
     notify: Restart mem0 service
 
   # Image acquisition must not happen inside the unit's start: `compose up -d`
@@ -294,3 +613,86 @@
     ansible.builtin.systemd:
       name: mem0.service
       state: restarted
+
+# Last, so clients point at a live harbor before ocean's ports are taken over.
+- name: Forward ocean's mem0 addresses to harbor
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: mem0-forward
+    home: "/data01/services/{{ service }}"
+    files: "{{ playbook_dir }}/../../../files/ocean-mem0"
+    port_api: "{{ service_ports.mem0.api }}"
+    port_mcp: "{{ service_ports.mem0.mcp }}"
+    upstream: "{{ hostvars['harbor'].ansible_ssh_host }}"
+
+  tasks:
+  # The handoff already stopped these; this catches a rerun after a manual start
+  # and keeps two mem0 writers from ever running at once.
+  - name: Stop and disable mem0 on ocean
+    ansible.builtin.systemd:
+      name: "{{ item }}"
+      state: stopped
+      enabled: false
+    loop:
+      - mem0-metrics.timer
+      - mem0.service
+    failed_when: false
+
+  - name: Remove ocean's mem0 units
+    ansible.builtin.file:
+      path: "/etc/systemd/system/{{ item }}"
+      state: absent
+    loop:
+      - mem0.service
+      - mem0-metrics.service
+      - mem0-metrics.timer
+    register: ocean_units_removed
+
+  - name: Reload systemd after removing the units
+    ansible.builtin.systemd:
+      daemon_reload: true
+    when: ocean_units_removed.changed
+
+  - name: Ensure the forwarder dir exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      mode: '0755'
+
+  - name: Write the forwarder config
+    ansible.builtin.template:
+      src: "{{ files }}/forward-nginx.conf.j2"
+      dest: "{{ home }}/nginx.conf"
+      mode: '0644'
+    register: forward_conf
+
+  - name: Write the forwarder compose file
+    ansible.builtin.template:
+      src: "{{ files }}/forward-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0644'
+    register: forward_compose
+
+  - name: Start the forwarder
+    ansible.builtin.command:
+      cmd: "docker compose up -d {{ '--force-recreate' if (forward_conf.changed or forward_compose.changed) else '' }}"
+      chdir: "{{ home }}"
+    environment:
+      COMPOSE_PROJECT_NAME: "{{ service }}"
+    register: forward_up
+    changed_when: "'Started' in forward_up.stderr or 'Recreated' in forward_up.stderr or 'Created' in forward_up.stderr"
+
+  - name: Verify mem0 answers through ocean
+    ansible.builtin.uri:
+      url: "http://{{ ansible_default_ipv4.address }}:{{ port_api }}/docs"
+      status_code: 200
+    retries: 6
+    delay: 5
+    register: forward_probe
+    until: forward_probe is succeeded

@@ -87,7 +87,9 @@ services:
       - POSTGRES_PASSWORD={{ ai_services.mem0.postgres_password }}
 
     volumes:
-      - {{ home }}/postgres-data:/var/lib/postgresql/data
+      # On the 870 EVO, not the state disk: the store's reads and its WAL are
+      # the latency mem0 search pays.
+      - {{ pg_data }}:/var/lib/postgresql/data
       # Creates mem0_app (users, api keys). Mounted from the clone so it cannot
       # drift from the schema code that expects it.
       - {{ home }}/src/server/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro

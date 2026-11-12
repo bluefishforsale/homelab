@@ -9,7 +9,7 @@ nothing with a WAL crosses NFS.
 
 Membership is the `[data01_workers]` inventory group. Adding a host there gets it
 the export, the mounts, the alerts, and a tdarr node; nothing else names harbor
-except its VM play, NZBGet and archmap.
+except its VM play, NZBGet, archmap and mem0.
 
 ## Playbooks
 
@@ -21,6 +21,7 @@ except its VM play, NZBGet and archmap.
 | `workers/tdarr_node.yaml` | `data01_workers` | CPU tdarr node joined to ocean's tdarr server. |
 | `workers/nzbget.yaml` | ocean, then harbor | NZBGet compose project with scratch on the 870 EVO; only finished files cross NFS into `/data01/incoming`. Retires the old ocean units. Prune timer. ocean's nginx proxies it at `192.168.1.32:8901`. |
 | `workers/archmap.yaml` | harbor, ocean, then harbor | The archmap compose project (api, worker, Postgres, tile nginx), moved off ocean to take the render worker's CPU with it. Pulls on harbor first, then stops archmap on ocean and tars its state (minus repo clones) for harbor, which unpacks it once onto the local disk. ocean's old dir stays as the backout. ocean's nginx proxies `archmap.home` and the tunnel at `192.168.1.32:8091`. |
+| `workers/mem0.yaml` | ocean, harbor, then ocean | The shared agent memory (API, pgvector Postgres, ollama embedder, MCP bridge). Pulls on harbor first, then stops mem0 on ocean and tars its state for harbor, which unpacks Postgres onto the 870 EVO (`/srv/nzbget/mem0`, beside NZBGet's scratch areas) and the rest onto the state disk. ocean clones the private bridge repo (harbor holds no GitHub key) and hands harbor a `git archive` of the pin. A TCP forwarder on ocean (`mem0-forward`) keeps `ocean.home:8888` and `:8766` working, so no client config changed. ocean's old dir stays as the backout. |
 | `infrastructure/db_restore_test.yaml` | harbor | Nightly restore test of the DB backups ([`db-restore.md`](../operations/db-restore.md)). |
 | `operations/backup/db_backup.yaml`, `db_restore.yaml` | ocean, `data01_workers` | Nightly backup of whatever DB containers run on each host, staged on the worker's state disk (root is squashed over NFS); restore acts only where the container lives. Dispatch-only. |
 
