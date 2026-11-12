@@ -195,17 +195,45 @@
           ExecStartPre=/usr/bin/test -f /data01/services/.worker-local
 
     # If the worker boots while ocean is down, the NFS mount times out and
-    # docker fails its dependency; Restart= does not cover that, so retry.
-    - name: Install the docker retry unit
+    # docker and every unit hanging off it or the mounts fail their dependency;
+    # Restart= does not cover that, so retry. Starting docker alone is not
+    # enough: the compose units stay dead (2026-11-11 power cycle).
+    # NOTE: "never activated this boot" is what separates a dependency failure
+    # from a unit someone stopped on purpose or a timer's oneshot that already
+    # ran. Widen it to "not active" and the timer restarts those every 5 min.
+    - name: Install the boot retry script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/data01-worker-retry
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          # Managed by playbooks/individual/infrastructure/data01_worker.yaml.
+          # Start every enabled service on docker or the /data01 mounts that
+          # has not run since boot. A dependency failure leaves a unit at
+          # InactiveExitTimestampMonotonic=0.
+          set -u
+          todo=""
+          for u in $(systemctl list-dependencies --reverse --plain --no-legend \
+                       docker.service data01.mount data01-services.mount \
+                     | awk '$1 ~ /\.service$/ {print $1}' | sort -u); do
+            [ "$(systemctl is-enabled "$u" 2>/dev/null)" = enabled ] || continue
+            [ "$(systemctl show "$u" -p InactiveExitTimestampMonotonic --value)" = 0 ] || continue
+            todo="$todo $u"
+          done
+          [ -n "$todo" ] || exit 0
+          echo "starting:$todo"
+          exec systemctl start $todo
+
+    - name: Install the boot retry unit
       ansible.builtin.copy:
         dest: /etc/systemd/system/data01-worker-retry.service
         mode: '0644'
         content: |
           [Unit]
-          Description=Start docker once /data01 is reachable
+          Description=Start docker and its services once /data01 is reachable
           [Service]
           Type=oneshot
-          ExecStart=/bin/sh -c 'systemctl is-active -q docker || systemctl start docker'
+          ExecStart=/usr/local/sbin/data01-worker-retry
 
     - name: Install the docker retry timer
       ansible.builtin.copy:

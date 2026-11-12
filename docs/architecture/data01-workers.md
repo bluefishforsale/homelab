@@ -57,7 +57,9 @@ containers write into ocean's databases over NFS. Three guards, all required:
 NOTE: drop any one and a failed local mount points a worker at ocean's live DBs.
 
 If node005 boots before ocean, the NFS mount times out, docker fails its
-dependency, and `data01-worker-retry.timer` retries until ocean is back.
+dependency, and `data01-worker-retry.timer` retries until ocean is back. Every
+5 minutes it starts each enabled service on docker or the `/data01` mounts that
+has not run since boot, docker included. Units stopped by hand stay stopped.
 
 ## Identity
 
