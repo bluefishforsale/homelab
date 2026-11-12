@@ -709,6 +709,52 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  Spycraft:
+    sort_title: "!Spycraft"
+    summary: "CIA, MI6, the KGB and the Cold War: tradecraft, moles, covert ops and the people who blow the whistle on them. 1980 on, best of the best only."
+    tmdb_movie:
+      - 26578    # The Falcon and the Snowman (1985)
+      - 10083    # No Way Out (1987)
+      - 1669     # The Hunt for Red October (1990)
+      - 10170    # The Russia House (1990)
+      - 9869     # Patriot Games (1992)
+      - 9331     # Clear and Present Danger (1994)
+      - 710      # GoldenEye (1995)
+      - 954      # Mission: Impossible (1996)
+      - 9798     # Enemy of the State (1998)
+      - 8195     # Ronin (1998)
+      - 11973    # Thirteen Days (2000)
+      - 1535     # Spy Game (2001)
+      - 2501     # The Bourne Identity (2002)
+      - 2502     # The Bourne Supremacy (2004)
+      - 612      # Munich (2005)
+      - 231      # Syriana (2005)
+      - 36557    # Casino Royale (2006)
+      - 1247     # The Good Shepherd (2006)
+      - 582      # The Lives of Others (2006)
+      - 4169     # Breach (2007)
+      - 6538     # Charlie Wilson's War (2007)
+      - 2503     # The Bourne Ultimatum (2007)
+      - 56292    # Mission: Impossible - Ghost Protocol (2011)
+      - 49517    # Tinker Tailor Soldier Spy (2011)
+      - 68734    # Argo (2012)
+      - 37724    # Skyfall (2012)
+      - 97630    # Zero Dark Thirty (2012)
+      - 157849   # A Most Wanted Man (2014)
+      - 293310   # Citizenfour (2014)
+      - 296098   # Bridge of Spies (2015)
+      - 177677   # Mission: Impossible - Rogue Nation (2015)
+      - 203801   # The Man from U.N.C.L.E. (2015)
+      - 341013   # Atomic Blonde (2017)
+      - 353081   # Mission: Impossible - Fallout (2018)
+      - 393624   # Official Secrets (2019)
+      - 524348   # The Report (2019)
+      - 522241   # The Courier (2020)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s
