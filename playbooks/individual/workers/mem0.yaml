@@ -675,3 +675,46 @@
     delay: 5
     register: forward_probe
     until: forward_probe is succeeded
+
+  # ocean's copy was the backout while harbor proved itself. harbor has served
+  # since 2026-11-11, backs up to GCS (mem0-postgres/, mem0/), and just answered
+  # through the forwarder above, so the copy and the old bridge clone go. Only
+  # once harbor holds the migrated store and no mem0 container runs here.
+  - name: Read harbor's migration marker
+    ansible.builtin.stat:
+      path: /data01/services/mem0/.migrated-from-ocean
+    delegate_to: harbor
+    register: harbor_marker
+
+  - name: List mem0 containers still on ocean
+    ansible.builtin.command:
+      cmd: docker ps -aq --filter name=^mem0(-postgres|-ollama|-bridge)?$
+    register: ocean_mem0_containers
+    changed_when: false
+
+  - name: Refuse to delete under a live mem0 container
+    ansible.builtin.assert:
+      that: ocean_mem0_containers.stdout == ''
+      fail_msg: "mem0 containers exist on ocean ({{ ocean_mem0_containers.stdout_lines | join(' ') }}); its old dir stays until they are gone."
+    when: harbor_marker.stat.exists
+
+  # NOTE: a mountpoint here would be a dataset; removing it is a ZFS change and
+  # out of scope for a playbook, so the delete refuses one.
+  - name: Check ocean's old mem0 dir is a plain directory
+    ansible.builtin.command:
+      cmd: findmnt -n /data01/services/mem0
+    register: ocean_mem0_mount
+    changed_when: false
+    failed_when: ocean_mem0_mount.rc == 0
+    when: harbor_marker.stat.exists
+
+  - name: Delete ocean's old mem0 dir and bridge clone
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /data01/services/mem0
+      - /root/mem0-mcp-bridge
+    async: 3600
+    poll: 15
+    when: harbor_marker.stat.exists
