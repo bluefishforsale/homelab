@@ -70,6 +70,25 @@
     delegate_to: harbor
     register: harbor_marker
 
+  - name: Read whether mem0 is running on ocean
+    ansible.builtin.command: systemctl is-active mem0.service
+    register: ocean_active
+    changed_when: false
+    failed_when: false
+
+  # NOTE: once harbor has the marker it owns the store, and this play no longer
+  # hands state over. A mem0 started on ocean after that takes writes harbor
+  # never sees, and the last play would stop it and drop them silently.
+  - name: Refuse to run with two mem0 writers
+    ansible.builtin.assert:
+      that: not (harbor_marker.stat.exists and ocean_active.stdout == 'active')
+      fail_msg: >-
+        mem0 is running on ocean but harbor already holds the migrated store.
+        Writes since ocean started exist only on ocean. To make ocean the
+        source again: stop mem0 on harbor, delete harbor's
+        /data01/services/mem0/.migrated-from-ocean, then rerun so ocean's state
+        is handed over fresh.
+
   # Catches a tar the in-run delete on harbor's side never got to.
   - name: Remove a leftover handoff once harbor has it
     ansible.builtin.file:
@@ -78,9 +97,10 @@
     loop: ["{{ handoff }}", "{{ handoff_sum }}"]
     when: harbor_marker.stat.exists
 
-  # ocean's dir stays as the backout: `systemctl start mem0` on ocean until the
-  # last play removes the unit. Writes made while mem0 is down wait in the
-  # clients' capture outbox.
+  # Backout before harbor's marker exists: `systemctl start mem0` on ocean. After
+  # it exists, ocean only becomes the source again by deleting the marker first
+  # (see the assert above). Writes made while mem0 is down wait in the clients'
+  # capture outbox.
   - name: Hand mem0's state to harbor
     when: ocean_unit.stat.exists and not harbor_marker.stat.exists
     block:
@@ -658,6 +678,17 @@
     ansible.builtin.systemd:
       daemon_reload: true
     when: ocean_units_removed.changed
+
+  # node_exporter would keep exporting ocean's last values under instance=ocean
+  # forever, beside harbor's live ones, and Mem0MetricsStale would never clear.
+  - name: Remove ocean's frozen mem0 metrics
+    ansible.builtin.file:
+      path: "/data01/services/node-exporter/text_files/{{ item }}"
+      state: absent
+    loop:
+      - mem0.prom
+      - .mem0-llm-probe-stamp
+      - .mem0-llm-probe-value
 
   - name: Ensure the forwarder dir exists
     ansible.builtin.file:
