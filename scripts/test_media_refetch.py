@@ -148,6 +148,8 @@ def fake_movie_search(year, titles):
             if path == "/api/v3/release":
                 return [{"title": t, "downloadAllowed": True, "rejections": [EXISTING], "releaseWeight": w}
                         for w, t in enumerate(titles)]
+            if path == "/api/v3/blocklist/movie":
+                return []
             return {"year": year}
     return Fake()
 
@@ -512,7 +514,7 @@ def test_movie_search_gets_the_same_time_as_a_season_search():
     class Fake:
         def get(self, app, path, timeout=120, **kw):
             seen.append((path, timeout))
-            return [] if path.endswith("/release") else {"year": 2024}
+            return [] if path.endswith(("/release", "/blocklist/movie")) else {"year": 2024}
 
     refetch.mc = Fake()
     BEST_RELEASE(1)
@@ -741,6 +743,55 @@ def test_movie_kept_after_the_last_attempt_drops_the_held_copy():
     cmds = run_step(item, FakeRadarr(new=True), subs=())
     assert item["state"] == "imported" and item.get("no_subs") and "held" not in item
     assert any("rm" in c and HOLD in c for c in cmds), cmds
+
+
+def test_movie_swap_waits_for_radarrs_scan_instead_of_blocklisting_it():
+    # Slow West (2026-11-12): the run loop stepped again 7s after the swap, before
+    # DownloadedMoviesScan ran, saw no file and the row still blocked, and
+    # blocklisted the download it had just asked Radarr to import.
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "id": 5, "statusMessages": [{"messages": ["Not an upgrade for existing movie file(s)"]}]}
+    fake = FakeRadarr(queue=[q])
+    item = grabbed_item()
+    run_step(item, fake)
+    fake.get_movie = fake.get
+    fake.get = lambda app, path, **kw: ({"hasFile": False, "path": "/movies/Film (2016)"}
+                                        if path == "/api/v3/movie/1" else fake.get_movie(app, path, **kw))
+    cmds = run_step(item, fake)
+    assert not [w for w in fake.writes if "/queue/" in w[1]], fake.writes
+    assert not any(OLD in c for c in cmds), cmds
+    assert item["state"] == "grabbed"
+
+
+def test_movie_swap_radarr_still_will_not_import_later_is_blocklisted():
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "id": 5, "statusMessages": [{"messages": ["Unable to parse file"]}]}
+    fake = FakeRadarr(queue=[q])
+    fake.get_movie = fake.get
+    fake.get = lambda app, path, **kw: ({"hasFile": False, "path": "/movies/Film (2016)"}
+                                        if path == "/api/v3/movie/1" else fake.get_movie(app, path, **kw))
+    item = grabbed_item(swapped_at=(refetch.now() - refetch.IMPORT_GRACE).isoformat())
+    run_step(item, fake)
+    assert ("delete", "/api/v3/queue/5") in fake.writes, fake.writes
+    assert item["state"] == "planned" and "swapped_at" not in item
+
+
+def test_reposted_copy_of_a_blocklisted_release_is_not_grabbed():
+    # Slow West (2026-11-11): BHDStudio was blocklisted for no English subtitle and
+    # grabbed again 51 minutes later as another post of the same title. Radarr's
+    # blocklist only matches the one post.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/release":
+                return [{"title": "Film.2016.1080p-BHD", "releaseWeight": 1, "downloadAllowed": True, "rejections": []},
+                        {"title": "Film.2016.1080p-OTHER", "releaseWeight": 2, "downloadAllowed": True,
+                         "rejections": []}]
+            if path == "/api/v3/blocklist/movie":
+                return [{"sourceTitle": "Film.2016.1080p-BHD"}]
+            return {"year": 2016}
+
+    refetch.mc = Fake()
+    assert BEST_RELEASE(1)["title"] == "Film.2016.1080p-OTHER"
 
 
 if __name__ == "__main__":

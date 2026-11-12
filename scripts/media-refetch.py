@@ -64,6 +64,9 @@ FLOW_TIMEOUT = dt.timedelta(days=3)
 # Marking a grab failed makes the *arr search and grab on its own; give that
 # grab this long to reach the queue before searching ourselves.
 REDOWNLOAD_GRACE = dt.timedelta(minutes=30)
+# DownloadedMoviesScan is queued, not run; until it has had this long the
+# download still reads as blocked though Radarr is about to import it.
+IMPORT_GRACE = dt.timedelta(minutes=10)
 # With a file on disk every release carries one of these; a release whose only
 # rejections are these is one Radarr would take if the file were gone.
 EXISTING_FILE = "Existing file on disk"
@@ -230,8 +233,10 @@ def same_film(title, year):
 def best_release(movie_id):
     rels = mc.get("radarr", "/api/v3/release", movieId=movie_id, timeout=SEARCH_TIMEOUT)
     year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
+    # Radarr blocks only the one post; the same release reposted comes back with no rejection.
+    blocked = {b["sourceTitle"] for b in mc.get("radarr", "/api/v3/blocklist/movie", movieId=movie_id)}
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
-          and r.get("downloadAllowed") and same_film(r["title"], year)]
+          and r.get("downloadAllowed") and same_film(r["title"], year) and r["title"] not in blocked]
     return pick(ok)
 
 
@@ -645,17 +650,21 @@ def step(item, yes):
                 if not yes:
                     return False
                 mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
+                item["swapped_at"] = now().isoformat()
                 for q in {q["downloadId"]: q for q in downloading}.values():
                     mc.post("radarr", "/api/v3/command", {"name": "DownloadedMoviesScan", "path": q["outputPath"],
                                                           "downloadClientId": q["downloadId"], "importMode": "auto"})
                 return True
             if import_blocked(downloading):
+                if "swapped_at" in item and now() - dt.datetime.fromisoformat(item["swapped_at"]) < IMPORT_GRACE:
+                    return False
                 note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
                 if not yes:
                     return False
                 blocklist("radarr", downloading)
                 if not movie.get("hasFile"):
                     put_back(item)
+                item.pop("swapped_at", None)
                 item["state"] = "planned"
                 return True
             if gave_up(grabbed, downloading):
