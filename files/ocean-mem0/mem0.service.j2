@@ -1,10 +1,12 @@
 [Unit]
 Description=mem0 shared agent memory (Docker Compose)
 Documentation=https://github.com/bluefishforsale/mem0
-After=docker.service zfs-mount.service zfs-import.target network-online.target
+After=docker.service network-online.target
 Wants=network-online.target
-Requires=docker.service zfs-mount.service zfs-import.target
-RequiresMountsFor=/data01
+Requires=docker.service
+# The state disk and the 870 EVO; started without either, compose would bind
+# empty mountpoints and Postgres would init a fresh cluster on the OS disk.
+RequiresMountsFor=/data01/services {{ ssd }}
 
 # Give up after three failures in an hour instead of restarting forever. A
 # start that times out mid-image-pull would otherwise re-download from scratch

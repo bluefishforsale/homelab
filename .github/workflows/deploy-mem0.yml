@@ -99,7 +99,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           INVENTORY="inventories/production/hosts.ini"
-          PLAYBOOK="playbooks/individual/ocean/ai/mem0.yaml"
+          PLAYBOOK="playbooks/individual/workers/mem0.yaml"
           VERSION="$DEPLOY_VERSION"
 
           EXTRA=()
@@ -138,7 +138,7 @@ jobs:
         env:
           VERSION: ${{ steps.params.outputs.version }}
         run: |
-          PLAYBOOK="playbooks/individual/ocean/ai/mem0.yaml"
+          PLAYBOOK="playbooks/individual/workers/mem0.yaml"
           # VERSION is already validated as 40 hex chars by the params step.
           if grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK"; then
             echo "pin already current, nothing to write back"
@@ -170,12 +170,16 @@ jobs:
       - name: Post-deployment health check
         if: success()
         run: |
-          if timeout 10 curl -fsS -o /dev/null http://192.168.1.143:8888/docs; then
-            echo "mem0 API serving /docs on 8888"
-          else
-            echo "::error::mem0 API is not serving /docs on 8888"
-            exit 1
-          fi
+          # harbor directly, then through ocean's forwarder, which is the address
+          # every client actually uses.
+          for url in http://192.168.1.32:8888/docs http://192.168.1.143:8888/docs; do
+            if timeout 10 curl -fsS -o /dev/null "$url"; then
+              echo "mem0 API serving $url"
+            else
+              echo "::error::mem0 API is not serving $url"
+              exit 1
+            fi
+          done
 
       - name: Generate deployment summary
         if: always()
@@ -206,7 +210,8 @@ jobs:
           |-----------|-------|
           | Repository | bluefishforsale/mem0 |
           | Image | ghcr.io/bluefishforsale/mem0-api-server |
-          | API | 192.168.1.143:8888 (LAN only, ssh forward off-site) |
-          | MCP bridge | 192.168.1.143:8766 |
+          | Host | harbor (192.168.1.32), Postgres on the 870 EVO |
+          | API | 192.168.1.143:8888 via ocean's forwarder (LAN only, ssh forward off-site) |
+          | MCP bridge | 192.168.1.143:8766 via ocean's forwarder |
 
           EOF

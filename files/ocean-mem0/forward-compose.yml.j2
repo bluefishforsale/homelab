@@ -1,0 +1,26 @@
+# Rendered by playbooks/individual/workers/mem0.yaml. Keeps ocean.home:{{ port_api }}
+# and :{{ port_mcp }} working after mem0 moved to harbor. Published on the LAN
+# address only, like mem0 itself was.
+services:
+  forward:
+    image: nginx:stable-alpine
+    container_name: {{ service }}
+    restart: unless-stopped
+    volumes:
+      - {{ home }}/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ port_api }}:{{ port_api }}"
+      - "{{ ansible_default_ipv4.address }}:{{ port_mcp }}:{{ port_mcp }}"
+    # End to end: a pass means harbor's mem0 answered through this hop.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:{{ port_api }}/docs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    cpus: '0.5'
+    mem_limit: 64m
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"

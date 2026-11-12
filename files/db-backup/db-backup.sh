@@ -31,7 +31,11 @@ CONF="${DB_BACKUP_ENV:-/data01/services/db-backup/db-backup.env}"
 : "${MYSQL_ROOT_PASSWORD:=}"
 : "${WORDPRESS_DB_CONTAINER:=}"
 : "${WORDPRESS_ROOT_PASSWORD:=}"
-: "${SKIP_SQLITE:=0}"
+# SQLITE_ONLY, when set (even empty), replaces the list below with these paths;
+# workers set it to the SQLite stores that live on them. SQLITE_EXCLUDE drops
+# paths whose service moved off this host, so a stale copy never overwrites the
+# live host's upload.
+: "${SQLITE_EXCLUDE:=}"
 
 START=$(date +%s)
 # Hostname in the name: ocean and every data01 worker run this at the same minute.
@@ -74,7 +78,11 @@ SQLITE_DBS=(
   my_ta_jose/data/my_ta_jose.db
   mem0/history/history.db
 )
-[ "$SKIP_SQLITE" = 1 ] && SQLITE_DBS=()
+# shellcheck disable=SC2206
+[ -n "${SQLITE_ONLY+x}" ] && SQLITE_DBS=($SQLITE_ONLY)
+for x in $SQLITE_EXCLUDE; do
+  for i in "${!SQLITE_DBS[@]}"; do [ "${SQLITE_DBS[$i]}" = "$x" ] && unset 'SQLITE_DBS[i]'; done
+done
 for rel in "${SQLITE_DBS[@]}"; do
   svc="${rel%%/*}"
   docker run --rm -v "$SERVICES_DIR":/svc:ro "$ALPINE_IMAGE" test -f "/svc/$rel" 2>/dev/null \
