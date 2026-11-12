@@ -184,10 +184,9 @@
     # fork/main.
     mem0_image: ghcr.io/bluefishforsale/mem0-api-server
     mem0_version: c7cb52dabdf47470f15ab0bf818cf0bb8787ba11
-    # SSH, unlike the mem0 fork above: the bridge repo is private, and an https
-    # clone of a private repo fails with "could not read Username for
-    # 'https://github.com'" rather than anything that names the real problem.
-    mem0_bridge_repo: git@github.com:bluefishforsale/mem0-mcp-bridge.git
+    # https with harbor's read-only token (tasks/github_read.yaml), not ssh:
+    # harbor holds no GitHub key.
+    mem0_bridge_repo: https://github.com/bluefishforsale/mem0-mcp-bridge.git
     # Pinned like the fork above, now that the repo has a commit worth pinning:
     # this is the one that constrains mcp<2. On `main` the bridge crash-looped,
     # because mcp>=1.0 resolved to 2.x where FastMCP was renamed and moved.
@@ -206,12 +205,6 @@
       - "192.168.1.32:{{ service_ports.mem0.mcp }}"
       - "localhost:{{ service_ports.mem0.mcp }}"
       - "127.0.0.1:{{ service_ports.mem0.mcp }}"
-    # harbor holds no GitHub key, so ocean clones the private bridge repo with
-    # terrac's key (as blog_terrac_com_static.yaml does) and harbor gets a
-    # git archive of the pinned commit through the controller.
-    git_ssh_key: /home/terrac/.ssh/id_ed25519
-    ocean_bridge_clone: /root/mem0-mcp-bridge
-    bridge_archive: "/tmp/mem0-mcp-bridge-{{ mem0_bridge_version }}.tar.gz"
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
     # What gets pulled, and what mem0 actually calls. They differ because
@@ -396,77 +389,29 @@
     no_log: true
     changed_when: false
 
-  - name: Read the bridge source version on harbor
-    ansible.builtin.slurp:
-      src: "{{ home }}/src-bridge/.version"
-    register: bridge_have
-    failed_when: false
+  - name: Let harbor clone private GitHub repos
+    ansible.builtin.include_tasks: "{{ playbook_dir }}/../../tasks/github_read.yaml"
 
-  # Only when the pin moves. ocean clones as root with terrac's key, archives the
-  # pinned commit, and the controller carries it to harbor.
-  - name: Fetch the pinned bridge source through ocean
-    when: (bridge_have.content | default('') | b64decode | trim) != mem0_bridge_version
-    block:
-    - name: Clone mem0-mcp-bridge on ocean
-      ansible.builtin.git:
-        repo: "{{ mem0_bridge_repo }}"
-        dest: "{{ ocean_bridge_clone }}"
-        version: "{{ mem0_bridge_version }}"
-        force: true
-        accept_hostkey: true
-      environment:
-        GIT_SSH_COMMAND: "ssh -i {{ git_ssh_key }} -o StrictHostKeyChecking=no"
-      delegate_to: ocean
+  # src-bridge was a plain unpacked archive while ocean did the cloning. git
+  # refuses to clone into a non-empty dir, so a non-checkout goes first.
+  - name: Look for a git checkout of the bridge on harbor
+    ansible.builtin.stat:
+      path: "{{ home }}/src-bridge/.git"
+    register: bridge_git
 
-    - name: Archive the pinned commit on ocean
-      ansible.builtin.command:
-        cmd: "git -C {{ ocean_bridge_clone }} archive --format=tar.gz -o {{ bridge_archive }} {{ mem0_bridge_version }}"
-      delegate_to: ocean
-      changed_when: true
+  - name: Clear the archive-era bridge source
+    ansible.builtin.file:
+      path: "{{ home }}/src-bridge"
+      state: absent
+    when: not bridge_git.stat.exists
 
-    - name: Bring the archive to the controller
-      ansible.builtin.fetch:
-        src: "{{ bridge_archive }}"
-        dest: "{{ bridge_archive }}"
-        flat: true
-      delegate_to: ocean
-
-    - name: Clear harbor's old bridge source
-      ansible.builtin.file:
-        path: "{{ home }}/src-bridge"
-        state: absent
-
-    - name: Create harbor's bridge source dir
-      ansible.builtin.file:
-        path: "{{ home }}/src-bridge"
-        state: directory
-        mode: '0755'
-
-    - name: Unpack the bridge source on harbor
-      ansible.builtin.unarchive:
-        src: "{{ bridge_archive }}"
-        dest: "{{ home }}/src-bridge"
-
-    - name: Record the bridge source version
-      ansible.builtin.copy:
-        content: "{{ mem0_bridge_version }}\n"
-        dest: "{{ home }}/src-bridge/.version"
-        mode: '0644'
-      register: bridge_clone
-
-    always:
-    - name: Remove the archive on ocean
-      ansible.builtin.file:
-        path: "{{ bridge_archive }}"
-        state: absent
-      delegate_to: ocean
-
-    - name: Remove the archive on the controller
-      ansible.builtin.file:
-        path: "{{ bridge_archive }}"
-        state: absent
-      delegate_to: localhost
-      become: false
+  - name: Clone mem0-mcp-bridge
+    ansible.builtin.git:
+      repo: "{{ mem0_bridge_repo }}"
+      dest: "{{ home }}/src-bridge"
+      version: "{{ mem0_bridge_version }}"
+      force: true
+    register: bridge_clone
 
   - name: Supply the bridge with a Dockerfile
     ansible.builtin.copy:
