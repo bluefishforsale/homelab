@@ -36,8 +36,8 @@
     home: /srv/llmeval
     port: "{{ service_ports.llmeval.port }}"
     llama_image: ghcr.io/ggml-org/llama.cpp@sha256:6d581c788abba2dfa23ff78dba37ea0abfc7d838c49bcc98f4be2103df9772b3
-    # axiomd main at the commit that ships the overreach-aware judge (axiomd #14).
-    axiomd_image: ghcr.io/bluefishforsale/axiomd:sha-c9e245869e3f484fee8e7be4741abfaff566ace2
+    # axiomd main at the commit that ships the 16k-token cap (axiomd #15).
+    axiomd_image: ghcr.io/bluefishforsale/axiomd:sha-5e68772356147a6964588ad7a1b46d68f81f588a
     axiomd_uid: 10001  # the image's axiomd user, which writes the eval output
     llmeval_ntfy_url: http://ntfy.home:8090/homelab  # same topic agentbox alerts on
     # Changes whenever the model list does, so an edited list re-downloads and

@@ -6,7 +6,10 @@ Requires=llmeval-models.service llmeval.service
 After=llmeval-models.service llmeval.service
 
 [Service]
-Type=oneshot
+# NOTE: simple, not oneshot. A oneshot stays "activating" for the whole run, and
+# systemd skips ExecStop for a unit that never went active, so a stop killed
+# only the docker client and left the container running (2026-11-08 and -11).
+Type=simple
 # Resumable: finished answers and verdicts in {{ home }}/out are kept, so a
 # restart picks up at the first missing one.
 # The PEM key is multi-line, which no env file can carry, so the shell reads it
