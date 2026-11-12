@@ -1,0 +1,31 @@
+---
+# Lets root on a host clone terrac's private GitHub repos over https, read-only.
+#
+# The token is fine-grained (Contents: read, selected repos only), so it can
+# clone and nothing else. It lives in a root-only credential store and git
+# finds it through /etc/gitconfig, scoped to github.com, so no remote URL or
+# .git/config ever carries it. A repo missing from the token's selection fails
+# with "Repository not found", not an auth error: add it on the token's GitHub
+# settings page.
+#
+# Needs the vault loaded (development.github.harbor_repo_read_token).
+
+- name: Install git
+  ansible.builtin.apt:
+    name: git
+    state: present
+
+- name: Write the GitHub credential store
+  ansible.builtin.copy:
+    content: "https://bluefishforsale:{{ development.github.harbor_repo_read_token }}@github.com\n"
+    dest: /root/.git-credentials-github
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Point git at the credential store for github.com
+  community.general.git_config:
+    scope: system
+    name: credential.https://github.com.helper
+    value: store --file /root/.git-credentials-github
