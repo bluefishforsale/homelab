@@ -215,6 +215,14 @@ service_ports:
   archmap:
     port: 8091
 
+  # ml-log-analyzer on harbor: the detector's status API and the processor,
+  # which takes the detector's anomalies on /webhook/anomaly. Both serve /metrics.
+  ml_log_analyzer_detector:
+    port: 8086
+
+  ml_log_analyzer_processor:
+    port: 8087
+
   wordpress:
     port: 8085
 

@@ -1,0 +1,120 @@
+# ml-log-analyzer: the detector polls Loki on ocean and posts anomalies to the
+# processor, which groups them into problems in Postgres and raises LogAnomaly
+# alerts in Alertmanager. Each keeps its own Redis, as they did on ocean, so
+# their keys never collide.
+services:
+  detector-redis:
+    image: redis:7-alpine
+    container_name: {{ service }}-detector-redis
+    restart: unless-stopped
+    user: "999:999"
+    command: >
+      redis-server --appendonly yes --appendfsync everysec
+      --maxmemory 512mb --maxmemory-policy allkeys-lru
+      --save 300 10 --save 60 10000
+    volumes:
+      - {{ home }}/detector-redis:/data
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-detector-redis"
+
+  detector:
+    image: {{ detector_image }}:{{ version }}
+    container_name: {{ service }}-detector
+    restart: unless-stopped
+    ports:
+      - "{{ service_ports.ml_log_analyzer_detector.port }}:8085"
+    volumes:
+      - {{ home }}/detector-data:/app/data
+    environment:
+      - TZ=America/Los_Angeles
+      - LOKI_URL=http://{{ hostvars['ocean'].ansible_ssh_host }}:{{ service_ports.loki.port }}
+      - WEBHOOK_URL=http://processor:8087/webhook/anomaly
+      - REDIS_ADDR=detector-redis:6379
+      - CHECK_INTERVAL=30
+      - BATCH_SIZE=1000
+      - FREQUENCY_SIGMA=4.0
+      - RATE_CHANGE_THRESHOLD=10.0
+      - ENTROPY_THRESHOLD=6.5
+      - LEVENSHTEIN_THRESHOLD=0.90
+      - ALERT_COOLDOWN_MINUTES=60
+      - MIN_SEVERITY=high
+      - MIN_PATTERN_SCORE=3.0
+      - MIN_REPETITION_COUNT=20
+      - SUPPRESSED_SERVICES=blackbox-exporter,promtail,node-exporter
+      - DASHBOARD_URL=http://ocean.home/d/log-anomaly-detector/log-anomaly-detector-tier-1
+    depends_on:
+      - detector-redis
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-detector"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: {{ service }}-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=log_anomaly_ml
+      - POSTGRES_USER=log_anomaly_ml
+      - POSTGRES_PASSWORD={{ log_anomaly_ml.postgres_password }}
+    volumes:
+      - {{ home }}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U log_anomaly_ml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-postgres"
+
+  processor-redis:
+    image: redis:7-alpine
+    container_name: {{ service }}-processor-redis
+    restart: unless-stopped
+    command: >
+      redis-server --appendonly yes --appendfsync everysec
+      --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - {{ home }}/processor-redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-processor-redis"
+
+  # LLM_URL and SMTP_USER stay unset, which turns off the processor's LLM
+  # analysis and email digest: AxiomD triages the alerts it raises.
+  processor:
+    image: {{ processor_image }}:{{ version }}
+    container_name: {{ service }}-processor
+    restart: unless-stopped
+    ports:
+      - "{{ service_ports.ml_log_analyzer_processor.port }}:8087"
+    environment:
+      - TZ=America/Los_Angeles
+      - PORT=8087
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=log_anomaly_ml
+      - POSTGRES_USER=log_anomaly_ml
+      - POSTGRES_PASSWORD={{ log_anomaly_ml.postgres_password }}
+      - REDIS_ADDR=processor-redis:6379
+      - ALERTMANAGER_URL=http://{{ hostvars['ocean'].ansible_ssh_host }}:{{ service_ports.alertmanager.port }}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      processor-redis:
+        condition: service_healthy
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-processor"

@@ -39,6 +39,7 @@ on:
           - my_ta_jose
           - etrading_boy
           - archmap
+          - ml_log_analyzer
           # Monitoring
           - prometheus
           - grafana
@@ -106,6 +107,7 @@ jobs:
             my_ta_jose) PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml" ;;
             etrading_boy) PLAYBOOK="playbooks/individual/ocean/services/etrading_boy.yaml" ;;
             archmap) PLAYBOOK="playbooks/individual/workers/archmap.yaml" ;;
+            ml_log_analyzer) PLAYBOOK="playbooks/individual/workers/ml_log_analyzer.yaml" ;;
 
             # Monitoring
             prometheus) PLAYBOOK="playbooks/individual/ocean/monitoring/prometheus.yaml" ;;

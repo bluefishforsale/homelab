@@ -1,0 +1,66 @@
+name: Deploy ml-log-analyzer
+
+# harbor-only playbook, so it shares main-apply's group for harbor, which the
+# resolver derives from the playbook's first hosts line.
+concurrency:
+  group: deploy-harbor
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+
+  # Webhook trigger from the ml-log-analyzer repository's build-and-push workflow.
+  repository_dispatch:
+    types: [deploy-ml-log-analyzer]
+
+env:
+  ANSIBLE_FORCE_COLOR: "true"
+  ANSIBLE_HOST_KEY_CHECKING: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ml-log-analyzer
+    runs-on: [self-hosted, homelab, ansible]
+    environment: Github Actions CI
+    steps:
+      - name: Checkout homelab repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      # Payload through env vars, never inline ${{ }} expansion: a commit
+      # message is free text.
+      - name: Run deployment playbook
+        env:
+          CLIENT_COMMIT_SHA: ${{ github.event.client_payload.sha }}
+          CLIENT_COMMIT_MESSAGE: ${{ github.event.client_payload.commit_message }}
+        run: |
+          echo "Commit: ${CLIENT_COMMIT_SHA:-manual}"
+          printf 'Message: %s\n' "$(printf '%s' "${CLIENT_COMMIT_MESSAGE:-Manual deployment}" | head -1)"
+          # NOTE: steps run under `bash -e`, so the failure branch has to be an
+          # if/else. Testing $? on the following line would never execute.
+          if ansible-playbook -i inventories/production/hosts.ini \
+               --vault-password-file=/tmp/.vault_pass \
+               playbooks/individual/workers/ml_log_analyzer.yaml; then
+            echo "deployed"
+          else
+            echo "::error::ml-log-analyzer deploy failed"
+            exit 1
+          fi
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
