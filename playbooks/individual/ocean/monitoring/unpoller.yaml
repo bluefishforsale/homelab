@@ -20,6 +20,9 @@
     unpoller_port: "{{ service_ports.unpoller.port }}"
     unpoller_home: "{{ path_data01 }}/{{ unpoller_service }}"
     unpoller_files: "{{ playbook_dir }}/../../../../files/unpoller"
+    # Loki runs on ocean too; unpoller is on the bridge network, so it goes
+    # by the host address, same as Grafana's Loki datasource.
+    unpoller_loki_url: "http://192.168.1.143:{{ service_ports.loki.port }}"
     
     # UniFi Controller Configuration (from vault)
     unifi_controller_url: "{{ network.unifi.controller_url }}"
