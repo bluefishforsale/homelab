@@ -266,7 +266,7 @@ scrape_configs:
     metrics_path: /ups_metrics
     scrape_interval: 30s
     static_configs:
-    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-3B2116X60175']
+    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-J6D525D41E6BE384041']
     relabel_configs:
     - source_labels: [__address__]
       target_label: __param_ups
