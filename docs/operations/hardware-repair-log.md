@@ -35,6 +35,12 @@ When a field is genuinely unknown write `unknown`, and when it was reconstructed
 
 Rows 1 to 14 were reconstructed on 2026-11-10 from `zpool history data01`, the Prometheus `smartctl_device` series (which tie a serial to a WWN by when each one appeared and disappeared, 30 minute resolution, retained from 2026-05-14), and order and UPS emails. Removed-disk serials before 2026-05-14 are not recoverable.
 
+## UPS swaps (node005 USB hub, read by NUT)
+
+| # | Date (PT) | Removed: model / serial | Installed: model / serial | Vendor, order, unit price | Notes |
+|---|---|---|---|---|---|
+| 1 | 2026-11-11 | APC Back-UPS XS 1500M / 3B2116X60175 | GoldenMate 2000VA/1600W LiFePO4 UPS, 8 outlets, 460Wh, AVR / `J6D525D41E6BE384041:23` (USB `075d:0300`, reports as `-BMS- Smart-Battery`) | GoldenMate Energy `#9496`, $759.00 | Ordered 2026-11-07. Fleet power-cycled to install it. The old unit carried the lightest load of the three (15% average of 900W). NUT reads it with usbhid-ups, but `battery.runtime` is a fixed 599940s, so its LB is charge-based at 20% (`nut_ups.yaml`). |
+
 ## FARM vs SMART power-on hours (2026-11-10)
 
 Every disk in the pool arrived with its SMART counters reset. FARM keeps the real lifetime.
