@@ -27,8 +27,8 @@
   vars:
     nut_server: node005
     # Labels everywhere (NUT names, metrics) are ups-<id>, where id is the USB
-    # serial. low_charge switches a UPS from the runtime-based low battery below
-    # to a charge-based one, for units whose runtime reading cannot be trusted.
+    # serial. low_charge adds a charge-based low battery on top of the runtime
+    # one below, for units whose runtime estimate is not proven.
     nut_upses:
       - id: 3B2116X60966
         desc: APC Back-UPS XS 1500M
@@ -42,9 +42,10 @@
       # 2026-11-11. The full serial is J6D525D41E6BE384041:23; the ":23" stays
       # out of the id because ':' would land in the NUT name and the driver's
       # systemd instance name.
-      # NOTE: its battery.runtime reads 599940s (166h) at any load, so a runtime
-      # threshold would never raise LB and this UPS would run flat with upsmon
-      # still waiting. 20% is about 30 min at the ~150W it carries.
+      # NOTE: on mains its battery.runtime is a flat 599940s (166h); only on
+      # battery does it estimate (4260-4320s at 99% in the 2026-11-11 pull-the-plug
+      # test). That estimate is unproven down to empty, so 20% charge raises LB
+      # too, whichever comes first. 20% is about 30 min at the ~150W it carries.
       - id: J6D525D41E6BE384041
         desc: GoldenMate 2000VA LiFePO4
         vendorid: 075d

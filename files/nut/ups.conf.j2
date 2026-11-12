@@ -16,13 +16,13 @@ maxretry = 3
   serial = "{{ ups.id }}.*"
   desc = "{{ ups.desc }} {{ ups.id }}"
   ignorelb
-{% if ups.low_charge is defined %}
-  # Raise LB at {{ ups.low_charge }}% charge; this unit's runtime reading is not real.
-  override.battery.charge.low = {{ ups.low_charge }}
-{% else %}
   # Raise LB at {{ nut_low_runtime_seconds }}s of runtime instead of the UPS's own
   # 2 minutes, which is too little for Proxmox to stop every VM.
   override.battery.runtime.low = {{ nut_low_runtime_seconds }}
+{% if ups.low_charge is defined %}
+  # And at {{ ups.low_charge }}% charge, whichever comes first: this unit's runtime
+  # estimate is unproven (see nut_upses in the playbook).
+  override.battery.charge.low = {{ ups.low_charge }}
 {% endif %}
 
 {% endfor %}

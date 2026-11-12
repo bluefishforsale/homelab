@@ -39,7 +39,7 @@ Rows 1 to 14 were reconstructed on 2026-11-10 from `zpool history data01`, the P
 
 | # | Date (PT) | Removed: model / serial | Installed: model / serial | Vendor, order, unit price | Notes |
 |---|---|---|---|---|---|
-| 1 | 2026-11-11 | APC Back-UPS XS 1500M / 3B2116X60175 | GoldenMate 2000VA/1600W LiFePO4 UPS, 8 outlets, 460Wh, AVR / `J6D525D41E6BE384041:23` (USB `075d:0300`, reports as `-BMS- Smart-Battery`) | GoldenMate Energy `#9496`, $759.00 | Ordered 2026-11-07. Fleet power-cycled to install it. The old unit carried the lightest load of the three (15% average of 900W). NUT reads it with usbhid-ups, but `battery.runtime` is a fixed 599940s, so its LB is charge-based at 20% (`nut_ups.yaml`). |
+| 1 | 2026-11-11 | APC Back-UPS XS 1500M / 3B2116X60175 | GoldenMate 2000VA/1600W LiFePO4 UPS, 8 outlets, 460Wh, AVR / `J6D525D41E6BE384041:23` (USB `075d:0300`, reports as `-BMS- Smart-Battery`) | GoldenMate Energy `#9496`, $759.00 | Ordered 2026-11-07. Fleet power-cycled to install it. The old unit carried the lightest load of the three (15% average of 900W). NUT reads it with usbhid-ups. On mains `battery.runtime` is a fixed 599940s; on battery it estimates (4260s at 99% in a pull-the-plug test, which also showed `OB DISCHRG`). LB at 300s runtime or 20% charge, whichever first (`nut_ups.yaml`). |
 
 ## FARM vs SMART power-on hours (2026-11-10)
 
