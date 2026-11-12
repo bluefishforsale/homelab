@@ -224,12 +224,15 @@
     #   nomic-embed-text     (30 threads): 34.53s
     #   nomic-embed-homelab  (6 threads):   ~0.9s on an idle host
     #
-    # Those 6 threads are the reason the compose file gives this container a
-    # 6-CPU quota. Do not also pin it with cpuset: one saturated core in a
-    # fixed set drags the whole pool to ~7s while its neighbours idle.
+    # The compose quota is embedder_parallel x embedder_threads CPUs, one per
+    # thread across every slot. Do not also pin it with cpuset: one saturated
+    # core in a fixed set drags the whole pool to ~7s while its neighbours idle.
+    # On harbor (24 cores) the quota is a ceiling shared with Tdarr, NZBGet and
+    # archmap, not a reservation.
     embedder_base_model: nomic-embed-text
     embedder_model: nomic-embed-homelab
-    embedder_threads: 6
+    embedder_threads: 4
+    embedder_parallel: 4
     data: /data01
     files: "{{ playbook_dir }}/../../../files/ocean-mem0"
     home: "{{ data }}/services/{{ service }}"
