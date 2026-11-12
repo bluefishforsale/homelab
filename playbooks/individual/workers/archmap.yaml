@@ -21,6 +21,7 @@
 
   vars_files:
     - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
 
   vars:
     home: /data01/services/archmap
@@ -64,6 +65,35 @@
       state: absent
     loop: ["{{ handoff }}", "{{ handoff_sum }}"]
     when: harbor_marker.stat.exists
+
+  # ocean's copy was the backout while harbor proved itself; harbor has served
+  # since 2026-11-09 and backs up to GCS, so the copy goes. Only once harbor holds
+  # the state, ocean's unit is gone, and harbor answers healthz right now.
+  - name: Ask harbor's archmap for healthz
+    ansible.builtin.uri:
+      url: "http://192.168.1.32:{{ service_ports.archmap.port }}/healthz"
+      status_code: 200
+    register: harbor_health
+    failed_when: false
+    when: harbor_marker.stat.exists and not ocean_unit.stat.exists
+
+  # NOTE: a mountpoint here would be a dataset; removing it is a ZFS change and
+  # out of scope for a playbook, so the delete refuses one.
+  - name: Check ocean's old archmap dir is a plain directory
+    ansible.builtin.command:
+      cmd: "findmnt -n {{ home }}"
+    register: ocean_home_mount
+    changed_when: false
+    failed_when: ocean_home_mount.rc == 0
+    when: harbor_health.status | default(0) == 200
+
+  - name: Delete ocean's old archmap dir
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: absent
+    async: 3600
+    poll: 15
+    when: harbor_health.status | default(0) == 200
 
   # The ocean unit stays (disabled) until harbor is healthy, so a failed move
   # backs out with `systemctl start archmap` on ocean. The marker stops a rerun
