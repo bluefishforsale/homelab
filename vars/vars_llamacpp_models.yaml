@@ -4,11 +4,37 @@
 # The one model actually loaded at runtime. Single source of truth: the deploy
 # downloads ONLY this file (skipped if already present) and docker-compose loads
 # it via --model. Change this one value to switch models.
-llamacpp_active_model: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+llamacpp_active_model: "Qwen3.8-27B-UD-Q4_K_M.gguf"
 
 llamacpp_models:
   reasoning:
-    # Active model: coding-specialized MoE 30B / ~3B active, native tool-calling,
+    # Active model: dense 27B on the Qwen3.5 hybrid arch (llama.cpp `qwen35`),
+    # thinking on by default, native tool-calling. Card: SWE-bench Pro 61.7,
+    # Terminal Bench 2.1 73.0. Only 16 of its 64 layers are full attention, so
+    # q8_0 KV @ 32K is ~1GB: 16GB weights + KV + buffers lands near what the
+    # Coder used. Dense means every weight is read per token, so expect roughly
+    # half the Coder's decode speed (~35 tok/s vs 60-90). The vision encoder
+    # (mmproj) is not loaded.
+    - name: "Qwen3.8-27B-UD-Q4_K_M.gguf"
+      url: "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q4_K_M.gguf"
+      # Hugging Face LFS oid, checked by get_url, so a truncated download fails
+      # the deploy instead of crash-looping the server.
+      sha256: "1bce504dfecd84153666928a41d8a66706f0158d3a317bc5196b72819d7dc529"
+      # Card's thinking-mode sampling. llama.cpp's own defaults (temp 0.8,
+      # top_k 40, min_p 0.05) are not what this model was tuned for.
+      server_args: ["--temp", "1.0", "--top-p", "0.95", "--top-k", "20", "--min-p", "0.0"]
+      size: "16GB"
+      parameters: "27B (dense)"
+      vram_usage: "~16GB + ~1GB q8_0 KV @ 32K (fits 24GB alongside Plex NVENC)"
+      capabilities: ["agentic-coding", "tool-calling", "reasoning", "thinking", "repo-level"]
+      context_size: "32K"
+      timeout: 7200
+      priority: 1
+      requires_auth: false
+      benchmark_eligible: true
+
+    # Previous active, still on disk: rollback is setting llamacpp_active_model
+    # back to this name. Coding-specialized MoE 30B / ~3B active, native tool-calling,
     # ~60-90 tok/s on a 3090. Q4_K_M (18.6GB) + q8_0 KV @ 32K fits the 24GB card
     # (measured Plex transcode only costs ~0.9GB, so headroom is real). Picked as
     # the best coder that fits: ~64% SWE-bench Verified, purpose-built for
@@ -21,11 +47,11 @@ llamacpp_models:
       capabilities: ["agentic-coding", "tool-calling", "repo-level", "reasoning"]
       context_size: "32K"
       timeout: 7200
-      priority: 1
+      priority: 6
       requires_auth: false
       benchmark_eligible: true
 
-    # Previous active: general MoE 35B / ~3B active, ~100 tok/s. Kept available
+    # Older active: general MoE 35B / ~3B active, ~100 tok/s. Kept available
     # for a fast general/reasoning swap. IQ4_NL (18GB) + q8_0 KV @ 32K.
     - name: "Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
       url: "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-IQ4_NL.gguf"
@@ -81,7 +107,7 @@ rtx_3090_profiles:
   # Active profile. q8_0 KV (needs flash-attn) keeps 32K context inside 24GB
   # alongside the 18GB model. --jinja enables the model's tool-call template.
   single_user_agentic:
-    model: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+    model: "Qwen3.8-27B-UD-Q4_K_M.gguf"
     gpu_layers: -1
     context_size: 32768
     batch_size: 2048
@@ -118,7 +144,8 @@ rtx_3090_profiles:
 
 # Model download priorities (1 = download first)
 download_priority:
-  1: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+  1: "Qwen3.8-27B-UD-Q4_K_M.gguf"
+  6: "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
   2: "Qwen3-8B-Q4_K_M.gguf"
   3: "Qwen3-14B-Q4_K_M.gguf"
   4: "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"

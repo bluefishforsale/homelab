@@ -95,6 +95,7 @@
       group: "{{ user }}"
       timeout: "{{ item.1.timeout | default(3600) }}"
       force: false
+      checksum: "{{ ('sha256:' ~ item.1.sha256) if item.1.sha256 is defined else omit }}"
     with_subelements:
       - "{{ llamacpp_models | dict2items }}"
       - value

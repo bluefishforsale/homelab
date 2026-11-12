@@ -28,12 +28,13 @@ services:
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs
     
-    # RTX 3090: Qwen3-Coder-30B-A3B-Instruct (MoE, ~3B active) coding model.
-    # 18.6GB model + q8_0 KV @ 32K fits the 24GB card; measured Plex NVENC only
-    # costs ~0.9GB so headroom is real. --jinja loads the model's tool-call chat
-    # template (required for tool-calling). Verify at deploy: CUDA 12.8+ in the
-    # image (13.2 reportedly produces gibberish); sanity-test a tool round-trip
-    # before trusting it in the agent loop.
+    # RTX 3090: the model is llamacpp_active_model (vars_llamacpp_models.yaml).
+    # Weights + q8_0 KV @ 32K must fit the 24GB card; measured Plex NVENC only
+    # costs ~0.9GB. --jinja loads the model's tool-call chat template (required
+    # for tool-calling). Verify at deploy: CUDA 12.8+ in the image (13.2
+    # reportedly produces gibberish); sanity-test a tool round-trip before
+    # trusting it in the agent loop.
+{% set active = llamacpp_models.values() | sum(start=[]) | selectattr('name', 'equalto', llamacpp_active_model) | first %}
     command:
       - "--host"
       - "0.0.0.0"
@@ -65,6 +66,11 @@ services:
       - "--no-webui"
       - "--metrics"
       - "--verbose"
+      # Per-model server defaults (the card's sampling), so a rollback to
+      # another model drops them with it. A request's own params still win.
+{% for arg in active.server_args | default([]) %}
+      - "{{ arg }}"
+{% endfor %}
     
     # Health check - check if server is responding. Must be an unauthenticated
     # route: --api-key-file guards /v1/*, so probing /v1/models returns 401 and
