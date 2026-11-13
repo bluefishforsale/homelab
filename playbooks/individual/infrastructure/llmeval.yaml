@@ -35,9 +35,9 @@
     files: "{{ playbook_dir }}/../../../files/llmeval"
     home: /srv/llmeval
     port: "{{ service_ports.llmeval.port }}"
-    llama_image: ghcr.io/ggml-org/llama.cpp@sha256:6d581c788abba2dfa23ff78dba37ea0abfc7d838c49bcc98f4be2103df9772b3
+    llama_image: registry-cache.home:5002/ggml-org/llama.cpp@sha256:6d581c788abba2dfa23ff78dba37ea0abfc7d838c49bcc98f4be2103df9772b3
     # axiomd main at the commit that ships the 16k-token cap (axiomd #15).
-    axiomd_image: ghcr.io/bluefishforsale/axiomd:sha-5e68772356147a6964588ad7a1b46d68f81f588a
+    axiomd_image: registry-cache.home:5005/bluefishforsale/axiomd:sha-5e68772356147a6964588ad7a1b46d68f81f588a
     axiomd_uid: 10001  # the image's axiomd user, which writes the eval output
     llmeval_ntfy_url: http://ntfy.home:8090/homelab  # same topic agentbox alerts on
     # Changes whenever the model list does, so an edited list re-downloads and
@@ -61,13 +61,13 @@
       ansible.builtin.command: docker compose version
       changed_when: false
 
-    - name: Log llmeval into GHCR to pull the private axiomd image
+    - name: Log llmeval into ghcr-private-cache to pull the private axiomd image
       ansible.builtin.shell: |
-        echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+        echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
       changed_when: false
       no_log: true
 
-    # Pulled here, not left to docker run, so a bad GHCR credential fails the
+    # Pulled here, not left to docker run, so a bad ghcr-private-cache credential fails the
     # deploy instead of the eval unit hours later.
     - name: Pull the axiomd image
       ansible.builtin.command: docker pull {{ axiomd_image }}

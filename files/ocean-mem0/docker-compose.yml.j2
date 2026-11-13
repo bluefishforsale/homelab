@@ -80,7 +80,7 @@ services:
         tag: "{{ service }}"
 
   postgres:
-    image: ankane/pgvector:v0.5.1
+    image: registry-cache.home:5001/ankane/pgvector:v0.5.1
     container_name: {{ service }}-postgres
     hostname: postgres
     restart: unless-stopped
@@ -115,7 +115,7 @@ services:
   # NOTE: the collection is 768-dim. Changing this model or MEM0_EMBEDDING_DIMS
   # orphans every vector already stored.
   ollama:
-    image: ollama/ollama:latest
+    image: registry-cache.home:5001/ollama/ollama:latest
     container_name: {{ service }}-ollama
     hostname: ollama
     restart: unless-stopped

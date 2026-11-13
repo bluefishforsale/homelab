@@ -17,7 +17,7 @@
 
   vars:
     service: my_ta_jose
-    image: ghcr.io/bluefishforsale/my-ta-jose
+    image: registry-cache.home:5005/bluefishforsale/my-ta-jose
     version: latest
     port_ext: "{{ service_ports.my_ta_jose.port }}"
     port_int: 8000
@@ -30,9 +30,9 @@
 
   tasks:
 
-  - name: Log ocean into GHCR to pull private my-ta-jose image
+  - name: Log ocean into ghcr-private-cache to pull private my-ta-jose image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     no_log: true
 
   - name: Ensure base directory exists

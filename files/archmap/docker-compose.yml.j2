@@ -3,7 +3,7 @@
 # Python. Only the nginx is published on the host.
 services:
   postgres:
-    image: postgres:16
+    image: registry-cache.home:5001/library/postgres:16
     container_name: {{ service }}-postgres
     hostname: {{ service }}-postgres
     restart: unless-stopped
@@ -86,7 +86,7 @@ services:
         tag: "{{ service }}-worker"
 
   web:
-    image: nginx:stable-alpine
+    image: registry-cache.home:5001/library/nginx:stable-alpine
     container_name: {{ service }}-web
     hostname: {{ service }}-web
     restart: unless-stopped

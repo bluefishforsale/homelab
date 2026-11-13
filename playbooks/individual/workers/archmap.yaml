@@ -28,15 +28,15 @@
     handoff: /data01/services/archmap-to-harbor.tar
     # Root-only and off the export, so harbor can trust the tar it reads over NFS.
     handoff_sum: /root/archmap-to-harbor.sha256
-    image: ghcr.io/bluefishforsale/archmap
+    image: registry-cache.home:5005/bluefishforsale/archmap
     version: latest
 
   tasks:
   # On harbor before anything stops here, so a cold pull or a bad GHCR
   # credential fails the deploy with ocean still serving.
-  - name: Log harbor into GHCR to pull private archmap image
+  - name: Log harbor into ghcr-private-cache to pull private archmap image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     delegate_to: harbor
     no_log: true
 
@@ -159,7 +159,7 @@
 
   vars:
     service: archmap
-    image: ghcr.io/bluefishforsale/archmap
+    image: registry-cache.home:5005/bluefishforsale/archmap
     version: latest
     port_ext: "{{ service_ports.archmap.port }}"
     api_port: 8000

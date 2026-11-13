@@ -40,12 +40,12 @@
     handoff_sum: /root/mem0-to-harbor.sha256
 
   tasks:
-  # On harbor before anything stops here, so a bad GHCR credential or a cold
+  # On harbor before anything stops here, so a bad ghcr-private-cache credential or a cold
   # 2GB ollama pull fails or finishes with ocean still serving. The API image is
   # pulled by the harbor play, which owns the pinned version.
-  - name: Log harbor into GHCR to pull the private mem0 image
+  - name: Log harbor into ghcr-private-cache to pull the private mem0 image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     delegate_to: harbor
     no_log: true
     changed_when: false
@@ -183,7 +183,7 @@
     # to 595f1989, undoing four merged PRs, with the container healthy
     # throughout. Found only by a check comparing the running image to
     # fork/main.
-    mem0_image: ghcr.io/bluefishforsale/mem0-api-server
+    mem0_image: registry-cache.home:5005/bluefishforsale/mem0-api-server
     mem0_version: c7cb52dabdf47470f15ab0bf818cf0bb8787ba11
     # https with harbor's read-only token (tasks/github_read.yaml), not ssh:
     # harbor holds no GitHub key.
@@ -385,11 +385,11 @@
       - "{{ home }}/history"
       - "{{ home }}/bridge-data/mem0-mcp-bridge"
 
-  # The API image is private, so the pull below needs credentials. Read-only
-  # token, the same vault key paia.yaml uses.
-  - name: Log harbor into GHCR to pull the private mem0 image
+  # The API image is private, so the pull below needs the ghcr-private-cache
+  # login, the same vault key paia.yaml uses.
+  - name: Log harbor into ghcr-private-cache to pull the private mem0 image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     no_log: true
     changed_when: false
 
