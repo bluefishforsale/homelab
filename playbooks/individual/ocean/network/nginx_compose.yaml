@@ -10,7 +10,7 @@
   vars:
     foo: bar
     service: nginx
-    image: nginx
+    image: registry-cache.home:5001/library/nginx
     version: 1.27.3-alpine
     port_http: 80
     port_https: 443

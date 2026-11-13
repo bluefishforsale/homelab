@@ -29,7 +29,7 @@ CONF="${DB_BACKUP_ENV:-/data01/services/db-backup/db-backup.env}"
 : "${GCS_BUCKET:?GCS_BUCKET not set in env}"
 : "${GCS_SA_KEY:=/data01/services/db-backup/gcs-sa.json}"
 : "${GCLOUD_IMAGE:=google/cloud-sdk:slim}"
-: "${ALPINE_IMAGE:=alpine:latest}"
+: "${ALPINE_IMAGE:=registry-cache.home:5001/library/alpine:latest}"
 : "${MYSQL_ROOT_PASSWORD:=}"
 : "${WORDPRESS_DB_CONTAINER:=blog_saetnere_com_wp_db}"
 : "${WORDPRESS_ROOT_PASSWORD:=}"
@@ -85,11 +85,11 @@ ALL="grafana-mysql wordpress jellystat-db mem0-postgres archmap-postgres sonarr 
 # own schedule, since a quiet app's newest row is legitimately old.
 probe(){
   case "$1" in
-    grafana-mysql) echo "percona/percona-server:5.7|SELECT MAX(last_execution) FROM grafana.server_lock|48" ;;
-    wordpress)     echo "mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
-    jellystat-db)  echo 'postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|' ;;  # no max age: jellyfin parked 2026-11-09
-    mem0-postgres) echo 'ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
-    archmap-postgres) echo 'postgres:16|\connect archmap \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM snapshots|' ;;
+    grafana-mysql) echo "registry-cache.home:5001/percona/percona-server:5.7|SELECT MAX(last_execution) FROM grafana.server_lock|48" ;;
+    wordpress)     echo "registry-cache.home:5001/library/mariadb:10.11|SELECT UNIX_TIMESTAMP(MAX(post_modified_gmt)) FROM wordpress.wp_posts|" ;;
+    jellystat-db)  echo 'registry-cache.home:5001/library/postgres:15.2|\connect jfstat \\ SELECT EXTRACT(EPOCH FROM MAX("TimeRun"))::bigint FROM jf_logging|' ;;  # no max age: jellyfin parked 2026-11-09
+    mem0-postgres) echo 'registry-cache.home:5001/ankane/pgvector:v0.5.1|\connect mem0_app \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM request_logs|48' ;;
+    archmap-postgres) echo 'registry-cache.home:5001/library/postgres:16|\connect archmap \\ SELECT EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM snapshots|' ;;
     sonarr|radarr|prowlarr) echo "|SELECT strftime('%s',substr(MAX(LastStartTime),1,19)) FROM ScheduledTasks|48" ;;
     bazarr)        echo "|SELECT strftime('%s',MAX(timestamp)) FROM table_history|" ;;
     jellyfin)      echo "|SELECT strftime('%s',substr(MAX(DateCreated),1,19)) FROM ActivityLogs|" ;;

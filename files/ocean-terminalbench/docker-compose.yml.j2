@@ -1,6 +1,6 @@
 services:
   terminalbench-llamacpp:
-    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    image: registry-cache.home:5002/ggerganov/llama.cpp:server-cuda
     container_name: terminalbench-llamacpp
     hostname: terminalbench-llamacpp
     restart: unless-stopped

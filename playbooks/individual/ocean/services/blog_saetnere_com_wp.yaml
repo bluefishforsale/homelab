@@ -9,7 +9,7 @@
 
   vars:
     service: blog_saetnere_com_wp
-    image: wordpress
+    image: registry-cache.home:5001/library/wordpress
     version: latest
     port_ext: 8085
     port_int: 80

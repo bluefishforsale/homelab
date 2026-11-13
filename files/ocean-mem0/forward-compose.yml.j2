@@ -3,7 +3,7 @@
 # address only, like mem0 itself was.
 services:
   forward:
-    image: nginx:stable-alpine
+    image: registry-cache.home:5001/library/nginx:stable-alpine
     container_name: {{ service }}
     restart: unless-stopped
     volumes:
