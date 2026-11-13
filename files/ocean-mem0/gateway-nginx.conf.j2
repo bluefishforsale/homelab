@@ -27,8 +27,15 @@ http {
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto https;
 
+  # NOTE: upstreams are looked up per request through Docker's DNS. A literal
+  # proxy_pass host is resolved once at startup, so when the stack restarted
+  # under a running gateway it kept mem0's old IP and 502'd every request.
+  resolver 127.0.0.11 valid=10s ipv6=off;
+
   server {
     listen 80;
+    set $bridge http://bridge:8766;
+    set $api http://{{ service }}:8000;
 
     location = /healthz {
       access_log off;
@@ -36,11 +43,11 @@ http {
     }
 
     location /mcp {
-      proxy_pass http://bridge:8766;
+      proxy_pass $bridge;
     }
 
     location / {
-      proxy_pass http://{{ service }}:8000;
+      proxy_pass $api;
     }
   }
 }
