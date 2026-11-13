@@ -1,12 +1,20 @@
 # Registry cache (registry-cache-01)
 
 A pull-through image cache on its own VM, so an image the fleet has pulled once
-can still be pulled while its upstream registry is down. Six `registry:2`
+can still be pulled while its upstream registry is down. Six `registry:3`
 containers each proxy one upstream (Docker Hub, ghcr.io, ghcr.io for private
-images, registry.gitlab.com, nvcr.io, gcr.io). Only the Docker Hub one is in any
-pull path today: dockerd uses it as a `registry-mirrors` entry, and nothing
-points at the other five yet. Moving every pull onto the cache is the
-docker-weekly rollout in `docs/specs/2026-11-08-docker-weekly-restart-design.md`.
+images, registry.gitlab.com, nvcr.io, gcr.io). Every image ref in the repo
+points at one of them (#1263), apart from the exceptions listed on that issue.
+
+Cached blobs expire 30 days after they were first fetched (`proxy.ttl: 720h`),
+counted from the fetch, not from the last pull. registry:2 ignored that key and
+expired everything at a fixed 168h, the same period as the weekly refresh, so
+most refreshes found the cache already emptied for that image and went back to
+upstream. Tags are rechecked upstream on every pull whatever the TTL, so a
+longer one never serves a stale `:latest`. registry:3 also reads its config from
+`/etc/distribution/config.yml`, not registry:2's `/etc/docker/registry/`; a
+config mounted at the old path is silently ignored and the container comes up
+as a plain empty registry.
 
 The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 `[registry_cache]` in `inventories/production/hosts.ini`. DNS is
@@ -43,7 +51,7 @@ are literals in the compose file, `files/docker/daemon.json.j2` and
 `files/ocean-prometheus/prometheus.yml.j2`.
 
 Private `ghcr.io/bluefishforsale/*` images go through `ghcr-private-cache` and
-never through `ghcr-cache`. A `registry:2` proxy holds one upstream credential
+never through `ghcr-cache`. A registry proxy holds one upstream credential
 and does no auth of its own, so a token on the anonymous cache would serve
 private images to anything on the LAN. The htpasswd in front is basic auth over
 plain HTTP, same as the rest of the cache, so it keeps casual pulls out rather
@@ -79,7 +87,7 @@ Hosts that do not get the mirror:
 `registry-cache.service` is `Type=oneshot`, `RemainAfterExit=yes`, with
 `ExecStartPre=docker compose pull --quiet` and `up -d --remove-orphans`. It is a
 compose project, so the `docker-refresh@` timer that `node_exporter.yaml`
-installs on all hosts keeps `registry:2` and `grafana/promtail:latest` current.
+installs on all hosts keeps `registry:3` and `grafana/promtail:latest` current.
 
 ## Monitoring
 
