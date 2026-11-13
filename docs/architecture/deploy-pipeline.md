@@ -21,7 +21,7 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 | Workflow | Trigger | What it owns | Concurrency group |
 |---|---|---|---|
 | `main-apply.yml` | push to master (path filter), dispatch with a playbook list | The only push-time apply. `detect-changes` runs the detector (`:89`) and the resolver (`:95`); `apply-playbooks` runs each playbook and fails if any failed; `verify-deployment` probes after. Dispatch input bypasses the detector and its exclusions (`:70-82`). | resolved per run, job level (`:127-130`) |
-| `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
+| `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-tradey-boy-quant`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
 | `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml`, an ocean play. | `deploy-ocean` |
 | `deploy-netboot-images.yml` | `repository_dispatch` `deploy-netboot-images` | `infrastructure/netboot_image.yaml` with image and sha. Excluded from push detection. | `deploy-netboot` |
 | `deploy-registry-cache.yml` | `repository_dispatch` `deploy-registry-cache` | `infrastructure/registry_cache.yaml`. | `deploy-registry-cache` |

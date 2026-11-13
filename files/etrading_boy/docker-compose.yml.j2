@@ -18,6 +18,11 @@ services:
     # and logs all land under {{ home }}/data/.etrading-boy on the host.
     volumes:
       - {{ home }}/data:/data
+      # quanty's quant.db, at the bridge's default ~/.tradey-boy-quant path.
+      # NOTE: not :ro. The bridge opens it read-only, but reading a WAL
+      # database still writes the -shm file; a read-only mount turns every
+      # read into an error and the Stack3 veto silently goes inactive.
+      - {{ data }}/services/tradey_boy_quant/data:/data/.tradey-boy-quant
 
     # The bot stops its scheduler and lets in-flight jobs finish on SIGTERM.
     # NOTE: too short a grace period kills it mid-order-submit, and the next
