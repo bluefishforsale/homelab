@@ -11,11 +11,11 @@
 
   vars:
     service: sonarr
-    image: linuxserver/sonarr
+    image: registry-cache.home:5001/linuxserver/sonarr
     version: latest
     sonarr_port: "{{ service_ports.sonarr.port }}"
     exporter_service: sonarr-exporter
-    exporter_image: ghcr.io/onedr0p/exportarr
+    exporter_image: registry-cache.home:5002/onedr0p/exportarr
     exporter_version: latest
     exporter_port: "{{ service_ports.sonarr_exporter.port }}"
     data: /data01

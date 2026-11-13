@@ -12,7 +12,7 @@
 
   vars:
     service: recyclarr
-    image: ghcr.io/recyclarr/recyclarr
+    image: registry-cache.home:5002/recyclarr/recyclarr
     version: "8"
     schedule: "@daily"
     files: "{{ playbook_dir }}/../../../../files/ocean-recyclarr"
