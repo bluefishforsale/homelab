@@ -1,0 +1,22 @@
+# axiomd ops: read-only triage notes on low-priority alerts (bluefishforsale/axiomd). It reads
+# Alertmanager, Prometheus, and Loki on ocean, asks ocean's llama.cpp, and comments on homelab's alert
+# issues as the axiomd GitHub App. No ports: nothing calls in.
+services:
+  ops:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}-ops
+    # No restart policy: systemd runs this in the foreground, so a crash fails the unit, and a unit that
+    # keeps failing raises SystemdUnitFailed. A container restarting itself would loop unseen.
+    restart: "no"
+    command: ["ops", "--state-dir", "/state"]
+    environment:
+      AXIOMD_APP_CLIENT_ID: "{{ axiomd.github_app.client_id }}"
+      LLAMA_API_KEY: "{{ llama_api_key }}"
+      AXIOMD_APP_PRIVATE_KEY: |
+        {{ axiomd.github_app.private_key | trim | indent(8) }}
+    volumes:
+      - {{ home }}/state:/state
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-ops"
