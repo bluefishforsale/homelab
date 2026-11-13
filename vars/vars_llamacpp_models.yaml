@@ -109,9 +109,9 @@ rtx_3090_profiles:
   single_user_agentic:
     model: "Qwen3.8-27B-UD-Q4_K_M.gguf"
     gpu_layers: -1
-    context_size: 32768
+    context_size: 131072
     batch_size: 2048
-    parallel_requests: 1
+    parallel_requests: 4
     flash_attention: true
     thinking_mode: true
     cache_type: q8_0

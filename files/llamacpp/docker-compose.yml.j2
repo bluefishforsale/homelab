@@ -44,10 +44,16 @@ services:
       - "/models/{{ llamacpp_active_model }}"
       - "--n-gpu-layers"
       - "-1"
+      # Four slots sharing one KV pool, so mem0, AxiomD, and Open WebUI stop
+      # queueing behind each other's long thinking runs. Unified means any one
+      # slot can still use the whole pool, which a 60k-token eval answer needs.
+      # Only 16 of 64 layers hold KV, so 128K of q8_0 is ~4GB on top of the
+      # ~17.4GB in use with one 32K slot.
       - "--ctx-size"
-      - "32768"
+      - "131072"
       - "--parallel"
-      - "1"
+      - "4"
+      - "--kv-unified"
       - "--batch-size"
       - "2048"
       - "--ubatch-size"
