@@ -23,6 +23,7 @@ services:
       - "{{ tautulli_port }}:8181"
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config:/config
       - {{ plex_logs }}:/logs:ro
       - /etc/localtime:/etc/localtime:ro
@@ -49,6 +50,8 @@ services:
 
   tautulli-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ exporter_service }}
     hostname: {{ exporter_service }}
     restart: unless-stopped

@@ -80,6 +80,7 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: all
       NVIDIA_VISIBLE_DEVICES: all
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /data01/complete:/media
       - $HOME_DIR/cache:/temp
       - $HOME_DIR/configs:/app/configs
@@ -111,6 +112,10 @@ cat >"$DCGM_DIR/docker-compose.yml" <<EOF
 services:
   dcgm-exporter:
     image: {{ dcgm_exporter_image }}
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: dcgm-exporter
     restart: unless-stopped
     privileged: true

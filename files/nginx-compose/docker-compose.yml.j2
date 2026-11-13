@@ -15,6 +15,7 @@ services:
       - "443:443"
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ home }}/conf.d:/etc/nginx/conf.d:ro
       - {{ home }}/html:/usr/share/nginx/html:ro

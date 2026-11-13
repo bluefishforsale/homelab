@@ -12,6 +12,7 @@ services:
       - "{{ terminalbench_llamacpp_port }}:8080"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # Shared model files, read-only — never writes into the production llamacpp dir.
       - /data01/services/llamacpp/models:/models:ro
 

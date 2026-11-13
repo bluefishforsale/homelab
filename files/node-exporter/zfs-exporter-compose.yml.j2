@@ -3,6 +3,8 @@ version: '3.8'
 services:
   zfs-exporter:
     image: {{ zfs_exporter_image }}:{{ zfs_exporter_version }}
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ zfs_exporter_service }}
     hostname: {{ inventory_hostname }}
     restart: unless-stopped
@@ -21,6 +23,7 @@ services:
     
     # Mount host filesystem for ZFS monitoring
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /proc:/proc:ro
       - /sys:/sys:ro
     

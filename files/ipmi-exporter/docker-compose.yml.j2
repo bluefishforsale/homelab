@@ -20,6 +20,7 @@ services:
     ports:
       - "{{ exporter_port }}:9290"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config.yml:/config.yml:ro
     command: ["--config.file=/config.yml"]
     # The landing page, not /metrics: /metrics runs the slow freeipmi collection.

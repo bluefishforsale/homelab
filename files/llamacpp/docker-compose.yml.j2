@@ -24,6 +24,7 @@ services:
       - "{{ port }}:{{ port }}"
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/models:/models
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs

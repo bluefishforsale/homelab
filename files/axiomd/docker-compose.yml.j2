@@ -10,11 +10,13 @@ services:
     restart: "no"
     command: ["ops", "--state-dir", "/state"]
     environment:
+      TZ: America/Los_Angeles
       AXIOMD_APP_CLIENT_ID: "{{ axiomd.github_app.client_id }}"
       LLAMA_API_KEY: "{{ llama_api_key }}"
       AXIOMD_APP_PRIVATE_KEY: |
         {{ axiomd.github_app.private_key | trim | indent(8) }}
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/state:/state
     logging:
       driver: journald

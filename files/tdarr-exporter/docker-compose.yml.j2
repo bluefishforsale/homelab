@@ -6,9 +6,12 @@ services:
   tdarr-exporter:
     build: .
     image: "{{ image }}"
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: "{{ service }}"
     hostname: "{{ service }}"
     environment:
+      TZ: America/Los_Angeles
       TDARR_URL: "{{ tdarr_url }}"
       TDARR_EXPORTER_PORT: "{{ tdarr_exporter_port }}"
       TDARR_DURATION_WINDOW_HOURS: "{{ tdarr_duration_window_hours }}"

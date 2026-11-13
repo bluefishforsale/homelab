@@ -21,6 +21,7 @@ services:
       - "8096:8096/tcp"  # Jellyfin HTTP UI/API
       - "8920:8920/tcp"  # Jellyfin HTTPS (optional)
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ jellyfin_home }}/config:/config
       - {{ jellyfin_home }}/cache:/cache
       - {{ complete }}/tv:/media/tv
@@ -49,10 +50,12 @@ services:
     restart: unless-stopped
     shm_size: '1gb'
     environment:
+      TZ: America/Los_Angeles
       POSTGRES_USER: {{ jellystat_db_user }}
       POSTGRES_PASSWORD: {{ jellystat_db_password }}
       POSTGRES_DB: {{ jellystat_db_name }}
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ jellyfin_home }}/jellystat-db-data:/var/lib/postgresql/data
     deploy:
       resources:
@@ -81,6 +84,7 @@ services:
       JWT_SECRET: "{{ jellystat_jwt_secret }}"
       TZ: America/Los_Angeles
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ jellyfin_home }}/jellystat-backup-data:/app/backend/backup-data
     ports:
       - "{{ jellystat_port }}:3000"
@@ -105,10 +109,13 @@ services:
 
   jellyfin-exporter:
     image: {{ jellyfin_exporter_image }}:{{ jellyfin_exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ jellyfin_exporter_service }}
     hostname: {{ jellyfin_exporter_service }}
     restart: always
     environment:
+      TZ: America/Los_Angeles
       JELLYFIN_BASEURL: "http://{{ ansible_default_ipv4.address }}:8096"
       JELLYFIN_APIKEY: "{{ jellyfin_exporter_api_key }}"
     ports:

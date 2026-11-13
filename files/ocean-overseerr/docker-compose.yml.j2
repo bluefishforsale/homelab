@@ -12,6 +12,7 @@ services:
     ports:
       - "{{ port }}:5055"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config:/app/config
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:5055/api/v1/status || exit 1"]

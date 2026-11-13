@@ -8,9 +8,12 @@
 services:
   nut-exporter:
     image: "registry-cache.home:5002/druggeri/nut_exporter:{{ nut_exporter_version }}"
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: "{{ service }}"
     hostname: "{{ service }}"
     environment:
+      TZ: America/Los_Angeles
       NUT_EXPORTER_SERVER: "{{ nut_server_host }}"
       NUT_EXPORTER_VARIABLES: "battery.charge,battery.runtime,battery.runtime.low,input.voltage,ups.load,ups.realpower.nominal,ups.status"
     ports:

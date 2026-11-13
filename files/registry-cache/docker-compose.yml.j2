@@ -12,6 +12,7 @@ services:
       - "5001:5000"
       - "5011:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/docker-hub.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/docker-hub:/var/lib/registry
     environment:
@@ -37,6 +38,7 @@ services:
       - "5002:5000"
       - "5012:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/ghcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/ghcr:/var/lib/registry
     environment:
@@ -62,6 +64,7 @@ services:
       - "5003:5000"
       - "5013:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/gitlab.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/gitlab:/var/lib/registry
     environment:
@@ -87,6 +90,7 @@ services:
       - "5004:5000"
       - "5014:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/nvcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/nvcr:/var/lib/registry
     environment:
@@ -112,6 +116,7 @@ services:
       - "5005:5000"
       - "5015:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/ghcr-private.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/ghcr-private:/var/lib/registry
       - {{ home }}/auth/ghcr-private.htpasswd:/auth/htpasswd:ro
@@ -138,6 +143,7 @@ services:
       - "5006:5000"
       - "5016:5001"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/gcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/gcr:/var/lib/registry
     environment:
@@ -157,9 +163,12 @@ services:
   # ── Promtail (Loki Log Collector) ──────────────────────────────────────
   promtail:
     image: grafana/promtail:latest
+    environment:
+      TZ: America/Los_Angeles
     container_name: registry-cache-promtail
     restart: unless-stopped
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/log/journal:/var/log/journal:ro
       - /run/log/journal:/run/log/journal:ro
