@@ -27,7 +27,7 @@ The host is `registry-cache-01` (192.168.1.30, node005), in both `[vms]` and
 |---|---|---|
 | terraform-root `lan/proxmox-node005-vms.tf` (`registry_cache_01`) | node005 | VM 7000 `registry-cache-01`, cloned from template 9999: 2 cores, 2048 MB, scsi0 grown `+192G`, onboot, static IP (dig of `registry-cache-01.home`, else 192.168.1.30), single nameserver 192.168.1.2. CPU, memory and network are only set when the VM is not running. |
 | `infrastructure/registry_cache.yaml` | `registry_cache` | Installs Docker inline (not via `docker_ce.yaml`), renders `daemon.json`, the six registry configs and the ghcr-private htpasswd, compose file, promtail config and `registry-cache.service`, plus the cache-size metric script and timer. State under `/data01/services/registry-cache/{config,data/<upstream>}`. |
-| `.github/workflows/deploy-registry-cache.yml` | runner | `workflow_dispatch` or `repository_dispatch: deploy-registry-cache`; runs `registry_cache.yaml`. Own concurrency group `deploy-registry-cache`, not `deploy-ocean`. |
+| `.github/workflows/deploy-registry-cache.yml` | runner | `workflow_dispatch` or `repository_dispatch: deploy-registry-cache`; runs `registry_cache.yaml`. Holds `deploy-ocean` like every fleet deploy. |
 | `infrastructure/docker_ce.yaml` | `all:!github_runners`, `serial: 1` | Renders `files/docker/daemon.json.j2` on every other docker host, which is where the mirror line comes from. |
 
 `/data01` on this VM is a plain local directory. The host is not in
