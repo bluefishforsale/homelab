@@ -442,6 +442,8 @@ scrape_configs:
         # the only signal they are actually serving. /docs is mem0's one
         # unauthenticated route; it is served by the same app as /memories.
         - http://ocean.home:8888/docs
+        # The gateway nginx in front of mem0 on harbor, origin for mem0.terrac.com.
+        - http://harbor.home:8767/docs
         # netboot01's nginx serves netboot images and role bundles to PXE clients.
         - http://netboot01.home/healthz
         # The exporter stays up while Lidarr is down, so up==0 cannot see it.

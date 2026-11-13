@@ -140,6 +140,7 @@ service_ports:
   mem0:
     api: 8888   # mem0 REST API (hooks, laptop over an ssh forward)
     mcp: 8766   # mem0-mcp-bridge, the MCP face agent harnesses connect to
+    gateway: 8767   # nginx in front of both, the origin for mem0.terrac.com (cloudflared on ocean)
 
   # =============================================================================
   # Media Services

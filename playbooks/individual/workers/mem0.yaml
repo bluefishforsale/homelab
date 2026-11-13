@@ -10,9 +10,10 @@
 # Runs on harbor, with Postgres on the passed-through 870 EVO and everything
 # else on harbor's local state disk. Clients still say ocean.home:8888 and
 # :8766; a TCP forwarder on ocean carries those to harbor, so no agent config
-# had to change. Reached over the LAN, or from off-site through an ssh
-# port-forward. Deliberately NOT on cloudflared: conversation memory is the most
-# personal data in the fleet and the CF edge terminates TLS.
+# had to change. Reached over the LAN, or from off-site at mem0.terrac.com: a
+# Cloudflare tunnel on ocean to the gateway nginx in this stack, behind an
+# Access service token. CF terminates TLS there and sees memory in the clear;
+# accepted on 2026-11-12 (see the compose header).
 #
 # The API image comes from GHCR, built and smoke-tested by the mem0 repo's
 # build-and-push workflow, which dispatches deploy-mem0 here on merge. The
@@ -205,8 +206,11 @@
       - "192.168.1.32:{{ service_ports.mem0.mcp }}"
       - "localhost:{{ service_ports.mem0.mcp }}"
       - "127.0.0.1:{{ service_ports.mem0.mcp }}"
+      # Through the tunnel and the gateway, which passes Host through.
+      - "mem0.terrac.com"
     port_api: "{{ service_ports.mem0.api }}"
     port_mcp: "{{ service_ports.mem0.mcp }}"
+    port_gateway: "{{ service_ports.mem0.gateway }}"
     # What gets pulled, and what mem0 actually calls. They differ because
     # ollama's thread count can only be set as a model parameter: it counts the
     # host's physical cores out of /proc/cpuinfo (not namespaced, not affinity
@@ -440,6 +444,14 @@
     - Reload systemd daemon
     - Restart mem0 service
 
+  - name: Write the gateway config
+    ansible.builtin.template:
+      src: "{{ files }}/gateway-nginx.conf.j2"
+      dest: "{{ home }}/gateway-nginx.conf"
+      mode: '0644'
+    notify:
+    - Restart mem0 service
+
   - name: Create docker-compose.yml
     ansible.builtin.template:
       src: "{{ files }}/docker-compose.yml.j2"
@@ -571,6 +583,15 @@
     delay: 10
     register: mem0_probe
     until: mem0_probe is succeeded
+
+  - name: Verify the API answers through the gateway
+    ansible.builtin.uri:
+      url: "http://{{ ansible_default_ipv4.address }}:{{ port_gateway }}/docs"
+      status_code: 200
+    retries: 6
+    delay: 5
+    register: gateway_probe
+    until: gateway_probe is succeeded
 
   handlers:
   - name: Reload systemd daemon
