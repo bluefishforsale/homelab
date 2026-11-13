@@ -287,8 +287,8 @@ jobs:
       - name: Detector unit tests
         run: bash .github/workflows/lib/detect-impacted-playbooks.test.sh
 
-      - name: Concurrency-group unit tests
-        run: bash .github/workflows/lib/resolve-concurrency-group.test.sh
+      - name: Deploy marker unit tests
+        run: bash .github/workflows/lib/deploy-marker.test.sh
 
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
