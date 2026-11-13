@@ -4,10 +4,15 @@
 # rewrite of the existing facts, not an append, so two instances fed the same
 # input produce different rows with different ids and can never be reconciled.
 #
-# Published on the LAN address only. Off-network access is an ssh port-forward
-# to {{ ansible_default_ipv4.address }}:{{ port_api }}, deliberately not a
-# cloudflared ingress: memory contents are the most personal data in the fleet
-# and CF terminates TLS at its edge.
+# Published on the LAN address only. Off-network clients come in through
+# mem0.terrac.com: Cloudflare tunnel to the gateway below, gated by an Access
+# service token, with mem0's own keys still required behind it.
+#
+# NOTE: Cloudflare terminates TLS at its edge, so it sees memory contents in
+# the clear. That was the reason this stayed off cloudflared behind an ssh
+# forward until 2026-11-12; terrac chose the tunnel anyway, for clients that
+# need no ssh. The backout is the ssh forward to :{{ port_api }}, which still
+# works because the LAN ports are unchanged.
 services:
   mem0:
     # Built and smoke-tested by the mem0 repo's build-and-push workflow, which
@@ -206,3 +211,41 @@ services:
       driver: journald
       options:
         tag: "{{ service }}-bridge"
+
+  # Off-LAN front door: cloudflared on ocean routes mem0.terrac.com here, behind
+  # a Cloudflare Access service token. /mcp goes to the bridge, the rest to the
+  # API. Both still demand their own keys.
+  gateway:
+    image: nginx:stable-alpine
+    container_name: {{ service }}-gateway
+    hostname: gateway
+    restart: unless-stopped
+
+    volumes:
+      - {{ home }}/gateway-nginx.conf:/etc/nginx/nginx.conf:ro
+
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ port_gateway }}:80"
+
+    # nginx resolves both upstreams at startup and exits if either is missing.
+    depends_on:
+      mem0:
+        condition: service_healthy
+      bridge:
+        condition: service_healthy
+
+    # End to end: a pass means the API answered through this hop.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/docs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    cpus: '0.5'
+    mem_limit: 64m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-gateway"

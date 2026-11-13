@@ -1,0 +1,46 @@
+# Rendered by playbooks/individual/workers/mem0.yaml. One front door for
+# off-LAN clients: cloudflared on ocean sends mem0.terrac.com here, Cloudflare
+# Access has already checked the service token, and mem0's own keys are still
+# required behind it (X-API-Key for the API, the bearer token for /mcp).
+# LAN clients keep using :{{ port_api }} and :{{ port_mcp }} directly.
+worker_processes 1;
+
+events {
+  worker_connections 256;
+}
+
+http {
+  access_log /dev/stdout;
+  error_log /dev/stderr warn;
+  client_max_body_size 8m;
+
+  # The MCP bridge holds streamable-HTTP sessions open between calls and streams
+  # SSE, so nothing is buffered and idle reads wait an hour.
+  proxy_http_version 1.1;
+  proxy_buffering off;
+  proxy_read_timeout 1h;
+  proxy_send_timeout 1h;
+  proxy_connect_timeout 5s;
+  # The bridge's DNS-rebinding check matches this Host against
+  # mem0_bridge_allowed_hosts, so it passes through untouched.
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto https;
+
+  server {
+    listen 80;
+
+    location = /healthz {
+      access_log off;
+      return 200 "ok\n";
+    }
+
+    location /mcp {
+      proxy_pass http://bridge:8766;
+    }
+
+    location / {
+      proxy_pass http://{{ service }}:8000;
+    }
+  }
+}
