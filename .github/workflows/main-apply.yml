@@ -51,11 +51,14 @@ jobs:
       playbook-count: ${{ steps.find-playbooks.outputs.count }}
       targets: ${{ steps.find-playbooks.outputs.targets }}
       concurrency-group: ${{ steps.find-playbooks.outputs.concurrency-group }}
+      head-sha: ${{ steps.find-playbooks.outputs.head-sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # Need previous commit for diff
+          # Full history plus the `deployed` branch, so the diff can start at
+          # the last clean deploy rather than one commit back.
+          fetch-depth: 0
 
       - name: Install Python deps
         # pyyaml powers the detector's service_ports key-diff; without it the
@@ -79,20 +82,27 @@ jobs:
             echo "$CHANGED_FILES"
             echo ""
             PLAYBOOK_JSON=$(echo "$CHANGED_FILES" | jq -R . | jq -s -c .)
+            CONCURRENCY_GROUP=$(echo "$PLAYBOOK_JSON" \
+              | bash .github/workflows/lib/resolve-concurrency-group.sh)
           else
-            echo "Detecting changed files in last commit..."
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            # Diff from the last clean deploy, not HEAD~1: a run that was
+            # cancelled while pending, or failed, leaves its changes for this
+            # one to pick up instead of losing them.
+            BASE=$(bash .github/workflows/lib/deploy-base.sh HEAD)
+            echo "Detecting changed files in $BASE..HEAD"
+            CHANGED_FILES=$(git diff --name-only "$BASE" HEAD)
             echo "Changed files:"
             echo "$CHANGED_FILES"
             echo ""
             PLAYBOOK_JSON=$(echo "$CHANGED_FILES" \
-              | bash .github/workflows/lib/detect-impacted-playbooks.sh)
+              | DETECT_BASE="$BASE" bash .github/workflows/lib/detect-impacted-playbooks.sh)
+            # NOTE: every push deploy shares one group. The `deployed` marker
+            # assumes push applies never overlap; per-host groups let two run
+            # at once and a stale one land last.
+            CONCURRENCY_GROUP=deploy-ocean
           fi
 
           COUNT=$(echo "$PLAYBOOK_JSON" | jq 'length')
-
-          CONCURRENCY_GROUP=$(echo "$PLAYBOOK_JSON" \
-            | bash .github/workflows/lib/resolve-concurrency-group.sh)
 
           # Health-check target derivation (preserves the existing targets output)
           TARGETS="[]"
@@ -113,6 +123,7 @@ jobs:
           echo "playbooks=$PLAYBOOK_JSON" >> "$GITHUB_OUTPUT"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "concurrency-group=$CONCURRENCY_GROUP" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
           if [[ "$COUNT" -gt 0 ]]; then
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
@@ -129,6 +140,9 @@ jobs:
       group: ${{ needs.detect-changes.outputs.concurrency-group }}
       cancel-in-progress: false
     environment: Github Actions CI
+    # Write is for one thing: fast-forwarding the `deployed` branch.
+    permissions:
+      contents: write
     outputs:
       total: ${{ steps.apply.outputs.total }}
       passed: ${{ steps.apply.outputs.passed }}
@@ -136,6 +150,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Apply the branch tip as it is now, not the commit that triggered
+          # this run. A run that waited in the queue would otherwise render
+          # older templates over a newer deploy (#1510 reverted mem0 this way).
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
 
       - name: Install Ansible
         run: |
@@ -185,7 +205,8 @@ jobs:
           echo "Applying playbooks to production infrastructure"
           echo "================================================"
           echo ""
-          echo "Commit: ${{ github.sha }}"
+          echo "Detected at: ${{ needs.detect-changes.outputs.head-sha }}"
+          echo "Applying tree: $(git rev-parse HEAD)"
           echo "Author: $COMMIT_AUTHOR"
           echo "Message: $COMMIT_MESSAGE"
           echo ""
@@ -199,6 +220,10 @@ jobs:
 
           # Apply each playbook
           for PLAYBOOK in $(echo "$PLAYBOOKS" | jq -r '.[]'); do
+            if [ ! -f "$PLAYBOOK" ]; then
+              echo "Skipping $PLAYBOOK: gone from the current tip"
+              continue
+            fi
             TOTAL=$((TOTAL + 1))
             echo "========================================"
             echo "Applying: $PLAYBOOK"
@@ -263,6 +288,10 @@ jobs:
           else
             echo "✅ All playbooks applied successfully"
           fi
+
+      - name: Mark deployed
+        if: success() && github.event_name == 'push'
+        run: bash .github/workflows/lib/mark-deployed.sh "${{ needs.detect-changes.outputs.head-sha }}"
 
       - name: Cleanup vault password
         if: always()

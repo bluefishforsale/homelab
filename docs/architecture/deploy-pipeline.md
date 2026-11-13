@@ -20,7 +20,7 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 
 | Workflow | Trigger | What it owns | Concurrency group |
 |---|---|---|---|
-| `main-apply.yml` | push to master (path filter), dispatch with a playbook list | The only push-time apply. `detect-changes` runs the detector (`:89`) and the resolver (`:95`); `apply-playbooks` runs each playbook and fails if any failed; `verify-deployment` probes after. Dispatch input bypasses the detector and its exclusions (`:70-82`). | resolved per run, job level (`:127-130`) |
+| `main-apply.yml` | push to master (path filter), dispatch with a playbook list | The only push-time apply. On push, `detect-changes` diffs from the `deployed` branch (`lib/deploy-base.sh`) to the pushed commit and runs the detector; `apply-playbooks` checks out the tip of master, runs each playbook, fails if any failed, and on a clean push run fast-forwards `deployed` (`lib/mark-deployed.sh`); `verify-deployment` probes after. Dispatch input bypasses the detector and its exclusions and leaves `deployed` alone. | push: `deploy-ocean`; dispatch: resolved per run |
 | `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
 | `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml`, an ocean play. | `deploy-ocean` |
 | `deploy-netboot-images.yml` | `repository_dispatch` `deploy-netboot-images` | `infrastructure/netboot_image.yaml` with image and sha. Excluded from push detection. | `deploy-netboot` |
@@ -36,7 +36,9 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 
 ## Concurrency
 
-GitHub matches concurrency groups as exact strings. main-apply derives its group
+GitHub matches concurrency groups as exact strings. Every main-apply push run
+holds `deploy-ocean`, because the `deployed` marker assumes push applies never
+overlap. A dispatched main-apply derives its group
 with `lib/resolve-concurrency-group.sh`: the first `hosts:` line of each playbook
 (`:31-36`), `all` if there is none (`:38`), sorted and joined with `-` (`:48-49`).
 So a homepage edit gets `deploy-ocean` and queues behind a `deploy-paia` run,
@@ -55,7 +57,9 @@ ocean dispatch workflows, even when it lands on ocean:
 
 `cancel-in-progress: false` everywhere. A GitHub concurrency group
 holds one running and one pending run, and a newer pending run cancels the older
-pending one, so three quick dispatches to ocean drop the middle one.
+pending one, so three quick dispatches to ocean drop the middle one. A cancelled
+main-apply push run loses nothing: its commits are still past `deployed`, so the
+next push run applies them. A cancelled dispatch is still gone.
 
 ## Vault password
 

@@ -109,8 +109,16 @@ These bite every agent that doesn't know them up front:
   still reports the job green. For real health verification use `health-check.yml`
   (exits 1 on unhealthy), the `scripts/*-check.sh` tools, or `scripts/homelab-health.sh`
   (fleet-wide diff).
-- **Squash-merge only.** `main-apply` detects impact via `git diff HEAD~1 HEAD`, which
-  assumes one commit per merge.
+- **Squash-merge only.** Keeps one commit per merge, which is what the rest of the
+  tooling (rollback's `HEAD~1`, the deploy summary) assumes.
+- **A push deploy applies master as it is now, and covers everything since the last
+  clean deploy.** `main-apply` diffs from the `deployed` branch (moved forward only
+  after an apply with no failures) to the pushed commit, and the apply job checks out
+  the tip of master rather than the pushed commit. So a run that waited in the queue
+  can't render older templates over a newer deploy, and a run cancelled while
+  pending, or one that failed, has its changes picked up by the next push. Every push
+  deploy holds `deploy-ocean`. Don't move or delete `deployed` by hand; if it is
+  ever off master's history the diff falls back to one commit.
 - **Deploy path filter.** `main-apply` runs only on `playbooks/**`, `files/**`,
   `roles/**`, `vars/**/*.yaml` and `group_vars/**`. CI (`ci-validate.yml`) covers most
   of those plus `vault/**` and `.github/workflows/**`, but not `group_vars/**`, so a
