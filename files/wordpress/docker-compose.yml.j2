@@ -84,7 +84,7 @@ services:
       - wordpress_internal
 
   wordpress-db:
-    image: mariadb:10.11
+    image: registry-cache.home:5001/library/mariadb:10.11
     container_name: {{ service }}_db
     hostname: wordpress-db
     restart: always
