@@ -144,12 +144,12 @@
       - ponytail@ponytail
 
     agentbox_mcp_servers:
-      # Fleet memory (playbooks/individual/ocean/ai/mem0.yaml). One store for
-      # every lane and the laptop, so a decision recorded in one place is
-      # visible from the others. Port hardcoded rather than read from
+      # Fleet memory (playbooks/individual/workers/mem0.yaml, on harbor). One
+      # store for every lane and the laptop, so a decision recorded in one place
+      # is visible from the others. Port hardcoded rather than read from
       # vars_service_ports so a port bump there doesn't redeploy agentbox.
       - name: mem0
-        url: "http://ocean.home:8766/mcp"
+        url: "http://harbor.home:8766/mcp"
         headers:
           Authorization: "Bearer {{ ai_services.mem0.bridge_token }}"
 

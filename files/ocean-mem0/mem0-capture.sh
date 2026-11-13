@@ -8,7 +8,7 @@
 # as described in the fleet documentation
 
 # Echo a message to indicate the hook is present
-echo "mem0-capture.sh hook present - configure on laptop side to forward to ocean.home:8888"
+echo "mem0-capture.sh hook present - configure on laptop side to reach https://mem0.terrac.com"
 
 # Exit successfully to avoid alerting about missing hook
 exit 0
