@@ -19,8 +19,8 @@
 
   vars:
     service: ml-log-analyzer
-    detector_image: ghcr.io/bluefishforsale/ml-log-analyzer-detector
-    processor_image: ghcr.io/bluefishforsale/ml-log-analyzer-processor
+    detector_image: registry-cache.home:5005/bluefishforsale/ml-log-analyzer-detector
+    processor_image: registry-cache.home:5005/bluefishforsale/ml-log-analyzer-processor
     version: latest
     files: "{{ playbook_dir }}/../../../files/ml-log-analyzer"
     home: "/data01/services/{{ service }}"
@@ -37,9 +37,11 @@
       that: state_mount.stdout == 'ext4'
       fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
 
-  - name: Log harbor into GHCR to pull the private images
+  # Through ghcr-private-cache, so the read:packages token stays on
+  # registry-cache-01 (#1511).
+  - name: Log harbor into ghcr-private-cache to pull the private images
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     no_log: true
     changed_when: false
 
