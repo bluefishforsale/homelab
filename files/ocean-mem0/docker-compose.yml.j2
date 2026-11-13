@@ -227,7 +227,7 @@ services:
     ports:
       - "{{ ansible_default_ipv4.address }}:{{ port_gateway }}:80"
 
-    # nginx resolves both upstreams at startup and exits if either is missing.
+    # Started after both upstreams are healthy, so the first requests land.
     depends_on:
       mem0:
         condition: service_healthy
