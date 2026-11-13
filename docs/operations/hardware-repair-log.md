@@ -41,6 +41,13 @@ Rows 1 to 14 were reconstructed on 2026-11-10 from `zpool history data01`, the P
 |---|---|---|---|---|---|
 | 1 | 2026-11-11 | APC Back-UPS XS 1500M / 3B2116X60175 | GoldenMate 2000VA/1600W LiFePO4 UPS, 8 outlets, 460Wh, AVR / `J6D525D41E6BE384041:23` (USB `075d:0300`, reports as `-BMS- Smart-Battery`) | GoldenMate Energy `#9496`, $759.00 | Ordered 2026-11-07. Fleet power-cycled to install it. The old unit carried the lightest load of the three (15% average of 900W). NUT reads it with usbhid-ups. On mains `battery.runtime` is a fixed 599940s; on battery it estimates (4260s at 99% in a pull-the-plug test, which also showed `OB DISCHRG`). LB at 300s runtime or 20% charge, whichever first (`nut_ups.yaml`). |
 
+## node005 parts (Dell R630)
+
+| # | Date (PT) | Removed: model / serial | Installed: model / serial | Vendor, order, unit price | Notes |
+|---|---|---|---|---|---|
+| 1 | 2026-11-13 | n/a | 4 x Micron `MTA36ASF4G72PZ-2G3A1` 32 GB DDR4-2400 RDIMM 2Rx4 / A3 `112C11D9`, A4 `112C1153`, B3 `112C1145`, B4 `112C113C` | eBay, order unknown, $125 ($500 for the lot of 4, best offer) | 128 GB to 256 GB. Fills the last empty white slot on each channel, so all 8 channels have one stick. Runs at 2400 MT/s next to the Hynix `HMA84GR7MFR4N-UH` in A1, A2, B1, B2 (`dmidecode -t 17` after boot). Serials read from `dmidecode`. iDRAC kept showing 128 GB after POST; the OS saw 256 GB. |
+| 2 | 2026-11-13 | Samsung 980 1TB NVMe / S64ANS0T211289W (PCIe slot 1 riser) | n/a | n/a | Removed in the same lid-off window. Unused since its 26 minutes as `vmpool` SLOG on 2025-12-15, 55% worn, ran hot. Gone from `lspci` after boot. |
+
 ## FARM vs SMART power-on hours (2026-11-10)
 
 Every disk in the pool arrived with its SMART counters reset. FARM keeps the real lifetime.
