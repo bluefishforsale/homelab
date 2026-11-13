@@ -441,7 +441,7 @@ scrape_configs:
         # Homelab services that expose no metrics of their own, so a probe is
         # the only signal they are actually serving. /docs is mem0's one
         # unauthenticated route; it is served by the same app as /memories.
-        - http://ocean.home:8888/docs
+        - http://harbor.home:8888/docs
         # The gateway nginx in front of mem0 on harbor, origin for mem0.terrac.com.
         - http://harbor.home:8767/docs
         # netboot01's nginx serves netboot images and role bundles to PXE clients.
@@ -746,7 +746,11 @@ scrape_configs:
     scrape_interval: 30s
     static_configs:
       - targets:
-        - http://ocean.home:8766/mcp
+        - http://harbor.home:8766/mcp
+        # mem0.terrac.com end to end: Cloudflare, ocean's cloudflared, harbor's
+        # gateway. Without the service token Access answers 403, which proves
+        # the tunnel and the hostname are up without the probe holding a secret.
+        - https://mem0.terrac.com/mcp
         labels:
           probe_type: "http"
           category: "homelab_services"

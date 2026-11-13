@@ -8,9 +8,8 @@
 # merged back. One writer on harbor, everything else is a client.
 #
 # Runs on harbor, with Postgres on the passed-through 870 EVO and everything
-# else on harbor's local state disk. Clients still say ocean.home:8888 and
-# :8766; a TCP forwarder on ocean carries those to harbor, so no agent config
-# had to change. Reached over the LAN, or from off-site at mem0.terrac.com: a
+# else on harbor's local state disk. LAN clients use harbor.home:8888 (API) and
+# :8766 (MCP). Off-site clients use mem0.terrac.com: a
 # Cloudflare tunnel on ocean to the gateway nginx in this stack, behind an
 # Access service token. CF terminates TLS there and sees memory in the clear;
 # accepted on 2026-11-12 (see the compose header).
@@ -197,11 +196,7 @@
     # client: agentbox's config pointed at a working service that could not
     # answer it. Naming the hosts opts into exactly these and no others.
     # Setting this REPLACES the SDK defaults, hence localhost is listed too.
-    # ocean's names stay: clients reach harbor through ocean's forwarder, which
-    # passes the Host header through untouched.
     mem0_bridge_allowed_hosts:
-      - "ocean.home:{{ service_ports.mem0.mcp }}"
-      - "192.168.1.143:{{ service_ports.mem0.mcp }}"
       - "harbor.home:{{ service_ports.mem0.mcp }}"
       - "192.168.1.32:{{ service_ports.mem0.mcp }}"
       - "localhost:{{ service_ports.mem0.mcp }}"
@@ -603,22 +598,14 @@
       name: mem0.service
       state: restarted
 
-# Last, so clients point at a live harbor before ocean's ports are taken over.
-- name: Forward ocean's mem0 addresses to harbor
+# Last, so ocean is cleaned up only after harbor is serving.
+- name: Clear mem0 off ocean
   hosts: ocean
   become: true
-  gather_facts: true
-
-  vars_files:
-    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
+  gather_facts: false
 
   vars:
-    service: mem0-forward
-    home: "/data01/services/{{ service }}"
-    files: "{{ playbook_dir }}/../../../files/ocean-mem0"
-    port_api: "{{ service_ports.mem0.api }}"
-    port_mcp: "{{ service_ports.mem0.mcp }}"
-    upstream: "{{ hostvars['harbor'].ansible_ssh_host }}"
+    forward_home: /data01/services/mem0-forward
 
   tasks:
   # The handoff already stopped these; this catches a rerun after a manual start
@@ -659,48 +646,32 @@
       - .mem0-llm-probe-stamp
       - .mem0-llm-probe-value
 
-  - name: Ensure the forwarder dir exists
-    ansible.builtin.file:
-      path: "{{ home }}"
-      state: directory
-      mode: '0755'
-
-  - name: Write the forwarder config
-    ansible.builtin.template:
-      src: "{{ files }}/forward-nginx.conf.j2"
-      dest: "{{ home }}/nginx.conf"
-      mode: '0644'
-    register: forward_conf
-
-  - name: Write the forwarder compose file
-    ansible.builtin.template:
-      src: "{{ files }}/forward-compose.yml.j2"
-      dest: "{{ home }}/docker-compose.yml"
-      mode: '0644'
+  # ocean carried ocean.home:8888 and :8766 to harbor while clients still said
+  # ocean. LAN clients say harbor.home now and the laptop uses mem0.terrac.com,
+  # so the forwarder goes.
+  - name: Read the forwarder's compose file
+    ansible.builtin.stat:
+      path: "{{ forward_home }}/docker-compose.yml"
     register: forward_compose
 
-  - name: Start the forwarder
+  - name: Stop the forwarder
     ansible.builtin.command:
-      cmd: "docker compose up -d {{ '--force-recreate' if (forward_conf.changed or forward_compose.changed) else '' }}"
-      chdir: "{{ home }}"
+      cmd: docker compose down
+      chdir: "{{ forward_home }}"
     environment:
-      COMPOSE_PROJECT_NAME: "{{ service }}"
-    register: forward_up
-    changed_when: "'Started' in forward_up.stderr or 'Recreated' in forward_up.stderr or 'Created' in forward_up.stderr"
+      COMPOSE_PROJECT_NAME: mem0-forward
+    when: forward_compose.stat.exists
+    changed_when: true
 
-  - name: Verify mem0 answers through ocean
-    ansible.builtin.uri:
-      url: "http://{{ ansible_default_ipv4.address }}:{{ port_api }}/docs"
-      status_code: 200
-    retries: 6
-    delay: 5
-    register: forward_probe
-    until: forward_probe is succeeded
+  - name: Remove the forwarder dir
+    ansible.builtin.file:
+      path: "{{ forward_home }}"
+      state: absent
 
   # ocean's copy was the backout while harbor proved itself. harbor has served
-  # since 2026-11-11, backs up to GCS (mem0-postgres/, mem0/), and just answered
-  # through the forwarder above, so the copy and the old bridge clone go. Only
-  # once harbor holds the migrated store and no mem0 container runs here.
+  # since 2026-11-11 and backs up to GCS (mem0-postgres/, mem0/), so the copy and
+  # the old bridge clone go. Only once harbor holds the migrated store and no
+  # mem0 container runs here.
   - name: Read harbor's migration marker
     ansible.builtin.stat:
       path: /data01/services/mem0/.migrated-from-ocean
