@@ -10,7 +10,11 @@
 
   vars:
     fail2ban_exporter_service: fail2ban-exporter
-    fail2ban_exporter_image: registry.gitlab.com/hctrdev/fail2ban-prometheus-exporter
+    # NOTE: registry-cache-01 pulls upstream so a dead cache cannot take its own
+    # monitoring down with it, and gh-runner-01's dockerd has no
+    # insecure-registries. Every other host pulls through the cache.
+    image_upstream: "{{ inventory_hostname in groups['registry_cache'] + groups['github_runners'] }}"
+    fail2ban_exporter_image: "{{ 'registry.gitlab.com' if image_upstream | bool else 'registry-cache.home:5003' }}/hctrdev/fail2ban-prometheus-exporter"
     fail2ban_exporter_version: latest
     fail2ban_exporter_port: "{{ service_ports.fail2ban_exporter.port }}"
     fail2ban_exporter_home: "/var/lib/services/{{ fail2ban_exporter_service }}"

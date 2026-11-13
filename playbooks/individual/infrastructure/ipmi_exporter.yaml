@@ -15,7 +15,7 @@
     service: ipmi-exporter
     home: "/data01/services/{{ service }}"
     files: "{{ playbook_dir }}/../../../files/{{ service }}"
-    docker_image: "prometheuscommunity/ipmi-exporter"
+    docker_image: "registry-cache.home:5001/prometheuscommunity/ipmi-exporter"
     docker_tag: "latest"
     exporter_port: 9290
     compose_dir: "/opt/compose/{{ service }}"

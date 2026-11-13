@@ -20,7 +20,7 @@
     service: pve-exporter
     home: "/data01/services/{{ service }}"
     files: "{{ playbook_dir }}/../../../files/{{ service }}"
-    docker_image: "prompve/prometheus-pve-exporter"
+    docker_image: "registry-cache.home:5001/prompve/prometheus-pve-exporter"
     docker_tag: "latest"
     exporter_port: 9221
     compose_dir: "/opt/compose/{{ service }}"
