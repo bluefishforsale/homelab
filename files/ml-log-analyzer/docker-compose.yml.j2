@@ -4,7 +4,7 @@
 # their keys never collide.
 services:
   detector-redis:
-    image: redis:7-alpine
+    image: registry-cache.home:5001/library/redis:7-alpine
     container_name: {{ service }}-detector-redis
     restart: unless-stopped
     user: "999:999"
@@ -52,7 +52,7 @@ services:
         tag: "{{ service }}-detector"
 
   postgres:
-    image: postgres:16-alpine
+    image: registry-cache.home:5001/library/postgres:16-alpine
     container_name: {{ service }}-postgres
     restart: unless-stopped
     environment:
@@ -73,7 +73,7 @@ services:
         tag: "{{ service }}-postgres"
 
   processor-redis:
-    image: redis:7-alpine
+    image: registry-cache.home:5001/library/redis:7-alpine
     container_name: {{ service }}-processor-redis
     restart: unless-stopped
     command: >
