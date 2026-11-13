@@ -53,10 +53,10 @@
 
   vars:
     service: nzbget
-    image: linuxserver/nzbget
+    image: registry-cache.home:5001/linuxserver/nzbget
     version: latest
     nzbget_port: "{{ service_ports.nzbget.port }}"
-    exporter_image: frebib/nzbget-exporter
+    exporter_image: registry-cache.home:5001/frebib/nzbget-exporter
     exporter_version: latest
     exporter_port: "{{ service_ports.nzbget_exporter.port }}"
     data: /data01
