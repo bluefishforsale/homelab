@@ -61,7 +61,7 @@
 
 - name: Create temporary container to extract schema
   ansible.builtin.command:
-    cmd: docker create --name pdns-temp powerdns/pdns-auth-49:latest
+    cmd: docker create --name pdns-temp {{ dns_reg_hub }}powerdns/pdns-auth-49:latest
   when: not pdns_db.stat.exists
 
 - name: Extract PowerDNS schema from container
