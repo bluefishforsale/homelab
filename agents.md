@@ -116,9 +116,14 @@ These bite every agent that doesn't know them up front:
   after an apply with no failures) to the pushed commit, and the apply job checks out
   the tip of master rather than the pushed commit. So a run that waited in the queue
   can't render older templates over a newer deploy, and a run cancelled while
-  pending, or one that failed, has its changes picked up by the next push. Every push
-  deploy holds `deploy-ocean`. Don't move or delete `deployed` by hand; if it is
-  ever off master's history the diff falls back to one commit.
+  pending, or one that failed, has its changes picked up by the next push. Only paths
+  in main-apply's push filter count, so an inventory or vault commit in the range
+  still deploys nothing. Every fleet deploy workflow holds `deploy-ocean`.
+  A playbook that keeps failing holds `deployed` back, and every push re-runs it until
+  it is fixed. Fix forward. If a change truly must be skipped, fast-forward the
+  marker past it by hand (`git push origin <sha>:refs/heads/deployed`; the remote
+  refuses anything but a fast-forward). If `deployed` is ever off master's history
+  the diff falls back to one commit.
 - **Deploy path filter.** `main-apply` runs only on `playbooks/**`, `files/**`,
   `roles/**`, `vars/**/*.yaml` and `group_vars/**`. CI (`ci-validate.yml`) covers most
   of those plus `vault/**` and `.github/workflows/**`, but not `group_vars/**`, so a
@@ -140,7 +145,7 @@ runs only those. The model is **explicit ownership**, not best-effort guessing:
   `service_ports.<key>` changed**, not the filename: a single port bump deploys only the
   service(s) referencing that key; a comment/format-only edit deploys nothing; if the
   key-diff can't be computed it falls back to every consumer. Needs `pyyaml` on the
-  runner (installed in the workflow) and the base commit (`fetch-depth: 2`).
+  runner (installed in the workflow) and the base commit (`fetch-depth: 0`).
 - **`roles/<role>/**`** → playbooks importing that role.
 - **`inventories/**`, `group_vars/all*`** → the ONLY inputs that replay the site-wide
   orchestrators (`01_base_system`, `02_core_infrastructure`, `03_ocean_services`).

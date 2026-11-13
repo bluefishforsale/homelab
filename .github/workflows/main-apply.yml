@@ -82,25 +82,29 @@ jobs:
             echo "$CHANGED_FILES"
             echo ""
             PLAYBOOK_JSON=$(echo "$CHANGED_FILES" | jq -R . | jq -s -c .)
-            CONCURRENCY_GROUP=$(echo "$PLAYBOOK_JSON" \
-              | bash .github/workflows/lib/resolve-concurrency-group.sh)
           else
             # Diff from the last clean deploy, not HEAD~1: a run that was
             # cancelled while pending, or failed, leaves its changes for this
             # one to pick up instead of losing them.
             BASE=$(bash .github/workflows/lib/deploy-base.sh HEAD)
             echo "Detecting changed files in $BASE..HEAD"
-            CHANGED_FILES=$(git diff --name-only "$BASE" HEAD)
+            # NOTE: keep this filter equal to on.push.paths. A wider range
+            # also holds commits that never triggered a deploy (inventory,
+            # vault); without it the next push would replay them, and an
+            # inventory edit replays the site orchestrators fleet-wide.
+            CHANGED_FILES=$(git diff --name-only "$BASE" HEAD \
+              | { grep -E '^(playbooks/.*\.ya?ml|files/|roles/|vars/.*\.yaml|group_vars/)' || true; })
             echo "Changed files:"
             echo "$CHANGED_FILES"
             echo ""
             PLAYBOOK_JSON=$(echo "$CHANGED_FILES" \
               | DETECT_BASE="$BASE" bash .github/workflows/lib/detect-impacted-playbooks.sh)
-            # NOTE: every push deploy shares one group. The `deployed` marker
-            # assumes push applies never overlap; per-host groups let two run
-            # at once and a stale one land last.
-            CONCURRENCY_GROUP=deploy-ocean
           fi
+
+          # NOTE: every fleet deploy workflow holds deploy-ocean. The
+          # `deployed` marker assumes applies never overlap, and per-host
+          # groups let two run on one host at once and a stale one land last.
+          CONCURRENCY_GROUP=deploy-ocean
 
           COUNT=$(echo "$PLAYBOOK_JSON" | jq 'length')
 
@@ -156,6 +160,9 @@ jobs:
           # older templates over a newer deploy (#1510 reverted mem0 this way).
           ref: ${{ github.ref_name }}
           fetch-depth: 0
+          # The write token stays out of .git/config while ansible runs; only
+          # the Mark deployed step gets it.
+          persist-credentials: false
 
       - name: Install Ansible
         run: |
@@ -291,7 +298,17 @@ jobs:
 
       - name: Mark deployed
         if: success() && github.event_name == 'push'
-        run: bash .github/workflows/lib/mark-deployed.sh "${{ needs.detect-changes.outputs.head-sha }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.detect-changes.outputs.head-sha }}
+        run: |
+          # Same header actions/checkout would have persisted, scoped to this
+          # step through env so it never lands in .git/config or argv.
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          bash .github/workflows/lib/mark-deployed.sh "$HEAD_SHA"
 
       - name: Cleanup vault password
         if: always()

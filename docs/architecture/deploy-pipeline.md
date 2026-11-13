@@ -24,36 +24,29 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 | `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
 | `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml`, an ocean play. | `deploy-ocean` |
 | `deploy-netboot-images.yml` | `repository_dispatch` `deploy-netboot-images` | `infrastructure/netboot_image.yaml` with image and sha. Excluded from push detection. | `deploy-netboot` |
-| `deploy-registry-cache.yml` | `repository_dispatch` `deploy-registry-cache` | `infrastructure/registry_cache.yaml`. | `deploy-registry-cache` |
+| `deploy-registry-cache.yml` | `repository_dispatch` `deploy-registry-cache` | `infrastructure/registry_cache.yaml`. | `deploy-ocean` |
 | `deploy-ocean-service.yml` | dispatch, service choice | Validate, `--check`, then apply one mapped playbook. | `deploy-ocean` |
-| `deploy-critical-service.yml` | dispatch, `dns` or `plex` | Same with a `critical-services` environment approval. dns runs `core/services/dns_ha_stack.yaml`. | `deploy-ocean` (plex), `deploy-dns_servers` (dns) |
+| `deploy-critical-service.yml` | dispatch, `dns` or `plex` | Same with a `critical-services` environment approval. dns runs `core/services/dns_ha_stack.yaml`. | `deploy-ocean` |
 | `deploy-services.yml` | dispatch, orchestrator choice | Runs `00_site` or `01`/`02`/`03` whole. | `deploy-ocean` |
 | `deploy-changed-services.yml` | dispatch, `base_ref` | Diffs `origin/<base_ref>...HEAD` (`:54`) and applies ocean playbooks. Older parallel detector. | `deploy-ocean` |
 | `rollback.yml` | dispatch | See Rollback. | `deploy-ocean` |
 | `decommission.yml` | dispatch | Report or apply a `playbooks/operations/decommission/<svc>.yaml`, then archive it with a `[skip ci]` push to master. Needs `contents: write`. | `deploy-ocean` |
 | `health-check.yml` | dispatch, `workflow_call` | Ocean, DNS and runner checks; exits 1 when unhealthy (`:291`). Nothing calls it today. | none |
-| `ci-validate.yml`, `pr-deploy.yml`, `pr-hygiene.yml` | push, PR | Syntax and lint only, plus the detector and resolver tests (`ci-validate.yml:288-294`). No apply. | none |
+| `ci-validate.yml`, `pr-deploy.yml`, `pr-hygiene.yml` | push, PR | Syntax and lint only, plus the detector and deploy marker tests. No apply. | none |
 
 ## Concurrency
 
-GitHub matches concurrency groups as exact strings. Every main-apply push run
-holds `deploy-ocean`, because the `deployed` marker assumes push applies never
-overlap. A dispatched main-apply derives its group
-with `lib/resolve-concurrency-group.sh`: the first `hosts:` line of each playbook
-(`:31-36`), `all` if there is none (`:38`), sorted and joined with `-` (`:48-49`).
-So a homepage edit gets `deploy-ocean` and queues behind a `deploy-paia` run,
-which is the case phase 1 was built for.
+Every workflow that applies to the fleet holds one group, `deploy-ocean`,
+main-apply included; only `deploy-netboot-images.yml` (`deploy-netboot`) keeps
+its own, since no push playbook targets netboot01. Fleet deploys therefore run
+one at a time. The name is historical.
 
-NOTE: anything that is not exactly `deploy-ocean` does not serialize with the
-ocean dispatch workflows, even when it lands on ocean:
-
-- a push spanning hosts (`deploy-dns-ocean`, `deploy-all-ocean`);
-- group names instead of hosts (`deploy-harbor` and `deploy-data01_workers`
-  both mean harbor);
-- multi-play playbooks keyed by their first play only (`workers/nzbget.yaml` is
-  ocean, then harbor, and resolves to `deploy-ocean`);
-- a site run (`deploy-services.yml` `00_site`) or a rollback, which holds
-  `deploy-ocean` but also touches the dns pair and the rest of the fleet.
+It used to be per host: main-apply derived `deploy-<first hosts:>` from each
+playbook. That let two runs touch one host at once whenever the keys differed
+(a push spanning hosts, `deploy-harbor` vs `deploy-data01_workers`, multi-play
+playbooks keyed by their first play), and let a run that started late render
+older templates over a newer deploy. The `deployed` marker also needs applies
+never to overlap.
 
 `cancel-in-progress: false` everywhere. A GitHub concurrency group
 holds one running and one pending run, and a newer pending run cancels the older
@@ -119,8 +112,7 @@ rerun as written: the runners play has since been excluded from push detection.
 
 ## Backout
 
-The detector and resolver are each one `bash` call in main-apply
-(`:89`, `:95`). Replacing the detector with an explicit playbook list, or the
-resolver output with a literal `deploy-ocean`, puts back the coarser behaviour
-without touching any playbook. Any single deploy can be redone with
+The detector is one `bash` call in main-apply. Replacing it with an explicit
+playbook list puts back the coarser behaviour without touching any playbook.
+Reverting the `deployed` marker change restores the one-commit diff. Any single deploy can be redone with
 `gh workflow run main-apply.yml -f playbooks=<path>`.
