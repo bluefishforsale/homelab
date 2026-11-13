@@ -12,11 +12,11 @@
 
   vars:
     service: prowlarr
-    image: lscr.io/linuxserver/prowlarr
+    image: registry-cache.home:5002/linuxserver/prowlarr
     version: latest
     prowlarr_port: "{{ service_ports.prowlarr.port }}"
     exporter_service: prowlarr-exporter
-    exporter_image: ghcr.io/onedr0p/exportarr
+    exporter_image: registry-cache.home:5002/onedr0p/exportarr
     exporter_version: latest
     exporter_port: "{{ service_ports.prowlarr_exporter.port }}"
     data: /data01

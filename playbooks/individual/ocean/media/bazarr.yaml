@@ -16,7 +16,7 @@
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
-    image: linuxserver/bazarr
+    image: registry-cache.home:5001/linuxserver/bazarr
     version: latest
     service: bazarr
     data: /data01
