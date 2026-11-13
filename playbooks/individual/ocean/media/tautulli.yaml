@@ -27,6 +27,39 @@
     user: media
     uid: "{{ system_users.media.uid }}"
     gid: "{{ system_users.media.gid }}"
+    # The config.ini keys this repo owns, each in the section Tautulli reads it
+    # from (plexpy/config.py). Everything else, auth and jwt_secret above all,
+    # belongs to Tautulli.
+    # NOTE: never manage http_username, http_password or jwt_secret here. Since
+    # v2.19 an empty password makes Tautulli generate a random one and rotate
+    # jwt_secret on start, which logs everyone out. The old whole-file template
+    # did exactly that on every deploy (2026-11-12). Login is Plex sign-in.
+    tautulli_settings:
+      - { section: General, option: api_enabled, value: '1' }
+      - { section: General, option: api_key, value: "{{ tautulli_api_key }}" }
+      - { section: General, option: check_github, value: '1' }
+      - { section: General, option: first_run_complete, value: '1' }
+      - { section: General, option: launch_browser, value: '0' }
+      - { section: General, option: http_port, value: '8181' }
+      - { section: General, option: http_host, value: 0.0.0.0 }
+      - { section: General, option: enable_https, value: '0' }
+      - { section: General, option: http_plex_admin, value: '1' }
+      - { section: PMS, option: pms_identifier, value: "{{ media_services.plex.pms_identifier }}" }
+      # NOTE: with pms_url_manual, Tautulli rebuilds pms_url from pms_ip, so this
+      # must be the hostname: by bare IP Plex serves its plex.direct cert, which
+      # chains to a root nothing here trusts yet. Without manual, it swaps in the
+      # plex.direct URL from plex.tv instead. extra_hosts pins the name to ocean.
+      - { section: PMS, option: pms_ip, value: home.terrac.com }
+      - { section: PMS, option: pms_port, value: '32400' }
+      - { section: PMS, option: pms_is_remote, value: '0' }
+      - { section: PMS, option: pms_ssl, value: '1' }
+      - { section: PMS, option: pms_url, value: "https://home.terrac.com:32400" }
+      - { section: PMS, option: pms_url_manual, value: '1' }
+      - { section: PMS, option: pms_token, value: "{{ media_services.plex.api_key }}" }
+      - { section: PMS, option: pms_use_bif, value: '0' }
+      - { section: Monitoring, option: monitoring_use_websocket, value: '1' }
+      - { section: Monitoring, option: refresh_users_on_startup, value: '1' }
+      - { section: Monitoring, option: refresh_libraries_on_startup, value: '1' }
 
   tasks:
 
@@ -46,16 +79,6 @@
       group: "{{ gid }}"
       mode: '0755'
 
-  - name: Create Tautulli config.ini with Plex connection
-    ansible.builtin.template:
-      src: "{{ files }}/config.ini.j2"
-      dest: "{{ home }}/config/config.ini"
-      owner: "{{ uid }}"
-      group: "{{ gid }}"
-      mode: '0644'
-      force: yes
-    register: tautulli_config
-
   - name: Create docker-compose.yml
     ansible.builtin.template:
       src: "{{ files }}/docker-compose.yml.j2"
@@ -73,6 +96,45 @@
       group: "{{ gid }}"
       mode: '0600'
     register: tautulli_env
+
+  # Tautulli writes its whole config back from memory, so an edit made while it
+  # runs is lost. Find drift first, and stop it only when there is some.
+  - name: Check config.ini for drift from the owned settings
+    community.general.ini_file:
+      path: "{{ home }}/config/config.ini"
+      section: "{{ item.section }}"
+      option: "{{ item.option }}"
+      value: "{{ item.value }}"
+      create: true
+    check_mode: true
+    loop: "{{ tautulli_settings }}"
+    loop_control:
+      label: "{{ item.section }}.{{ item.option }}"
+    no_log: true
+    register: tautulli_drift
+
+  - name: Stop Tautulli so it cannot write over the config edit
+    ansible.builtin.command:
+      cmd: docker compose stop tautulli
+      chdir: "{{ home }}"
+    when: tautulli_drift is changed
+    failed_when: false
+
+  - name: Set the owned settings in config.ini
+    community.general.ini_file:
+      path: "{{ home }}/config/config.ini"
+      section: "{{ item.section }}"
+      option: "{{ item.option }}"
+      value: "{{ item.value }}"
+      create: true
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0644'
+    loop: "{{ tautulli_settings }}"
+    loop_control:
+      label: "{{ item.section }}.{{ item.option }}"
+    no_log: true
+    register: tautulli_config
 
   - name: Show what configuration files changed
     ansible.builtin.debug:
@@ -128,42 +190,6 @@
       delay: 5
       timeout: 60
     when: docker_compose_config.changed or tautulli_env.changed or tautulli_config.changed
-
-  - name: Restart Tautulli container to reload config properly
-    ansible.builtin.shell: |
-      cd {{ home }}
-      docker compose restart tautulli
-      echo "Tautulli restarted to apply Plex server configuration"
-    when: tautulli_config.changed
-
-  - name: Wait for Tautulli to fully initialize and write its config
-    ansible.builtin.pause:
-      seconds: 10
-    when: tautulli_config.changed
-
-  - name: Stop Tautulli before config rewrite
-    ansible.builtin.shell: |
-      cd {{ home }}
-      docker compose stop tautulli
-      echo "Tautulli stopped for config rewrite"
-    when: tautulli_config.changed
-
-  - name: Rewrite config.ini to override Tautulli defaults
-    ansible.builtin.template:
-      src: "{{ files }}/config.ini.j2"
-      dest: "{{ home }}/config/config.ini"
-      owner: "{{ uid }}"
-      group: "{{ gid }}"
-      mode: '0644'
-      force: yes
-    when: tautulli_config.changed
-
-  - name: Start Tautulli with corrected configuration
-    ansible.builtin.shell: |
-      cd {{ home }}
-      docker compose start tautulli
-      echo "Tautulli started with correct Plex configuration"
-    when: tautulli_config.changed
 
   handlers:
   - name: Reload systemd daemon
