@@ -15,7 +15,7 @@
     
     # UnPoller (Docker Compose deployment)
     unpoller_service: unpoller
-    unpoller_image: golift/unifi-poller
+    unpoller_image: registry-cache.home:5001/golift/unifi-poller
     unpoller_version: latest
     unpoller_port: "{{ service_ports.unpoller.port }}"
     unpoller_home: "{{ path_data01 }}/{{ unpoller_service }}"

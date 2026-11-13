@@ -10,7 +10,7 @@
 
   vars:
     service: grafana
-    image: grafana/grafana
+    image: registry-cache.home:5001/grafana/grafana
     version: 11.5.4
     port_int: 3000
     port_ext: "{{ service_ports.grafana.port }}"

@@ -11,7 +11,7 @@
     - "{{ playbook_dir }}/../../../../vars/vars_tdarr_desktop.yaml"
 
   vars:
-    image: prom/prometheus
+    image: registry-cache.home:5001/prom/prometheus
     version: v2.54.1
     service: prometheus
     prom_port: "{{ service_ports.prometheus.port }}"
@@ -23,31 +23,31 @@
     uid: 1026  # Ocean user ID
     gid: 100   # Users group ID
     blackbox_exporter_service: blackbox-exporter
-    blackbox_exporter_image: prom/blackbox-exporter
+    blackbox_exporter_image: registry-cache.home:5001/prom/blackbox-exporter
     blackbox_exporter_version: master
     blackbox_exporter_port: "{{ service_ports.blackbox_exporter.port }}"
     mtr_exporter_service: mtr-exporter
-    mtr_exporter_image: dragoonaethis/mtr-exporter
+    mtr_exporter_image: registry-cache.home:5001/dragoonaethis/mtr-exporter
     mtr_exporter_version: "0.3.0"
     mtr_exporter_port: "{{ service_ports.mtr_exporter.port }}"
     probe_exporters: [blackbox-exporter, mtr-exporter]
     # Alertmanager (Docker Compose deployment)
     alertmanager_service: alertmanager
-    alertmanager_image: prom/alertmanager
+    alertmanager_image: registry-cache.home:5001/prom/alertmanager
     alertmanager_version: v0.27.0
     alertmanager_port: "{{ service_ports.alertmanager.port }}"
     alertmanager_home: "{{ path_data01 }}/{{ alertmanager_service }}"
     alertmanager_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
     # Karma (Alertmanager Dashboard)
     karma_service: karma
-    karma_image: ghcr.io/prymitive/karma
+    karma_image: registry-cache.home:5002/prymitive/karma
     karma_version: latest
     karma_port: "{{ service_ports.karma.port }}"
     karma_home: "{{ path_data01 }}/{{ karma_service }}"
     karma_files: "{{ playbook_dir }}/../../../../files/ocean-prometheus"
     # Pushgateway (metrics from batch jobs, e.g. the mem0 nightly benchmark)
     pushgateway_service: pushgateway
-    pushgateway_image: prom/pushgateway
+    pushgateway_image: registry-cache.home:5001/prom/pushgateway
     pushgateway_version: v1.11.4
     pushgateway_port: "{{ service_ports.pushgateway.port }}"
     pushgateway_home: "{{ path_data01 }}/{{ pushgateway_service }}"
