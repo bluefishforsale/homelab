@@ -1,0 +1,107 @@
+---
+# ml-log-analyzer: watches the fleet's logs in Loki and raises LogAnomaly alerts
+# in Alertmanager, so a fault that never trips a metric still reaches a human and
+# AxiomD. The ml-log-analyzer repo's CI builds the detector and processor images
+# and dispatches `deploy-ml-log-analyzer` here.
+#
+# It ran on ocean until #146 retired it in July 2026, built on the host from
+# source kept in this repo. It now ships from its own repo and runs on harbor,
+# off ocean's CPU, with all state on harbor's local disk. The old state on
+# ocean was removed with it, so this starts fresh: baselines relearn from Loki.
+- name: Deploy ml-log-analyzer on harbor using Docker Compose
+  hosts: harbor
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+    - "{{ playbook_dir }}/../../../vars/vars_service_ports.yaml"
+
+  vars:
+    service: ml-log-analyzer
+    detector_image: ghcr.io/bluefishforsale/ml-log-analyzer-detector
+    processor_image: ghcr.io/bluefishforsale/ml-log-analyzer-processor
+    version: latest
+    files: "{{ playbook_dir }}/../../../files/ml-log-analyzer"
+    home: "/data01/services/{{ service }}"
+
+  tasks:
+  - name: Read the state mount
+    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+    register: state_mount
+    changed_when: false
+
+  # NOTE: Postgres keeps a WAL; on ocean's NFS view it would corrupt.
+  - name: State lands on the local disk, not ocean's NFS
+    ansible.builtin.assert:
+      that: state_mount.stdout == 'ext4'
+      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+  - name: Log harbor into GHCR to pull the private images
+    ansible.builtin.shell: |
+      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+    no_log: true
+    changed_when: false
+
+  # Loud on a bad credential, before anything is stopped.
+  - name: Pull the analyzer images
+    ansible.builtin.command:
+      cmd: "docker pull {{ item }}:{{ version }}"
+    loop:
+      - "{{ detector_image }}"
+      - "{{ processor_image }}"
+    register: ghcr_pull
+    changed_when: "'Downloaded newer image' in ghcr_pull.stdout"
+
+  - name: Ensure ml-log-analyzer home exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      mode: '0755'
+
+  # The detector runs as uid 1001 (its image's media user) and its Redis as 999.
+  - name: Ensure state directories exist with their container owners
+    ansible.builtin.file:
+      path: "{{ home }}/{{ item.path }}"
+      state: directory
+      owner: "{{ item.owner }}"
+      group: "{{ item.owner }}"
+      mode: '0755'
+    loop:
+      - { path: detector-data, owner: '1001' }
+      - { path: detector-redis, owner: '999' }
+      - { path: processor-redis, owner: '999' }
+
+  # Compose carries POSTGRES_PASSWORD.
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0600'
+
+  - name: Create ml-log-analyzer systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/ml-log-analyzer.service.j2"
+      dest: /etc/systemd/system/ml-log-analyzer.service
+      mode: '0644'
+
+  # Always restart so a dispatched deploy recreates the containers on the
+  # images pulled above, even when every template was byte-identical.
+  - name: Enable and restart ml-log-analyzer
+    ansible.builtin.systemd:
+      name: ml-log-analyzer.service
+      enabled: true
+      state: restarted
+      daemon_reload: true
+
+  - name: Wait for the detector and processor
+    ansible.builtin.uri:
+      url: "http://127.0.0.1:{{ item }}/health"
+      status_code: 200
+    loop:
+      - "{{ service_ports.ml_log_analyzer_detector.port }}"
+      - "{{ service_ports.ml_log_analyzer_processor.port }}"
+    register: health
+    retries: 20
+    delay: 6
+    until: health.status == 200
