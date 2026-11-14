@@ -7,13 +7,16 @@ walks the "refetch" bucket from media-conformance.py a batch at a time. Every
 item goes through a ledger, so a run can stop anywhere and resume:
 
   planned   Plex rating key and original added date recorded
-  grabbed   the old file deleted and the best acceptable release grabbed
+  grabbed   the best acceptable release grabbed (a movie's old file held, a show's deleted)
   imported  Radarr/Sonarr imported files that have an English subtitle; a release
             without one is blocklisted and the next is tried, up to 3, after
             which the last download is kept and flagged no-subs
   done      tdarr has run the flow over it and Plex's added date is restored
 
-The old file is only deleted once Radarr or Sonarr has accepted a grab to replace it.
+A movie's old file stays in the library until its replacement imports, and a
+hardlink under HOLD keeps it until the replacement passes, so a failed attempt
+puts it back. A TV file is only deleted once Sonarr has accepted a grab to
+replace it.
 
   media-refetch.py plan --movies 25 --max-gb 2000 --tv-gb 1000   # pick the next batch
   media-refetch.py run                              # what the next step would do
@@ -61,6 +64,9 @@ FLOW_TIMEOUT = dt.timedelta(days=3)
 # Marking a grab failed makes the *arr search and grab on its own; give that
 # grab this long to reach the queue before searching ourselves.
 REDOWNLOAD_GRACE = dt.timedelta(minutes=30)
+# DownloadedMoviesScan is queued, not run; until it has had this long the
+# download still reads as blocked though Radarr is about to import it.
+IMPORT_GRACE = dt.timedelta(minutes=10)
 # With a file on disk every release carries one of these; a release whose only
 # rejections are these is one Radarr would take if the file were gone.
 EXISTING_FILE = "Existing file on disk"
@@ -69,9 +75,6 @@ JUNK = re.compile(r"(/sample\.mkv$|-sample\.mkv$|/Plex Versions/|/\.[^/]+$|\.iso
 # A bonus disc Sonarr parses as the whole season. It imports nothing, and the
 # season's old files are gone by then.
 EXTRAS = re.compile(r"\bextras\b", re.I)
-# tdarr copies an HEVC source's video untouched, so its size is whatever the
-# release group chose; any other codec goes through the flow's encode.
-HEVC = re.compile(r"\b(x265|hevc|h\.?265)\b", re.I)
 # The same disc also comes without the word. An SD DVDRip runs 170-350 MB an
 # episode; under this, the release cannot hold what it would replace.
 MIN_EPISODE_BYTES = 50e6
@@ -84,6 +87,14 @@ PACK_PROFILE = "No season packs"
 # episodes are searched, since a pack also replaces the good ones.
 PACK_SHARE = 0.5
 PLEX_MOVIE, PLEX_EPISODE = 1, 4
+# The old file stays in the library until its replacement passes; a hardlink
+# here (same pool, no space) survives Radarr deleting it on an upgrade import,
+# so a replacement that fails the checks can be put back.
+HOLD = "/data01/complete/.refetch-hold"
+# Radarr's /movies is this on ocean.
+MOVIES_HOST = "/data01/complete/movies"
+# An import Radarr refuses only because the old file is still there.
+NO_UPGRADE = re.compile(r"Not an? (Custom Format )?upgrade", re.I)
 
 
 def now():
@@ -205,8 +216,12 @@ def bump(item, files, yes):
 
 
 def pick(rels):
-    """The release Radarr or Sonarr ranks first, passing over HEVC while anything else is left."""
-    return min(rels, key=lambda r: (bool(HEVC.search(r["title"])), r.get("releaseWeight", 0))) if rels else None
+    """The release Radarr or Sonarr ranks first.
+
+    The codec preference lives in their custom formats (files/ocean-recyclarr):
+    TV ranks x265 10-bit SDR first, movies rank x265 last. A second opinion here
+    would fight them."""
+    return min(rels, key=lambda r: r.get("releaseWeight", 0)) if rels else None
 
 
 def same_film(title, year):
@@ -216,10 +231,12 @@ def same_film(title, year):
 
 
 def best_release(movie_id):
-    rels = mc.get("radarr", "/api/v3/release", movieId=movie_id)
+    rels = mc.get("radarr", "/api/v3/release", movieId=movie_id, timeout=SEARCH_TIMEOUT)
     year = mc.get("radarr", f"/api/v3/movie/{movie_id}")["year"]
+    # Radarr blocks only the one post; the same release reposted comes back with no rejection.
+    blocked = {b["sourceTitle"] for b in mc.get("radarr", "/api/v3/blocklist/movie", movieId=movie_id)}
     ok = [r for r in rels if all(x.startswith(EXISTING_FILE) for x in r.get("rejections", []))
-          and r.get("downloadAllowed") and same_film(r["title"], year)]
+          and r.get("downloadAllowed") and same_film(r["title"], year) and r["title"] not in blocked]
     return pick(ok)
 
 
@@ -293,9 +310,19 @@ def when(stamp):
     return dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
 
 
-def plan_tv(a, refetch, ledger, plex, count):
+def tv_held(ledger, relist=False):
+    """Episode ids and season keys a TV plan leaves alone.
+
+    A hand-made list (relist) re-plans finished items: Charmed S03 was refetched,
+    then squeezed by the 1.2 Mbps flow before the 10-bit target landed."""
+    live = [(k, i) for k, i in ledger.items() if i.get("kind") == "tv" and not (relist and i.get("state") == "done")]
+    return ({e for _, i in live for e in i["episode_ids"]},
+            {k for k, i in live if k.startswith("tv:")})
+
+
+def plan_tv(a, refetch, ledger, plex, count, relist=False):
     series = {os.path.basename(s["path"].rstrip("/")): s for s in mc.get("sonarr", "/api/v3/series")}
-    held = {e for i in ledger.values() if i.get("kind") == "tv" for e in i["episode_ids"]}
+    held, held_seasons = tv_held(ledger, relist)
     groups, skipped = {}, collections.Counter()
     for f in refetch:
         if f["library"] != "tv":
@@ -308,7 +335,7 @@ def plan_tv(a, refetch, ledger, plex, count):
             skipped["specials, or not in a season folder"] += 1
         elif m.group(1) not in series:
             skipped["not in Sonarr"] += 1
-        elif f"tv:{series[m.group(1)]['id']}:{m.group(2)}" in ledger:
+        elif f"tv:{series[m.group(1)]['id']}:{m.group(2)}" in held_seasons:
             pass                                       # the season is already in a batch
         else:
             groups.setdefault((m.group(1), int(m.group(2))), []).append({**f, "path": path})
@@ -394,9 +421,66 @@ def with_stripped_hdr(rows, arr_hdr):
         yield f
 
 
+# What a grab under the 1080p, 12 Mbps Radarr profile can't bring back, so a
+# movie the ledger already refetched is planned again for these.
+REGRAB = {"over-1080p", "hdr", "over-bitrate"}
+
+
+def held_back(movie_id, reasons, held):
+    """A movie refetched before is left alone unless its file is now over the size or SDR cap."""
+    return movie_id in held and not REGRAB & set(reasons)
+
+
+def listed_movies(movies, ids, plex, count, ledger):
+    """Movies picked by hand (Radarr ids), planned whatever conformance says.
+
+    tdarr's old 8-bit squeeze left films like Arrival conformant on paper and
+    banded on screen; only a person watching can tell, so they come as a list."""
+    busy = {i["movie_id"] for i in ledger.values()
+            if "movie_id" in i and (i.get("state") != "done" or "listed" in i.get("reasons", []))}
+    todo = []
+    for m in movies:
+        if m["id"] not in ids or m["id"] in busy:
+            continue
+        path = os.path.join(m["path"].rstrip("/"), m["movieFile"]["relativePath"])
+        if path not in plex:
+            continue
+        rk, added, _ = plex[path]
+        todo.append({"file": "/media" + path, "path": path, "reasons": ["listed"],
+                     "size_gb": round(m["movieFile"]["size"] / 1e9, 2), "movie_id": m["id"],
+                     "title": f"{m['title']} ({m['year']})", "rating_key": rk, "added_at": added,
+                     "plays": count.get(rk, 0)})
+    return todo
+
+
 def cmd_plan(a):
     ledger = load()
     movies = [m for m in mc.get("radarr", "/api/v3/movie") if m.get("hasFile")]
+    if a.tv_files:
+        # Episode paths as tdarr sees them (/media/tv/...), one per line.
+        with open(a.tv_files) as f:
+            listed = [{"file": x.split("#")[0].strip(), "library": "tv", "reasons": ["listed"], "size_gb": 0.0}
+                      for x in f if x.split("#")[0].strip()]
+        a.tv_gb = a.tv_gb or float("inf")
+        plan_tv(a, listed, ledger, plex_items(), plays(), relist=True)
+        save(ledger)
+        return
+    if a.ids:
+        with open(a.ids) as f:
+            ids = {int(x.split("#")[0]) for x in f if x.split("#")[0].strip()}
+        todo = sorted(listed_movies(movies, ids, plex_items(), plays(), ledger), key=lambda t: (-t["plays"], t["title"]))
+        batch, gb = [], 0.0
+        for t in todo:
+            if len(batch) >= a.movies or gb + t["size_gb"] > a.max_gb:
+                break
+            batch.append(t)
+            gb += t["size_gb"]
+        for t in batch:
+            print(f"plan   {t['title']}: listed, {t['plays']} plays")
+            ledger[t["file"]] = {**t, "state": "planned", "attempts": 0, "log": []}
+        print(f"{len(batch)} planned from {a.ids} ({gb:.0f} GB on disk now), {len(todo) - len(batch)} more waiting")
+        save(ledger)
+        return
     radarr = {os.path.join(m["path"].rstrip("/"), m["movieFile"]["relativePath"]): m for m in movies}
     folders = {m["path"].rstrip("/") for m in movies}
     plex = plex_items()
@@ -430,7 +514,7 @@ def cmd_plan(a):
         if why:
             skipped.setdefault(why, []).append(path)
             continue
-        if movie["id"] in held:
+        if held_back(movie["id"], f["reasons"], held):
             continue
         rk, added, _ = plex[path]
         todo.append({"file": f["file"], "path": path, "reasons": f["reasons"], "size_gb": f["size_gb"],
@@ -477,6 +561,36 @@ def import_blocked(downloading):
                                      for q in downloading)
 
 
+def hold(item, movie):
+    """Hardlink the movie's current file aside, so losing it to an import is undoable."""
+    if not movie.get("hasFile"):
+        return
+    src = MOVIES_HOST + movie["path"].removeprefix("/movies") + "/" + movie["movieFile"]["relativePath"]
+    dst = f"{HOLD}/{item['movie_id']}/{os.path.basename(src)}"
+    ssh(f"sudo -n mkdir -p {shlex.quote(os.path.dirname(dst))} && sudo -n ln -f {shlex.quote(src)} {shlex.quote(dst)}")
+    item["held"] = [[src, dst]]
+
+
+def drop_hold(item):
+    for _, dst in item.pop("held", []):
+        ssh(f"sudo -n rm -f {shlex.quote(dst)}")
+
+
+def put_back(item):
+    """Return the held file to its place and let Radarr adopt it again."""
+    for src, dst in item.get("held", []):
+        # NOTE: Radarr runs as media; a folder made by root's mkdir blocks its next delete there.
+        ssh(f"sudo -n install -d -o media -g media -m 755 {shlex.quote(os.path.dirname(src))}"
+            f" && sudo -n ln -f {shlex.quote(dst)} {shlex.quote(src)}")
+    if item.get("held"):
+        mc.post("radarr", "/api/v3/command", {"name": "RescanMovie", "movieIds": [item["movie_id"]]})
+
+
+def no_upgrade(downloading):
+    return any(NO_UPGRADE.search(m) for q in downloading for sm in q.get("statusMessages") or []
+               for m in sm.get("messages") or [])
+
+
 def blocklist(app, downloading):
     for q in {q["downloadId"]: q for q in reversed(downloading)}.values():
         mc.delete(app, f"/api/v3/queue/{q['id']}", removeFromClient="true", blocklist="true",
@@ -494,6 +608,7 @@ def step(item, yes):
         if queued:
             note(item, f"already downloading {queued[0]['title']}; following it")
             if yes:
+                hold(item, mc.get("radarr", f"/api/v3/movie/{mid}"))
                 item.update(state="grabbed", grabbed_at=now().isoformat(), release=queued[0]["title"])
             return yes
         if awaiting_redownload(item):
@@ -507,11 +622,10 @@ def step(item, yes):
         if not yes:
             return False
         movie = mc.get("radarr", f"/api/v3/movie/{mid}")
-        # Grab first: a refused grab must leave the old file, and the download
-        # takes minutes, long before Radarr would import over it.
+        # The old file stays playable through the download; it only leaves when
+        # the new one is imported, and the held link can bring it back.
         mc.post("radarr", "/api/v3/release", {"guid": rel["guid"], "indexerId": rel["indexerId"]})
-        if movie.get("hasFile"):
-            mc.delete("radarr", f"/api/v3/moviefile/{movie['movieFile']['id']}")
+        hold(item, movie)
         item.update(state="grabbed", grabbed_at=now().isoformat(), release=rel["title"])
         return True
 
@@ -530,11 +644,27 @@ def step(item, yes):
                 if yes:
                     item["state"] = "planned"
                 return yes
+            if import_blocked(downloading) and movie.get("hasFile") and no_upgrade(downloading):
+                note(item, f"Radarr will not import {downloading[0]['title'][:60]} over the old file; "
+                           "removing the old file (held) and importing")
+                if not yes:
+                    return False
+                mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
+                item["swapped_at"] = now().isoformat()
+                for q in {q["downloadId"]: q for q in downloading}.values():
+                    mc.post("radarr", "/api/v3/command", {"name": "DownloadedMoviesScan", "path": q["outputPath"],
+                                                          "downloadClientId": q["downloadId"], "importMode": "auto"})
+                return True
             if import_blocked(downloading):
+                if "swapped_at" in item and now() - dt.datetime.fromisoformat(item["swapped_at"]) < IMPORT_GRACE:
+                    return False
                 note(item, f"Radarr cannot import {downloading[0]['title'][:60]}; blocklisting and searching again")
                 if not yes:
                     return False
                 blocklist("radarr", downloading)
+                if not movie.get("hasFile"):
+                    put_back(item)
+                item.pop("swapped_at", None)
                 item["state"] = "planned"
                 return True
             if gave_up(grabbed, downloading):
@@ -542,15 +672,19 @@ def step(item, yes):
                 item["state"] = "stuck"
                 return True
             return False
-        path = movie["path"] + "/" + mf["relativePath"]
-        langs = subs("/media" + path)
+        # Radarr may still name the .mp4 the flow already remuxed to .mkv.
+        file = flowed("/media" + movie["path"] + "/" + mf["relativePath"])
+        path = file.removeprefix("/media")
+        langs = subs(file)
         item["attempts"] += 1
         if any(lang in conformance.ENGLISH for lang in langs):
             note(item, f"imported {mf['relativePath']} with subtitles {sorted(set(langs))}")
+            drop_hold(item)
             item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path)
             return True
         if item["attempts"] >= MAX_ATTEMPTS:
             note(item, f"attempt {item['attempts']} still has no English subtitle; keeping it")
+            drop_hold(item)
             item.update(state="imported", imported_at=now().isoformat(), file="/media" + path, path=path,
                         no_subs=True)
             return True
@@ -561,6 +695,7 @@ def step(item, yes):
         latest = max(hist, key=lambda h: h["date"])
         mc.delete("radarr", f"/api/v3/moviefile/{mf['id']}")
         mc.post("radarr", f"/api/v3/history/failed/{latest['id']}", {})
+        put_back(item)
         item.update(state="planned", failed_at=now().isoformat())
         return True
 
@@ -683,9 +818,9 @@ def step_tv(item, yes, ledger):
             mc.post("sonarr", "/api/v3/command", {"name": "EpisodeSearch", "episodeIds": missing})
             item["episode_ids"] = eps = sorted(new)
         paths = sorted({f["path"] for f in new.values()})
-        bare = [p for p in paths if not any(lang in conformance.ENGLISH for lang in subs("/media" + p))]
+        files = [flowed("/media" + p) for p in paths]
+        bare = [f for f in files if not any(lang in conformance.ENGLISH for lang in subs(f))]
         item["attempts"] += 1
-        files = ["/media" + p for p in paths]
         if not bare:
             note(item, f"imported {len(paths)} files with English subtitles")
             item.update(state="imported", imported_at=now().isoformat(), files=files)
@@ -807,6 +942,8 @@ def main():
     p.add_argument("--max-gb", type=float, default=2000)
     p.add_argument("--tv-gb", type=float, default=0, help="TV to plan, in GB on disk; 0 plans none")
     p.add_argument("--show-skipped", action="store_true", help="list every skipped path")
+    p.add_argument("--tv-files", help="plan only these episode files (/media/tv/... paths, one per line), even ones refetched before")
+    p.add_argument("--ids", help="plan only these Radarr movie ids, one per line (# comments), whatever conformance says")
     p.set_defaults(fn=cmd_plan)
     r = sub.add_parser("run")
     r.add_argument("--yes", action="store_true")

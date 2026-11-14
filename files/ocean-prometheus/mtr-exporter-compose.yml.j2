@@ -1,0 +1,24 @@
+# mtr-exporter as a compose project so docker-refresh@mtr-exporter covers it.
+# The tag is pinned, so the refresh only matters once the pin moves.
+services:
+  mtr-exporter:
+    image: {{ mtr_exporter_image }}:{{ mtr_exporter_version }}
+    container_name: {{ mtr_exporter_service }}
+    hostname: {{ mtr_exporter_service }}
+    restart: unless-stopped
+    init: true
+    cap_add:
+      - NET_RAW
+    environment:
+      - TZ=America/Los_Angeles
+    ports:
+      - "{{ mtr_exporter_port }}:8080"
+    volumes:
+      - {{ path_home }}/config/mtr-exporter-jobs.txt:/jobs.txt:ro
+    command: ["-jobs", "/jobs.txt"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

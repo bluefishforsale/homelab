@@ -29,9 +29,17 @@ services:
       - UP_INFLUXDB_DISABLE=true
       - UP_UNIFI_DEFAULT_SAVE_SITES=true
       - UP_UNIFI_DEFAULT_SAVE_DPI=false
-      - UP_UNIFI_DEFAULT_SAVE_IDS=false
-      - UP_UNIFI_DEFAULT_SAVE_EVENTS=false
-      - UP_UNIFI_DEFAULT_SAVE_ALARMS=false
+      # IPS alerts, alarms and controller events only leave unpoller through
+      # its Loki output, not Prometheus. They feed the threat review in
+      # terraform-root lan/unifi-threat.tf: a legit flow that IPS blocks gets
+      # a suppression entry there, never IPS turned off.
+      - UP_UNIFI_DEFAULT_SAVE_IDS=true
+      - UP_UNIFI_DEFAULT_SAVE_EVENTS=true
+      - UP_UNIFI_DEFAULT_SAVE_ALARMS=true
+      # NOTE: the image's built-in up.conf ships [loki] disable = true, so the
+      # URL alone does nothing; without this line no logs reach Loki.
+      - UP_LOKI_DISABLE=false
+      - UP_LOKI_URL={{ unpoller_loki_url }}
       - UP_UNIFI_DEFAULT_SAVE_ANOMALIES=false
       - UP_DEBUG=true
     

@@ -287,8 +287,8 @@ jobs:
       - name: Detector unit tests
         run: bash .github/workflows/lib/detect-impacted-playbooks.test.sh
 
-      - name: Concurrency-group unit tests
-        run: bash .github/workflows/lib/resolve-concurrency-group.test.sh
+      - name: Deploy marker unit tests
+        run: bash .github/workflows/lib/deploy-marker.test.sh
 
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
@@ -354,3 +354,8 @@ jobs:
       # the *.home wildcard.
       - name: nginx vhosts have DNS records
         run: bash .github/workflows/lib/nginx-vhosts-have-dns.test.sh
+
+      # A play aimed at all has to subtract the Macs, which have no apt,
+      # systemd or docker.
+      - name: Plays aimed at all exclude macos
+        run: bash .github/workflows/lib/playbooks-exclude-macos.test.sh

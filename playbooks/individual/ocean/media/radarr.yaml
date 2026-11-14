@@ -11,11 +11,11 @@
 
   vars:
     service: radarr
-    image: linuxserver/radarr
+    image: registry-cache.home:5001/linuxserver/radarr
     version: latest
     radarr_port: "{{ service_ports.radarr.port }}"
     exporter_service: radarr-exporter
-    exporter_image: ghcr.io/onedr0p/exportarr
+    exporter_image: registry-cache.home:5002/onedr0p/exportarr
     exporter_version: latest
     exporter_port: "{{ service_ports.radarr_exporter.port }}"
     data: /data01

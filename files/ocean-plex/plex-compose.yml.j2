@@ -47,6 +47,8 @@ services:
       - {{ complete }}/tv:/tv
       - {{ complete }}/music:/music
       - {{ complete }}/movies:/movies
+      # Home-only 4K library: never shared, never touched by tdarr or Radarr.
+      - {{ complete }}/movies-4k:/movies-4k
       - {{ ramdisk }}:/transcode
       - {{ data }}:/data01
     shm_size: 2g

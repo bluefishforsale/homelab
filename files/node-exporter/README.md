@@ -42,7 +42,8 @@ ansible-playbook -i inventories/production/hosts.ini \
 | `cadvisor-compose.yml.j2` | cAdvisor Docker Compose |
 | `cadvisor.service.j2` | cAdvisor systemd service |
 | `cadvisor.env.j2` | cAdvisor environment |
-| `process-exporter.service.j2` | Process exporter systemd service (docker run, not compose) |
+| `process-exporter-compose.yml.j2` | Process exporter Docker Compose |
+| `process-exporter.service.j2` | Process exporter systemd service |
 | `nvidia-gpu-exporter-compose.yml.j2` | GPU exporter Docker Compose |
 | `nvidia-gpu-exporter.service.j2` | GPU exporter systemd service |
 | `nvidia-gpu-exporter.env.j2` | GPU exporter environment |
@@ -73,7 +74,7 @@ All services deployed to `/data01/services/`:
     ├── docker-compose.yml
     └── .env
 
-# Note: process-exporter runs via direct docker run in systemd, no compose directory
+# process-exporter is the exception: its compose file is in /opt/compose/process-exporter
 ```
 
 ---

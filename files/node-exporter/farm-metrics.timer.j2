@@ -1,0 +1,10 @@
+[Unit]
+Description=Run farm-metrics every 15m
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=15m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

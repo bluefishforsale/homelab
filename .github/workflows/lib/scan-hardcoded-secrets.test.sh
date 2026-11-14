@@ -53,6 +53,7 @@ while IFS='|' read -r name content; do
 done <<'CASES'
 a vault reference|api_key: "{{ media_services.radarr.api_key }}"
 an env reference|api_key: "${RADARR_API_KEY}"
+a recyclarr env tag|api_key: !env_var RADARR_API_KEY
 a commented example|# password = hunter2someexample
 an ini-commented default|;client_secret = some_secret
 an empty value|password =

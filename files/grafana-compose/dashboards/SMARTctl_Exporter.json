@@ -1383,12 +1383,464 @@
       "type": "stat"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 41
+      },
+      "id": 41,
+      "panels": [],
+      "title": "Seagate FARM (true lifetime)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "id": 42,
+      "type": "table",
+      "pluginVersion": "11.3.0",
+      "title": "FARM vs SMART: true drive age",
+      "description": "Seagate's FARM log keeps lifetime counters that are not cleared when SMART is reset. Hours before SMART = FARM power-on hours minus SMART power-on hours: how long the drive ran before its SMART history was wiped (resold or recertified used drives). Source: farm-metrics.sh textfile collector, refreshed every 15 minutes. Drives without a FARM log are not listed.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hours before SMART"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5000
+                    },
+                    {
+                      "color": "red",
+                      "value": 20000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reallocated (FARM)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 20
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [],
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Hours before SMART",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device, serial_number) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$instance\"}) / 3600 and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600 - on (instance, device) (max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$instance\"}) / 3600)",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device) (smart_farm_power_cycles{instance=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device) (smartctl_device_power_cycle_count{instance=~\"$instance\"}) and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (instance, device) (smart_farm_reallocated_sectors{instance=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "F"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "device": 1,
+              "serial_number": 2,
+              "Value #A": 3,
+              "Value #B": 4,
+              "Value #C": 5,
+              "Value #D": 6,
+              "Value #E": 7,
+              "Value #F": 8
+            },
+            "renameByName": {
+              "instance": "Host",
+              "device": "Device",
+              "serial_number": "Serial",
+              "Value #A": "FARM hours",
+              "Value #B": "SMART hours",
+              "Value #C": "Hours before SMART",
+              "Value #D": "Power cycles (FARM)",
+              "Value #E": "Power cycles (SMART)",
+              "Value #F": "Reallocated (FARM)"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "id": 43,
+      "type": "barchart",
+      "pluginVersion": "11.3.0",
+      "title": "Power-on hours: FARM vs SMART",
+      "description": "Gap between the two bars is time the drive ran before its SMART counters were reset.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "h",
+          "decimals": 0,
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "axisPlacement": "auto",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.9,
+        "groupWidth": 0.8,
+        "fullHighlight": false,
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "xField": "disk",
+        "xTickLabelRotation": -30,
+        "xTickLabelSpacing": 0,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_join(max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600, \"disk\", \" \", \"instance\", \"device\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_join((max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$instance\"}) / 3600 and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$instance\"}) / 3600), \"disk\", \" \", \"instance\", \"device\")",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "instance": true,
+              "device": true
+            },
+            "renameByName": {
+              "Value #A": "FARM hours",
+              "Value #B": "SMART hours"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "disk",
+                "desc": false
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
       },
       "id": 6,
       "panels": [
@@ -1481,7 +1933,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 62
           },
           "id": 16,
           "options": {
@@ -1582,7 +2034,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 62
           },
           "id": 4,
           "options": {
@@ -1656,7 +2108,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 70
           },
           "id": 2,
           "options": {
@@ -1726,7 +2178,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 50
+            "y": 70
           },
           "id": 28,
           "options": {
@@ -1777,7 +2229,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 62
       },
       "id": 19,
       "panels": [
@@ -1844,7 +2296,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 79
           },
           "id": 17,
           "options": {
@@ -1940,7 +2392,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 59
+            "y": 79
           },
           "id": 23,
           "options": {
@@ -2036,7 +2488,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 67
+            "y": 87
           },
           "id": 18,
           "options": {
@@ -2132,7 +2584,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 67
+            "y": 87
           },
           "id": 24,
           "options": {
@@ -2228,7 +2680,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 95
           },
           "id": 20,
           "options": {
@@ -2324,7 +2776,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 95
           },
           "id": 25,
           "options": {
@@ -2419,7 +2871,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 83
+            "y": 103
           },
           "id": 21,
           "options": {
@@ -2513,7 +2965,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 83
+            "y": 103
           },
           "id": 26,
           "options": {
@@ -2607,7 +3059,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 91
+            "y": 111
           },
           "id": 22,
           "options": {

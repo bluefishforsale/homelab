@@ -102,7 +102,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           INVENTORY="inventories/production/hosts.ini"
-          PLAYBOOK="playbooks/individual/ocean/services/archmap.yaml"
+          PLAYBOOK="playbooks/individual/workers/archmap.yaml"
 
           echo "================================================"
           echo "Deploying archmap"

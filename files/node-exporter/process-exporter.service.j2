@@ -1,31 +1,21 @@
 [Unit]
 Description={{ process_exporter_service }}
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
-Type=simple
+# Compose project so the refresh timer sees it; crash recovery is the container's
+# own `restart: unless-stopped`, since Restart= is not valid on a oneshot.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ process_exporter_compose_dir }}
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
-Restart=always
-RestartSec=120s
-TimeoutStartSec=180s
-ExecStartPre=-docker rm -f {{ process_exporter_service }}
-ExecStartPre=-docker images --filter reference={{ process_exporter_image }}:{{ process_exporter_version }} -q | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull {{ process_exporter_image }}:{{ process_exporter_version }}
-ExecStart=docker run --rm \
-    --name {{ process_exporter_service }} \
-    --hostname {{ process_exporter_service }} \
-    -e TZ=America/Los_Angeles \
-    -p {{ process_exporter_port }}:9256 \
-    --privileged \
-    -v /proc:/host/proc \
-    {{ process_exporter_image }}:{{ process_exporter_version }} \
-        --procfs /host/proc \
-        -procnames \
-            docker,dockerd,containerd,prometheus,grafana-server,nginx,mysqld,Plex,cloudflared,node_exporter,cadvisor,loki
-ExecStop=docker rm -f {{ process_exporter_service }}
+ExecStart=/usr/bin/docker compose -f {{ process_exporter_compose_dir }}/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f {{ process_exporter_compose_dir }}/docker-compose.yml down --timeout 30
+TimeoutStartSec=300
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

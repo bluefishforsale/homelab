@@ -1,10 +1,10 @@
 ---
 name: Deploy Critical Service (Protected)
 
-# NOTE: must match the key main-apply's resolver emits for the same playbook
-# (deploy-<first hosts:>), or a dispatch here and a push deploy run on one host at once.
+# NOTE: every fleet deploy holds deploy-ocean, main-apply included. Any other
+# group lets a dispatch here and a push deploy run on one host at once.
 concurrency:
-  group: ${{ inputs.service == 'plex' && 'deploy-ocean' || 'deploy-dns_servers' }}
+  group: deploy-ocean
   cancel-in-progress: false
 
 on:

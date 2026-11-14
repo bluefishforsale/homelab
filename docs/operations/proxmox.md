@@ -351,11 +351,8 @@ qm resize 2001 scsi0 +8G
 qm start 2001
 ```
 
-Or via Ansible:
-
-```bash
-ansible-playbook -i inventories/production/hosts.ini playbooks/individual/core/services/dns02_vm.yaml
-```
+The VM definition lives in terraform-root (`lan/proxmox-node006-vms.tf`); a
+hand `qm set` shows up as drift there, so change it in HCL instead.
 
 #### pihole (VMID 3000)
 

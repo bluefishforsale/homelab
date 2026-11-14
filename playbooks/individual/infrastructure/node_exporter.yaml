@@ -1,6 +1,6 @@
 ---
 - name: Configure host-exporter systemd services
-  hosts: all
+  hosts: all:!macos
   become: true
   gather_facts: yes
 
@@ -9,14 +9,21 @@
     - ../../../vault/secrets.yaml
 
   vars:
+    # NOTE: every other host pulls through registry-cache-01. Not these two:
+    # the cache host pulling its own exporters through itself means a dead cache
+    # also takes down the monitoring that would show it, and gh-runner-01's
+    # dockerd has no insecure-registries, so a cache ref there cannot pull.
+    image_upstream: "{{ inventory_hostname in groups['registry_cache'] + groups['github_runners'] }}"
+    reg_hub: "{{ 'docker.io' if image_upstream | bool else 'registry-cache.home:5001' }}"
+    reg_gcr: "{{ 'gcr.io' if image_upstream | bool else 'registry-cache.home:5006' }}"
     cadvisor_service: cadvisor
-    cadvisor_image: gcr.io/cadvisor/cadvisor
+    cadvisor_image: "{{ reg_gcr }}/cadvisor/cadvisor"
     cadvisor_version: v0.55.1
     cadvisor_port: "{{ service_ports.cadvisor.port }}"
     cadvisor_home: "/data01/services/{{ cadvisor_service }}"
     cadvisor_files: "{{ playbook_dir }}/../../../files/node-exporter"
     node_exporter_service: node-exporter
-    node_exporter_image: prom/node-exporter
+    node_exporter_image: "{{ reg_hub }}/prom/node-exporter"
     node_exporter_version: v1.8.2
     node_exporter_port: "{{ service_ports.node_exporter.port }}"
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
@@ -42,19 +49,20 @@
     docker_refresh_exclude:
       - github-runners
     process_exporter_service: process-exporter
-    process_exporter_image: ncabatoff/process-exporter
+    process_exporter_image: "{{ reg_hub }}/ncabatoff/process-exporter"
     process_exporter_version: latest
     process_exporter_port: "{{ service_ports.process_exporter.port }}"
+    process_exporter_compose_dir: /opt/compose/process-exporter
     # NVIDIA GPU Exporter (Docker Compose deployment)
     nvidia_gpu_exporter_service: nvidia-gpu-exporter
-    nvidia_gpu_exporter_image: utkuozdemir/nvidia_gpu_exporter
+    nvidia_gpu_exporter_image: "{{ reg_hub }}/utkuozdemir/nvidia_gpu_exporter"
     nvidia_gpu_exporter_version: 1.4.0
     nvidia_gpu_exporter_port: "{{ service_ports.nvidia_gpu_exporter.port }}"
     nvidia_gpu_exporter_home: "/data01/services/{{ nvidia_gpu_exporter_service }}"
     nvidia_gpu_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     # SMART monitoring (Docker Compose deployment)
     smart_exporter_service: smart-exporter
-    smart_exporter_image: prometheuscommunity/smartctl-exporter
+    smart_exporter_image: "{{ reg_hub }}/prometheuscommunity/smartctl-exporter"
     smart_exporter_version: latest
     smart_exporter_port: "{{ service_ports.smart_exporter.port }}"
     smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"
@@ -159,6 +167,36 @@
       enabled: true
       daemon_reload: yes
 
+  # Seagate FARM log -> node_exporter textfile collector. Read-only log read via
+  # the smart-exporter container. FARM keeps the true lifetime hours that
+  # resellers zero out of SMART. Skips drives without a FARM log.
+  - name: Install farm-metrics collector script
+    ansible.builtin.copy:
+      src: "{{ node_exporter_files }}/farm-metrics.sh"
+      dest: /usr/local/bin/farm-metrics.sh
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create farm-metrics systemd service
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/farm-metrics.service.j2"
+      dest: /etc/systemd/system/farm-metrics.service
+      mode: '0644'
+
+  - name: Create farm-metrics systemd timer
+    ansible.builtin.template:
+      src: "{{ node_exporter_files }}/farm-metrics.timer.j2"
+      dest: /etc/systemd/system/farm-metrics.timer
+      mode: '0644'
+
+  - name: Start and enable farm-metrics timer
+    ansible.builtin.systemd:
+      name: farm-metrics.timer
+      state: started
+      enabled: true
+      daemon_reload: true
+
   # Floating tags (:latest, :main, :stable) never update on their own: compose
   # pulls only when an image is missing. Without this the fleet runs whatever it
   # first pulled, which is how prometheus sat on a June image while restarting
@@ -232,6 +270,58 @@
   - name: Reload systemd for the docker-refresh templates
     ansible.builtin.systemd:
       daemon_reload: true
+
+  # Before the project enumeration below, so a first deploy also gets
+  # process-exporter its refresh timer instead of waiting for the next apply.
+  - name: Create process-exporter compose dir
+    ansible.builtin.file:
+      path: "{{ process_exporter_compose_dir }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+    when: docker_check.rc == 0
+
+  - name: Create process-exporter docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter-compose.yml.j2"
+      dest: "{{ process_exporter_compose_dir }}/docker-compose.yml"
+      owner: root
+      group: root
+      mode: '0644'
+    when: docker_check.rc == 0
+    register: process_exporter_compose
+
+  - name: Create process-exporter systemd service
+    ansible.builtin.template:
+      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter.service.j2"
+      dest: /etc/systemd/system/process-exporter.service
+      mode: '0644'
+    when: docker_check.rc == 0
+    register: process_exporter_unit
+
+  - name: Find a leftover bare docker run process-exporter
+    ansible.builtin.command: >-
+      docker ps -a --filter name=^{{ process_exporter_service }}$
+      --format 'project={{ "{{" }}.Label "com.docker.compose.project"{{ "}}" }}'
+    register: process_exporter_legacy
+    changed_when: false
+    check_mode: false
+    failed_when: false
+    when: docker_check.rc == 0
+
+  - name: Remove the bare docker run process-exporter before compose takes the name
+    ansible.builtin.command: docker rm -f {{ process_exporter_service }}
+    register: process_exporter_legacy_rm
+    when: docker_check.rc == 0 and process_exporter_legacy.stdout | default('') | trim == 'project='
+
+  - name: Start and enable process-exporter (restart only on change)
+    ansible.builtin.systemd:
+      name: process-exporter.service
+      enabled: true
+      daemon_reload: true
+      state: "{{ 'restarted' if (process_exporter_compose is changed or process_exporter_unit is changed or process_exporter_legacy_rm is changed) else 'started' }}"
+    when: docker_check.rc == 0
 
   # Read-only, and it has to run in check mode too or the dry run would loop
   # over an undefined list.
@@ -407,16 +497,6 @@
       mode: '0644'
     when: (nvidia_gpu | default(false) | bool)
 
-  - name: Create process-exporter systemd service (non-compose)
-    ansible.builtin.template:
-      src: "{{ playbook_dir }}/../../../files/node-exporter/process-exporter.service.j2"
-      dest: "/etc/systemd/system/process-exporter.service"
-      mode: '0644'
-    when: docker_check.rc == 0
-    notify:
-    - Reload systemd daemon
-    - Restart services
-
   - name: Create cadvisor Docker Compose systemd service
     ansible.builtin.template:
       src: "{{ cadvisor_files }}/cadvisor.service.j2"
@@ -545,7 +625,6 @@
     when: (nvidia_gpu | default(false) | bool) and docker_check.rc == 0
     notify:
     - Reload systemd daemon
-    - Restart services
     - Restart GPU services
 
   - name: Show GPU configuration status
@@ -562,13 +641,6 @@
       echo "GPU container recreation completed"
     when: (nvidia_gpu | default(false) | bool) and docker_check.rc == 0 and (gpu_docker_compose_config.changed or gpu_env_config.changed)
     
-  - name: Start and enable process-exporter (non-compose service)
-    ansible.builtin.systemd:
-      name: process-exporter.service
-      state: started
-      enabled: true
-    when: docker_check.rc == 0
-
   - name: Start and enable cadvisor Docker Compose service
     ansible.builtin.systemd:
       name: cadvisor.service
@@ -612,11 +684,6 @@
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
-
-  - name: Restart services
-    ansible.builtin.systemd:
-      name: process-exporter.service
-      state: restarted
 
   - name: Restart cadvisor service
     ansible.builtin.systemd:

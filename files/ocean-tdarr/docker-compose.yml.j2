@@ -1,0 +1,86 @@
+# Tdarr's server and ocean's GPU node, one compose project so docker-refresh@tdarr
+# pulls and recreates them together.
+# NOTE: a node refuses a server of another version. As two units each pulling
+# :latest on its own restart they split 3.00.00 vs 2.94.03 on 2026-10-12 and
+# all transcoding stopped; one project keeps them on the same pull.
+services:
+  tdarr:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    # tdarr.slice is the shared CPU budget for server and node (load 54, 2026-10-19).
+    cgroup_parent: tdarr.slice
+    environment:
+      - TZ=America/Los_Angeles
+      - THREADS_WORKER_INIT_TIMEOUT=200000
+      - webUIPort={{ tdarr_port_web }}
+      - serverPort={{ tdarr_port_api }}
+      - ROOT_URL=http://{{ inventory_hostname }}.home
+      - PUID={{ system_users.media.uid }}
+      - PGID={{ system_users.media.gid }}
+    ports:
+      - "{{ tdarr_port_web }}:8265"
+      - "{{ tdarr_port_api }}:8266"
+    volumes:
+      - {{ path_home }}/plugins/{{ repo }}:/app/server/Tdarr/Plugins/Local
+      - {{ path_complete }}:/media
+      - {{ path_home }}/server:/app/server
+      - {{ path_home }}/conf:/app/configs
+      - {{ path_home }}/logs:/app/logs
+      - {{ transcode }}:/temp
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8265/api/v2/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # The worker init timeout above is 200s; give startup that and some.
+      start_period: 300s
+
+  tdarr-node:
+    image: {{ node_image }}:{{ node_version }}
+    container_name: {{ service_node }}
+    hostname: {{ service_node }}
+    restart: unless-stopped
+    cgroup_parent: tdarr.slice
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      - THREADS_WORKER_INIT_TIMEOUT=200000
+      # Routes this node's GPU workers to the flow's -hwaccel cuda encoder.
+      - TDARR_CUDA_DECODE=1
+      - TZ=America/Los_Angeles
+      - PUID={{ system_users.media.uid }}
+      - PGID={{ system_users.media.gid }}
+      - serverIP={{ ansible_default_ipv4.address }}
+      - serverPort={{ tdarr_port_api }}
+      - nodePort={{ node_port }}
+      - nodeID={{ inventory_hostname }}.home
+      - nodeIP={{ ansible_default_ipv4.address }}
+    ports:
+      - "{{ node_port }}:8267"
+    volumes:
+      - {{ path_home }}/plugins/{{ repo }}:/app/server/Tdarr/Plugins/Local
+      - {{ path_complete }}:/media
+      - {{ path_home }}/server:/app/server
+      - {{ path_home }}/conf:/app/configs
+      - {{ path_home }}/logs:/app/logs
+      - {{ transcode }}:/temp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility, video]
+    # The node serves nothing locally (it dials the server), so health is the
+    # node process being alive; the play gates on the server listing it.
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qas Tdarr_Node /proc/[0-9]*/cmdline"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - tdarr

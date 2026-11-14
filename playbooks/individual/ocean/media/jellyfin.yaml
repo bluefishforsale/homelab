@@ -30,7 +30,7 @@
   vars:
     service: jellyfin
     jellyfin_enabled: false
-    image: jellyfin/jellyfin
+    image: registry-cache.home:5001/jellyfin/jellyfin
     version: latest
     data: /data01
     files: "{{ playbook_dir }}/../../../../files/ocean-jellyfin"
@@ -49,15 +49,15 @@
       - /dev/nvidiactl
 
     jellyfin_exporter_service: jellyfin-exporter
-    jellyfin_exporter_image: drkhsh/jellyfin-exporter
+    jellyfin_exporter_image: registry-cache.home:5001/drkhsh/jellyfin-exporter
     jellyfin_exporter_version: dev
     jellyfin_exporter_port: "{{ service_ports.jellyfin_exporter.port }}"
     jellyfin_exporter_api_key: "{{ media_services.jellyfin.api_key | default('changeme') }}"
 
-    jellystat_image: cyfershepard/jellystat
+    jellystat_image: registry-cache.home:5001/cyfershepard/jellystat
     jellystat_version: latest
     jellystat_port: "{{ service_ports.jellystat.port }}"
-    jellystat_db_image: postgres:15.2
+    jellystat_db_image: registry-cache.home:5001/library/postgres:15.2
     jellystat_db_name: jfstat
     jellystat_db_user: postgres
     jellystat_db_password: "{{ media_services.jellystat.db_password | default('changeme') }}"

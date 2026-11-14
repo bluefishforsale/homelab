@@ -1,7 +1,7 @@
 - name: raspberry pi setup
   ignore_errors: true
   become: yes
-  hosts: all
+  hosts: all:!macos
   tasks:
 
 

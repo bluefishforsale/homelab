@@ -1,26 +1,21 @@
 [Unit]
 Description=Proxmox VE Exporter
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
+Wants=network-online.target
 
 [Service]
-Restart=always
-RestartSec=30s
-TimeoutStartSec=60s
-Environment=IMAGE="{{ docker_image }}"
-Environment=VERSION="{{ docker_tag }}"
-Environment=LOCALDIR="{{ home }}"
-PassEnvironment=IMAGE VERSION LOCALDIR
-ExecStartPre=-docker rm -f {{ service }}
-ExecStartPre=-/usr/bin/docker pull ${IMAGE}:${VERSION}
-ExecStart=docker run --rm \
-    --name={{ service }} \
-    --hostname=%H \
-    -e TZ=America/Los_Angeles \
-    -p {{ exporter_port }}:9221 \
-    -v ${LOCALDIR}/pve.yaml:/etc/prometheus/pve.yml:ro \
-    ${IMAGE}:${VERSION}
-ExecStop=docker rm -f {{ service }}
+# Compose project so the refresh timer sees it; crash recovery is the container's
+# own `restart: unless-stopped`, since Restart= is not valid on a oneshot.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ compose_dir }}
+StandardOutput=journal
+StandardError=journal
+ExecStart=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f {{ compose_dir }}/docker-compose.yml down --timeout 30
+TimeoutStartSec=300
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

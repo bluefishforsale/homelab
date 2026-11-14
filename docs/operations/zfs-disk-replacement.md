@@ -234,6 +234,8 @@ zpool scrub data01
 zpool status data01 | grep "scan:"
 ```
 
+Then add a row to [hardware-repair-log.md](hardware-repair-log.md): date, the removed and installed WWN and serial, model, vendor, order number, price, and FARM vs SMART hours. The swap is not done until it is logged.
+
 ---
 
 ## Troubleshooting

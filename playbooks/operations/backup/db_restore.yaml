@@ -15,7 +15,8 @@
 #
 # Lives under operations/backup/ -> dispatch-only (never auto-applies on push).
 - name: Restore a homelab service database from GCS
-  hosts: ocean
+  # Every host that keeps service state; db-restore.sh acts only where the container lives.
+  hosts: ocean:data01_workers
   become: true
   gather_facts: false
 
@@ -63,3 +64,12 @@
     - name: Restore output
       ansible.builtin.debug:
         var: restore_out.stdout_lines
+
+    - name: Fail unless exactly one host holds the service's container
+      ansible.builtin.assert:
+        that: >-
+          ansible_play_hosts | map('extract', hostvars, ['restore_out', 'stdout'])
+          | reject('search', 'skipped here') | list | length == 1
+        fail_msg: "{{ restore_service }} must live on exactly one of ocean:data01_workers; zero means nothing was restored, two means both copies were."
+      run_once: true
+      when: restore_service != 'all'

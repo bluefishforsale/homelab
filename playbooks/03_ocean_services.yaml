@@ -50,6 +50,9 @@
 - name: Deploy Radarr for Movies
   ansible.builtin.import_playbook: individual/ocean/media/radarr.yaml
 
+- name: Sync TRaSH Guides profiles into Sonarr and Radarr
+  ansible.builtin.import_playbook: individual/ocean/media/recyclarr.yaml
+
 - name: Deploy Lidarr for Music
   ansible.builtin.import_playbook: individual/ocean/media/lidarr.yaml
 

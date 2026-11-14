@@ -12,6 +12,13 @@ proxy:
   remoteurl: https://ghcr.io
   username: bluefishforsale
   password: "{{ development.github.packages_read_token }}"
+  # NOTE: registry:3 only; registry:2 ignores this key and expires at a fixed
+  # 168h. Expiry counts from first fetch, not last use, so a TTL equal to the
+  # weekly refresh means the cache is usually empty for that image when the
+  # refresh comes, and it refetches from upstream (Docker Hub rate limit). 30
+  # days keeps a weekly refresh on cached blobs; tags are still rechecked
+  # upstream on every pull, so this never serves a stale :latest.
+  ttl: 720h
 auth:
   htpasswd:
     realm: ghcr-private

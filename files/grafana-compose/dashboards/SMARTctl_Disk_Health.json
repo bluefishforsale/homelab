@@ -1,0 +1,3037 @@
+{
+  "uid": "ce8j0dmrrej9cc",
+  "title": "SMARTctl Exporter",
+  "tags": [
+    "prometheus",
+    "smartmon",
+    "farm",
+    "disks"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 40,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(smartctl_version,instance)",
+        "includeAll": true,
+        "multi": true,
+        "name": "node",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smartctl_version,instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(smartctl_device,device)",
+        "includeAll": true,
+        "multi": true,
+        "name": "disk",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smartctl_device,device)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(smartctl_device,interface)",
+        "includeAll": true,
+        "multi": true,
+        "name": "type",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smartctl_device,interface)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(smartctl_device,model_name)",
+        "includeAll": true,
+        "multi": true,
+        "name": "device_model",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smartctl_device,model_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "definition": "label_values(smartctl_device,serial_number)",
+        "includeAll": true,
+        "multi": true,
+        "name": "serial_number",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smartctl_device,serial_number)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "id": 101,
+      "title": "Overview",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "id": 102,
+      "title": "Disks",
+      "description": "Physical disks reporting SMART, after the node005 megaraid duplicates are excluded at the exporter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 103,
+      "title": "SMART failed",
+      "description": "Drive's own overall SMART verdict is FAILED. Note PASSED means little: ZJV4M3HE passed while faulted.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count((min by (instance, device) (smartctl_device_smart_status{instance=~\"$node\", device=~\"$disk\"}) == 0) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 104,
+      "title": "Reallocated > 0",
+      "description": "Disks that have remapped at least one sector. Growth over time is the signal; see Error trends.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count((max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reallocated_Sector_Ct\", attribute_value_type=\"raw\"}) > 0) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 105,
+      "title": "Pending sectors",
+      "description": "Disks with sectors waiting to be reallocated: unreadable right now.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count((max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Current_Pending_Sector\", attribute_value_type=\"raw\"}) > 0) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 106,
+      "title": "Uncorrectable",
+      "description": "Disks reporting uncorrectable reads (SMART 187 or 198).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(((max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reported_Uncorrect|Uncorrectable_Error_Cnt\", attribute_value_type=\"raw\"}) > 0) or (max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Offline_Uncorrectable\", attribute_value_type=\"raw\"}) > 0)) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 107,
+      "title": "CRC errors",
+      "description": "Interface CRC errors: cable, backplane or HBA, not the platters.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count((max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"UDMA_CRC_Error_Count|CRC_Error_Count\", attribute_value_type=\"raw\"}) > 0) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 108,
+      "title": "Hidden prior use",
+      "description": "Seagate disks whose FARM power-on hours exceed SMART by more than 1000: SMART was reset before sale.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(((max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 - on (instance, device) (max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600)) > 1000) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}) or vector(0)",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "id": 109,
+      "title": "Hottest disk",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(max by (instance, device) (smartctl_device_temperature{instance=~\"$node\", device=~\"$disk\", temperature_type=\"current\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 45
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "row",
+      "id": 110,
+      "title": "Inventory",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "id": 111,
+      "title": "Disks",
+      "description": "One row per physical disk. FARM columns are Seagate only (farm-metrics.sh, every 15m). Hours before reset = FARM minus SMART: runtime hidden by a SMART reset before sale.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, model_name, serial_number, firmware_version, interface) (smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_temperature{instance=~\"$node\", device=~\"$disk\", temperature_type=\"current\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "D",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "(max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 - on (instance, device) (max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600)) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "E",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_power_cycle_count{instance=~\"$node\", device=~\"$disk\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "F",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reallocated_Sector_Ct\", attribute_value_type=\"raw\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "G",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Current_Pending_Sector\", attribute_value_type=\"raw\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "H",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reported_Uncorrect|Uncorrectable_Error_Cnt\", attribute_value_type=\"raw\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "I",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Offline_Uncorrectable\", attribute_value_type=\"raw\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "J",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"UDMA_CRC_Error_Count|CRC_Error_Count\", attribute_value_type=\"raw\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "K",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "min by (instance, device) (smartctl_device_smart_status{instance=~\"$node\", device=~\"$disk\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "L",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_capacity_bytes{instance=~\"$node\", device=~\"$disk\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "M",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "device": 1,
+              "model_name": 2,
+              "serial_number": 3,
+              "firmware_version": 4,
+              "interface": 5,
+              "Value #M": 6,
+              "Value #B": 7,
+              "Value #C": 8,
+              "Value #D": 9,
+              "Value #E": 10,
+              "Value #F": 11,
+              "Value #G": 12,
+              "Value #H": 13,
+              "Value #I": 14,
+              "Value #J": 15,
+              "Value #K": 16,
+              "Value #L": 17,
+              "Value": 18
+            },
+            "renameByName": {
+              "instance": "Host",
+              "device": "Device",
+              "model_name": "Model",
+              "serial_number": "Serial",
+              "firmware_version": "Firmware",
+              "interface": "Interface",
+              "Value #M": "Capacity",
+              "Value #B": "Temp",
+              "Value #C": "SMART hours",
+              "Value #D": "FARM hours",
+              "Value #E": "Hours before reset",
+              "Value #F": "Power cycles",
+              "Value #G": "Reallocated",
+              "Value #H": "Pending",
+              "Value #I": "Uncorrectable",
+              "Value #J": "Offline unc.",
+              "Value #K": "CRC errors",
+              "Value #L": "SMART"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Capacity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temp"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 45
+                    },
+                    {
+                      "color": "red",
+                      "value": 50
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hours before reset"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5000
+                    },
+                    {
+                      "color": "red",
+                      "value": 20000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reallocated"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 20
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pending"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Uncorrectable"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Offline unc."
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CRC errors"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "transparent",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "FAILED"
+                      },
+                      "1": {
+                        "text": "PASSED"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [],
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Hours before reset",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "id": 112,
+      "title": "Error trends",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "id": 113,
+      "title": "Reallocated sectors",
+      "description": "SMART 5. Any growth means the disk is consuming spare sectors.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reallocated_Sector_Ct\", attribute_value_type=\"raw\"}) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 114,
+      "title": "Pending sectors",
+      "description": "SMART 197. Sectors that failed a read and await rewrite or reallocation.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Current_Pending_Sector\", attribute_value_type=\"raw\"}) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 115,
+      "title": "Uncorrectable reads",
+      "description": "SMART 187 (HDD) / Uncorrectable_Error_Cnt (SSD).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"Reported_Uncorrect|Uncorrectable_Error_Cnt\", attribute_value_type=\"raw\"}) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 116,
+      "title": "Interface CRC errors",
+      "description": "SMART 199. Rising here with clean media counters points at cabling or the backplane.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (max by (instance, device) (smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=~\"UDMA_CRC_Error_Count|CRC_Error_Count\", attribute_value_type=\"raw\"}) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "stepAfter",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 117,
+      "title": "Temperature",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (max by (instance, device) (smartctl_device_temperature{instance=~\"$node\", device=~\"$disk\", temperature_type=\"current\"}) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "linear",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 118,
+      "title": "Data written rate",
+      "description": "SMART 241 x 512 bytes for SATA, bytes_written for NVMe.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) ((rate(smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=\"Total_LBAs_Written\", attribute_value_type=\"raw\"}[$__rate_interval]) * 512 or rate(smartctl_device_bytes_written{instance=~\"$node\", device=~\"$disk\"}[$__rate_interval])) * on (instance, device) group_left (serial_number, model_name) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"})",
+          "refId": "A",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{instance}} {{device}} {{serial_number}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "lineInterpolation": "linear",
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "id": 119,
+      "title": "Seagate FARM (true lifetime)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "id": 120,
+      "title": "FARM vs SMART",
+      "description": "Seagate's FARM log is not cleared when SMART is reset, so it shows a drive's real age. Hours before reset = FARM minus SMART power-on hours.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device, serial_number) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\", serial_number=~\"$serial_number\"}) / 3600",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "(max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 - on (instance, device) (max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600))",
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_power_cycles{instance=~\"$node\", device=~\"$disk\"})",
+          "refId": "D",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_power_cycle_count{instance=~\"$node\", device=~\"$disk\"}) and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600",
+          "refId": "E",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_reallocated_sectors{instance=~\"$node\", device=~\"$disk\"})",
+          "refId": "F",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_unrecoverable_read_errors{instance=~\"$node\", device=~\"$disk\"})",
+          "refId": "G",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "device": 1,
+              "serial_number": 2,
+              "Value #A": 3,
+              "Value #B": 4,
+              "Value #C": 5,
+              "Value #D": 6,
+              "Value #E": 7,
+              "Value #F": 8,
+              "Value #G": 9
+            },
+            "renameByName": {
+              "instance": "Host",
+              "device": "Device",
+              "serial_number": "Serial",
+              "Value #A": "FARM hours",
+              "Value #B": "SMART hours",
+              "Value #C": "Hours before reset",
+              "Value #D": "Power cycles (FARM)",
+              "Value #E": "Power cycles (SMART)",
+              "Value #F": "Reallocated (FARM)",
+              "Value #G": "Unrecoverable reads (FARM)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART hours"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hours before reset"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "h"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5000
+                    },
+                    {
+                      "color": "red",
+                      "value": 20000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reallocated (FARM)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 20
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unrecoverable reads (FARM)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [],
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Hours before reset",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "barchart",
+      "id": 121,
+      "title": "Power-on hours: FARM vs SMART",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "description": "The gap between the bars is runtime the drive had before its SMART counters were reset.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "label_join(max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600, \"disk\", \" \", \"instance\", \"device\")",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "label_join((max by (instance, device) (smartctl_device_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600 and on (instance, device) max by (instance, device) (smart_farm_power_on_seconds{instance=~\"$node\", device=~\"$disk\"}) / 3600), \"disk\", \" \", \"instance\", \"device\")",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "instance": true,
+              "device": true
+            },
+            "renameByName": {
+              "Value #A": "FARM hours",
+              "Value #B": "SMART hours"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "disk"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMART hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "disk",
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "xTickLabelRotation": -30,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "id": 122,
+      "title": "SSD and NVMe",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "displayName": "",
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "id": 8,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sort_desc(100 - smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=\"Wear_Leveling_Count\",attribute_value_type=\"value\"} * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"sat\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"})",
+          "format": "time_series",
+          "instant": true,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{instance}}:{{device}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Wear Level on SATA Devices",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "displayName": "",
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "id": 14,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sort_desc(smartctl_device_percentage_used{instance=~\"$node\", device=~\"$disk\"} * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"nvme\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"})\n",
+          "format": "time_series",
+          "instant": true,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{instance}}:{{device}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Wear Level on NVMe Devices",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 75
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "smartctl_device_media_errors{instance=~\"$node\", device=~\"$disk\"} * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"$type\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"} > 0",
+          "format": "time_series",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{instance}} {{device}} {{model_name}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Media Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byValue",
+              "options": {
+                "op": "gte",
+                "reducer": "allIsZero",
+                "value": 0
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 75
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "smartctl_device_critical_warning{instance=~\"$node\", device=~\"$disk\"} * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"$type\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"} > 0",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "Critical Warnings {{device}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Critical Warnings",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Written"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total Written"
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              },
+              {
+                "id": "custom.align"
+              },
+              {
+                "id": "displayName",
+                "value": "Last Checked"
+              },
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Device Model"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "device"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Device"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Node"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "serial_number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Serial Number"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Device"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 77
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Serial Number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 177
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 277
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Written"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 123
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 81
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Total Written"
+          }
+        ]
+      },
+      "pluginVersion": "11.5.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(smartctl_device_bytes_written{instance=~\"$node\", device=~\"$disk\"} * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"$type\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"}) by (device, instance, model_name, serial_number)",
+          "format": "table",
+          "instant": true,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max((smartctl_device_attribute{instance=~\"$node\", device=~\"$disk\", attribute_name=\"Total_LBAs_Written\", attribute_value_type=\"raw\"} * on (instance,device) smartctl_device_block_size{instance=~\"$node\", device=~\"$disk\",blocks_type=\"physical\"}) * on(instance, device) group_left(interface,serial_number,model_family,model_name) smartctl_device{interface=~\"$type\",serial_number=~\"$serial_number\",model_name=~\"$device_model\"}) by (device, instance, model_name, serial_number)\n",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Total Data Written on SSDs",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {
+            "reducers": []
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Total Written",
+            "binary": {
+              "left": {
+                "fixed": ""
+              },
+              "right": {
+                "fixed": ""
+              }
+            },
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "Value #B",
+                "Value #A"
+              ],
+              "reducer": "sum"
+            },
+            "replaceFields": false,
+            "window": {
+              "reducer": "mean",
+              "windowAlignment": "trailing",
+              "windowSize": 0.1,
+              "windowSizeMode": "percentage"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Time",
+                "device",
+                "instance",
+                "model_name",
+                "serial_number",
+                "Total Written"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "type": "row",
+      "id": 123,
+      "title": "Exporter health",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 91
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "id": 124,
+      "title": "Collection status",
+      "description": "smartctl exit status is a bitmask: bit 6 (64) = errors in the device error log, bit 7 (128) = self-test errors. FARM log read = 0 on a Seagate disk that used to report FARM means the read is failing; 143 = killed by the 60s timeout.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 92
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smartctl_device_smartctl_exit_status{instance=~\"$node\", device=~\"$disk\"}) and on (instance, device) smartctl_device{instance=~\"$node\", device=~\"$disk\", interface=~\"$type\", serial_number=~\"$serial_number\", model_name=~\"$device_model\"}",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_log_present{instance=~\"$node\", device=~\"$disk\"})",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (instance, device) (smart_farm_smartctl_exit_code{instance=~\"$node\", device=~\"$disk\"})",
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "instance": 0,
+              "device": 1,
+              "Value #A": 2,
+              "Value #B": 3,
+              "Value #C": 4
+            },
+            "renameByName": {
+              "instance": "Host",
+              "device": "Device",
+              "Value #A": "smartctl exit (exporter)",
+              "Value #B": "FARM log read",
+              "Value #C": "smartctl exit (FARM)"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FARM log read"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "no"
+                      },
+                      "1": {
+                        "text": "yes"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [],
+          "countRows": false
+        },
+        "sortBy": []
+      }
+    }
+  ],
+  "links": [],
+  "description": "Per-disk SMART health plus Seagate FARM lifetime. Managed in git: files/grafana-compose/dashboards/SMARTctl_Disk_Health.json; edits in the UI are overwritten."
+}

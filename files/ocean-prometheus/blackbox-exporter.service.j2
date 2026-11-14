@@ -1,35 +1,22 @@
 [Unit]
-Description={{ blackbox_exporter_service }}
-After=docker.service
-Requires=docker.service
+Description=blackbox-exporter
+After=docker.service zfs-mount.service zfs-import.target network-online.target
+Requires=docker.service zfs-mount.service zfs-import.target
+Wants=network-online.target
+RequiresMountsFor=/data01
 
 [Service]
-Type=simple
+# Compose project so the refresh timer sees it; crash recovery is the container's
+# own `restart: unless-stopped`, since Restart= is not valid on a oneshot.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/compose/blackbox-exporter
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
-Restart=always
-RestartSec=120s
-TimeoutStartSec=180s
-ExecStartPre=-docker rm -f {{ blackbox_exporter_service }}
-ExecStartPre=-docker images --filter reference={{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} -q | xargs docker rmi -f
-ExecStartPre=-/usr/bin/docker pull {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }}
-# NOTE: docker's journald log driver plus this unit relaying the attached
-# `docker run` journaled every line twice. --log-driver=none keeps only the
-# unit's copy (journalctl -u), which also holds pull and startup errors;
-# `docker logs` no longer works for this container.
-ExecStart=docker run --rm \
-    --log-driver=none \
-    --name {{ blackbox_exporter_service }} \
-    --hostname {{ blackbox_exporter_service }}\
-    -e TZ=America/Los_Angeles \
-    -p {{ blackbox_exporter_port }}:9115 \
-    -v {{ path_home }}/config:/config \
-    {{ blackbox_exporter_image }}:{{ blackbox_exporter_version }} \
-      --config.file=/config/blackbox.yml \
-      --log.level=warn \
-      --log.prober=warn
-ExecStop=docker rm -f {{ blackbox_exporter_service }}
+ExecStart=/usr/bin/docker compose -f /opt/compose/blackbox-exporter/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/compose/blackbox-exporter/docker-compose.yml down --timeout 30
+TimeoutStartSec=300
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

@@ -48,10 +48,9 @@ This role configures a dedicated runner host VM with:
 
 ### 1. Create Runner Host VM on Proxmox
 
+The runner VM is defined in terraform-root's `lan/proxmox-node005-vms.tf`.
+
 ```bash
-# Create the runner VM on node005
-ansible-playbook -i inventories/production/hosts.ini \
-  playbooks/individual/infrastructure/create_runner_vm.yaml
 
 # VM will be created on node005:
 #   - Name: gh-runner-01

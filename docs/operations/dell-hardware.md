@@ -53,8 +53,8 @@ mixing RDIMMs in won't POST.
 | **Model** | Dell PowerEdge R630 |
 | **CPU** | 28 cores / 56 threads (2x Intel Xeon E5-2690 v4) |
 | **RAM** | 128 GB DDR4 ECC |
-| **Boot Disk** | 64 GB SSD |
-| **VM Storage** | 256 GB SSD + 1 TB SSD (vm-boot-lvm-thin) |
+| **Boot Disk** | 64 GB SATADOM (Proxmox, LVM `pve`) |
+| **VM Storage** | 2 x 1 TB SSD, ZFS mirror `vmpool`; see disk survey below |
 | **GPU** | None |
 | **Hypervisor** | Proxmox VE |
 | **Network** | 192.168.1.x (management) |
@@ -97,6 +97,26 @@ Why it hasn't been bought: in October 2026 this part cost about $6.50/GB
 (about $208 per stick, about $830 for the 4-stick step) because of the AI-driven
 DRAM shortage, and node005 had 69 GB available (VMs about 25 GB, ZFS ARC
 capped at 32 GB). Buy when a workload actually needs it or prices fall.
+
+#### Node005 disks: what each one is for
+
+Surveyed 2026-11-10 from `lsblk`, `zpool status`/`zpool history`, LVM, mounts, every
+VM config in `/etc/pve/qemu-server/`, and I/O counters since the 2025-12-15 boot. This
+is the checklist for what is safe to pull with the lid off. Kernel names (`sdX`) can
+move across reboots, so go by model and serial on the label, not by `sdX`.
+
+| Disk | Model / serial | Use | Safe to pull? |
+|------|----------------|-----|---------------|
+| sdf | SATADOM-ML 3SE 64 GB / TW00T4M44829386L0022 | Proxmox boot: LVM VG `pve` (root at `/`, swap, empty thin pool `data`), `/boot/efi`. Excluded from smart-exporter on purpose. | **No.** It's the OS. |
+| sdb | Samsung 860 EVO 1TB / S3Z6NB0K200672E | `vmpool` mirror, side A: every VM's boot disk and cloud-init, plus harbor's 200 G data disk. | **No.** |
+| sdc | Samsung 860 EVO 1TB / S3Z6NB0K200671Y | `vmpool` mirror, side B. | **No.** |
+| sdd | Samsung 870 EVO 2TB / S753NL0XB02941L | Passed whole to harbor (VM 6000) as `scsi2` by `wwn-0x5002538f54b047b7`; ext4 labelled `nzbget-scratch`. Proxmox shows "Usage: No" because the filesystem lives inside the VM. | **No.** Live harbor storage. |
+| sda | Netac SSD 256 GB / YS255550000138011936 | Nothing. No partition table or filesystem signature, not in any pool, LVM or VM config. | Yes. |
+| sde | Dell IDSDM 8 GB (internal dual-SD module, USB) | Nothing. 392 reads, 0 writes since boot. | Yes. |
+| nvme0n1 | Samsung 980 1TB / S64ANS0T211289W, PCIe slot 1 riser (82:00.0) | Nothing. It was `vmpool`'s SLOG for 26 minutes on 2025-12-15 (added 12:45, removed 13:11) and idle since. The 34 GB ZFS partition Proxmox shows is that stale label. 55% worn, 103 TB written before it arrived here; runs hot. | Yes. |
+
+The four PERC disks (sda through sdd) also show up a second time in SMART as
+`bus_0_megaraid_N`; that's the controller path to the same drives, not more disks.
 
 ### Network Architecture
 

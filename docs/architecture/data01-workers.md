@@ -9,18 +9,21 @@ nothing with a WAL crosses NFS.
 
 Membership is the `[data01_workers]` inventory group. Adding a host there gets it
 the export, the mounts, the alerts, and a tdarr node; nothing else names harbor
-except its VM play and NZBGet.
+except its VM play, NZBGet, archmap and mem0.
 
 ## Playbooks
 
 | Playbook | Host | What it owns |
 |---|---|---|
-| `infrastructure/create_harbor_vm.yaml` | node005 | VM 6000 at 192.168.1.32: CPU `host`, 24 cores (`cpuunits` 200), 32 GiB, `virtio-scsi-single` with an iothread per disk. scsi0 OS (~64G), scsi1 200G state disk on `vmpool-storage`, scsi2 the passed-through 870 EVO 2TB (`wwn-0x5002538f54b047b7`) as NZBGet scratch. Disk and CPU changes only apply to a stopped VM. |
+| terraform-root `lan/proxmox-node005-vms.tf` (`harbor`) | node005 | VM 6000 at 192.168.1.32: CPU `host`, 24 cores (`cpuunits` 200), 32 GiB, `virtio-scsi-single` with an iothread per disk. scsi0 OS (~64G), scsi1 200G state disk on `vmpool-storage`, scsi2 the passed-through 870 EVO 2TB (`wwn-0x5002538f54b047b7`) as NZBGet scratch. Disk and CPU changes only apply to a stopped VM. |
 | `ocean/nfs_export_data01.yaml` | ocean | NFSv4.2 only (`vers3=n`). One export of all of `/data01` to each worker's IP: `rw,sync,no_subtree_check,root_squash,sec=sys,fsid=1`, no `crossmnt`. Netboot hosts get `/data01/complete` only, `all_squash` to media, `subtree_check`. Refuses an empty client list. Never touches ZFS or restarts anything but nfs-server. |
 | `infrastructure/data01_worker.yaml` | ocean, then workers (`serial: 1`) | Asserts ids match ocean, formats the state disk if blank, migrates existing state onto it on first mount, mounts NFS at `/data01` and the state disk over `/data01/services`, installs the docker guards and a retry timer. |
 | `workers/tdarr_node.yaml` | `data01_workers` | CPU tdarr node joined to ocean's tdarr server. |
 | `workers/nzbget.yaml` | ocean, then harbor | NZBGet compose project with scratch on the 870 EVO; only finished files cross NFS into `/data01/incoming`. Retires the old ocean units. Prune timer. ocean's nginx proxies it at `192.168.1.32:8901`. |
+| `workers/archmap.yaml` | harbor, ocean, then harbor | The archmap compose project (api, worker, Postgres, tile nginx), moved off ocean to take the render worker's CPU with it. Pulls on harbor first, then stops archmap on ocean and tars its state (minus repo clones) for harbor, which unpacks it once onto the local disk. ocean's old dir stays as the backout. ocean's nginx proxies `archmap.home` and the tunnel at `192.168.1.32:8091`. |
+| `workers/mem0.yaml` | ocean, harbor, then ocean | The shared agent memory (API, pgvector Postgres, ollama embedder, MCP bridge). Pulls on harbor first, then stops mem0 on ocean and tars its state for harbor, which unpacks Postgres onto the 870 EVO (`/srv/nzbget/mem0`, beside NZBGet's scratch areas) and the rest onto the state disk. harbor clones the private bridge repo over https with a read-only fine-grained token (`playbooks/tasks/github_read.yaml`: a root-only credential store, scoped to github.com in `/etc/gitconfig`). LAN clients use `harbor.home:8888` and `:8766`. Off-site clients use `https://mem0.terrac.com`: ocean's cloudflared to a gateway nginx in the stack (`:8767`), behind a Cloudflare Access service token (terraform-root). The play's last stage clears ocean: the old forwarder, the old dir and the bridge clone. ocean's old dir and bridge clone are deleted once harbor holds the store. |
 | `infrastructure/db_restore_test.yaml` | harbor | Nightly restore test of the DB backups ([`db-restore.md`](../operations/db-restore.md)). |
+| `operations/backup/db_backup.yaml`, `db_restore.yaml` | ocean, `data01_workers` | Nightly backup of whatever DB containers run on each host, staged on the worker's state disk (root is squashed over NFS); restore acts only where the container lives. Dispatch-only. |
 
 ## Mounts
 
@@ -54,7 +57,9 @@ containers write into ocean's databases over NFS. Three guards, all required:
 NOTE: drop any one and a failed local mount points a worker at ocean's live DBs.
 
 If node005 boots before ocean, the NFS mount times out, docker fails its
-dependency, and `data01-worker-retry.timer` retries until ocean is back.
+dependency, and `data01-worker-retry.timer` retries until ocean is back. Every
+5 minutes it starts each enabled service on docker or the `/data01` mounts that
+has not run since boot, docker included. Units stopped by hand stay stopped.
 
 ## Identity
 
@@ -74,11 +79,14 @@ name and ocean's nginx proxies to the worker.
 
 ## Not built
 
-- **Backups of worker state.** `db-backup.sh` runs on ocean through
-  `docker exec` and can't see a worker's containers, and there is no rsync of
-  `/data01/services` back onto the pool. Today that state is NZBGet's and the
-  tdarr node's config, both rebuildable; a service with a real database must not
-  move to a worker until this exists.
+- **File-level backups of worker state.** Databases on a worker are backed up
+  like ocean's: `db-backup.sh` runs on every `data01_workers` host and dumps the
+  Postgres and MySQL containers running there. Workers skip the SQLite set, so a
+  host still holding a moved service's old `.db` can't overwrite the live
+  backup; a SQLite service on a worker is not backed up. Everything else under
+  a worker's `/data01/services`
+  (configs, caches, clones) has no copy back onto the pool, so a service whose
+  non-DB state isn't rebuildable still doesn't belong on a worker.
 - **A host registry.** A service picks its host by sitting in `workers/` with
   `hosts:` set to `harbor` or `data01_workers`. Fine at one worker.
 

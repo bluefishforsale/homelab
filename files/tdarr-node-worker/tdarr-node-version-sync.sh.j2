@@ -12,7 +12,7 @@ set -euo pipefail
 SERVER_URL={{ tdarr_server_url }}
 COMPOSE={{ home }}/docker-compose.yml
 NODE_NAME={{ inventory_hostname }}.home
-IMAGE=ghcr.io/haveagitgat/tdarr_node
+IMAGE=registry-cache.home:5002/haveagitgat/tdarr_node
 
 want=$(curl -fsS --max-time 20 "$SERVER_URL/api/v2/status" | jq -r .version)
 # The version goes into an image tag in a YAML file.

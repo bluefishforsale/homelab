@@ -40,7 +40,8 @@ for p in "${PATHS[@]}"; do
     # Skip comments outright: a commented example is not a published credential.
     printf '%s' "$text" | grep -qE '^[[:space:]]*([#;]|//)' && continue
     # Templated, env-sourced, or vault-sourced values are the correct pattern.
-    printf '%s' "$text" | grep -qE '\{\{|\{%|\$\{|\$\(|\$[A-Z_]+|lookup\(|vault|ANSIBLE_VAULT' && continue
+    # Recyclarr names an env var with a YAML tag: `api_key: !env_var SONARR_API_KEY`.
+    printf '%s' "$text" | grep -qE '\{\{|\{%|\$\{|\$\(|\$[A-Z_]+|lookup\(|vault|ANSIBLE_VAULT|!env_var[[:space:]]' && continue
     # Documented placeholders, not secrets.
     printf '%s' "$text" | grep -qiE '(example|placeholder|changeme|your[-_]|xxx|<[^>]+>|redacted|_here|\.\.\.)' && continue
     # A value that is a variable reference (token_data.token) or a boolean is

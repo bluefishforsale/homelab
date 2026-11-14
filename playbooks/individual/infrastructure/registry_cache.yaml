@@ -1,10 +1,10 @@
 ---
 # Docker Registry Pull-Through Cache
-# Six registry:2 containers (docker-hub, ghcr, ghcr-private, gitlab, nvcr, gcr)
+# Six registry:3 containers (docker-hub, ghcr, ghcr-private, gitlab, nvcr, gcr)
 # + promtail sidecar.
 #
 # Prerequisites:
-#   - VM created via playbooks/individual/infrastructure/create_registry_cache_vm.yaml
+#   - VM defined in terraform-root lan/proxmox-node005-vms.tf
 #   - vault/secrets.yaml provides development.docker_registry.username/password
 #     (Docker Hub credentials, used by the docker-hub-cache upstream auth)
 #   - development.github.packages_read_token (ghcr-private-cache upstream) and

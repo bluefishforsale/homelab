@@ -26,17 +26,22 @@ scrape_configs:
     - source_labels: [__address__]
       regex: "([^:]+):\\d+"
       target_label: instance
+    # target is the PVE host the exporter queries over the API; without it the
+    # exporter has no host to talk to and returns 500. node005 and node006 are
+    # separate PVE installs, not a cluster, so each node's exporter queries its
+    # own mgmt IP and neither node's metrics depend on the other being up.
     static_configs:
-    - targets:
-        - node005.home:9221
+    - targets: ['node005.home:9221']
+      labels:
+        __param_target: '192.168.1.105'
+    - targets: ['node006.home:9221']
+      labels:
+        __param_target: '192.168.1.106'
     metrics_path: /pve
     params:
       module: [default]
       cluster: ['1']
       node: ['1']
-      # target is the PVE host the exporter queries over the API; without it the
-      # exporter has no host to talk to and returns 500. node005 mgmt IP is stable.
-      target: ['192.168.1.105']
 
   # In-band IPMI on the Dell bare-metal hosts (PSU/fan/temp/voltage/SEL). freeipmi
   # collection is slow, so a long interval/timeout keeps scrapes from overlapping.
@@ -261,7 +266,7 @@ scrape_configs:
     metrics_path: /ups_metrics
     scrape_interval: 30s
     static_configs:
-    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-3B2116X60175']
+    - targets: ['ups-3B2116X60966', 'ups-3B2037X27090', 'ups-J6D525D41E6BE384041']
     relabel_configs:
     - source_labels: [__address__]
       target_label: __param_ups
@@ -358,10 +363,10 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: /metrics
     static_configs:
-    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+    - targets: ['harbor.home:{{ service_ports.archmap.port }}']
       labels:
         service: archmap
-        host: ocean
+        host: harbor
 
   - job_name: 'archmap-worker'
     relabel_configs: *dropPortNumber
@@ -369,10 +374,32 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: /worker-metrics
     static_configs:
-    - targets: ['ocean.home:{{ service_ports.archmap.port }}']
+    - targets: ['harbor.home:{{ service_ports.archmap.port }}']
       labels:
         service: archmap
-        host: ocean
+        host: harbor
+
+  - job_name: 'ml-log-analyzer-detector'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+    - targets: ['harbor.home:{{ service_ports.ml_log_analyzer_detector.port }}']
+      labels:
+        service: ml-log-analyzer
+        host: harbor
+
+  - job_name: 'ml-log-analyzer-processor'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+    - targets: ['harbor.home:{{ service_ports.ml_log_analyzer_processor.port }}']
+      labels:
+        service: ml-log-analyzer
+        host: harbor
 
   # HTTP Probes - Web services and APIs
   - job_name: 'blackbox-http'
@@ -436,7 +463,9 @@ scrape_configs:
         # Homelab services that expose no metrics of their own, so a probe is
         # the only signal they are actually serving. /docs is mem0's one
         # unauthenticated route; it is served by the same app as /memories.
-        - http://ocean.home:8888/docs
+        - http://harbor.home:8888/docs
+        # The gateway nginx in front of mem0 on harbor, origin for mem0.terrac.com.
+        - http://harbor.home:8767/docs
         # netboot01's nginx serves netboot images and role bundles to PXE clients.
         - http://netboot01.home/healthz
         # The exporter stays up while Lidarr is down, so up==0 cannot see it.
@@ -739,7 +768,11 @@ scrape_configs:
     scrape_interval: 30s
     static_configs:
       - targets:
-        - http://ocean.home:8766/mcp
+        - http://harbor.home:8766/mcp
+        # mem0.terrac.com end to end: Cloudflare, ocean's cloudflared, harbor's
+        # gateway. Without the service token Access answers 403, which proves
+        # the tunnel and the hostname are up without the probe holding a secret.
+        - https://mem0.terrac.com/mcp
         labels:
           probe_type: "http"
           category: "homelab_services"

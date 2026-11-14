@@ -1,28 +1,22 @@
 [Unit]
-Description={{ mtr_exporter_service }}
-After=docker.service
-Requires=docker.service
+Description=mtr-exporter
+After=docker.service zfs-mount.service zfs-import.target network-online.target
+Requires=docker.service zfs-mount.service zfs-import.target
+Wants=network-online.target
+RequiresMountsFor=/data01
 
 [Service]
-Type=simple
+# Compose project so the refresh timer sees it; crash recovery is the container's
+# own `restart: unless-stopped`, since Restart= is not valid on a oneshot.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/compose/mtr-exporter
 StandardOutput=journal
 StandardError=journal
-RuntimeMaxSec=7d
-Restart=always
-RestartSec=120s
-TimeoutStartSec=180s
-ExecStartPre=-docker rm -f {{ mtr_exporter_service }}
-ExecStartPre=-/usr/bin/docker pull {{ mtr_exporter_image }}:{{ mtr_exporter_version }}
-ExecStart=docker run --rm --init \
-    --name {{ mtr_exporter_service }} \
-    --hostname {{ mtr_exporter_service }} \
-    --cap-add NET_RAW \
-    -e TZ=America/Los_Angeles \
-    -p {{ mtr_exporter_port }}:8080 \
-    -v {{ path_home }}/config/mtr-exporter-jobs.txt:/jobs.txt:ro \
-    {{ mtr_exporter_image }}:{{ mtr_exporter_version }} \
-      -jobs /jobs.txt
-ExecStop=docker rm -f {{ mtr_exporter_service }}
+ExecStart=/usr/bin/docker compose -f /opt/compose/mtr-exporter/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/compose/mtr-exporter/docker-compose.yml down --timeout 30
+TimeoutStartSec=300
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

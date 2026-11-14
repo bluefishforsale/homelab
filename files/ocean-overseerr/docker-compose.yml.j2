@@ -1,0 +1,23 @@
+# Overseerr as a compose project so docker-refresh@overseerr keeps the image current.
+services:
+  overseerr:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+    environment:
+      - TZ=America/Los_Angeles
+    extra_hosts:
+      - "home.terrac.com:{{ ansible_default_ipv4.address }}"
+    ports:
+      - "{{ port }}:5055"
+    volumes:
+      - {{ home }}/config:/app/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:5055/api/v1/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true

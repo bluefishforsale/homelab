@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
+# TRaSH Guides profiles synced onto the profiles the library already uses, so no
+# series or movie changes profile. Hand edits in the UI to anything listed here
+# get overwritten on the next sync; change this file instead.
+#
+# The library is capped at 1080p SDR (#1302). The hand-made HDR/DV formats that
+# enforce that at grab time are not TRaSH's, so the score reset leaves them be.
+
+sonarr:
+  sonarr:
+    base_url: http://127.0.0.1:{{ service_ports.sonarr.port }}
+    api_key: !env_var SONARR_API_KEY
+
+    quality_definition:
+      type: series
+
+    quality_profiles:
+      - trash_id: 72dae194fc92bf828f32cde7744e51a1  # WEB-1080p
+        name: HD-1080p
+        # TV targets ~3.5 Mbps as 10-bit HEVC. TRaSH's WEB-1080p allows only
+        # WEB, and Sonarr ranks quality before score, so a WEB-DL would always
+        # beat a BluRay x265. One group puts every 1080p source on equal footing
+        # and the custom format scores pick: x265 10-bit SDR (played as-is),
+        # then the WEB tiers, then disc sources (one 10-bit tdarr encode).
+        # The series quality definition's 15 MB/min floor (2 Mbps) rejects
+        # starved encodes.
+        qualities:
+          - name: HD 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+              - Bluray-1080p
+              - Bluray-1080p Remux
+          - name: HDTV-1080p
+        upgrade:
+          allowed: true
+          until_quality: HD 1080p
+          until_score: 10000
+        reset_unmatched_scores:
+          enabled: true
+          except: [DV, DV HDR10, DV HDR10+, DV HLG, DV SDR, HDR, HDR (undefined), HDR10, HDR10+, HLG, PQ]
+
+    custom_format_groups:
+      add:
+        - trash_id: 74aff4168620ed49dcc67e92b2c2a5b4  # [Optional] Language Profiles
+        - trash_id: 85fae4a2294965b75710ef2989c850eb  # [Streaming Services] HD/UHD boost
+        - trash_id: 59c3af66780d08332fdc64e68297098f  # [Unwanted] Unwanted Formats
+      # NOTE: Golden Rule HD is a default group of TRaSH's WEB-1080p profile, so
+      # leaving it out of `add` still syncs it. Both its options score 1080p SDR
+      # x265 at -10000, which outweighs "x265 10-bit SDR" (+2000) and sinks the
+      # releases TV now prefers. Skipping it lets the score reset zero x265 (HD).
+      skip:
+        - 158188097a58d7687dee647e04af0da3  # [Optional] Golden Rule HD
+
+    custom_formats:
+      # files/ocean-recyclarr/custom-formats/sonarr/x265-10bit-sdr.json
+      - trash_ids: [291fa856bb7709e01cb88da6cbc7ecbe]  # x265 10-bit SDR
+        assign_scores_to:
+          - name: HD-1080p
+
+radarr:
+  radarr:
+    base_url: http://127.0.0.1:{{ service_ports.radarr.port }}
+    api_key: !env_var RADARR_API_KEY
+
+    # Movies play as grabbed (tdarr leaves their video alone), so the size is
+    # the stream and the disk: prefer ~10 Mbps and cap at 12 (MB/min = Mbps x
+    # 7.5). At 10 the 6000-hour movie library is ~27 TB; Tier 01 BluRay encodes
+    # run 12-20 Mbps (20 GB for Dune) and don't fit, so this lands on WEB-DLs
+    # and streaming-sized BluRay encodes instead.
+    quality_definition:
+      type: movie
+      qualities:
+        - name: Bluray-1080p
+          max: 90
+          preferred: 75
+        - name: WEBDL-1080p
+          max: 90
+          preferred: 75
+        - name: WEBRip-1080p
+          max: 90
+          preferred: 75
+
+    quality_profiles:
+      # HD Bluray + WEB: tier-01 BluRay encodes keep film grain, and tdarr leaves
+      # movie video untouched (#1384), so what's grabbed is what plays.
+      - trash_id: d1d67249d3890e49bc12e275d989a7e9  # HD Bluray + WEB
+        name: HD  REMUX + WEB
+        reset_unmatched_scores:
+          enabled: true
+          except: [DV, DV HDR10, HDR, HDR10, HDR10+]
+
+    custom_format_groups:
+      add:
+        - trash_id: f8bf8eab4617f12dfdbd16303d8da245  # [Optional] Golden Rule HD
+        - trash_id: a3ac6af01d78e4f21fcb75f601ac96df  # [Unwanted] Unwanted Formats

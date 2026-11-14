@@ -38,9 +38,10 @@ services:
       - "/config/keys.txt"
       - "--no-webui"
       # NOTE: the 3600s default dropped answers mid-generation on this CPU.
-      # Must be at least axiomd's 12h client read timeout.
+      # Must be at least axiomd's 36h client read timeout: GLM-4.5-Air needs
+      # about a day for a 16k-token answer here.
       - "--timeout"
-      - "43200"
+      - "129600"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:{{ port }}/health || exit 1"]
       interval: 30s

@@ -1,5 +1,5 @@
 - name: Nvidia Driver, encoding patch, and Containerd config
-  hosts: all
+  hosts: all:!macos
   vars:
     nvidia_driver_version: latest
     nvidia_container_toolkit_version: latest

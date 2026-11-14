@@ -13,6 +13,15 @@ This directory contains reusable Ansible task files that are included by multipl
   include_tasks: ../../tasks/dpkg_lock.yaml
 ```
 
+### `github_read.yaml`
+**Purpose**: Let root clone terrac's private GitHub repos over https with a read-only token
+**Used by**: `workers/mem0.yaml` (harbor)
+**Usage**:
+```yaml
+- name: Let harbor clone private GitHub repos
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/../../tasks/github_read.yaml"
+```
+
 ### `kind.yaml`
 **Purpose**: Kubernetes in Docker (kind) cluster setup  
 **Used by**: Kubernetes deployment playbooks  

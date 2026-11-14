@@ -75,13 +75,14 @@ issue per alert) and the media timers. It no longer drafts fixes for open
 issues on its own: the issue watcher, escalation tier and roadmap reconciler
 were retired on 2026-11-08 in favour of axiomd. Vocabulary:
 
-- **RC session** - a persistent `claude remote-control` process for one repo,
-  run as a systemd template instance (`agentbox-rc@<repo>.service`, cwd
-  `repos/<repo>`), drivable live from the Android app or desktop. One per repo
-  in the curated interactive set; idle sessions hold a process but spend almost
-  nothing until driven.
-- **Deployable repo** - see the deployment model above. RC sessions run only
-  for the few actively driven.
+- **RC session** - a persistent `claude remote-control` process run as a
+  systemd template instance (`agentbox-rc@repositories-root.service`), drivable
+  live from the Android app or desktop. It runs from `~/repos`, which is a
+  checkout of the workspace root repo (`bluefishforsale/repositories-root`)
+  with every sub-repo inside it, the same way a laptop session starts at
+  `~/Projects/bluefishforsale`. One lane covers every repo; idle sessions hold
+  a process but spend almost nothing until driven.
+- **Deployable repo** - see the deployment model above.
 
 ## Conventions
 

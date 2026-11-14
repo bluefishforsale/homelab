@@ -6,7 +6,7 @@
 # installs after the host joins inventory.
 #
 # Prerequisites:
-#   - VM created via playbooks/individual/infrastructure/create_netboot_vm.yaml
+#   - VM defined in terraform-root lan/proxmox-node005-vms.tf
 
 - name: Deploy netboot image server
   hosts: netboot
