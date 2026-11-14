@@ -379,55 +379,6 @@
     loop_control:
       label: "{{ item.0.name }}:{{ item.1 }}"
 
-  # The lane owner's ~/repos is the workspace root
-  # (bluefishforsale/repositories-root): sub-repos live inside it, ignored by
-  # its .gitignore, and its scripts/sync.sh clones and fast-forwards them. It
-  # is initialized in place rather than cloned because the old per-repo lane
-  # clones already sit at ~/repos/<repo> and git clone refuses a non-empty
-  # directory. Those clones keep their state; sync.sh only fast-forwards a
-  # clean default branch.
-  - name: Make ~/repos the repositories-root checkout
-    ansible.builtin.shell: |
-      set -eu
-      cd {{ home }}/repos
-      [ -d .git ] && exit 0
-      git init -q -b main
-      git remote add origin https://github.com/bluefishforsale/repositories-root.git
-      git fetch -q origin main
-      git checkout -q -B main origin/main
-      git branch -q -u origin/main
-      echo initialized
-    args:
-      executable: /bin/bash
-    become: true
-    become_user: "{{ user }}"
-    environment:
-      HOME: "{{ home }}"
-    register: repos_root
-    changed_when: "'initialized' in repos_root.stdout"
-
-  # The first run clones every sub-repo (a few GB, cockroach-hpc alone ~2G),
-  # which is too slow to put in front of a lane launch. rc-launch.sh re-runs it
-  # on every launch for the cheap part: fetch and fast-forward. A sub-repo that
-  # can't be fast-forwarded (feature branch, local changes, diverged) is
-  # reported and left alone, which is expected, so a non-zero exit only warns.
-  - name: Clone and fast-forward root sub-repos
-    ansible.builtin.command: "{{ home }}/repos/scripts/sync.sh"
-    become: true
-    become_user: "{{ user }}"
-    environment:
-      HOME: "{{ home }}"
-    register: repos_sync
-    changed_when: "'cloned' in repos_sync.stdout"
-    failed_when: false
-    async: 3600
-    poll: 15
-
-  - name: Report sub-repos sync.sh could not bring current
-    ansible.builtin.debug:
-      msg: "{{ repos_sync.stdout_lines | select('match', '^FAILED') | list }}"
-    when: repos_sync.rc | default(0) != 0
-
   # --- git config per account (commit identity + token-backed https) ---
   # The lane commits as `agentbox`; the human account commits as itself, so a
   # push from an interactive session is not attributed to the robot.
@@ -451,6 +402,58 @@
     loop_control:
       label: "{{ item.name }}"
     changed_when: false
+
+  # ~/repos is the workspace root repo (private, so after the credential helper
+  # above). Initialized in place, not cloned: the old per-repo lane clones
+  # already sit at ~/repos/<repo> and git clone refuses a non-empty directory.
+  # NOTE: the guard is a resolvable HEAD, not the presence of .git. A run that
+  # dies after `git init` must be retried, or the lane comes up in an empty
+  # root forever.
+  - name: Make ~/repos the repositories-root checkout
+    ansible.builtin.shell: |
+      set -eu
+      cd {{ home }}/repos
+      git rev-parse -q --verify HEAD >/dev/null && exit 0
+      url=https://github.com/bluefishforsale/repositories-root.git
+      git init -q -b main
+      git remote add origin "$url" 2>/dev/null || git remote set-url origin "$url"
+      git fetch -q origin main
+      git checkout -q -B main origin/main
+      git branch -q -u origin/main
+      echo initialized
+    args:
+      executable: /bin/bash
+    become: true
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+      GH_TOKEN: "{{ (agentbox | default({})).fleet_pat | default('') }}"
+    register: repos_root
+    changed_when: "'initialized' in repos_root.stdout"
+
+  # The first run clones every sub-repo (a few GB, cockroach-hpc alone ~2G),
+  # too slow to put in front of a lane launch. sync.sh exits 1 for a sub-repo
+  # it couldn't clone, fetch or fast-forward; that warns rather than fails,
+  # because one diverged sandbox repo would otherwise fail every agentbox apply
+  # and hold `deployed` back. Anything else (timeout, missing script) fails.
+  # The lock is shared with rc-launch.sh's background run.
+  - name: Clone and fast-forward root sub-repos
+    ansible.builtin.command: "flock {{ home }}/repos/.git/sync.lock {{ home }}/repos/scripts/sync.sh"
+    become: true
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+      GH_TOKEN: "{{ (agentbox | default({})).fleet_pat | default('') }}"
+    register: repos_sync
+    changed_when: "'cloned' in (repos_sync.stdout | default(''))"
+    failed_when: repos_sync.rc is not defined or repos_sync.rc not in [0, 1]
+    async: 3600
+    poll: 15
+
+  - name: Warn about sub-repos sync.sh could not bring current
+    ansible.builtin.debug:
+      msg: "{{ (repos_sync.stdout_lines | select('match', '^FAILED') | list) + repos_sync.stderr_lines }}"
+    when: repos_sync.rc == 1
 
   # --- Fleet SSH (remediation from a phone-driven RC session) ---
   # Every fleet host pulls authorized_keys from https://github.com/<user>.keys
@@ -749,7 +752,7 @@
       name: "agentbox-rc@{{ item }}.service"
       enabled: true
       state: started
-      daemon_reload: yes
+      daemon_reload: true
     loop: "{{ agentbox_rc_lanes }}"
 
   # An RC lane's websocket to claude.ai can die silently: the process stays
@@ -768,7 +771,8 @@
         systemctl list-units 'agentbox-rc@*.service' --state=active --no-legend --plain 2>/dev/null \
           | awk '{print $1}' | while read -r unit; do
             lane=$(echo "$unit" | sed -E 's/agentbox-rc@(.*)\.service/\1/')
-            exp=$(pgrep -f "claude remote-control --name $lane" | head -1 || true)
+            # rc-launch.sh falls back to `--continue`, which carries no --name.
+            exp=$(pgrep -f "claude remote-control (--name $lane|--continue)" | head -1 || true)
             cpid=""
             [ -n "$exp" ] && cpid=$(pgrep -P "$exp" -x claude | head -1 || true)
             reason=""

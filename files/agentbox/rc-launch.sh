@@ -78,11 +78,12 @@ refresh_checkout() {
 
 refresh_checkout "$root"
 # Sub-repos get the same fetch-and-fast-forward-if-clean treatment from the
-# root's own sync.sh. Backgrounded so a slow fetch (or a first clone of a
-# repo newly added to repos.txt) never delays the lane coming up; it shares
-# the unit's cgroup and journal, so a restart stops it and its output lands
-# under this lane.
-[ -x "$root/scripts/sync.sh" ] && "$root/scripts/sync.sh" &
+# root's own sync.sh, backgrounded so a slow fetch or a first clone never
+# delays the lane. Its output and any non-zero exit land in this unit's
+# journal. The lock (shared with the playbook's run) skips the sync while
+# another is still going instead of racing it.
+( flock -n -E 0 "$root/.git/sync.lock" "$root/scripts/sync.sh" \
+    || echo "WARN: sub-repo sync.sh exited $?; see FAILED lines above" >&2 ) &
 /usr/local/bin/agentbox-trust-dir.sh "$root"
 
 # One launch attempt under a pty, exiting with the child's status so the caller

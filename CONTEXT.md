@@ -82,8 +82,7 @@ were retired on 2026-11-08 in favour of axiomd. Vocabulary:
   with every sub-repo inside it, the same way a laptop session starts at
   `~/Projects/bluefishforsale`. One lane covers every repo; idle sessions hold
   a process but spend almost nothing until driven.
-- **Deployable repo** - see the deployment model above. RC sessions run only
-  for the few actively driven.
+- **Deployable repo** - see the deployment model above.
 
 ## Conventions
 
