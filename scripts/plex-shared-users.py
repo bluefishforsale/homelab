@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Print the email of everyone the Plex server is shared with, owner first.
 
-The vault's `cloudflare.access_allow_emails.plex-users` list is meant to be exactly
-these people, and it drifts every time someone is invited in the Plex UI. One email per
-line, so it pipes straight into the vault:
+terraform-root's Access allow list (`secrets/access.enc.yaml`, key `plex_users`, SOPS)
+is meant to be exactly these people, and it drifts every time someone is invited in the
+Plex UI. One email per line, so it pipes straight into that file:
 
   scripts/plex-shared-users.py                  # print, e.g. to address a mail to everyone
-  scripts/plex-shared-users.py | scripts/vault.py replace-list cloudflare.access_allow_emails.plex-users
 
-The vault alone changes nobody's access. terraform-root applies the "Allow plex users"
-Access policy from its repo secret TF_VAR_ACCESS_PLEX_USER_EMAILS, so after the vault
-edit merges, reset that secret from the vault and apply terraform-root (the command is
-in terraform-root's agents.md, "Where the Access (tunnel) user emails live").
+The pipeline that rewrites the SOPS file, without putting the emails on screen, is in
+terraform-root's agents.md, "Where the Access (tunnel) user emails live". Merging that
+change in terraform-root is what applies it.
 
 The plex.tv account token comes from the vault (media_services.plex.api_key), or
 PLEX_TV_TOKEN wins if set.
