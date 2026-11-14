@@ -16,7 +16,9 @@ Environment=PATH={{ home }}/.local/bin:/usr/local/bin:/usr/bin:/bin
 # OTel env (telemetry endpoint + flags) without ANTHROPIC_API_KEY; per-repo label.
 EnvironmentFile={{ home }}/.config/agentbox/agentbox.env
 Environment=OTEL_RESOURCE_ATTRIBUTES=repo=%i,lane=claude,service=agentbox
-WorkingDirectory={{ home }}/repos/%i
+# Every lane runs from the repositories-root checkout; %i is only the lane
+# name shown in claude.ai. See agentbox_rc_lanes in the playbook.
+WorkingDirectory={{ home }}/repos
 # Wrapper seeds workspace trust and answers the per-launch "Enable Remote
 # Control?" prompt under a pty (Claude Code has no flag for either). See
 # files/agentbox/rc-launch.sh.

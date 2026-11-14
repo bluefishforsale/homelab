@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Launch `claude remote-control` for a repo under systemd.
-# Rendered from files/agentbox/rc-launch.sh. Arg $1 = repo name (= dir under
-# ~/repos and the --name shown in claude.ai/code).
+# Launch `claude remote-control` for a lane under systemd.
+# Rendered from files/agentbox/rc-launch.sh. Arg $1 = lane name (the --name
+# shown in claude.ai/code). Every lane runs from ~/repos, the
+# repositories-root checkout, so its sessions see every sub-repo.
 #
 # Two headless gates Claude Code has no flag for:
 #  1. Per-folder workspace trust -> seed it (trust-dir.sh).
@@ -17,7 +18,8 @@
 # unsupported community patterns; re-verify after a Claude Code upgrade.
 set -euo pipefail
 
-repo="$1"
+lane="$1"
+root="${HOME}/repos"
 
 # A remote-control session reads whatever this checkout was last left in, and
 # nothing else refreshes it. repos/homelab sat 34 commits behind master on a
@@ -74,8 +76,14 @@ refresh_checkout() {
   fi
 }
 
-refresh_checkout "${HOME}/repos/${repo}"
-/usr/local/bin/agentbox-trust-dir.sh "${HOME}/repos/${repo}"
+refresh_checkout "$root"
+# Sub-repos get the same fetch-and-fast-forward-if-clean treatment from the
+# root's own sync.sh. Backgrounded so a slow fetch (or a first clone of a
+# repo newly added to repos.txt) never delays the lane coming up; it shares
+# the unit's cgroup and journal, so a restart stops it and its output lands
+# under this lane.
+[ -x "$root/scripts/sync.sh" ] && "$root/scripts/sync.sh" &
+/usr/local/bin/agentbox-trust-dir.sh "$root"
 
 # One launch attempt under a pty, exiting with the child's status so the caller
 # can branch on it. expect exits 0 on a failed child, hence the `catch wait`.
@@ -131,4 +139,4 @@ rc() {
 # --continue is also rejected alongside --spawn/--capacity/--create-session-in-dir,
 # so it cannot carry --spawn=same-dir; it adopts the recorded session's mode and
 # shows no spawn-mode prompt.
-rc "--name ${repo} --spawn=same-dir" || rc --continue
+rc "--name ${lane} --spawn=same-dir" || rc --continue
