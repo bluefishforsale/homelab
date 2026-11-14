@@ -4,8 +4,6 @@ Documentation=https://github.com/bluefishforsale/axiomd
 After=docker.service network-online.target
 Wants=network-online.target
 Requires=docker.service
-# harbor's local state disk, never ocean's NFS view of the same path.
-RequiresMountsFor=/data01/services
 # Five crashes in ten minutes leaves the unit failed, which is what SystemdUnitFailed watches.
 StartLimitIntervalSec=600
 StartLimitBurst=5

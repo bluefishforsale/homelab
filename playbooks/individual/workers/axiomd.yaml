@@ -3,10 +3,58 @@
 # read-only triage notes on low-priority alerts, written by ocean's local model and posted to homelab's
 # alert issues as the axiomd GitHub App. It changes nothing on any host and spends nothing metered.
 #
-# On harbor beside mem0, off ocean's CPU. The image comes through ghcr-private-cache (#1511), floating on
-# latest: AxiomD's CI tags latest only from main, and the weekly docker refresh picks it up.
-- name: Deploy axiomd on harbor using Docker Compose
+# On agentbox beside the repositories-root checkout and its remote-control lane. The image comes through
+# ghcr-private-cache (#1511), floating on latest: AxiomD's CI tags latest only from main, and the weekly
+# docker refresh picks it up. agentbox also holds the owner PAT (agentbox.fleet_pat) for the RC lane; the
+# container mounts only its state dir and no docker socket, so AxiomD itself never reaches that token.
+#
+# It ran on harbor until 2026-11-14. The first play retires it there and carries triage.db over, so a
+# triaged alert is not triaged again and this week's flap report is not opened twice.
+- name: Retire axiomd on harbor
   hosts: harbor
+  become: true
+  gather_facts: false
+
+  vars:
+    old_home: /data01/services/axiomd
+
+  tasks:
+  - name: Look for the harbor unit
+    ansible.builtin.stat:
+      path: /etc/systemd/system/axiomd.service
+    register: harbor_unit
+
+  # Stopped before the copy, so triage.db is not mid-write when it is read.
+  - name: Stop and disable axiomd on harbor
+    ansible.builtin.systemd:
+      name: axiomd.service
+      state: stopped
+      enabled: false
+    when: harbor_unit.stat.exists
+
+  # The compose file carries the app's private key; harbor has no use for it now. State stays for backout.
+  - name: Remove the harbor unit and compose file
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/systemd/system/axiomd.service
+      - "{{ old_home }}/docker-compose.yml"
+
+  - name: Look for harbor's triage.db
+    ansible.builtin.stat:
+      path: "{{ old_home }}/state/triage.db"
+    register: harbor_db
+
+  - name: Fetch harbor's triage.db to the runner
+    ansible.builtin.fetch:
+      src: "{{ old_home }}/state/triage.db"
+      dest: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/axiomd-triage.db"
+      flat: true
+    when: harbor_db.stat.exists
+
+- name: Deploy axiomd on agentbox using Docker Compose
+  hosts: agentbox
   become: true
   gather_facts: true
 
@@ -18,23 +66,13 @@
     image: registry-cache.home:5005/bluefishforsale/axiomd
     version: latest
     files: "{{ playbook_dir }}/../../../files/axiomd"
-    home: "/data01/services/{{ service }}"
+    home: "/srv/{{ service }}"
     # spare2, handed out so llama.cpp needs no restart for a new key. AxiomD's own named key replaces it
     # the next time llamacpp.yaml restarts ocean's llama anyway.
     llama_api_key: "{{ ai_services.llamacpp.api_keys.spare2 }}"
 
   tasks:
-  - name: Read the state mount
-    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
-    register: state_mount
-    changed_when: false
-
-  - name: State lands on the local disk, not ocean's NFS
-    ansible.builtin.assert:
-      that: state_mount.stdout == 'ext4'
-      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
-
-  - name: Log harbor into ghcr-private-cache to pull the private image
+  - name: Log agentbox into ghcr-private-cache to pull the private image
     ansible.builtin.shell: |
       echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     no_log: true
@@ -61,6 +99,17 @@
       owner: '10001'
       group: '10001'
       mode: '0750'
+
+  # force: false, so a later apply never puts harbor's old copy over the live one.
+  - name: Carry harbor's triage.db over
+    ansible.builtin.copy:
+      src: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/axiomd-triage.db"
+      dest: "{{ home }}/state/triage.db"
+      owner: '10001'
+      group: '10001'
+      mode: '0644'
+      force: false
+    when: hostvars['harbor'].harbor_db.stat.exists | default(false)
 
   # Compose carries the app's private key and the llama key.
   - name: Create docker-compose.yml
