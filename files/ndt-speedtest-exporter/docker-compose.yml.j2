@@ -9,6 +9,8 @@ services:
   ndt-speedtest-exporter:
     build: .
     image: "{{ ndt_exporter_image }}"
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: "{{ ndt_exporter_service }}"
     hostname: "{{ ndt_exporter_service }}"
     environment:

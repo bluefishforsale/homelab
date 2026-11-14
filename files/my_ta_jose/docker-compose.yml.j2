@@ -20,6 +20,7 @@ services:
       - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/data:/app/data
 
     # llama.cpp is published on the host (0.0.0.0:{{ service_ports.llamacpp.port }}).
@@ -64,6 +65,7 @@ services:
       - langtool_languageModel=/ngrams
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # ~9GB of Lucene ngram indexes, populated on the host by the playbook.
       - {{ home }}/ngrams:/ngrams:ro
 

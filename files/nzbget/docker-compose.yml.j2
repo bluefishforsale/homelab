@@ -17,6 +17,7 @@ services:
       # warning and logs a dozen lines of it per job; the regexes still work.
       PYTHONWARNINGS: ignore::SyntaxWarning
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /etc/localtime:/etc/localtime:ro
       - "{{ home }}/scripts:/scripts"
       - "{{ home }}/config:/config"
@@ -41,6 +42,8 @@ services:
 
   nzbget-exporter:
     image: "{{ exporter_image }}:{{ exporter_version }}"
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: nzbget-exporter
     hostname: nzbget-exporter
     environment:

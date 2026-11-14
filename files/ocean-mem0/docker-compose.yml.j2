@@ -48,6 +48,7 @@ services:
       - "{{ ansible_default_ipv4.address }}:{{ port_api }}:8000"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # mem0 opens a SQLite audit trail at /app/history/history.db on startup
       # and dies if the directory is absent. Upstream gitignores server/history,
       # so a fresh clone never has it and the image never gets one. Bind-mounted
@@ -92,6 +93,7 @@ services:
       - POSTGRES_PASSWORD={{ ai_services.mem0.postgres_password }}
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # On the 870 EVO, not the state disk: the store's reads and its WAL are
       # the latency mem0 search pays.
       - {{ pg_data }}:/var/lib/postgresql/data
@@ -133,6 +135,7 @@ services:
       - OLLAMA_KEEP_ALIVE=-1
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/ollama:/root/.ollama
 
     healthcheck:
@@ -185,6 +188,7 @@ services:
       - MEM0_MCP_ALLOWED_HOSTS={{ mem0_bridge_allowed_hosts | join(',') }}
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/bridge-data:/data
 
     ports:
@@ -217,11 +221,14 @@ services:
   # API. Both still demand their own keys.
   gateway:
     image: nginx:stable-alpine
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ service }}-gateway
     hostname: gateway
     restart: unless-stopped
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/gateway-nginx.conf:/etc/nginx/nginx.conf:ro
 
     ports:

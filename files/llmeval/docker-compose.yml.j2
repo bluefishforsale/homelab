@@ -3,6 +3,8 @@ services:
     # CPU build, pinned: router mode (--models-dir) is recent, and a floating tag
     # changing mid-eval would change the answers being compared.
     image: {{ llama_image }}
+    environment:
+      TZ: America/Los_Angeles
     container_name: llmeval-llama
     restart: unless-stopped
     # NOTE: the cap is what makes this a 395 stand-in. A 395 gives its GPU about
@@ -13,6 +15,7 @@ services:
     ports:
       - "{{ port }}:{{ port }}"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/models:/models:ro
       - {{ home }}/config:/config:ro
     # Router mode: one server, one model loaded at a time, picked by the

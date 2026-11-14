@@ -12,6 +12,7 @@ services:
     ports:
       - "{{ process_exporter_port }}:9256"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /proc:/host/proc
     command:
       - --procfs

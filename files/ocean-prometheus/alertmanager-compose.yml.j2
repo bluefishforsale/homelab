@@ -3,6 +3,8 @@ version: '3.8'
 services:
   alertmanager:
     image: {{ alertmanager_image }}:{{ alertmanager_version }}
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ alertmanager_service }}
     restart: unless-stopped
     
@@ -12,6 +14,7 @@ services:
     
     # Configuration and data
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ alertmanager_home }}/config:/etc/alertmanager:ro
       - {{ alertmanager_home }}/data:/alertmanager
     

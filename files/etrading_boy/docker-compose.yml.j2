@@ -9,7 +9,7 @@ services:
       - {{ home }}/.env
 
     environment:
-      - TZ=America/New_York
+      - TZ=America/Los_Angeles
 
     ports:
       - "0.0.0.0:{{ port_ext }}:{{ port_int }}"
@@ -17,6 +17,7 @@ services:
     # The image runs as uid 1000 with HOME=/data, so state.db, bar_cache.db
     # and logs all land under {{ home }}/data/.etrading-boy on the host.
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/data:/data
 
     # The bot stops its scheduler and lets in-flight jobs finish on SIGTERM.

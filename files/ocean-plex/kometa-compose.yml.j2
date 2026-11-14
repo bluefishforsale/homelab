@@ -24,6 +24,7 @@ services:
     extra_hosts:
       - "home.terrac.com:{{ ansible_default_ipv4.address }}"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ kometa_home }}/config:/config:rw
     healthcheck:
       # `test -f` only proved a file existed, so this container reported healthy

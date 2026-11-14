@@ -29,6 +29,7 @@ services:
       - "{{ ntfy_port }}:80"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ ntfy_home }}/data:/var/lib/ntfy
 
     healthcheck:

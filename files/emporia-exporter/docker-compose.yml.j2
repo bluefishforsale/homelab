@@ -6,11 +6,14 @@ services:
   emporia-exporter:
     build: .
     image: "{{ image }}"
+    environment:
+      TZ: America/Los_Angeles
     container_name: "{{ service }}"
     hostname: "{{ service }}"
     env_file:
       - emporia-exporter.env
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - ./state:/state
     ports:
       - "{{ emporia_port }}:{{ emporia_internal_port }}"

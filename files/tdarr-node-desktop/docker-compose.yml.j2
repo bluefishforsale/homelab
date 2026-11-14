@@ -27,6 +27,7 @@ services:
       - "{{ node.render_gid }}"
       - "{{ node.video_gid }}"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # Same in-container paths as every other node, so no path translation.
       - /data01/complete:/media
       - "{{ home }}/cache:/temp"

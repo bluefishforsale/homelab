@@ -41,6 +41,7 @@ services:
       - "{{ port }}:{{ port }}/udp"
 {% endfor %}
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /etc/letsencrypt/live/home.terrac.com:/certs:ro
       - {{ plex_home }}/config:/config
       - {{ plex_home }}/Profiles:/config/Library/Application Support/Plex Media Server/Profiles:ro
@@ -78,10 +79,13 @@ services:
 
   plex-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ exporter_service }}
     hostname: {{ exporter_service }}
     restart: always
     environment:
+      TZ: America/Los_Angeles
       PLEX_ADDR: https://plex:32400
       PLEX_TOKEN: "{{ media_services.plex.api_key }}"
       # Keep below Prometheus scrape_timeout (default 10s) so scrapes don't

@@ -11,6 +11,7 @@ services:
     ports:
       - "{{ exporter_port }}:9221"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/pve.yaml:/etc/prometheus/pve.yml:ro
     # The landing page, not /pve: /pve needs a target and calls the Proxmox API.
     healthcheck:

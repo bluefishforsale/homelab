@@ -22,6 +22,7 @@ services:
       - "{{ port_ext }}:{{ port_int }}"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config:/app/config
       - {{ home }}/images:/app/public/images
       - /data01:/data01:ro

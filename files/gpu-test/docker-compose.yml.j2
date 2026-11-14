@@ -2,10 +2,13 @@
 services:
   gpu-test:
     image: registry-cache.home:5001/nvidia/cuda:12.2.0-base-ubuntu22.04
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: gpu-test
     runtime: nvidia
     
     environment:
+      TZ: America/Los_Angeles
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: all
     
