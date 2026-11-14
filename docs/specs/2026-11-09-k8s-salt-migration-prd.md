@@ -52,8 +52,10 @@ where merge is deploy.
 - **A5.** A secret lives in both the vault and sops after its Ansible consumer
   is gone, or anywhere in plaintext in git.
 - **A6.** A host concern managed by both Ansible and Salt at once.
-- **A7.** Any DNS record, resolver, sshd, `authorized_keys` or port 22 change
-  made by an agent as part of this work.
+- **A7.** A DNS, DHCP or resolver change that reaches a host without terrac's
+  merge, outside CI, or without passing the pair gates; both DNS servers
+  changed in one step. Any sshd, `authorized_keys` or port 22 change made by an
+  agent as part of this work.
 - **A8.** A service migrated without its health check, blackbox probe and
   metrics scrape (the "every service is monitored" rule).
 - **A9.** An in-place OS major upgrade (`apt full-upgrade` across a release,
@@ -93,6 +95,7 @@ where merge is deploy.
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, needs terrac's sign-off |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
+| D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac (2026-11-14) |
 
 ## Open questions for terrac
 
@@ -151,10 +154,20 @@ where merge is deploy.
 - **R9.** Salt runs masterless. States applied through CI (`salt-call --local`
   over SSH at the merged SHA); drift reported by a per-host `test=True` timer
   as a node-exporter metric with an alert. No scheduled highstate. A host
-  decrypts only the pillar encrypted to its own key. The DNS pair is on a
-  CI-enforced deny list.
-- **R10.** `unattended-upgrades` (security origin) on every VM except the DNS
-  pair, which terrac patches by hand; NVIDIA, ZFS and
+  decrypts only the pillar encrypted to its own key. CI ships the tree to the
+  host by rsync at the SHA; hosts never fetch from GitHub.
+- **R9a.** DNS and DHCP (PowerDNS, recursor, dnsdist, zones, Kea DHCP4 and
+  DDNS, reservations, netboot.xyz on the pair, pihole, fleet resolver config)
+  are Salt states applied by CI in the order and with the gates in the
+  design's "DNS and DHCP under Salt": offline config validation, pair
+  pre-flight, standby first, per-host gate, primary, pair gate, resolvers
+  canary first and runner last. Halt and alert on any failure; no automatic
+  rollback. terrac is the required reviewer on those paths. Host, IP, MAC,
+  reservation and DNS record render from one address table that CI checks
+  against `terraform-root`'s VM MACs.
+- **R10.** `unattended-upgrades` (security origin) on every VM; the DNS pair
+  reboots one at a time through the pair gates, never both in a window run;
+  NVIDIA, ZFS and
   kernel packages held on passthrough and module-building hosts, and moved in
   a supervised monthly window.
 - **R11.** kured reboots k8s nodes one at a time in the agreed window, draining
@@ -187,7 +200,7 @@ where merge is deploy.
 | 4 | Every Docker service on ocean is a pod or explicitly parked. |
 | 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
 | 5b | Passthrough swap rehearsed on `k3s-agent01`, then, with Docker drained, ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
-| 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; a host cannot decrypt another host's pillar (tested); every Ansible role and play is deleted or ported. |
+| 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; a host cannot decrypt another host's pillar (tested); the DNS and DHCP rehearsal drills pass on the isolated test pair and Salt's rendered DNS and DHCP configs match Ansible's byte for byte before the flip; every Ansible role and play is deleted or ported. |
 | 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). `homelab` archived. |
 
 ## Success measures

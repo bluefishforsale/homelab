@@ -126,7 +126,8 @@ scheduling and reconciliation stop.
   - Hubble on, so per-flow visibility is available when a NetworkPolicy
     blocks something.
 - **No new IP ranges, no DNS changes.** Load-balancer IP pools would have to be
-  carved out of DHCP, which lives with the DNS pair (an agent hard limit). So:
+  carved out of DHCP, and reshaping the pools on a live DHCP pair is risk this
+  migration does not need, even with DHCP under Salt (D25). So:
   - During migration, ocean's nginx stays the front door. Each service cutover
     repoints one nginx upstream from the Docker container to the k8s service
     (a NodePort on a node IP).
@@ -337,8 +338,10 @@ Two different things, handled differently:
   every Docker service. Ocean reboots only in the supervised monthly window.
   Its `reboot-required` alert still fires, so a pending reboot is visible.
 - Reboots on tier 0 VMs: one at a time in the same window, driven by the
-  patch play (Ansible now, Salt later). **The DNS pair is excluded from any
-  automation an agent writes or runs**; terrac patches it, never both at once.
+  patch play (Ansible now, Salt later). The DNS pair patches in the same
+  window, one of the pair per run, through the pair gates in "DNS and DHCP
+  under Salt": the second is never touched until the first is back and
+  answering, and neither is touched while the pair is already degraded.
 - Proxmox hosts: monthly patch window, hand-run. A hypervisor reboot takes
   every VM on it down (no shared storage, and passthrough VMs cannot
   live-migrate), so it is scheduled. PVE major upgrades are in place by
@@ -361,7 +364,7 @@ replacement patterns:
 | Plain k8s agent | future agents without passthrough | Blue/green: new VM joins, old one is cordoned, drained, removed. Zero app downtime for anything with a second replica or no local state. |
 | k3s server | `k3s-server01` | New VM built and patched, old one stopped, the nightly SQLite backup (plus token and `server/tls`) restored onto the new one, which takes the old IP and MAC. API down for minutes, workloads keep running. This is the same restore rehearsed in phase 1. |
 | Passthrough VM | ocean (GPU plus HBA plus pool), `k3s-agent01` (passed-through scratch disk) | The passthrough swap, below. |
-| Tier 0 VM | registry-cache, runners, agentbox | Rebuilt from config (Ansible now, Salt later), cut over by IP. DNS pair: terrac only. |
+| Tier 0 VM | registry-cache, runners, agentbox, the DNS pair | Rebuilt from config (Ansible now, Salt later), cut over by IP. DNS pair: one at a time, the standby first, through the pair gates; Kea's HA lease sync repopulates the rebuilt peer. |
 
 ### Passthrough swap procedure
 
@@ -542,11 +545,14 @@ path that runs on the thing that died sends nothing.
 - **Repo**: new repo, `homelab-salt` (name is the builder's call).
 - **Apply model**: no scheduled highstate. Changes apply through CI, per changed
   state, from the self-hosted runner, mirroring today's impact detection and
-  serialization: for each impacted host the runner SSHes in, checks the repo
-  out at the merged commit (an exact SHA, not a branch tip, so what applies is
-  what was reviewed) and runs `salt-call --local state.apply <state>`, one host
-  at a time under `deploy-ocean`. The SSH path is the one Ansible uses today;
-  no new port or daemon.
+  serialization: for each impacted host the runner rsyncs the repo tree at the
+  merged commit (an exact SHA, not a branch tip, so what applies is what was
+  reviewed) to the host over SSH, connecting by IP from pillar rather than by
+  name, and runs `salt-call --local state.apply <state>`, one host at a time
+  under `deploy-ocean`. The host never fetches from GitHub, so it needs no
+  deploy key and no working DNS to be repaired, which is what lets CI fix a
+  DNS server whose resolver is broken. The SSH path is the one Ansible uses
+  today; no new port or daemon.
 - **Drift (coordination rule 8)**: a systemd timer on each host runs
   `state.apply test=True` against its checked-out commit and writes a
   node-exporter textfile metric (states that would change, failures, last run
@@ -565,14 +571,13 @@ path that runs on the thing that died sends nothing.
   upstream package repo has moved before; verify the repo URL and signing key
   at phase 6 start and mirror the pinned `.deb` rather than trusting the URL to
   stay put.
-- **DNS pair**: excluded from CI's target list by a deny list in the apply
-  workflow, enforced by a CI test. terrac runs `salt-call --local` on dns01 and
-  dns02 by hand, one at a time.
 - **Ownership**: a host concern is owned by exactly one of Ansible or Salt at a
   time. The PR that turns on a Salt state deletes the Ansible role or play that
   owned the same concern.
-- **Hard limits carry over**: DNS, sshd, `authorized_keys`, the fleet key and
-  port 22 firewall rules may be ported to Salt only by terrac, by hand.
+- **Hard limits carry over**: sshd, `authorized_keys`, the fleet key and
+  port 22 firewall rules may be ported to Salt only by terrac, by hand. DNS
+  and DHCP are no longer in this list; they are CI-applied with their own
+  gates (D25, next section).
 - **Secrets**: host secrets move from ansible-vault to Salt pillar encrypted
   with the same sops/age scheme. With a master, the master decides which host
   sees which pillar; masterless, every host holds the whole repo, so the
@@ -593,7 +598,92 @@ path that runs on the thing that died sends nothing.
 - **Order**: base system first (packages, users, node-exporter, docker on the
   remaining Docker hosts), then the k3s install and upgrade (after phase 3, so
   the playbook that survived three upgrades is the reference), then Proxmox
-  hosts, DNS last.
+  hosts, DNS and DHCP last, because the gates below are worth more once every
+  other host has exercised the apply path.
+
+### DNS and DHCP under Salt
+
+Decision D25 (terrac, 2026-11-14): Salt owns DNS and DHCP end to end, applied
+by CI like everything else, not by hand. Today's Ansible play already does
+this from CI, guarded by `serial: 1`, `any_errors_fatal` and a post-host
+`dig` gate (`playbooks/individual/core/services/dns_ha_stack.yaml`); the Salt
+version keeps those guards and adds more, since a resolver pair that is down
+takes the runner that would fix it down too.
+
+**Scope.** Everything `roles/dns_infrastructure` and its neighbours own today:
+
+- PowerDNS authoritative (primary on dns02, AXFR secondary on dns01), the
+  recursor, dnsdist, and the zone data and its import.
+- Kea DHCP4 in hot-standby (primary dns02, standby dns01), Kea DHCP-DDNS, the
+  control agent, every reservation and option, and the kea exporter.
+- netboot.xyz and TFTP on the pair, and promtail on both.
+- The fleet resolver config on every host (`fleet_resolvers.yaml` today: the
+  netplan drop-in on cloud-init VMs, `/etc/resolv.conf` on the Proxmox hosts).
+- pihole (192.168.1.9).
+
+**One address table.** Host, IP, MAC, DHCP reservation and A/PTR record come
+from a single pillar data file. Kea reservations and PowerDNS records both
+render from it, so a host cannot get a reservation without a matching record
+or the reverse. VM MACs are set in `terraform-root`; a CI check compares the
+table to the MACs in `lan/proxmox-node00{5,6}-vms.tf` and fails on a mismatch.
+
+**Who may change it.** Agents may author DNS and DHCP PRs. Only terrac merges
+them: CODEOWNERS plus branch protection on `homelab-salt` require terrac's
+review for the DNS, DHCP and resolver states, the address table, and the dns01,
+dns02 and pihole pillar. Agents never run these states outside CI. terrac's
+break-glass is `salt-call --local` on one host of the pair from the tree that
+is already there, which works with GitHub, CI and DNS all down.
+
+**Apply sequence (CI).** Each step gates the next; any failure halts the run,
+leaves the untouched peer alone, and alerts through agentbox (ntfy and email).
+No automatic rollback, per the standing homelab default; the fix is a forward
+PR or terrac's break-glass.
+
+1. *Offline validation on the runner*, before any host is touched: render
+   every changed config and run each daemon's own config check against it in a
+   container pinned to the hosts' versions (`kea-dhcp4 -t`, `kea-dhcp-ddns -t`,
+   a PowerDNS zone check, dnsdist's config check; exact flags confirmed when
+   porting).
+2. *Pair pre-flight*: both hosts answer DNS, Kea HA reports a healthy
+   hot-standby pair, and the secondary's SOA serials match the primary's. A
+   pair that is already degraded is not applied to, except through a dispatch
+   input only terrac uses.
+3. *Standby first* (dns01). Every managed config file uses Salt's
+   `file.managed` `check_cmd`, so a file that fails its daemon's check never
+   replaces the working one on disk. Only the daemon whose config changed is
+   restarted (`docker compose up -d <svc>` while the stack stays in compose),
+   never the whole stack, which is how today's play restarts it.
+4. *Host gate* on dns01, querying that host's IP directly so the peer cannot
+   mask a failure: an internal A record, a PTR, an external name through the
+   recursor, and Kea's status. Same 3-minute budget the Ansible gate grew after
+   the 2026-09-09 slow restart.
+5. *Primary* (dns02), then its host gate. Kea fails over to dns01 while the
+   primary restarts; that is the hot-standby pair doing its job.
+6. *Pair gate*: both answering, Kea HA back to normal hot-standby, SOA serials
+   equal on both.
+7. *Resolver config* on fleet hosts: one canary host first, then one host at a
+   time with a `dig` gate each, and the runner last so a bad resolver change
+   cannot cut off the run applying it.
+
+A zone-only change applies to the primary alone and gates on the secondary's
+serial catching up through NOTIFY and AXFR.
+
+**Cutover from Ansible.** For at least two weeks before ownership moves, the
+Salt DNS and DHCP states run on the pair in `test=True` only, and CI diffs
+Salt's rendered configs against the files Ansible deployed. The flip happens
+only once they are byte-identical, in one PR that deletes
+`roles/dns_infrastructure`, `dns_ha_stack.yaml` and `fleet_resolvers.yaml`.
+The first real Salt apply on the pair therefore changes nothing on disk.
+
+**Rehearsal.** Before that flip, a throwaway pair (`dns-test01`, `dns-test02`)
+plus a client VM, defined in `terraform-root` on a Proxmox bridge with no
+uplink, so a test Kea can never hand out a lease on the LAN. Drills, all
+through the real CI path: a full apply; a deliberately bad Kea config (CI
+halts at step 1); a config that passes the check but breaks resolution (CI
+halts at step 4, the primary untouched, the client still resolving and
+renewing its lease); a killed primary (the standby serves leases); and a zone
+change reaching the secondary. Results are recorded, then the test VMs are
+deleted.
 
 ## What stays in Ansible until Salt replaces it
 

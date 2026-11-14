@@ -22,8 +22,10 @@ hard limits so a phase plan cannot quietly drop one.
   `.github/workflows/lib/detect-impacted-playbooks.sh`).
 - No mutating ZFS verb in any committed play. Pool export and import in the
   passthrough swap are hand-run by terrac.
-- No DNS, resolver, DHCP, sshd, `authorized_keys`, fleet key or port 22 change
-  by an agent. Adding new VMs to the inventory replays the site orchestrators,
+- No sshd, `authorized_keys`, fleet key or port 22 change by an agent. DNS,
+  DHCP and resolver changes go only through a PR terrac merges and the CI pair
+  gates (D25, R9a); never both DNS servers in one step, never by hand from an
+  agent. Adding new VMs to the inventory replays the site orchestrators,
   so those PRs are merged by terrac, deliberately.
 - No in-place OS major upgrade on a VM.
 - Pods select node role labels (`homelab.role/*`), never hostnames.
@@ -42,7 +44,7 @@ hard limits so a phase plan cannot quietly drop one.
 | 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
 | 2027 Q2 | Phase 2 (harbor), Phase 3 (ocean joins, GPU gate) | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W1 to W5) | | k3s install moves to Salt |
-| 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
+| 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS and DHCP (gated CI, D25) |
 | 2028 H1 | | | Phase 6 done, Phase 7 archive |
 
 Schedule risk: phase 4 is roughly forty cutovers in one quarter, about three a
@@ -139,8 +141,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [ ] `docs/operations/os-lifecycle.md`: patch policy, held-package monthly
       window with the `dkms status` pre-reboot check, replacement patterns per
       VM kind, Proxmox patch window.
-- [ ] Roll the patch pipeline to tier 0 VMs one VM per PR (DNS pair excluded,
-      terrac's).
+- [ ] Roll the patch pipeline to tier 0 VMs one VM per PR. The DNS pair goes
+      last and reboots one at a time behind the existing `dig` gate.
 
 **Gate:** PRD phase 1b acceptance; the alert fires on a deliberately stale VM.
 
@@ -230,8 +232,8 @@ k3s-only.
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
 - [ ] `homelab-salt` repo: `file_client: local` layout, `.sops.yaml` per-host
-      creation rules, CI apply over SSH at the merged SHA, DNS deny list with a
-      test. No master VM (D7).
+      creation rules, CI apply by rsync over SSH at the merged SHA, by IP.
+      No master VM (D7).
 - [ ] Bootstrap play (Ansible, then cloud-init in the base template): pinned
       Salt onedir held, masterless minion config, host age key generated on
       the host, repo checkout.
@@ -245,7 +247,22 @@ k3s-only.
 - [ ] k3s install and upgrade (after phase 3, using the play that survived the
       drill as the reference).
 - [ ] Proxmox hosts.
-- [ ] DNS pair: terrac, by hand.
+- [ ] DNS and DHCP (D25), in this order:
+  - [ ] Address table in pillar; CI check against `terraform-root` VM MACs.
+  - [ ] CODEOWNERS and branch protection: terrac required on DNS, DHCP,
+        resolver, address table and dns01/dns02/pihole pillar paths.
+  - [ ] States for PowerDNS, recursor, dnsdist, zones, Kea DHCP4, DDNS and
+        control agent, netboot.xyz, promtail, pihole, fleet resolvers; every
+        config `file.managed` with `check_cmd`; per-daemon restarts.
+  - [ ] CI apply workflow with the seven gated steps, halt and alert, no
+        rollback; offline validation container pinned to host versions.
+  - [ ] Isolated test pair and client in `terraform-root`; all five drills
+        pass and are recorded; test VMs deleted.
+  - [ ] Two weeks of `test=True` on the real pair with Salt's rendered configs
+        byte-identical to Ansible's.
+  - [ ] Flip PR: delete `roles/dns_infrastructure`, `dns_ha_stack.yaml`,
+        `fleet_resolvers.yaml`, `pi_hole.yaml`; first Salt apply changes
+        nothing on disk.
 
 ## Phase 7: archive `homelab` (2028 H1)
 
