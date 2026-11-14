@@ -21,7 +21,7 @@ Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-patter
 | Workflow | Trigger | What it owns | Concurrency group |
 |---|---|---|---|
 | `main-apply.yml` | push to master (path filter), dispatch with a playbook list | The only push-time apply. On push, `detect-changes` diffs from the `deployed` branch (`lib/deploy-base.sh`) to the pushed commit and runs the detector; `apply-playbooks` checks out the tip of master, runs each playbook, fails if any failed, and on a clean push run fast-forwards `deployed` (`lib/mark-deployed.sh`); `verify-deployment` probes after. Dispatch input bypasses the detector and its exclusions and leaves `deployed` alone. | push: `deploy-ocean`; dispatch: resolved per run |
-| `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
+| `deploy-paia`, `-mem0`, `-my-ta-jose`, `-etrading-boy`, `-tradey-boy-quant`, `-photonic-inventory`, `-terrac-com` | `repository_dispatch` `deploy-<name>`, or dispatch | Shape A/B entry points for external repos: one fixed playbook each. | `deploy-ocean` |
 | `deploy-blog-terrac-com.yml` | `repository_dispatch` `deploy-blog-terrac-com` | `ocean/services/blog_terrac_com_static.yaml`, an ocean play. | `deploy-ocean` |
 | `deploy-netboot-images.yml` | `repository_dispatch` `deploy-netboot-images` | `infrastructure/netboot_image.yaml` with image and sha. Excluded from push detection. | `deploy-netboot` |
 | `deploy-registry-cache.yml` | `repository_dispatch` `deploy-registry-cache` | `infrastructure/registry_cache.yaml`. | `deploy-ocean` |

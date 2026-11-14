@@ -1,0 +1,26 @@
+services:
+  tradey_boy_quant:
+    image: {{ image }}:{{ version }}
+    container_name: {{ service }}
+    hostname: {{ service }}
+    restart: unless-stopped
+
+    env_file:
+      - {{ home }}/.env
+
+    environment:
+      - TZ=America/New_York
+
+    # quant.db lives at {{ home }}/data/quant.db. etrading_boy mounts the
+    # same directory to read the signals, so it must stay a plain host dir.
+    volumes:
+      - {{ home }}/data:/data
+
+    # SIGTERM stops the daemon after the current cycle. SQLite keeps a
+    # killed write consistent, so this only buys a tidier exit.
+    stop_grace_period: 2m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"

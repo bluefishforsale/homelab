@@ -1,0 +1,115 @@
+---
+# tradey-boy-quant: the daemon that refreshes quant.db every few hours
+# (https://github.com/bluefishforsale/tradey-boy-quant). etrading_boy mounts
+# the same data dir and reads the signals as its Stack3 short-vol veto.
+# No port: nothing talks to it except through quant.db.
+- name: Deploy tradey-boy-quant signal daemon using Docker Compose
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: tradey_boy_quant
+    image: registry-cache.home:5005/bluefishforsale/tradey-boy-quant
+    version: latest
+    data: /data01
+    files: "{{ playbook_dir }}/../../../../files/tradey_boy_quant"
+    home: "{{ data }}/services/{{ service }}"
+    # NOTE: uid 1000 is both the image's quanty user and etrading-boy's bot
+    # user. The bot reads quant.db from this dir but still writes the WAL's
+    # -shm file, so changing either uid breaks the bot's signal reads.
+    uid: 1000
+    gid: 1000
+
+  tasks:
+
+  - name: Log ocean into ghcr-private-cache to pull private tradey-boy-quant image
+    ansible.builtin.shell: |
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
+    no_log: true
+
+  - name: Ensure base directory exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Ensure data directory exists, owned by the container user
+    ansible.builtin.file:
+      path: "{{ home }}/data"
+      state: directory
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0750'
+
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      owner: root
+      group: root
+      mode: '0644'
+    notify:
+    - Reload systemd daemon
+    - Restart tradey_boy_quant service
+
+  - name: Create tradey_boy_quant environment file
+    ansible.builtin.template:
+      src: "{{ files }}/tradey_boy_quant.env.j2"
+      dest: "{{ home }}/.env"
+      owner: root
+      group: root
+      mode: '0600'
+    no_log: true
+    notify:
+    - Reload systemd daemon
+    - Restart tradey_boy_quant service
+
+  - name: Create tradey_boy_quant systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    with_items:
+    - tradey_boy_quant.service
+    notify:
+    - Reload systemd daemon
+    - Restart tradey_boy_quant service
+
+  - name: Enable tradey_boy_quant service
+    ansible.builtin.systemd:
+      name: tradey_boy_quant.service
+      enabled: yes
+      daemon_reload: yes
+
+  # Always restart so a new :latest image is pulled and the container is
+  # recreated even when every template was byte-identical.
+  - name: Restart tradey_boy_quant service to pick up latest image
+    ansible.builtin.systemd:
+      name: tradey_boy_quant.service
+      state: restarted
+
+  # No port to probe, so the deploy gate is the image's healthcheck: it goes
+  # healthy once quant.db opens and has its signals table.
+  - name: Wait for tradey_boy_quant to report healthy
+    ansible.builtin.command: docker inspect --format '{{ '{{' }}.State.Health.Status{{ '}}' }}' {{ service }}
+    register: health
+    until: health.stdout == "healthy"
+    retries: 18
+    delay: 10
+    changed_when: false
+
+  handlers:
+  - name: Reload systemd daemon
+    ansible.builtin.systemd:
+      daemon_reload: yes
+
+  - name: Restart tradey_boy_quant service
+    ansible.builtin.systemd:
+      name: tradey_boy_quant.service
+      state: restarted
