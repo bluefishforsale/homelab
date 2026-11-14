@@ -170,9 +170,9 @@ jobs:
       - name: Post-deployment health check
         if: success()
         run: |
-          # harbor directly, then through ocean's forwarder, which is the address
-          # every client actually uses.
-          for url in http://192.168.1.32:8888/docs http://192.168.1.143:8888/docs; do
+          # harbor's API directly, then through the gateway that mem0.terrac.com
+          # lands on.
+          for url in http://192.168.1.32:8888/docs http://192.168.1.32:8767/docs; do
             if timeout 10 curl -fsS -o /dev/null "$url"; then
               echo "mem0 API serving $url"
             else
@@ -211,7 +211,7 @@ jobs:
           | Repository | bluefishforsale/mem0 |
           | Image | ghcr.io/bluefishforsale/mem0-api-server |
           | Host | harbor (192.168.1.32), Postgres on the 870 EVO |
-          | API | 192.168.1.143:8888 via ocean's forwarder (LAN only, ssh forward off-site) |
-          | MCP bridge | 192.168.1.143:8766 via ocean's forwarder |
+          | API | harbor.home:8888 on the LAN, https://mem0.terrac.com off it (Cloudflare Access service token) |
+          | MCP bridge | harbor.home:8766 on the LAN, https://mem0.terrac.com/mcp off it |
 
           EOF

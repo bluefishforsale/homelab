@@ -1,9 +1,9 @@
 name: Deploy ml-log-analyzer
 
-# harbor-only playbook, so it shares main-apply's group for harbor, which the
-# resolver derives from the playbook's first hosts line.
+# Every fleet deploy holds deploy-ocean, main-apply included, so two never
+# apply at once.
 concurrency:
-  group: deploy-harbor
+  group: deploy-ocean
   cancel-in-progress: false
 
 on:

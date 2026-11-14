@@ -36,6 +36,9 @@ services:
       - UP_UNIFI_DEFAULT_SAVE_IDS=true
       - UP_UNIFI_DEFAULT_SAVE_EVENTS=true
       - UP_UNIFI_DEFAULT_SAVE_ALARMS=true
+      # NOTE: the image's built-in up.conf ships [loki] disable = true, so the
+      # URL alone does nothing; without this line no logs reach Loki.
+      - UP_LOKI_DISABLE=false
       - UP_LOKI_URL={{ unpoller_loki_url }}
       - UP_UNIFI_DEFAULT_SAVE_ANOMALIES=false
       - UP_DEBUG=true

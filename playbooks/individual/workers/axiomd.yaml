@@ -1,0 +1,94 @@
+---
+# axiomd: the fleet's autonomous engineer (bluefishforsale/axiomd). Phase one runs `axiomd ops` only:
+# read-only triage notes on low-priority alerts, written by ocean's local model and posted to homelab's
+# alert issues as the axiomd GitHub App. It changes nothing on any host and spends nothing metered.
+#
+# On harbor beside mem0, off ocean's CPU. The image comes through ghcr-private-cache (#1511), floating on
+# latest: AxiomD's CI tags latest only from main, and the weekly docker refresh picks it up.
+- name: Deploy axiomd on harbor using Docker Compose
+  hosts: harbor
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../vault/secrets.yaml"
+
+  vars:
+    service: axiomd
+    image: registry-cache.home:5005/bluefishforsale/axiomd
+    version: latest
+    files: "{{ playbook_dir }}/../../../files/axiomd"
+    home: "/data01/services/{{ service }}"
+    # spare2, handed out so llama.cpp needs no restart for a new key. AxiomD's own named key replaces it
+    # the next time llamacpp.yaml restarts ocean's llama anyway.
+    llama_api_key: "{{ ai_services.llamacpp.api_keys.spare2 }}"
+
+  tasks:
+  - name: Read the state mount
+    ansible.builtin.command: findmnt -n -o FSTYPE /data01/services
+    register: state_mount
+    changed_when: false
+
+  - name: State lands on the local disk, not ocean's NFS
+    ansible.builtin.assert:
+      that: state_mount.stdout == 'ext4'
+      fail_msg: "/data01/services is '{{ state_mount.stdout }}', not the local ext4 disk; run data01_worker.yaml first"
+
+  - name: Log harbor into ghcr-private-cache to pull the private image
+    ansible.builtin.shell: |
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
+    no_log: true
+    changed_when: false
+
+  # Loud on a bad credential, before anything is stopped.
+  - name: Pull the axiomd image
+    ansible.builtin.command:
+      cmd: "docker pull {{ image }}:{{ version }}"
+    register: pull
+    changed_when: "'Downloaded newer image' in pull.stdout"
+
+  - name: Ensure axiomd home exists
+    ansible.builtin.file:
+      path: "{{ home }}"
+      state: directory
+      mode: '0755'
+
+  # The image runs as uid 10001; triage.db there keeps a restart from re-asking the model.
+  - name: Ensure the state directory is the container user's
+    ansible.builtin.file:
+      path: "{{ home }}/state"
+      state: directory
+      owner: '10001'
+      group: '10001'
+      mode: '0750'
+
+  # Compose carries the app's private key and the llama key.
+  - name: Create docker-compose.yml
+    ansible.builtin.template:
+      src: "{{ files }}/docker-compose.yml.j2"
+      dest: "{{ home }}/docker-compose.yml"
+      mode: '0600'
+    no_log: true
+
+  - name: Create axiomd systemd service
+    ansible.builtin.template:
+      src: "{{ files }}/axiomd.service.j2"
+      dest: /etc/systemd/system/axiomd.service
+      mode: '0644'
+
+  # Always restart so a deploy runs the image pulled above, even when every template was byte-identical.
+  - name: Enable and restart axiomd
+    ansible.builtin.systemd:
+      name: axiomd.service
+      enabled: true
+      state: restarted
+      daemon_reload: true
+
+  # A bad key or config exits the container at startup, which a foreground unit reports as failed.
+  - name: Give axiomd time to fail on a bad config
+    ansible.builtin.wait_for:
+      timeout: 20
+
+  - name: axiomd is still running
+    ansible.builtin.command: systemctl is-active axiomd.service
+    changed_when: false

@@ -33,6 +33,14 @@ route:
   receiver: 'agentbox'
 
   routes:
+  # ml-log-analyzer's LogAnomaly alerts are input for AxiomD's triage, not
+  # pages. Each anomaly is its own problem_id, so on a cold start it raised one
+  # alert, GitHub issue, email, and ntfy push a minute (12 issues in 5 minutes,
+  # 2026-11-12). Until AxiomD consumes them they stop here, still visible in
+  # Alertmanager and karma. Must stay first: the critical route below would
+  # otherwise catch a critical anomaly.
+  - matchers: ['alertname="LogAnomaly"']
+    receiver: 'quiet'
   # Hardware that needs hands (UPS battery, PSU, disk): the first push is the
   # signal, and nothing changes until someone swaps a part, so remind daily.
   # Must stay above the critical route, which would otherwise catch the
@@ -52,6 +60,9 @@ inhibit_rules:
     equal: ['alertname', 'dev', 'instance']
 
 receivers:
+# No notifiers: alerts routed here are held in Alertmanager and nowhere else.
+- name: 'quiet'
+
 # agentbox alert receiver: fans out to ntfy (push) + GitHub issues, and routes
 # critical alerts to the premium lane. See files/agentbox/alert-receiver.py.
 - name: 'agentbox'

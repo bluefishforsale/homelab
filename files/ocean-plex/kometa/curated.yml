@@ -755,6 +755,65 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  How the West Was Really Won:
+    sort_title: "!How the West Was Really Won"
+    summary: "The frontier without the myth: land grabs, immigrants, outlaws, the Civil War and the people pushed off the map, from Unforgiven to Killers of the Flower Moon."
+    tmdb_movie:
+      - 10935    # Heaven's Gate (1980)
+      - 14729    # The Long Riders (1980)
+      - 11509    # Silverado (1985)
+      - 11967    # Young Guns (1988)
+      - 9665     # Glory (1989)
+      - 581      # Dances with Wolves (1990)
+      - 9086     # Young Guns II (1990)
+      - 123938   # Thousand Pieces of Gold (1991)
+      - 11259    # Far and Away (1992)
+      - 9361     # The Last of the Mohicans (1992)
+      - 33       # Unforgiven (1992)
+      - 11969    # Tombstone (1993)
+      - 4476     # Legends of the Fall (1994)
+      - 12160    # Wyatt Earp (1994)
+      - 922      # Dead Man (1995)
+      - 10212    # Ravenous (1999)
+      - 22267    # Ride with the Devil (1999)
+      - 3131     # Gangs of New York (2002)
+      - 2289     # Cold Mountain (2003)
+      - 11400    # The New World (2005)
+      - 13249    # Seraphim Falls (2007)
+      - 4512     # The Assassination of Jesse James by the Coward Robert Ford (2007)
+      - 7345     # There Will Be Blood (2007)
+      - 44264    # True Grit (2010)
+      - 57120    # Meek's Cutoff (2011)
+      - 68718    # Django Unchained (2012)
+      - 72976    # Lincoln (2012)
+      - 76203    # 12 Years a Slave (2013)
+      - 152599   # The Immigrant (2013)
+      - 264656   # The Homesman (2014)
+      - 284284   # The Keeping Room (2014)
+      - 294963   # Bone Tomahawk (2015)
+      - 223485   # Slow West (2015)
+      - 273248   # The Hateful Eight (2015)
+      - 281957   # The Revenant (2015)
+      - 324560   # Brimstone (2016)
+      - 316152   # Free State of Jones (2016)
+      - 384680   # Hostiles (2017)
+      - 399019   # The Beguiled (2017)
+      - 537996   # The Ballad of Buster Scruggs (2018)
+      - 440161   # The Sisters Brothers (2018)
+      - 558582   # First Cow (2020)
+      - 581032   # News of the World (2020)
+      - 785663   # Old Henry (2021)
+      - 618162   # The Harder They Fall (2021)
+      - 600583   # The Power of the Dog (2021)
+      - 843846   # Butcher's Crossing (2023)
+      - 466420   # Killers of the Flower Moon (2023)
+      - 932086   # Horizon: An American Saga - Chapter 1 (2024)
+      - 1032425  # The Dead Don't Hurt (2024)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s

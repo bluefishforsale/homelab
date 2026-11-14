@@ -2,7 +2,7 @@
 name: Deploy registry-cache
 
 concurrency:
-  group: deploy-registry-cache
+  group: deploy-ocean
   cancel-in-progress: false
 
 on:

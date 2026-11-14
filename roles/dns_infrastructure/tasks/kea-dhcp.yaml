@@ -9,7 +9,7 @@
     src: kea/kea-dhcp4.conf.j2
     dest: "{{ dns_home }}/config/kea-dhcp4.conf"
     mode: '0644'
-    validate: docker run --rm --network host -v %s:/etc/kea/kea-dhcp4.conf:ro jonasal/kea-dhcp4:2 -t /etc/kea/kea-dhcp4.conf
+    validate: docker run --rm --network host -v %s:/etc/kea/kea-dhcp4.conf:ro {{ dns_reg_hub }}jonasal/kea-dhcp4:2 -t /etc/kea/kea-dhcp4.conf
   notify: Restart kea
 
 - name: Deploy Kea DHCP-DDNS configuration

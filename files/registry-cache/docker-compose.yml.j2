@@ -5,14 +5,14 @@
 services:
   # ── Docker Hub pull-through cache ──────────────────────────────────────
   docker-hub-cache:
-    image: registry:2
+    image: registry:3
     container_name: docker-hub-cache
     restart: unless-stopped
     ports:
       - "5001:5000"
       - "5011:5001"
     volumes:
-      - {{ home }}/config/docker-hub.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/docker-hub.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/docker-hub:/var/lib/registry
     environment:
       TZ: America/Los_Angeles
@@ -30,14 +30,14 @@ services:
 
   # ── ghcr.io pull-through cache ─────────────────────────────────────────
   ghcr-cache:
-    image: registry:2
+    image: registry:3
     container_name: ghcr-cache
     restart: unless-stopped
     ports:
       - "5002:5000"
       - "5012:5001"
     volumes:
-      - {{ home }}/config/ghcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/ghcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/ghcr:/var/lib/registry
     environment:
       TZ: America/Los_Angeles
@@ -55,14 +55,14 @@ services:
 
   # ── registry.gitlab.com pull-through cache ─────────────────────────────
   gitlab-cache:
-    image: registry:2
+    image: registry:3
     container_name: gitlab-cache
     restart: unless-stopped
     ports:
       - "5003:5000"
       - "5013:5001"
     volumes:
-      - {{ home }}/config/gitlab.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/gitlab.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/gitlab:/var/lib/registry
     environment:
       TZ: America/Los_Angeles
@@ -80,14 +80,14 @@ services:
 
   # ── nvcr.io pull-through cache ─────────────────────────────────────────
   nvcr-cache:
-    image: registry:2
+    image: registry:3
     container_name: nvcr-cache
     restart: unless-stopped
     ports:
       - "5004:5000"
       - "5014:5001"
     volumes:
-      - {{ home }}/config/nvcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/nvcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/nvcr:/var/lib/registry
     environment:
       TZ: America/Los_Angeles
@@ -105,14 +105,14 @@ services:
 
   # ── ghcr.io private-image cache ───────────────────────────────────────
   ghcr-private-cache:
-    image: registry:2
+    image: registry:3
     container_name: ghcr-private-cache
     restart: unless-stopped
     ports:
       - "5005:5000"
       - "5015:5001"
     volumes:
-      - {{ home }}/config/ghcr-private.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/ghcr-private.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/ghcr-private:/var/lib/registry
       - {{ home }}/auth/ghcr-private.htpasswd:/auth/htpasswd:ro
     environment:
@@ -131,14 +131,14 @@ services:
 
   # ── gcr.io pull-through cache ──────────────────────────────────────────
   gcr-cache:
-    image: registry:2
+    image: registry:3
     container_name: gcr-cache
     restart: unless-stopped
     ports:
       - "5006:5000"
       - "5016:5001"
     volumes:
-      - {{ home }}/config/gcr.yml:/etc/docker/registry/config.yml:ro
+      - {{ home }}/config/gcr.yml:/etc/distribution/config.yml:ro
       - {{ home }}/data/gcr:/var/lib/registry
     environment:
       TZ: America/Los_Angeles
