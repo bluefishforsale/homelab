@@ -82,8 +82,15 @@ refresh_checkout "$root"
 # delays the lane. Its output and any non-zero exit land in this unit's
 # journal. The lock (shared with the playbook's run) skips the sync while
 # another is still going instead of racing it.
-( flock -n -E 0 "$root/.git/sync.lock" "$root/scripts/sync.sh" \
-    || echo "WARN: sub-repo sync.sh exited $?; see FAILED lines above" >&2 ) &
+(
+  rc=0
+  flock -n -E 75 "$root/.git/sync.lock" "$root/scripts/sync.sh" || rc=$?
+  case $rc in
+    0) ;;
+    75) echo "sub-repo sync skipped: another sync holds the lock" >&2 ;;
+    *) echo "WARN: flock/sync.sh exited ${rc}" >&2 ;;
+  esac
+) &
 /usr/local/bin/agentbox-trust-dir.sh "$root"
 
 # One launch attempt under a pty, exiting with the child's status so the caller

@@ -453,7 +453,7 @@
   - name: Warn about sub-repos sync.sh could not bring current
     ansible.builtin.debug:
       msg: "{{ (repos_sync.stdout_lines | select('match', '^FAILED') | list) + repos_sync.stderr_lines }}"
-    when: repos_sync.rc == 1
+    when: repos_sync.rc | default(0) == 1
 
   # --- Fleet SSH (remediation from a phone-driven RC session) ---
   # Every fleet host pulls authorized_keys from https://github.com/<user>.keys
@@ -772,6 +772,8 @@
           | awk '{print $1}' | while read -r unit; do
             lane=$(echo "$unit" | sed -E 's/agentbox-rc@(.*)\.service/\1/')
             # rc-launch.sh falls back to `--continue`, which carries no --name.
+            # NOTE: with a second lane this matches the other lane's --continue
+            # process too, and a dead lane would read as alive.
             exp=$(pgrep -f "claude remote-control (--name $lane|--continue)" | head -1 || true)
             cpid=""
             [ -n "$exp" ] && cpid=$(pgrep -P "$exp" -x claude | head -1 || true)
@@ -837,7 +839,7 @@
       state: started
       daemon_reload: yes
 
-  - name: Note remote-control requires manual login + repo clones
+  - name: Note remote-control requires manual login
     ansible.builtin.debug:
       msg: "On agentbox: 'claude /login', then 'systemctl start agentbox-rc@<lane>.service' for each agentbox_rc_lanes."
 
