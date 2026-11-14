@@ -12,13 +12,13 @@
 #   # per-HOME: ssh terrac@agentbox && claude /login
 #   gh auth login          # only if no vaulted PAT (agentbox.fleet_pat)
 #   gcloud auth login      # only if not using a vaulted service-account key
-#   for r in homelab photonic_inventory my-ta-jose; do \
-#     gh repo clone bluefishforsale/$r repos/$r; done   # rc-repo clones
+#   # ~/repos (the repositories-root checkout) and its sub-repos are set up
+#   # by this playbook; nothing to clone by hand.
 #   # Fleet SSH: the playbook generates ~/.ssh/id_ed25519 and prints the pubkey.
 #   # Paste it into https://github.com/settings/keys once; every host re-pulls
 #   # https://github.com/bluefishforsale.keys every 5 minutes. Delete it there
 #   # to revoke fleet-wide.
-#   sudo systemctl start agentbox-rc@homelab.service     # ...per rc repo, after /login
+#   sudo systemctl start agentbox-rc@repositories-root.service   # after /login
 #
 # Structure mirrors playbooks/individual/ocean/ai/paia.yaml.
 
@@ -99,9 +99,17 @@
     # agent with write access, so this is the trust boundary, not a preference.
     agentbox_issue_authors:
       - bluefishforsale
-    # Repos driven live via a per-repo Claude Code remote-control session
-    # (systemd template agentbox-rc@<repo>.service, cwd repos/<repo>).
-    agentbox_rc_repos:
+    # Claude Code remote-control lanes (systemd template agentbox-rc@<lane>,
+    # --name <lane> in claude.ai). Every lane runs from ~/repos, the
+    # repositories-root checkout, same as a laptop session starting at the
+    # workspace root, so one lane reaches every sub-repo and the root's
+    # CLAUDE.md, AGENTS.md index and .claude/settings.json. claude.ai refuses a
+    # second registration for the same folder (409), so this stays one lane.
+    agentbox_rc_lanes:
+      - repositories-root
+    # Per-repo lanes from before the root existed, stopped and disabled on
+    # deploy. Drop an entry once no host has it enabled.
+    agentbox_rc_retired_lanes:
       - homelab
       - photonic_inventory
       - my-ta-jose
@@ -371,17 +379,6 @@
     loop_control:
       label: "{{ item.0.name }}:{{ item.1 }}"
 
-  # RC clones belong to the lane owner only; the units' WorkingDirectory is
-  # {{ home }}/repos/<repo>, so a second copy elsewhere would just go stale.
-  - name: Ensure RC lane repo directories exist
-    ansible.builtin.file:
-      path: "{{ home }}/repos/{{ item }}"
-      state: directory
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: '0755'
-    loop: "{{ agentbox_rc_repos }}"
-
   # --- git config per account (commit identity + token-backed https) ---
   # The lane commits as `agentbox`; the human account commits as itself, so a
   # push from an interactive session is not attributed to the robot.
@@ -405,6 +402,58 @@
     loop_control:
       label: "{{ item.name }}"
     changed_when: false
+
+  # ~/repos is the workspace root repo (private, so after the credential helper
+  # above). Initialized in place, not cloned: the old per-repo lane clones
+  # already sit at ~/repos/<repo> and git clone refuses a non-empty directory.
+  # NOTE: the guard is a resolvable HEAD, not the presence of .git. A run that
+  # dies after `git init` must be retried, or the lane comes up in an empty
+  # root forever.
+  - name: Make ~/repos the repositories-root checkout
+    ansible.builtin.shell: |
+      set -eu
+      cd {{ home }}/repos
+      git rev-parse -q --verify HEAD >/dev/null && exit 0
+      url=https://github.com/bluefishforsale/repositories-root.git
+      git init -q -b main
+      git remote add origin "$url" 2>/dev/null || git remote set-url origin "$url"
+      git fetch -q origin main
+      git checkout -q -B main origin/main
+      git branch -q -u origin/main
+      echo initialized
+    args:
+      executable: /bin/bash
+    become: true
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+      GH_TOKEN: "{{ (agentbox | default({})).fleet_pat | default('') }}"
+    register: repos_root
+    changed_when: "'initialized' in repos_root.stdout"
+
+  # The first run clones every sub-repo (a few GB, cockroach-hpc alone ~2G),
+  # too slow to put in front of a lane launch. sync.sh exits 1 for a sub-repo
+  # it couldn't clone, fetch or fast-forward; that warns rather than fails,
+  # because one diverged sandbox repo would otherwise fail every agentbox apply
+  # and hold `deployed` back. Anything else (timeout, missing script) fails.
+  # The lock is shared with rc-launch.sh's background run.
+  - name: Clone and fast-forward root sub-repos
+    ansible.builtin.command: "flock {{ home }}/repos/.git/sync.lock {{ home }}/repos/scripts/sync.sh"
+    become: true
+    become_user: "{{ user }}"
+    environment:
+      HOME: "{{ home }}"
+      GH_TOKEN: "{{ (agentbox | default({})).fleet_pat | default('') }}"
+    register: repos_sync
+    changed_when: "'cloned' in (repos_sync.stdout | default(''))"
+    failed_when: repos_sync.rc is not defined or repos_sync.rc not in [0, 1]
+    async: 3600
+    poll: 15
+
+  - name: Warn about sub-repos sync.sh could not bring current
+    ansible.builtin.debug:
+      msg: "{{ (repos_sync.stdout_lines | select('match', '^FAILED') | list) + repos_sync.stderr_lines }}"
+    when: repos_sync.rc | default(0) == 1
 
   # --- Fleet SSH (remediation from a phone-driven RC session) ---
   # Every fleet host pulls authorized_keys from https://github.com/<user>.keys
@@ -688,17 +737,23 @@
       state: restarted
       daemon_reload: yes
 
-  # Per-repo remote-control instances are enabled (start on boot) but not
-  # started now: they need the one-time interactive `claude /login` and a clone
-  # of each repo into repos/<repo> first (see header). After bootstrap they
-  # come up on the next boot or via `systemctl start`.
-  - name: Enable and start per-repo remote-control instances
+  # The template is shared, so retiring a lane is stopping and disabling its
+  # instance; there is no unit file to remove.
+  - name: Stop and disable retired per-repo RC lanes
     ansible.builtin.systemd:
       name: "agentbox-rc@{{ item }}.service"
-      enabled: yes
+      state: stopped
+      enabled: false
+    loop: "{{ agentbox_rc_retired_lanes }}"
+
+  # Lanes need the one-time interactive `claude /login` first (see header).
+  - name: Enable and start remote-control lanes
+    ansible.builtin.systemd:
+      name: "agentbox-rc@{{ item }}.service"
+      enabled: true
       state: started
-      daemon_reload: yes
-    loop: "{{ agentbox_rc_repos }}"
+      daemon_reload: true
+    loop: "{{ agentbox_rc_lanes }}"
 
   # An RC lane's websocket to claude.ai can die silently: the process stays
   # alive (so Restart=always never fires) but stops receiving, and the app sees
@@ -716,7 +771,10 @@
         systemctl list-units 'agentbox-rc@*.service' --state=active --no-legend --plain 2>/dev/null \
           | awk '{print $1}' | while read -r unit; do
             lane=$(echo "$unit" | sed -E 's/agentbox-rc@(.*)\.service/\1/')
-            exp=$(pgrep -f "claude remote-control --name $lane" | head -1 || true)
+            # rc-launch.sh falls back to `--continue`, which carries no --name.
+            # NOTE: with a second lane this matches the other lane's --continue
+            # process too, and a dead lane would read as alive.
+            exp=$(pgrep -f "claude remote-control (--name $lane|--continue)" | head -1 || true)
             cpid=""
             [ -n "$exp" ] && cpid=$(pgrep -P "$exp" -x claude | head -1 || true)
             reason=""
@@ -781,9 +839,9 @@
       state: started
       daemon_reload: yes
 
-  - name: Note remote-control requires manual login + repo clones
+  - name: Note remote-control requires manual login
     ansible.builtin.debug:
-      msg: "On agentbox: 'claude /login', clone each agentbox_rc_repos into repos/<repo>, then 'systemctl start agentbox-rc@<repo>.service'."
+      msg: "On agentbox: 'claude /login', then 'systemctl start agentbox-rc@<lane>.service' for each agentbox_rc_lanes."
 
   # --- Shared agent config (skills, commands, scripts, MCP) ---
   # One source tree (files/agentbox/shared) fanned out to both lanes. Autonomous
@@ -1012,6 +1070,9 @@
   - name: Restart RC sessions
     # restart, not try-restart: try-restart skips units that are stopped/failed,
     # leaving a dead lane dead. restart revives them so config changes reconcile
-    # every configured lane back up.
-    ansible.builtin.command: systemctl restart 'agentbox-rc@*.service'
-    changed_when: true
+    # every configured lane back up. Named, not 'agentbox-rc@*.service': the
+    # glob matches any instance systemd still has loaded, retired lanes included.
+    ansible.builtin.systemd:
+      name: "agentbox-rc@{{ item }}.service"
+      state: restarted
+    loop: "{{ agentbox_rc_lanes }}"
