@@ -759,7 +759,7 @@
   # alive (so Restart=always never fires) but stops receiving, and the app sees
   # a dead environment. A healthy lane receives keepalive data every few seconds,
   # so a lane with no claude child, no ESTABLISHED :443 socket, or no inbound on
-  # any of them for 3 minutes is hung — restart it.
+  # any :443 socket for a minute is hung: restart it.
   - name: Install RC liveness watchdog script
     ansible.builtin.copy:
       dest: /usr/local/sbin/agentbox-rc-watchdog
@@ -767,7 +767,9 @@
       content: |
         #!/bin/sh
         set -eu
-        STALE_MS=180000
+        # The websocket receives every 5-15s. Keep this tight: any other :443
+        # socket with inbound traffic inside the window masks a hung websocket.
+        STALE_MS=60000
         systemctl list-units 'agentbox-rc@*.service' --state=active --no-legend --plain 2>/dev/null \
           | awk '{print $1}' | while read -r unit; do
             lane=$(echo "$unit" | sed -E 's/agentbox-rc@(.*)\.service/\1/')
@@ -782,19 +784,20 @@
               reason="no claude process"
             else
               age=$(ps -o etimes= -p "$cpid" 2>/dev/null | tr -d ' ' || echo 0)
-              # The freshest socket, not the stalest: claude also holds idle
-              # :443 sockets beside the websocket (four on 2026-11-14), and the
-              # stalest one passed STALE_MS within four minutes, so the
-              # repositories-root lane was restarted every four minutes while
-              # its websocket was live. Only a lane with every socket silent is hung.
-              minrcv=$(ss -tinp state established "dst :443" 2>/dev/null \
+              # NOTE: judge the FRESHEST :443 socket, not the stalest. claude keeps
+              # idle keep-alive sockets beside the RC websocket, and they pass
+              # STALE_MS about 4 minutes in, so taking the max restarted every
+              # healthy lane on that cycle (~45 restarts/hour across 3 lanes)
+              # and killed whatever session was being driven.
+              rcvs=$(ss -tinp state established "dst :443" 2>/dev/null \
                 | grep -A1 "pid=$cpid," | grep -oE 'lastrcv:[0-9]+' \
-                | cut -d: -f2 | sort -n | head -1 || true)
-              if [ -z "$minrcv" ]; then
+                | cut -d: -f2 | sort -n | tr '\n' ' ' || true)
+              rcv=${rcvs%% *}
+              if [ -z "$rcv" ]; then
                 # grace: a freshly-spawned claude takes a few seconds to connect
                 [ "${age:-0}" -ge 90 ] && reason="no :443 socket"
-              elif [ "$minrcv" -gt "$STALE_MS" ]; then
-                reason="stale lastrcv=${minrcv}ms"
+              elif [ "$rcv" -gt "$STALE_MS" ]; then
+                reason="stale lastrcv=${rcv}ms (all sockets: ${rcvs% })"
               fi
             fi
             if [ -n "$reason" ]; then
