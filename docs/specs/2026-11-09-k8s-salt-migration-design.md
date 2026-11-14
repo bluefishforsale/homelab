@@ -65,7 +65,7 @@ stands; the reason is fsync latency, not rotation.
 
 | Tier | What | Runs on | Managed by |
 |---|---|---|---|
-| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, Salt master, registry-cache, k3s server, gh-runner, agentbox, ntfy and the dead-man watchdog (both on agentbox) | Plain VMs and hosts | VM definitions: `terraform-root`. Inside the VM: Ansible now, Salt later |
+| 0: break-glass | DNS pair, DHCP, Proxmox, ZFS and NFS on the ocean host, registry-cache, k3s server, gh-runner, agentbox, ntfy and the dead-man watchdog (both on agentbox) | Plain VMs and hosts | VM definitions: `terraform-root`. Inside the VM: Ansible now, Salt later |
 | 1: platform | Argo CD, cert-manager, secrets operator, Cilium Gateway, NVIDIA device plugin, NFS and local storage classes, kube-prometheus-stack, Alloy | The cluster | Argo CD |
 | 2: apps | Every service that runs as a container today | The cluster | Argo CD |
 
@@ -361,7 +361,7 @@ replacement patterns:
 | Plain k8s agent | future agents without passthrough | Blue/green: new VM joins, old one is cordoned, drained, removed. Zero app downtime for anything with a second replica or no local state. |
 | k3s server | `k3s-server01` | New VM built and patched, old one stopped, the nightly SQLite backup (plus token and `server/tls`) restored onto the new one, which takes the old IP and MAC. API down for minutes, workloads keep running. This is the same restore rehearsed in phase 1. |
 | Passthrough VM | ocean (GPU plus HBA plus pool), `k3s-agent01` (passed-through scratch disk) | The passthrough swap, below. |
-| Tier 0 VM | Salt master, registry-cache, runners, agentbox | Rebuilt from config (Ansible now, Salt later), cut over by IP. DNS pair: terrac only. |
+| Tier 0 VM | registry-cache, runners, agentbox | Rebuilt from config (Ansible now, Salt later), cut over by IP. DNS pair: terrac only. |
 
 ### Passthrough swap procedure
 
@@ -530,25 +530,66 @@ path that runs on the thing that died sends nothing.
 
 ### Salt
 
-- **Master**: a small VM, `salt01`, on node005. Tier 0. Not in the cluster:
-  the master must be able to repair the hosts the cluster runs on, so it cannot
-  depend on them. This settles the chicken-and-egg question.
-- **Minions**: every Linux host in the inventory, Proxmox hosts included. Not
+- **Masterless (D7)**: no master, no `salt-minion` daemon. Every host runs
+  `salt-call --local` against its own checkout of the Salt repo, with
+  `file_client: local` and `file_roots` and `pillar_roots` pointing at that
+  checkout. There is no tier 0 Salt VM, so nothing central has to be up for a
+  host to be repaired, and the chicken-and-egg question does not arise. The
+  minion `id` is set explicitly to the inventory name, never derived from the
+  hostname.
+- **Hosts**: every Linux host in the inventory, Proxmox hosts included. Not
   the Mac.
 - **Repo**: new repo, `homelab-salt` (name is the builder's call).
 - **Apply model**: no scheduled highstate. Changes apply through CI, per changed
   state, from the self-hosted runner, mirroring today's impact detection and
-  serialization. A scheduled `state.apply test=True` reports drift (coordination
-  rule 8).
+  serialization: for each impacted host the runner SSHes in, checks the repo
+  out at the merged commit (an exact SHA, not a branch tip, so what applies is
+  what was reviewed) and runs `salt-call --local state.apply <state>`, one host
+  at a time under `deploy-ocean`. The SSH path is the one Ansible uses today;
+  no new port or daemon.
+- **Drift (coordination rule 8)**: a systemd timer on each host runs
+  `state.apply test=True` against its checked-out commit and writes a
+  node-exporter textfile metric (states that would change, failures, last run
+  time, the commit's age). Alerts: any would-change state for more than a day,
+  a failed run, or a checkout more than 7 days behind `master`. No central
+  collector is needed.
+- **No master features**: no mine, no reactor, no event bus, no
+  `salt '*' cmd.run`. Cross-host data (the k3s server URL and join token, the
+  NFS server address) lives in pillar. Cross-host ordering (k3s server before
+  agents) is the CI workflow's order, not Salt orchestrate. Ad hoc fleet
+  commands stay with `scripts/fleet-systemctl.sh` and friends.
+- **Bootstrap**: the Salt onedir package pinned to one version and held,
+  `/etc/salt/minion.d/masterless.conf`, the host's age key, and the repo
+  checkout. Installed by one Ansible play first (the last role Ansible gains),
+  then by cloud-init in the base template that `terraform-root` builds. Salt's
+  upstream package repo has moved before; verify the repo URL and signing key
+  at phase 6 start and mirror the pinned `.deb` rather than trusting the URL to
+  stay put.
+- **DNS pair**: excluded from CI's target list by a deny list in the apply
+  workflow, enforced by a CI test. terrac runs `salt-call --local` on dns01 and
+  dns02 by hand, one at a time.
 - **Ownership**: a host concern is owned by exactly one of Ansible or Salt at a
   time. The PR that turns on a Salt state deletes the Ansible role or play that
   owned the same concern.
 - **Hard limits carry over**: DNS, sshd, `authorized_keys`, the fleet key and
   port 22 firewall rules may be ported to Salt only by terrac, by hand.
 - **Secrets**: host secrets move from ansible-vault to Salt pillar encrypted
-  with the same sops/age scheme. The vault cannot be archived until every key
-  has a new home, including the cluster's age key and the Cloudflare Access
-  email lists that `terraform-root` still reads from it.
+  with the same sops/age scheme. With a master, the master decides which host
+  sees which pillar; masterless, every host holds the whole repo, so the
+  encryption does that job instead. Pillar is split per host
+  (`pillar/hosts/<id>.sls`) and per shared need (`pillar/shared/<name>.sls`,
+  for example the k3s join token), and `.sops.yaml` creation rules encrypt each
+  file to terrac's key, the CI key, and only the host keys that need it. Each
+  host's age key is generated on the host at bootstrap (`/etc/salt/age.key`,
+  root, `0400`) and only its public half is committed. A host therefore
+  decrypts its own pillar and nothing else, and a lost host key means a rekey,
+  not a fleet compromise. How pillar gets decrypted at render time (a sops
+  renderer, an `ext_pillar`, or a wrapper that decrypts to tmpfs before
+  `salt-call`) is the builder's call; verify Salt's support for it at phase 6
+  start (not checked here). Q9 covers the alternative of hosts holding no key.
+  The vault cannot be archived until every key has a new home, including the
+  cluster's age key and the Cloudflare Access email lists that `terraform-root`
+  still reads from it.
 - **Order**: base system first (packages, users, node-exporter, docker on the
   remaining Docker hosts), then the k3s install and upgrade (after phase 3, so
   the playbook that survived three upgrades is the reference), then Proxmox

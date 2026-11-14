@@ -39,7 +39,7 @@ hard limits so a phase plan cannot quietly drop one.
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
 | 2026 Q4 | Phase 0 | | |
-| 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Master and minions |
+| 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
 | 2027 Q2 | Phase 2 (harbor), Phase 3 (ocean joins, GPU gate) | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W1 to W5) | | k3s install moves to Salt |
 | 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS (terrac) |
@@ -55,7 +55,7 @@ must leave room for it.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons); signs off D19, D21,
+- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons), Q9 (masterless pillar keys); signs off D19, D21,
       D23. Q7 (is Salt still worth it) answered before phase 6 work starts.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
@@ -229,9 +229,15 @@ k3s-only.
 
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
-- [ ] `salt01` VM on node005 (tier 0); `homelab-salt` repo with CI apply and a
-      scheduled `test=True` drift report.
-- [ ] Minions on every Linux host.
+- [ ] `homelab-salt` repo: `file_client: local` layout, `.sops.yaml` per-host
+      creation rules, CI apply over SSH at the merged SHA, DNS deny list with a
+      test. No master VM (D7).
+- [ ] Bootstrap play (Ansible, then cloud-init in the base template): pinned
+      Salt onedir held, masterless minion config, host age key generated on
+      the host, repo checkout.
+- [ ] Per-host `test=True` drift timer, node-exporter textfile metric, alert
+      rules (would-change over a day, failed run, checkout over 7 days stale).
+- [ ] Test that a host cannot decrypt another host's pillar.
 - [ ] Port by concern, one per PR, each deleting the Ansible owner in the same
       change: base packages and users, node-exporter, unattended-upgrades and
       the patch metrics, docker on remaining Docker hosts, registry-cache,

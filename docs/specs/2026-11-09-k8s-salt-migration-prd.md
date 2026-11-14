@@ -42,8 +42,9 @@ where merge is deploy.
 
 ## Anti-goals (failure even if it technically works)
 
-- **A1.** Anything in tier 0 depends on the cluster being up (Salt master,
-  DNS, registry cache, the k3s server's backup, the dead-man alert).
+- **A1.** Anything in tier 0 depends on the cluster being up (DNS, registry
+  cache, the k3s server's backup, the dead-man alert), or a host's Salt apply
+  depends on anything but its own checkout and pillar.
 - **A2.** Any database or SQLite file ends up on NFS.
 - **A3.** A service runs as a Docker container and a pod at the same time
   against the same state.
@@ -74,7 +75,7 @@ where merge is deploy.
 | D4 | Ocean joins as the GPU agent in phase 3 and runs Docker and k3s side by side for the whole migration; services move one at a time (least downtime per service). | design call, signed off by terrac |
 | D5 | New small server VM on node006; new agent VM on node005 replaces the harbor VM. Both defined in `terraform-root`. | terrac (server VM), design call (server is not ocean) |
 | D6 | Argo CD, Helm charts, app-of-apps, in `homelab-kube` brought up to date. | terrac |
-| D7 | Salt master outside the cluster, on its own VM. | design call (resolves chicken-and-egg) |
+| D7 | Salt runs masterless: `salt-call --local` on each host from a checkout of `homelab-salt`, driven by CI over SSH. No master VM, no minion daemon. Supersedes the 2026-11-09 `salt01` master design. | terrac (2026-11-14) |
 | D8 | Upgrade drill: start three minors behind stable, upgrade three times with Argo CD and test apps running, before any real service moves. | terrac |
 | D9 | `/data01` reaches the cluster via NFS from the ZFS passthrough on ocean, as today. | terrac |
 | D10 | No new IP ranges and no DNS changes; ocean's IP stays the front door. | design call |
@@ -108,12 +109,22 @@ where merge is deploy.
 - **Q7.** Is Salt still worth it? After this migration, services are in
   Kubernetes and VMs are in `terraform-root`. What is left for a host tool is
   small: base packages, users, exporters, the k3s install, NFS and drivers, on
-  about a dozen hosts. Salt adds a master VM, a minion on every host, a new
-  repo and a new CI path for that. The alternative is a slimmed-down Ansible
-  in a renamed repo. Salt stays in the plan as decided; this asks for a
-  deliberate yes before phase 6 work starts.
+  about a dozen hosts. Masterless (D7) drops the master VM, but it also drops
+  most of what Salt has over Ansible (mine, reactor, event bus, central
+  targeting): CI SSHing in to run a local apply is Ansible's model with a
+  different DSL. What masterless Salt still adds is a local apply that works
+  with CI and the network down, and a cheap per-host `test=True` drift timer.
+  The alternative is a slimmed-down Ansible in a renamed repo plus a `--check`
+  drift timer. Salt stays in the plan as decided; this asks for a deliberate
+  yes before phase 6 work starts.
 - **Q8.** `avahi-daemon`, `netatalk` and `glances` run on ocean outside any
   container: keep on the host or drop.
+- **Q9.** Masterless pillar secrets: (a) each host holds its own age key and
+  decrypts only the pillar encrypted to it; (b) hosts hold no key and CI
+  decrypts and pushes just that host's pillar to tmpfs for each run.
+  Recommendation: (a), because the drift timer and a break-glass local apply
+  both need pillar on the host when CI is not there; (b) keeps keys off hosts
+  but means secret-bearing states cannot be drift-checked or applied by hand.
 
 ## Requirements
 
@@ -137,8 +148,11 @@ where merge is deploy.
 - **R8.** Upgrade log: each upgrade records add-on compatibility checked,
   removed APIs found, what broke, what the play missed, API downtime and app
   downtime.
-- **R9.** Salt states applied through CI with drift reported by a scheduled
-  `test=True` run. No scheduled highstate.
+- **R9.** Salt runs masterless. States applied through CI (`salt-call --local`
+  over SSH at the merged SHA); drift reported by a per-host `test=True` timer
+  as a node-exporter metric with an alert. No scheduled highstate. A host
+  decrypts only the pillar encrypted to its own key. The DNS pair is on a
+  CI-enforced deny list.
 - **R10.** `unattended-upgrades` (security origin) on every VM except the DNS
   pair, which terrac patches by hand; NVIDIA, ZFS and
   kernel packages held on passthrough and module-building hosts, and moved in
@@ -173,7 +187,7 @@ where merge is deploy.
 | 4 | Every Docker service on ocean is a pod or explicitly parked. |
 | 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
 | 5b | Passthrough swap rehearsed on `k3s-agent01`, then, with Docker drained, ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
-| 6 | Every host is a Salt minion; every Ansible role and play is deleted or ported. |
+| 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; a host cannot decrypt another host's pillar (tested); every Ansible role and play is deleted or ported. |
 | 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). `homelab` archived. |
 
 ## Success measures
