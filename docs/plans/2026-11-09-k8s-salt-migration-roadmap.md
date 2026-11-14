@@ -57,8 +57,9 @@ must leave room for it.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons), Q9 (masterless pillar keys); signs off D19, D21,
-      D23. Q7 (is Salt still worth it) answered before phase 6 work starts.
+- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons), Q9 (masterless pillar keys), Q10 (third
+      resolver); signs off D19, D21, D23, D26 (VMs are cattle), D32 (recovery
+      key). Q7 (is Salt still worth it) answered before phase 6 work starts.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
 - [ ] `homelab-kube`: sops from GPG to age; age private key into the vault at
@@ -79,8 +80,27 @@ must leave room for it.
       backup.
 - [ ] Agree the branch and merge policy for `homelab-kube` (merge is deploy
       under Argo CD auto-sync); add it to `docs/architecture/agent-autonomy.md`.
-- [ ] Debian 13 base image for new VMs on both hypervisors, wherever
-      `terraform-root` sources it (9999 stays until nothing uses it).
+- [ ] Debian 13 base image per D30: stock genericcloud pinned by sha512,
+      mirrored to GCS, downloaded per node by `terraform-root` (9999 stays
+      until nothing uses it).
+
+Rebuild gaps that exist today, so they do not wait for 2027:
+
+- [ ] Fix `docs/architecture/overview.md`: node005's VM disks are on
+      `vmpool-storage`, not `local-lvm`.
+- [ ] D27, node006: two SSDs as ZFS mirror `vmpool` (terrac, by hand: free
+      bays and parts checked first); confirm whether `terraform-root` moves a
+      disk in place on `datastore_id`; then dns02, llmeval and ocean's root
+      disk moved off `local-lvm`, one per window, `terraform-root` updated in
+      the same change.
+- [ ] D28: config DB backup timer on both hypervisors (Ansible for now), GCS
+      prefix and write-only service account in `terraform-root`, freshness
+      metric and alert; one restore tested onto a nested Proxmox VM.
+- [ ] D32: recovery age key generated offline, added as a recipient to every
+      `.sops.yaml` (`terraform-root`, `homelab-kube`), files rekeyed; first
+      decrypt test recorded.
+- [ ] Q10 answered; if yes, the third resolver is built under Ansible now and
+      ported with the DNS pair in phase 6.
 
 **Gate:** all Phase 0 boxes checked; PRD phase 0 acceptance.
 
@@ -237,6 +257,9 @@ k3s-only.
 - [ ] Bootstrap play (Ansible, then cloud-init in the base template): pinned
       Salt onedir held, masterless minion config, host age key generated on
       the host, repo checkout.
+- [ ] Bootstrap script (D29): pinned `.deb` from the GCS mirror, verified by
+      hash; CI runs it in a clean Debian container; Ansible play wraps it for
+      existing hosts; cloud-init user-data calls it for new VMs.
 - [ ] Per-host `test=True` drift timer, node-exporter textfile metric, alert
       rules (would-change over a day, failed run, checkout over 7 days stale).
 - [ ] Test that a host cannot decrypt another host's pillar.
@@ -246,7 +269,15 @@ k3s-only.
       runners, agentbox.
 - [ ] k3s install and upgrade (after phase 3, using the play that survived the
       drill as the reference).
-- [ ] Proxmox hosts.
+- [ ] Proxmox hosts (D34): repos, IOMMU arguments for GRUB and
+      `proxmox-boot-tool`, vfio-pci binding with softdep ahead of `mpt3sas` and
+      `nvidia`, `zfs-import-*` limited to host pools on node006, `storage.cfg`
+      via `pvesm`, the D28 timer, NUT, exporters. Network bridges rendered,
+      `test=True` in CI, applied by terrac with the iDRAC console open.
+- [ ] D27 boot mirrors: node005 reinstalled onto a ZFS boot mirror as the
+      first hardware rehearsal of the recovery order, then node006.
+- [ ] DNS `rebuild_peer` mode (D33) built and drilled on the isolated test
+      pair (a sixth drill: delete a test peer, rebuild it, survivor untouched).
 - [ ] DNS and DHCP (D25), in this order:
   - [ ] Address table in pillar; CI check against `terraform-root` VM MACs.
   - [ ] CODEOWNERS and branch protection: terrac required on DNS, DHCP,
@@ -269,6 +300,11 @@ k3s-only.
 - [ ] Every vault key rehomed: cluster age key, host secrets to Salt pillar,
       the Cloudflare Access email lists `terraform-root` reads.
 - [ ] Every deployable repo dispatches to `homelab-kube`, none to `homelab`.
+- [ ] Per-chart backup CronJob and restore Job (D31) for every app with a
+      node-local database; `db-backup.sh` and `db_restore.yaml` retired.
+- [ ] Rebuild drill on the isolated bridge (design, "Rehearsal"): nested
+      Proxmox boot disk wiped, recovered from git and GCS only, every step
+      timed; result recorded; yearly repeat scheduled.
 - [ ] No playbook remains that is not superseded; `main-apply` disabled.
 - [ ] Docs worth keeping moved to `homelab-kube` or `homelab-salt`.
 - [ ] Repo archived.

@@ -37,6 +37,8 @@ where merge is deploy.
 - Replacing the DNS pair, DHCP, Proxmox, or the ZFS pool layout.
 - Moving `/data01` off ocean, or replacing NFS with a distributed storage
   system (Ceph, Longhorn).
+- An off-site copy of `/data01`. RAIDZ2 on the HBA is its only protection;
+  everything else needed to rebuild is in git or GCS.
 - Inventing a new chart style. The 2021 wrapper charts are upgraded and are
   the style every new app chart follows (D24).
 
@@ -96,6 +98,15 @@ where merge is deploy.
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, needs terrac's sign-off |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac (2026-11-14) |
+| D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, needs terrac's sign-off |
+| D27 | Both hypervisors: VM disks on a ZFS mirror `vmpool` separate from boot, and a mirrored boot disk. node006's VM storage moves first, in 2026, not 2027. | terrac asked for every rebuild gap closed (2026-11-14); shape is a design call |
+| D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
+| D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
+| D30 | The VM base image is stock Debian genericcloud, pinned by hash, mirrored to GCS, downloaded per node by `terraform-root`. No custom template build. | design call |
+| D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. | design call |
+| D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, needs terrac's sign-off |
+| D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
+| D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
 
 ## Open questions for terrac
 
@@ -122,6 +133,14 @@ where merge is deploy.
   yes before phase 6 work starts.
 - **Q8.** `avahi-daemon`, `netatalk` and `glances` run on ocean outside any
   container: keep on the host or drop.
+- **Q10.** A third resolver off the hypervisors. With dns01, dns02 and pihole
+  all VMs on node005 and node006, losing both hosts takes DNS away from the
+  whole house until node005 is back. Option: the Raspberry Pi
+  (`raspberry_pi.yaml` exists) as a third DHCP-advertised resolver, a
+  recursor with a copy of the `.home` zone rendered from the same address
+  table, managed by Salt like the pair. Recommendation: yes; it is cheap, and
+  it is the only item here that keeps the house online during the outage
+  itself rather than shortening it.
 - **Q9.** Masterless pillar secrets: (a) each host holds its own age key and
   decrypts only the pillar encrypted to it; (b) hosts hold no key and CI
   decrypts and pushes just that host's pillar to tmpfs for each run.
@@ -187,12 +206,21 @@ where merge is deploy.
   rebuilt per Debian release.
 - **R14.** The passthrough swap is a written runbook, rehearsed first on
   `k3s-agent01` (passed-through scratch disk) before it is used on ocean.
+- **R19.** The fleet rebuilds from git plus GCS plus `/data01`, in the order in
+  the design's "Disaster recovery" section, with no Ansible. Every input
+  outside git (age keys, Terraform state, DB dumps, the k3s backup, the
+  Proxmox config DBs, the Salt `.deb`, the Debian image) has a named home and
+  a freshness alert or test.
+- **R20.** No hypervisor keeps VM disks on its boot disk, and every boot disk
+  is mirrored (D27).
+- **R21.** A reinstalled node006 never imports `/data01` on the host: HBA bound
+  to vfio-pci before `mpt3sas`, pool auto-import off (D34).
 
 ## Acceptance (per phase gate)
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5, Q6 and Q8 answered, D19, D21 and D23 signed off. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5, Q6, Q8, Q9 and Q10 answered, D19, D21, D23, D26 and D32 signed off. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
 | 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
 | 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
@@ -201,7 +229,7 @@ where merge is deploy.
 | 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
 | 5b | Passthrough swap rehearsed on `k3s-agent01`, then, with Docker drained, ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
 | 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; a host cannot decrypt another host's pillar (tested); the DNS and DHCP rehearsal drills pass on the isolated test pair and Salt's rendered DNS and DHCP configs match Ansible's byte for byte before the flip; every Ansible role and play is deleted or ported. |
-| 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). `homelab` archived. |
+| 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). The rebuild drill passes from git and GCS only, with each step timed and recorded, and no Ansible. `homelab` archived. |
 
 ## Success measures
 

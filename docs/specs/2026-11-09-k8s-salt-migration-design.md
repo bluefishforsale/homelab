@@ -564,13 +564,18 @@ path that runs on the thing that died sends nothing.
   NFS server address) lives in pillar. Cross-host ordering (k3s server before
   agents) is the CI workflow's order, not Salt orchestrate. Ad hoc fleet
   commands stay with `scripts/fleet-systemctl.sh` and friends.
-- **Bootstrap**: the Salt onedir package pinned to one version and held,
-  `/etc/salt/minion.d/masterless.conf`, the host's age key, and the repo
-  checkout. Installed by one Ansible play first (the last role Ansible gains),
-  then by cloud-init in the base template that `terraform-root` builds. Salt's
-  upstream package repo has moved before; verify the repo URL and signing key
-  at phase 6 start and mirror the pinned `.deb` rather than trusting the URL to
-  stay put.
+- **Bootstrap (D29)**: one script, `bootstrap/bootstrap.sh` in `homelab-salt`,
+  for every host. It installs the Salt onedir `.deb` pinned by version and
+  sha256 and holds it, writes `/etc/salt/minion.d/masterless.conf` with the id
+  it is given, generates the host's age key and prints the public half. terrac
+  commits that public key and runs `sops updatekeys`; CI's next rsync brings
+  the tree. Bare metal (the Proxmox hosts) runs it by hand after install, since
+  there is no cloud-init there; VMs run the same script from cloud-init
+  user-data that `terraform-root` attaches. During the migration one Ansible
+  play calls the script on existing hosts, so there is a single code path from
+  day one. Salt's upstream package repo has moved before, so the script never
+  fetches from it: the pinned `.deb` is mirrored to GCS and verified by hash.
+  CI runs the script in a clean Debian container on every change to it.
 - **Ownership**: a host concern is owned by exactly one of Ansible or Salt at a
   time. The PR that turns on a Salt state deletes the Ansible role or play that
   owned the same concern.
@@ -684,6 +689,148 @@ halts at step 4, the primary untouched, the client still resolving and
 renewing its lease); a killed primary (the standby serves leases); and a zone
 change reaching the secondary. Results are recorded, then the test VMs are
 deleted.
+
+## Disaster recovery: rebuild from git
+
+The test case is both hypervisor boot disks dying at once. The probe below
+(read-only, 2026-11-14) is what decides what survives.
+
+| | node005 | node006 |
+|---|---|---|
+| Boot disk | SATADOM-ML 64 GB (`sdf`): `pve-root`, an empty `local-lvm` | Samsung 870 EVO 2TB (`sda`): `pve-root` **and** `local-lvm` |
+| VM disks | `vmpool-storage`, a ZFS mirror on two 860 EVO 1TB, separate from boot | `local-lvm` on the boot disk: ocean root (129G), dns02, llmeval (300G), template 9999 |
+| Boot disk dies | Proxmox and `/etc/pve` lost; every VM disk survives | Proxmox, `/etc/pve`, every VM disk and the template lost; only `/data01` (HBA passthrough) survives |
+
+The two nodes are not a Proxmox cluster (VMID 5000 exists on both), so
+neither holds the other's VM configs. No vzdump or Proxmox Backup Server job
+exists.
+
+### What git cannot rebuild, and where each lives
+
+| Thing | Home | Protection |
+|---|---|---|
+| terrac's age key | terrac's machines | Plus an offline **recovery** age key (D32), printed and on a USB stick in two places. Every sops file in every repo is also encrypted to it. A quarterly decrypt test proves it still works. |
+| Terraform state | GCS, versioned | Already so. |
+| DB dumps, k3s SQLite backup, Proxmox config DBs | `gs://homelab-db-backups`, versioned | Each has a freshness metric and alert. |
+| `/data01` | The HBA disks | RAIDZ2; imported by hand only. Not backed up off-site by this plan (see non-goals). |
+| Images | GHCR | Rebuildable from each app repo's CI. |
+| Salt `.deb`, Debian cloud image | GCS mirror, pinned by hash | Upstream URLs are not trusted to stay put. |
+
+### Decisions that close the gaps
+
+- **D26: VM root disks are cattle.** No VM-disk backups. Every VM is
+  rebuildable from git, GCS and `/data01`, and the rebuild drill proves it.
+  Backout: a VM that fails the drill gets a weekly vzdump until it passes.
+- **D27: both hypervisors get the same storage shape.** VM disks on a ZFS mirror
+  `vmpool` separate from the boot disk (node005 already has this), and the boot
+  disk itself a ZFS mirror from the Proxmox installer. node006's VM storage
+  goes first and does not wait for 2027: it is the single worst exposure in
+  this table, and it exists today. Order: two new SSDs as `vmpool` on node006,
+  then each VM disk moved off `local-lvm` in a window with `terraform-root`
+  updated in the same change (whether the provider moves a disk in place on a
+  `datastore_id` change, or the move is a hand `qm disk move` followed by a
+  matching PR, is checked before the first move). The boot mirror needs a
+  reinstall, so it happens as the first real rehearsal of the recovery below:
+  node005 first, whose VMs all survive on `vmpool` by design.
+- **D28: the Proxmox config DB is backed up.** A nightly timer on each
+  hypervisor takes `sqlite3 .backup` of `/var/lib/pve-cluster/config.db`,
+  age-encrypts it to terrac's and the recovery key (it holds `/etc/pve/priv`),
+  and uploads it to `gs://homelab-db-backups/pve/<node>/`. Freshness metric,
+  alert past 48 hours. Restoring it onto a reinstall with the same hostname and
+  IP brings back every VM config and `storage.cfg`, so VMs whose disks
+  survived start as they were and `terraform-root`'s next plan is a no-op.
+  This is the reattach path; letting Terraform recreate a VM over existing
+  zvols is not one (its behaviour there is unverified, and the VMs carry
+  `purge_on_destroy` and `delete_unreferenced_disks_on_destroy`). Ansible
+  owns the timer from phase 0, Salt after phase 6.
+- **D29: one bootstrap script** (in "Salt" above).
+- **D30: the base image is stock.** No custom template build. Each node's base
+  is the Debian genericcloud image, pinned by URL and sha512, mirrored to GCS,
+  and downloaded onto the node by `terraform-root`. Everything else comes from
+  cloud-init calling the bootstrap script, then Salt. A dead node's template
+  is therefore one `terraform apply` away, and a new Debian major is a pin
+  change. (Provider resource names are confirmed when it is built.)
+- **D31: stateful pods restore by an explicit Job.** Every app chart with a
+  node-local database carries a backup CronJob (writing the same GCS object
+  names `db-backup.sh` writes today) and a restore Job template that is never
+  synced automatically: run on demand, dry-run by default, refusing a
+  non-empty target unless told otherwise, the same contract as today's
+  `db_restore.yaml`. The nightly restore test runs it against a scratch PVC.
+  App state on ocean needs none of this for a host rebuild: it is `hostPath`
+  on `/data01/services/<svc>` (Storage, above) and survives.
+- **D32: a recovery age key** (table above).
+- **D33: the DNS pair gate has a rebuild mode.** The pair pre-flight refuses a
+  degraded pair, which as written would block rebuilding a dead peer. A
+  dispatch input `rebuild_peer=<dns01|dns02>`, behind a GitHub environment
+  that only terrac can approve, applies to that host only. It requires the
+  other peer to pass its host gate first and never touches it. Kea syncs
+  leases from the survivor on start; the rebuilt PowerDNS renders zones from
+  git, and its SOA serial must be at least the survivor's. Then the normal
+  pair gate runs.
+- **D34: Salt owns the hypervisor, passthrough included.** States for the
+  Proxmox hosts cover apt repos, IOMMU kernel arguments (handled for both the
+  GRUB and the `proxmox-boot-tool` boot paths, since D27 changes node006's),
+  vfio-pci binding of the GPU and HBA with a softdep that runs before
+  `mpt3sas` and `nvidia` can claim them, `storage.cfg` entries through
+  `pvesm`, the D28 timer, NUT, and the exporters. On node006 the state also
+  disables `zfs-import-scan` and `zfs-import-cache` for anything but the
+  host's own pools: a reinstalled host that sees the HBA must never import
+  `/data01` while ocean may. The bridges in `/etc/network/interfaces` are
+  rendered by Salt, but like sshd a mistake there locks the host out, so CI
+  only runs them `test=True`; terrac applies them by hand with the iDRAC
+  console open.
+- **Break-glass Terraform.** The `lan/` root normally applies from the
+  self-hosted runners, which may be on the dead node. When they are down,
+  terrac applies it from the laptop on the LAN against the same GCS state and
+  lock. This is the one sanctioned local apply, and the next CI plan must be
+  clean.
+
+### Recovery order: both boot disks dead
+
+1. **node005** (its VM disks survive). Replace the boot media; install
+   Proxmox by hand with the same hostname and IP; run the bootstrap script;
+   restore `config.db` from GCS (D28); `zpool import vmpool`. Start dns01
+   first: DNS and DHCP return on one server (Kea standby in partner-down,
+   PowerDNS serving its secondary copy). Then gh-runner-01 and the
+   `terraform-lan` runners, and CI is back. Then registry-cache-01, agentbox
+   (ntfy, dead-man), pihole, netboot01, `k3s-agent01`. The household is
+   without DNS only for this step, which is why it comes first.
+2. **node006 host.** Install Proxmox; bootstrap; restore `config.db` (its VM
+   configs now point at disks that no longer exist, unless D27 is done).
+   Before anything touches the HBA, `zpool import` with no arguments must show
+   `/data01` as last used by another system; the host never imports it.
+   terrac applies the D34 network state by hand; CI applies the rest.
+3. **node006 VMs** through CI: `terraform-root` downloads the base image
+   (D30) and recreates whatever is missing.
+4. **dns02** through the D33 rebuild mode, then the normal pair gate.
+5. **k3s server**: Salt installs it, the nightly SQLite backup is restored
+   (the phase 1 rehearsal), agents reconnect.
+6. **ocean**: terrac imports `/data01` inside the VM; Salt brings NFS,
+   NVIDIA and zed; the k3s agent's `/data01` mount guard lets it start; Argo
+   reschedules the pods onto their `hostPath` state.
+7. **Everything else**: llmeval and any other VM from Terraform plus Salt;
+   pods with node-local databases on lost disks restore through D31.
+8. **Verify**: drift metrics zero on every host, Argo all Synced and Healthy,
+   the dead-man fires on a stopped API, `terraform-root` plans clean.
+
+With D27 done, step 2 restores configs that point at surviving disks and
+steps 3 and 4 shrink to starting VMs.
+
+### Rehearsal
+
+A rebuild that is never run is a guess, so it is a phase gate (phase 7) and a
+yearly drill after that, on the isolated bridge the DNS test pair uses:
+Proxmox nested in a VM, a small throwaway ZFS mirror standing in for
+`vmpool`, a test DNS pair and a test runner. The drill wipes the nested
+host's boot disk and runs this section's order from git and GCS only, timing
+each step. The D27 boot-mirror reinstall of node005 is the first rehearsal
+on real hardware.
+
+### Single-site DNS
+
+Both DNS servers and pihole are VMs on the two hypervisors, so losing both
+hosts takes name resolution away from every device in the house until step 1
+finishes. Q10 asks whether a third resolver should live off the hypervisors.
 
 ## What stays in Ansible until Salt replaces it
 
