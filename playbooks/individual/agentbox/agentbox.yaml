@@ -782,14 +782,19 @@
               reason="no claude process"
             else
               age=$(ps -o etimes= -p "$cpid" 2>/dev/null | tr -d ' ' || echo 0)
-              maxrcv=$(ss -tinp state established "dst :443" 2>/dev/null \
+              # NOTE: judge the FRESHEST :443 socket, not the stalest. claude keeps
+              # idle keep-alive sockets beside the RC websocket, and they pass
+              # STALE_MS about 4 minutes in, so taking the max restarted every
+              # healthy lane on that cycle (~45 restarts/hour across 3 lanes)
+              # and killed whatever session was being driven.
+              rcv=$(ss -tinp state established "dst :443" 2>/dev/null \
                 | grep -A1 "pid=$cpid," | grep -oE 'lastrcv:[0-9]+' \
-                | cut -d: -f2 | sort -n | tail -1 || true)
-              if [ -z "$maxrcv" ]; then
+                | cut -d: -f2 | sort -n | head -1 || true)
+              if [ -z "$rcv" ]; then
                 # grace: a freshly-spawned claude takes a few seconds to connect
                 [ "${age:-0}" -ge 90 ] && reason="no :443 socket"
-              elif [ "$maxrcv" -gt "$STALE_MS" ]; then
-                reason="stale lastrcv=${maxrcv}ms"
+              elif [ "$rcv" -gt "$STALE_MS" ]; then
+                reason="stale lastrcv=${rcv}ms"
               fi
             fi
             if [ -n "$reason" ]; then
