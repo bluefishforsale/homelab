@@ -15,9 +15,12 @@ where merge is deploy.
 
 ## Goals
 
-- **G1.** Every container service on the fleet runs on one k3s cluster,
+- **G1.** Every tier 2 container service on the fleet runs on one k3s cluster,
   deployed by Argo CD from Helm charts in `homelab-kube`, onboarded one at a
-  time through an app-of-apps.
+  time through an app-of-apps. Tier 0 keeps its compose stacks (the DNS pair,
+  registry-cache, ntfy), owned by Salt and refreshed by `docker-refresh@`.
+  That is the intended end state, not a leftover: two update systems, split
+  by tier.
 - **G2.** A new or moved service needs only a chart and a values file:
   secrets, TLS, ingress, network policy and monitoring come from the platform.
 - **G3.** Kubernetes upgrades are controlled: pinned version, deliberate
@@ -91,15 +94,15 @@ where merge is deploy.
 | D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). Done: 252 GiB, verified 2026-11-15. | terrac |
 | D17 | "Cluster is down" is reported by email and ntfy. | terrac |
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
-| D19 | The dead-man watchdog and ntfy live on agentbox (tier 0); ntfy never moves into the cluster. Email leaves by a relay that does not pass through ocean. | design call, needs terrac's sign-off |
-| D20 | North-south traffic uses Cilium's Gateway API in host-network mode on ocean. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call |
+| D19 | The dead-man watchdog and ntfy live on agentbox (tier 0), built in phase 1; ntfy never moves into the cluster. The watchdog's email leaves by a relay that does not pass through ocean. Alertmanager keeps the exim smarthost on the ocean host as its own email route, so node005 dying is still reported. | design call, amended 2026-11-15, needs terrac's sign-off |
+| D20 | North-south traffic uses Cilium's Gateway API in host-network mode: on alternate host ports from phase 1, with nginx proxying each migrated service to it, then on 80/443 on ocean at W7. No per-service NodePorts. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call; staging on alternate ports folded in at terrac's direction (2026-11-15) |
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, signed off by terrac (2026-11-15) |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, signed off by terrac (2026-11-15) |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac (2026-11-14) |
 | D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, signed off by terrac (2026-11-15) |
-| D27 | Both hypervisors: VM disks on a ZFS mirror `vmpool` separate from boot, and a mirrored boot disk. node006's VM storage moves first, in 2026, not 2027. | terrac asked for every rebuild gap closed (2026-11-14); shape is a design call |
+| D27 | Both hypervisors: VM disks on a ZFS mirror `vmpool` separate from boot, and a mirrored boot disk. node006's VM storage moves first, in 2026, not 2027. Each boot-mirror reinstall lands on the current PVE major. | terrac asked for every rebuild gap closed (2026-11-14); shape is a design call |
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
 | D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
 | D30 | The VM base image is stock Debian genericcloud, pinned by hash, mirrored to GCS, downloaded per node by `terraform-root`. No custom template build. | design call |
@@ -108,6 +111,8 @@ where merge is deploy.
 | D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
 | D35 | Every Postgres database runs as a single-instance CloudNativePG cluster with continuous WAL archiving to GCS: RPO about five minutes, 14 days of point-in-time recovery. The nightly logical dump stays. No Postgres replicas. | terrac (2026-11-15); shape is a design call |
+| D36 | A second self-hosted runner on node006, so losing node005 does not also lose CI. A runner is never applied or rebooted by its own job. | design call, needs terrac's sign-off |
+| D37 | Phases gate on what they depend on, not on their number: phases 2 and 3 run in parallel after phase 1, and W1 starts on `k3s-agent01` after the phase 1 soak. Blackbox, pushgateway and karma move in W6, not W1. | design call, folded in at terrac's direction (2026-11-15) |
 
 ## Open questions for terrac
 
@@ -121,7 +126,29 @@ where merge is deploy.
   with CI and the network down, and a cheap per-host `test=True` drift timer.
   The alternative is a slimmed-down Ansible in a renamed repo plus a `--check`
   drift timer. Salt stays in the plan as decided; this asks for a deliberate
-  yes before phase 6 work starts.
+  yes in phase 0, not "before phase 6". Phase 6 starts in 2027 Q1, D25, D29,
+  D34 and R19 already assume Salt, and the answer decides whether phase 0
+  and 1 host work (the D28 timer, the patch pipeline, the watchdog) is
+  written once in Salt or twice.
+- **Q11.** The UniFi gateway as a last-resort resolver. Q10 was answered no
+  because there is no Raspberry Pi, but the gateway is hardware off the
+  hypervisors. Listed last in Kea's `domain-name-servers`, it keeps external
+  names resolving when both hypervisors are down. Cost: clients do not
+  strictly honour resolver order, so some queries would bypass pihole and
+  some `.home` lookups would fail now and then even when the pair is healthy.
+- **Q12.** Media pods can read every app's state, because the pool is one
+  dataset and the whole-pool mount is what makes hardlinks work (design,
+  "Storage"). Options: (a) accept it for 2027 and record it as a known limit;
+  (b) later, by hand, move `services` to its own dataset mounted outside the
+  media mount; (c) give each service its own uid and `0700` state directory.
+  Recommendation: (a) now, (b) as a follow-up after 5b.
+- **Q13.** Soak period between a service's cutover window and its retire PR.
+  Proposal: 7 days.
+- **Q14.** ml-log-analyzer has a Postgres (`postgres:16-alpine`) and a play
+  that targets harbor, and is in no backup. Is it live? If yes it joins D35
+  and phase 2; if no, the play is deleted in phase 0.
+- **Q15.** How far behind k3s stable is allowed in steady state (R23).
+  Proposal: never more than two minors.
 
 ## Answered questions
 
@@ -151,17 +178,23 @@ where merge is deploy.
   to GCS; restore rehearsed in phase 1 and documented as a runbook.
 - **R3.** Argo CD manages itself and the app-of-apps root from `homelab-kube`
   `master`. Sync policy `allowEmpty: false`. Every `/data01` and state PV is
-  `Retain`.
-- **R4.** All image pulls go through registry-cache-01.
+  `Retain`, `local-path` volumes included: the default StorageClass reclaims
+  with `Retain` and the stock `Delete` class is removed.
+- **R4.** Image pulls prefer registry-cache-01 and fall back to the upstream
+  registry when it is down.
 - **R5.** NVIDIA device plugin with time-slicing on ocean; at least Plex,
   Tdarr and llama.cpp schedule onto the GPU together.
 - **R6.** Every migrated service has a default-deny NetworkPolicy plus explicit
   allows, a health check, a blackbox probe, and a metrics scrape if it exposes
-  metrics.
+  metrics. Its alert rules and dashboard panels return series after the move.
+  Its namespace runs at Pod Security `baseline` unless the chart lists why it
+  cannot (hostNetwork, GPU, a host device).
 - **R7.** One service per cutover. Each cutover is one `homelab-kube` PR (chart,
   values, secrets) and one `homelab` PR (retire play, files, port, vault keys,
   timers), preceded where needed by a `terraform-root` PR (tunnel rule, bucket)
-  and a PR in the service's own repo (dispatch target).
+  and a PR in the service's own repo (dispatch target). The window runs as one
+  dispatch workflow with a `back` direction, and the `homelab` retire PR
+  waits out the soak (Q13).
 - **R8.** Upgrade log: each upgrade records add-on compatibility checked,
   removed APIs found, what broke, what the play missed, API downtime and app
   downtime.
@@ -213,22 +246,30 @@ where merge is deploy.
 - **R22.** Every Postgres database archives WAL to GCS (D35). An alert fires
   when the newest archived segment is older than 15 minutes or the newest base
   backup is older than 8 days, and a monthly recovery into a scratch cluster
-  proves the archive restores.
+  proves the archive restores. A third alert watches `pg_wal` size, since a
+  stalled archive fills the local disk.
+- **R23.** The cluster is never more than N minors behind k3s stable (Q15). A
+  metric reports the gap and an alert fires past it, the same way R12 and R13
+  do for the OS.
+- **R24.** Two self-hosted runners on different hypervisors (D36). A runner's
+  own states and reboots are applied by the other runner, or from agentbox.
+- **R25.** Proxmox startup order on node006 starts `k3s-server01` before
+  ocean.
 
 ## Acceptance (per phase gate)
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5, Q6, Q8, Q9 and Q10 answered, D19, D21, D23, D26 and D32 signed off. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
-| 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5 to Q15 answered (Q7 included), D19, D21, D23, D26, D32 and D36 signed off. PVE 8's end-of-support date checked. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
+| 1 | The dead-man watchdog and ntfy on agentbox, tested by stopping the API. The Gateway in host-network mode on alternate ports, with the sonarr reference chart behind it and each nginx feature in use proven on it. Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
 | 2 | harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
 | 4 | Every Docker service on ocean is a pod or explicitly parked. |
-| 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
+| 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Stopping agentbox still produces an email from Alertmanager. Docker nginx retired; the Cilium Gateway has moved to 80/443 on ocean. Docker removed from ocean. |
 | 5b | Passthrough swap rehearsed on `k3s-agent01`, then, with Docker drained, ocean swapped to a clean Debian 13 k8s-only VM; old VM deleted after 14 days with no backout. |
-| 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; a host cannot decrypt another host's pillar (tested); the DNS and DHCP rehearsal drills pass on the isolated test pair and Salt's rendered DNS and DHCP configs match Ansible's byte for byte before the flip; every Ansible role and play is deleted or ported. |
-| 7 | Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). The rebuild drill passes from git and GCS only, with each step timed and recorded, and no Ansible. `homelab` archived. |
+| 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; the Salt k3s state has done an install and an upgrade on the rehearsal cluster; ocean's host states existed before 5b; a host cannot decrypt another host's pillar (tested); the DNS and DHCP rehearsal drills pass on the isolated test pair and Salt's rendered DNS and DHCP configs match Ansible's byte for byte before the flip; every Ansible role and play is deleted or ported. |
+| 7 | The operational tooling `homelab` carries (`scripts/`, `health-check.yml`, the alert-to-issue receiver's target repo) has a new home or a recorded retirement. Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). The rebuild drill passes from git and GCS only, with each step timed and recorded, and no Ansible. `homelab` archived. |
 
 ## Success measures
 

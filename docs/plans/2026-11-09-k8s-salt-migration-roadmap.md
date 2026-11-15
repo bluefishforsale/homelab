@@ -3,8 +3,8 @@
 > **For agentic workers:** this is a roadmap, not a single implementation plan.
 > Each phase gets its own detailed plan (`docs/plans/<date>-<phase>.md`) when it
 > starts, written against the spec and PRD. Do not start a phase before the
-> previous phase's gate is met and recorded. Steps use checkbox (`- [ ]`)
-> syntax for tracking.
+> gates it depends on are met and recorded (see "Phase dependencies"). Steps
+> use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec:** `docs/specs/2026-11-09-k8s-salt-migration-design.md`
 **PRD:** `docs/specs/2026-11-09-k8s-salt-migration-prd.md`
@@ -41,9 +41,9 @@ hard limits so a phase plan cannot quietly drop one.
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
 | 2026 Q4 | Phase 0 | | |
-| 2027 Q1 | Phase 1 (build, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
-| 2027 Q2 | Phase 2 (harbor), Phase 3 (ocean joins, GPU gate) | Debian 13 template; patch pipeline fleet-wide | Base system states |
-| 2027 Q3 | Phase 4 (ocean waves W1 to W5) | | k3s install moves to Salt |
+| 2027 Q1 | Phase 1 (build, watchdog, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
+| 2027 Q2 | Phase 2 (harbor) and Phase 3 (ocean joins, GPU gate) in parallel; W1 on `k3s-agent01` | Debian 13 template; patch pipeline fleet-wide | Base system states |
+| 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean host states, move to Salt |
 | 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS and DHCP (gated CI, D25) |
 | 2028 H1 | | | Phase 6 done, Phase 7 archive |
 
@@ -55,13 +55,28 @@ Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item. It
 runs only after Docker on ocean is drained (end of phase 5), so phases 4 and 5
 must leave room for it.
 
+## Phase dependencies
+
+Phases gate on what they need, not on their number (D37).
+
+- Phase 1 needs from phase 0: node006's `vmpool`, the Debian image, the GCS
+  bucket, the `homelab-kube` defects fixed, and Q7 answered. The rest of
+  phase 0 runs beside it.
+- Phase 2 and phase 3 each need phase 1 and the coexistence proof. They run
+  in parallel; neither waits for the other.
+- W1 needs phase 1 only. W2 to W5 need phase 3.
+- Phase 5 needs phase 4. Phase 5b needs phase 5, phase 2's swap rehearsal,
+  and ocean's host states in Salt.
+
 ## Phase 0: decide and clean up (2026 Q4)
 
 - [x] terrac answers Q5 (Wednesday 03:00 to 05:00), Q6 (a), Q8 (drop
       glances; avahi and netatalk to pods), Q9 (a), Q10 (no); signs off D21,
       D23, D26, D32 (2026-11-15).
-- [ ] terrac signs off D19 (ntfy and watchdog on agentbox). Q7 (is Salt
-      still worth it) answered before phase 6 work starts.
+- [ ] terrac signs off D19 (as amended) and D36 (second runner); answers Q7
+      (is Salt still worth it) now, not before phase 6, and Q11 to Q15.
+- [ ] Check PVE 8's end-of-support date. If it has passed, the D27 boot-mirror
+      reinstalls (which land on the current PVE major) move up.
 - [ ] `homelab-ca` spec (2026-10-14) amended per Q6: `pathlen:1` root, cluster
       intermediate, and whether the root's name constraints admit the
       cluster's IP ranges. Lands before the CA is built.
@@ -76,7 +91,8 @@ must leave room for it.
 - [ ] `homelab-kube`: write `docs/chart-style.md` from the 2021 charts (D24),
       then upgrade one chart end to end as the reference (sonarr: wrapper on
       `app-template`, new values schema, pinned image, HTTPRoute, NetworkPolicy)
-      and render it in CI. The other seven are upgraded in their own wave, each
+      and render it in CI. It runs in phase 1 as the Gateway test app, so it does
+      not sit untested until W2. The other seven are upgraded in their own wave, each
       just before its cutover, so no chart sits upgraded and untested.
 - [ ] `homelab-kube`: Renovate workflow on the self-hosted runner (D21) and
       the `repository_dispatch` workflow that writes a home-grown image tag
@@ -114,8 +130,10 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [ ] `vars/vars_k3s.yaml`: `k3s_version` (stable minus 3 minors at build time;
       on 2026-11-09 stable is v1.37, so v1.34), node labels, taints,
       `registries.yaml` mirrors to registry-cache-01.
-- [ ] `terraform-root` PR: `k3s-server01` (node006) and `k3s-agent01`
-      (node005), Debian 13, static IPs from the free infrastructure range.
+- [ ] `terraform-root` PR: `k3s-server01` (node006, disk on `vmpool`, never
+      `local-lvm`) and `k3s-agent01` (node005), Debian 13, static IPs from the
+      free infrastructure range. Proxmox startup order on node006 puts the
+      server before ocean (R25).
       Then the `homelab` inventory PR, merged by terrac.
 - [ ] `k3s.yaml` install and upgrade play: server first, then agents with
       cordon, drain, upgrade, uncordon, `serial: 1`. Added to the
@@ -128,7 +146,10 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
       NetworkPolicy controller disabled), Hubble, cert-manager with the
       Let's Encrypt issuer, internal issuer from the cluster intermediate (Q6), sops-secrets-operator (age),
-      Cilium Gateway (D20), local-path, the `/data01` NFS PV, metrics-server.
+      Cilium Gateway in host-network mode on alternate host ports (D20), a
+      `local-path` class with `reclaimPolicy: Retain` as the default (stock
+      class removed), the `/data01` NFS PV, metrics-server. App namespaces at
+      Pod Security `baseline`.
 - [ ] `k3s-agent01` added to ocean's NFS export client list before the NFS PV
       is used.
 - [ ] Alloy in the cluster: metrics by remote write to ocean's Prometheus,
@@ -137,8 +158,15 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [ ] Registry fallback test: stop registry-cache-01, pull an image.
 - [ ] Renovate opens, and auto-merges, one real update on a test app; one
       home-grown test image goes push, dispatch, values commit, sync.
-- [ ] Three test apps: one behind the Gateway with a cert, one with the NFS PV,
-      one reading a sops secret.
+- [ ] Three test apps: one behind the Gateway with a cert (the sonarr
+      reference chart), one with the NFS PV, one reading a sops secret.
+- [ ] Each nginx feature in use today (rate limit, body size, websocket
+      upgrade, IP allowlist) proven on the Gateway with a test route.
+- [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
+- [ ] Watchdog on agentbox: probes the k3s API, ocean and Alertmanager's
+      heartbeat; sends email by a relay that bypasses ocean, and ntfy (D17).
+      Tested by stopping the API and receiving both. In place before the
+      soak, since the soak has to notice an outage.
 - [ ] **Upgrade 1, 2, 3** (v1.34 to v1.35 to v1.36 to v1.37, or whatever stable
       minus 3 is then). Each: check every add-on's supported Kubernetes range,
       scan for removed APIs, upgrade add-ons that must move first, bump
@@ -155,6 +183,9 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 **Gate:** PRD phase 1 acceptance.
 
 ## Phase 1b: patch pipeline (2027 Q1, new VMs first)
+
+If Q7 is yes, this pipeline is written as Salt states from the start (the
+bootstrap moves up to make that possible), not in Ansible and then ported.
 
 - [ ] `unattended-upgrades` (security origin only) on the k3s VMs; package
       holds for kernel, NVIDIA and ZFS where they apply.
@@ -174,8 +205,9 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 - [x] node005 RAM upgrade installed and verified (D16): 252 GiB, read from
       Prometheus 2026-11-15.
 - [ ] Prove Docker plus k3s coexistence on `k3s-agent01` (spec, "Docker and k3s
-      side by side"), including a Docker container reaching a NodePort on its
-      own host, and a reboot.
+      side by side"), including a Docker container reaching the Gateway's
+      host port on its own host, and a reboot. This box also gates phase 3
+      and W1, so it goes first.
 - [ ] Move the nightly DB restore test (`db_restore_test.yaml`, runs on harbor
       today) to `k3s-agent01` before harbor goes.
 - [ ] Move the passed-through 870 EVO (by WWN) and nzbget to `k3s-agent01`;
@@ -192,7 +224,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 ## Phase 3: ocean joins, GPU go/no-go (2027 Q2)
 
 - [ ] Ocean migration table (spec, step 1): every container with class, state
-      path, ports, dependants, deploying repo.
+      path, ports, dependants, nginx vhost features, host devices, deploying
+      repo.
 - [ ] Join window (spec, step 2): holds, NVIDIA runtime for k3s containerd,
       k3s agent with `homelab.role/*` labels and the ocean taint, verify, reboot,
       verify. Backout tested on paper beforehand.
@@ -209,17 +242,24 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 
 - [ ] Before W1: every ocean host unit and timer has a destination (R18);
       k3s agent mount guard on ocean in place (R17).
-- [ ] W1 stateless (app exporters, homepage, languagetool, karma, ...)
-- [ ] W2 *arr stack (WAL state via `hostPath`)
+- [ ] Cutover workflow (`forward` and `back`) built; the first W1 cutover
+      drills `back` on purpose.
+- [ ] W1 stateless (app exporters, homepage, languagetool, mtr, ndt) on
+      `k3s-agent01`; startable after the phase 1 soak.
+- [ ] Before W2: service-to-service URLs held in app databases repointed to
+      front-door names.
+- [ ] W2 *arr stack (WAL state on local PVs)
 - [ ] W3 external-repo apps (each repo's deploy pattern switches in the same
       cutover; `docs/operations/deploy-pattern.md` gains the k8s pattern before
       the first one)
 - [ ] W4 GPU services; plex in quiet hours; mem0 with no agent run in flight
 - [ ] W5 homeassistant, avahi, netatalk (hostNetwork); glances removed
 
-Per cutover: chart and values PR in `homelab-kube` (scaled to 0) -> window:
-retire play stops the container, scale to 1, flip the nginx upstream, verify
-probes -> `homelab` PR removes the play, files, port entry and vault keys.
+Per cutover: chart and values PR in `homelab-kube` (scaled to 0) -> window,
+run by the cutover workflow: retire play stops the container, scale to 1,
+flip the nginx upstream to the Gateway, verify probes, alert rules and
+panels -> soak (Q13), with `back` as the backout -> `homelab` PR removes the
+play, files, port entry and vault keys.
 Database services: the `db-backup` entry becomes a CronJob writing the same
 GCS object name, verified with `db_restore_test.yaml`.
 
@@ -239,15 +279,16 @@ Postgres (D35), before the first Postgres cutover:
 
 ## Phase 5: monitoring and the front door (2027 Q4)
 
-- [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
-- [ ] Watchdog on agentbox: probes the k3s API, ocean and Alertmanager's
-      heartbeat; sends email by a relay that bypasses ocean, and ntfy (D17).
-      Tested by stopping the API and receiving both.
-- [ ] W6: kube-prometheus-stack, Loki plus Alloy, Grafana, Alertmanager in
+- [ ] Watchdog (built in phase 1) re-tested: stop the API, receive email and
+      ntfy.
+- [ ] Stop agentbox; Alertmanager still emails through ocean's exim (D19).
+- [ ] W6: kube-prometheus-stack, Loki plus Alloy, Grafana, Alertmanager,
+      blackbox, pushgateway and karma in
       cluster; TSDB and Loki on ocean local disk. Scrape configs become
       ServiceMonitors. Old file-based scrape config retires.
-- [ ] W7: Cilium Gateway on ocean in host-network mode on 80/443; certbot
-      retires to cert-manager; Docker nginx retires. Cilium host firewall in
+- [ ] W7: the Gateway moves from its alternate ports to 80/443 on ocean;
+      Docker nginx and certbot retire. A port swap: every route and cert has
+      carried traffic since its own cutover. Cilium host firewall in
       audit mode, enforced after a clean week (port 22 rules: terrac approves).
 - [ ] Docker removed from ocean.
 
@@ -260,7 +301,8 @@ k3s-only.
       procedure", before the window).
 - [ ] `terraform-root` swap PR and its revert PR prepared.
 - [ ] Window, with terrac hand-running the ZFS steps.
-- [ ] 14-day backout period; then delete the old VM.
+- [ ] 14-day backout period, with no `zpool upgrade` in it; then delete the
+      old VM.
 
 **Gate:** PRD phase 5b acceptance.
 
@@ -276,21 +318,33 @@ k3s-only.
       hash; CI runs it in a clean Debian container; Ansible play wraps it for
       existing hosts; cloud-init user-data calls it for new VMs.
 - [ ] Per-host `test=True` drift timer, node-exporter textfile metric, alert
-      rules (would-change over a day, failed run, checkout over 7 days stale).
+      rules (would-change over a day, failed run, checkout SHA differing from
+      the runner-exported `master` SHA for 7 days). CI rsyncs the tree to
+      every host on every merge.
 - [ ] Test that a host cannot decrypt another host's pillar.
+- [ ] Rekey workflow: takes a new host's public key, runs `sops updatekeys`
+      with the CI key and opens the PR, so a VM rebuild needs terrac's merge
+      and nothing else.
+- [ ] Second runner on node006 (D36); each runner's states applied by the
+      other.
 - [ ] Port by concern, one per PR, each deleting the Ansible owner in the same
       change: base packages and users, node-exporter, unattended-upgrades and
       the patch metrics, docker on remaining Docker hosts, registry-cache,
       runners, agentbox.
 - [ ] k3s install and upgrade (after phase 3, using the play that survived the
-      drill as the reference).
+      drill as the reference). One install and one upgrade on the rehearsal
+      cluster under Salt before the real cluster.
+- [ ] Ocean's host states (NFS server, zed, NVIDIA, the metrics timers),
+      before phase 5b, so the replacement VM is built by Salt.
 - [ ] Proxmox hosts (D34): repos, IOMMU arguments for GRUB and
       `proxmox-boot-tool`, vfio-pci binding with softdep ahead of `mpt3sas` and
       `nvidia`, `zfs-import-*` limited to host pools on node006, `storage.cfg`
       via `pvesm`, the D28 timer, NUT, exporters. Network bridges rendered,
       `test=True` in CI, applied by terrac with the iDRAC console open.
 - [ ] D27 boot mirrors: node005 reinstalled onto a ZFS boot mirror as the
-      first hardware rehearsal of the recovery order, then node006.
+      first hardware rehearsal of the recovery order, then node006. Each
+      lands on the current PVE major; the `config.db` restore across that
+      jump is tried on the nested host first.
 - [ ] DNS `rebuild_peer` mode (D33) built and drilled on the isolated test
       pair (a sixth drill: delete a test peer, rebuild it, survivor untouched).
 - [ ] DNS and DHCP (D25), in this order:
@@ -322,4 +376,7 @@ k3s-only.
       timed; result recorded; yearly repeat scheduled.
 - [ ] No playbook remains that is not superseded; `main-apply` disabled.
 - [ ] Docs worth keeping moved to `homelab-kube` or `homelab-salt`.
+- [ ] Operational tooling rehomed or retired on the record: `scripts/`
+      (`prom.sh`, `loki.sh`, `docker.sh`, `homelab-health.sh`),
+      `health-check.yml`, and the repo the alert-to-issue receiver files into.
 - [ ] Repo archived.
