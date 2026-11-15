@@ -183,7 +183,7 @@
     # throughout. Found only by a check comparing the running image to
     # fork/main.
     mem0_image: registry-cache.home:5005/bluefishforsale/mem0-api-server
-    mem0_version: c7cb52dabdf47470f15ab0bf818cf0bb8787ba11
+    mem0_version: 9c0f14b89f4333e74d459bbb7045cff36b34d004
     # https with harbor's read-only token (tasks/github_read.yaml), not ssh:
     # harbor holds no GitHub key.
     mem0_bridge_repo: https://github.com/bluefishforsale/mem0-mcp-bridge.git
