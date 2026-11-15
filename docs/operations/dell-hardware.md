@@ -52,7 +52,7 @@ mixing RDIMMs in won't POST.
 | **Hostname** | node005.home |
 | **Model** | Dell PowerEdge R630 |
 | **CPU** | 28 cores / 56 threads (2x Intel Xeon E5-2690 v4) |
-| **RAM** | 128 GB DDR4 ECC |
+| **RAM** | 256 GB DDR4-2400 ECC RDIMM (8 x 32 GB) |
 | **Boot Disk** | 64 GB SATADOM (Proxmox, LVM `pve`) |
 | **VM Storage** | 2 x 1 TB SSD, ZFS mirror `vmpool`; see disk survey below |
 | **GPU** | None |
@@ -73,12 +73,14 @@ purchase doesn't start with a research pass.
 | Slot | Part | Spec |
 |------|------|------|
 | A1, A2, B1, B2 | SK Hynix `HMA84GR7MFR4N-UH` | 32 GB DDR4-2400 (PC4-2400T-R), registered ECC, 2Rx4 |
+| A3, A4, B3, B4 | Micron `MTA36ASF4G72PZ-2G3A1` | 32 GB DDR4-2400 RDIMM, 2Rx4. Added 2026-11-13, see hardware-repair-log.md |
 
 The board takes 24 slots (A1-A12 on CPU1, B1-B12 on CPU2) and up to 3 TB.
 Each E5-2690 v4 has 4 memory channels. Dell's fill order is the white slots
-first (A1-A4), then black (A5-A8), then green (A9-A12). With only A1/A2 and
-B1/B2 filled, each socket uses 2 of its 4 channels, so the box runs at half
-its memory bandwidth today.
+first (A1-A4), then black (A5-A8), then green (A9-A12). Since 2026-11-13 all
+eight white slots are filled, one stick per channel, everything at 2400.
+After a memory change the OS sees it on the first boot, but iDRAC can keep
+showing the old total until Collect System Inventory On Restart runs.
 
 What to buy: more of the same part, or any 32 GB 2Rx4 PC4-2400T-R RDIMM
 (Hynix, Samsung, Micron). PC4-2666V-R also works and runs at 2400. Never mix
@@ -86,23 +88,24 @@ in LRDIMMs (`-L` parts); the R630 won't boot with LRDIMMs and RDIMMs together.
 
 | Add | Slots | Total | Notes |
 |-----|-------|-------|-------|
-| 4 sticks | A3, A4, B3, B4 | 256 GB | All 8 channels, 1 stick each. Doubles bandwidth. Best value step. |
-| 12 sticks | A3-A8, B3-B8 | 512 GB | 2 sticks per channel, balanced, still 2400. The clean big upgrade. |
+| 8 sticks | A5-A8, B5-B8 | 512 GB | 2 sticks per channel, balanced, still 2400. The clean next step. |
 | 20 sticks | all 24 | 768 GB | 3 sticks per channel; RDIMMs likely drop to 1866 (check Dell's R630 memory table first). |
 
-Avoid buying 8 or 16 more: some channels end up with more sticks than others,
-and any channel with 3 sticks slows the whole system to 1866.
+Avoid buying 4 or 12 more: some channels end up with more sticks than others,
+and any channel with 3 sticks slows the whole system to 1866. Skip 2133 parts
+too (for example Kingston `KTH-PL421/32G`), they pull every stick down to 2133.
 
-Why it hasn't been bought: in October 2026 this part cost about $6.50/GB
-(about $208 per stick, about $830 for the 4-stick step) because of the AI-driven
-DRAM shortage, and node005 had 69 GB available (VMs about 25 GB, ZFS ARC
-capped at 32 GB). Buy when a workload actually needs it or prices fall.
+Pricing: in October 2026 this part listed at about $6.50/GB (about $208 per
+stick) because of the AI-driven DRAM shortage. The 4 Micron sticks came off
+eBay in November 2026 for $500 the lot via best offer, $125 a stick, so make
+an offer rather than paying list.
 
 #### Node005 disks: what each one is for
 
 Surveyed 2026-11-10 from `lsblk`, `zpool status`/`zpool history`, LVM, mounts, every
 VM config in `/etc/pve/qemu-server/`, and I/O counters since the 2025-12-15 boot. This
-is the checklist for what is safe to pull with the lid off. Kernel names (`sdX`) can
+is the checklist for what is safe to pull with the lid off. The Samsung 980 NVMe
+(S64ANS0T211289W) that sat in the PCIe slot 1 riser was pulled 2026-11-13. Kernel names (`sdX`) can
 move across reboots, so go by model and serial on the label, not by `sdX`.
 
 | Disk | Model / serial | Use | Safe to pull? |
@@ -113,7 +116,6 @@ move across reboots, so go by model and serial on the label, not by `sdX`.
 | sdd | Samsung 870 EVO 2TB / S753NL0XB02941L | Passed whole to harbor (VM 6000) as `scsi2` by `wwn-0x5002538f54b047b7`; ext4 labelled `nzbget-scratch`. Proxmox shows "Usage: No" because the filesystem lives inside the VM. | **No.** Live harbor storage. |
 | sda | Netac SSD 256 GB / YS255550000138011936 | Nothing. No partition table or filesystem signature, not in any pool, LVM or VM config. | Yes. |
 | sde | Dell IDSDM 8 GB (internal dual-SD module, USB) | Nothing. 392 reads, 0 writes since boot. | Yes. |
-| nvme0n1 | Samsung 980 1TB / S64ANS0T211289W, PCIe slot 1 riser (82:00.0) | Nothing. It was `vmpool`'s SLOG for 26 minutes on 2025-12-15 (added 12:45, removed 13:11) and idle since. The 34 GB ZFS partition Proxmox shows is that stale label. 55% worn, 103 TB written before it arrived here; runs hot. | Yes. |
 
 The four PERC disks (sda through sdd) also show up a second time in SMART as
 `bus_0_megaraid_N`; that's the controller path to the same drives, not more disks.

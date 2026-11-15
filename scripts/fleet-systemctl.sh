@@ -122,6 +122,12 @@ cmd_host() {
 }
 
 [ $# -ge 1 ] || usage 1
+# NOTE: the unit name is spliced into the remote shell string inside single
+# quotes, so a quote or any character outside systemd's unit alphabet would
+# break out and run on every host in the sweep.
+for a in "$@"; do
+  [[ $a =~ ^-?-?[A-Za-z0-9][A-Za-z0-9@:_.-]*$ ]] || die "bad argument: '$a'"
+done
 case "$1" in
   all)  cmd_all ;;
   list) cmd_list "${2:-}" ;;

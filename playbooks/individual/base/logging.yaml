@@ -4,7 +4,6 @@
   hosts: all:!macos
   strategy: free
   vars:
-    SYSLOG: "192.168.1.65"
     LOKI_URL: "http://192.168.1.143:3100"
   tasks:
   ########### Syslog
@@ -28,17 +27,42 @@
     notify:
     - Restart rsyslogd
 
-  - name: Rsyslog remote server configuration
+  # NOTE: journald has ForwardToSyslog=false, so rsyslog only ever sees
+  # kernel lines, and those already reach Loki through promtail's journal
+  # scrape. The old forward pointed at 192.168.1.65, which no longer exists,
+  # and logged "No route to host" on every host. Removing the file stops that
+  # without sending a second copy of the kernel log to Loki.
+  - name: Remove the dead rsyslog remote forward
+    ansible.builtin.file:
+      path: /etc/rsyslog.d/99-remote-syslog.conf
+      state: absent
+    notify:
+    - Restart rsyslogd
+
+  # The UCG Max sends its syslog (IPS detections, firewall drops, admin
+  # logins) as BSD syslog over UDP, but promtail's syslog listener only takes
+  # RFC5424 over TCP. rsyslog on ocean takes the UDP, rewrites it and hands it
+  # to promtail on 1514. The gateway's target is set in terraform-root
+  # (lan/unifi-syslog.tf).
+  # NOTE: the port has to match unifi_setting_rsyslogd's port in
+  # terraform-root, or the gateway's logs go nowhere and nothing errors. The
+  # bound ruleset keeps these lines out of ocean's /var/log/syslog.
+  - name: Rsyslog UDP relay for the UniFi gateway (ocean only)
     ansible.builtin.copy:
       force: true
-      dest: "/etc/rsyslog.d/99-remote-syslog.conf"
+      dest: "/etc/rsyslog.d/10-unifi-relay.conf"
       content: |
         # This file is managed by ansible
 
-        module(load="omprog")
-        module(load="mmutf8fix")
-        action(type="mmutf8fix" replacementChar="?")
-        action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
+        module(load="imudp")
+        ruleset(name="unifi") {
+          action(type="omfwd" target="127.0.0.1" port="1514" protocol="tcp"
+                 Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted"
+                 queue.type="LinkedList" queue.size="10000" action.resumeRetryCount="-1")
+          stop
+        }
+        input(type="imudp" port="5514" ruleset="unifi")
+    when: inventory_hostname == 'ocean'
     notify:
     - Restart rsyslogd
 
