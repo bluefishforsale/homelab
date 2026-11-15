@@ -39,6 +39,33 @@
     notify:
     - Restart rsyslogd
 
+  # The UCG Max sends its syslog (IPS detections, firewall drops, admin
+  # logins) as BSD syslog over UDP, but promtail's syslog listener only takes
+  # RFC5424 over TCP. rsyslog on ocean takes the UDP, rewrites it and hands it
+  # to promtail on 1514. The gateway's target is set in terraform-root
+  # (lan/unifi-syslog.tf).
+  # NOTE: the port has to match unifi_setting_rsyslogd's port in
+  # terraform-root, or the gateway's logs go nowhere and nothing errors. The
+  # bound ruleset keeps these lines out of ocean's /var/log/syslog.
+  - name: Rsyslog UDP relay for the UniFi gateway (ocean only)
+    ansible.builtin.copy:
+      force: true
+      dest: "/etc/rsyslog.d/10-unifi-relay.conf"
+      content: |
+        # This file is managed by ansible
+
+        module(load="imudp")
+        ruleset(name="unifi") {
+          action(type="omfwd" target="127.0.0.1" port="1514" protocol="tcp"
+                 Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted"
+                 queue.type="LinkedList" queue.size="10000" action.resumeRetryCount="-1")
+          stop
+        }
+        input(type="imudp" port="5514" ruleset="unifi")
+    when: inventory_hostname == 'ocean'
+    notify:
+    - Restart rsyslogd
+
   ########### systemd-journald
   - name: Write journald config
     ansible.builtin.copy:
