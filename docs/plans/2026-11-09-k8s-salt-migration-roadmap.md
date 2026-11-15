@@ -40,7 +40,7 @@ hard limits so a phase plan cannot quietly drop one.
 
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
-| 2026 Q4 | Phase 0 | | |
+| 2026 Q4 | Phase 0 | | `homelab-salt` repo, bootstrap script, first CI apply (Q7) |
 | 2027 Q1 | Phase 1 (build, watchdog, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
 | 2027 Q2 | Phase 2 (harbor) and Phase 3 (ocean joins, GPU gate) in parallel; W1 on `k3s-agent01` | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean host states, move to Salt |
@@ -73,8 +73,15 @@ Phases gate on what they need, not on their number (D37).
 - [x] terrac answers Q5 (Wednesday 03:00 to 05:00), Q6 (a), Q8 (drop
       glances; avahi and netatalk to pods), Q9 (a), Q10 (no); signs off D21,
       D23, D26, D32 (2026-11-15).
-- [ ] terrac signs off D19 (as amended) and D36 (second runner); answers Q7
-      (is Salt still worth it) now, not before phase 6, and Q11 to Q15.
+- [x] terrac answers Q7 (yes, bootstrap now), Q11 (no), Q12 (per-service
+      uid, `0700`), Q13 (14 days), Q14 (ml-log-analyzer is live), Q15 (two
+      minors); signs off D36 (2026-11-15).
+- [ ] Q16 (can agentbox be retired) answered; D19 settled from it.
+- [ ] Salt, moved up from phase 6 (Q7): `homelab-salt` repo, the D29
+      bootstrap script with its CI test, the rekey workflow, and one state
+      applied to one host through CI.
+- [ ] ml-log-analyzer's Postgres added to `db-backup.sh` and `db-restore.sh`
+      (it is live on harbor and in no backup).
 - [ ] Check PVE 8's end-of-support date. If it has passed, the D27 boot-mirror
       reinstalls (which land on the current PVE major) move up.
 - [ ] `homelab-ca` spec (2026-10-14) amended per Q6: `pathlen:1` root, cluster
@@ -114,7 +121,7 @@ Rebuild gaps that exist today, so they do not wait for 2027:
       disk in place on `datastore_id`; then dns02, llmeval and ocean's root
       disk moved off `local-lvm`, one per window, `terraform-root` updated in
       the same change.
-- [ ] D28: config DB backup timer on both hypervisors (Ansible for now), GCS
+- [ ] D28: config DB backup timer on both hypervisors (a Salt state), GCS
       prefix and write-only service account in `terraform-root`, freshness
       metric and alert; one restore tested onto a nested Proxmox VM.
 - [ ] D32: recovery age key generated offline, added as a recipient to every
@@ -184,8 +191,7 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 
 ## Phase 1b: patch pipeline (2027 Q1, new VMs first)
 
-If Q7 is yes, this pipeline is written as Salt states from the start (the
-bootstrap moves up to make that possible), not in Ansible and then ported.
+Written as Salt states from the start (Q7), not in Ansible and then ported.
 
 - [ ] `unattended-upgrades` (security origin only) on the k3s VMs; package
       holds for kernel, NVIDIA and ZFS where they apply.
@@ -213,6 +219,14 @@ bootstrap moves up to make that possible), not in Ansible and then ported.
 - [ ] Move the passed-through 870 EVO (by WWN) and nzbget to `k3s-agent01`;
       nzbget state on its local disk.
 - [ ] Move tdarr-node (CPU) to `k3s-agent01`.
+- [ ] Postgres prerequisites (D35), moved up from phase 4 because
+      ml-log-analyzer is the first database to move: the `gs://homelab-pg-wal`
+      bucket and write-only service account in `terraform-root`, the
+      CloudNativePG operator and Barman Cloud plugin as tier 1 apps, and the
+      R22 alerts (archive age, base backup age, `pg_wal` size) firing on a
+      test cluster with archiving stopped.
+- [ ] Move ml-log-analyzer to `k3s-agent01`: Postgres by `initdb.import`
+      into a CloudNativePG cluster, both Redis volumes on `local-path`.
 - [ ] **Rehearse the passthrough swap on `k3s-agent01`**: build a replacement
       VM, swap the scratch disk, reschedule pods, then back out and swap
       again. Fix the runbook from what happened.
@@ -258,19 +272,17 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0) -> window,
 run by the cutover workflow: retire play stops the container, scale to 1,
 flip the nginx upstream to the Gateway, verify probes, alert rules and
-panels -> soak (Q13), with `back` as the backout -> `homelab` PR removes the
-play, files, port entry and vault keys.
+panels -> 14-day soak (Q13), with `back` as the backout -> `homelab` PR
+removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
+the service to its own uid and a `0700` state directory (R26).
 Database services: the `db-backup` entry becomes a CronJob writing the same
 GCS object name, verified with `db_restore_test.yaml`.
 
-Postgres (D35), before the first Postgres cutover:
+Postgres (D35). The bucket, the operator and the alerts are phase 2 boxes;
+what is left here:
 
-- [ ] `terraform-root`: `gs://homelab-pg-wal` bucket and a write-only service
-      account.
-- [ ] CloudNativePG operator and Barman Cloud plugin as tier 1 apps in Argo.
-- [ ] R22 alerts (archive age 15 minutes, base backup age 8 days) firing on a
-      test cluster with archiving stopped.
-- [ ] Each of jellystat, archmap and mem0 cuts over by `initdb.import` from the
+- [ ] ml-log-analyzer went first, in phase 2. Each of jellystat, archmap and
+      mem0 cuts over by `initdb.import` from the
       running container; its first base backup lands before the Docker
       container is removed.
 - [ ] Monthly mem0 scratch recovery scheduled and passed once.
@@ -308,9 +320,11 @@ k3s-only.
 
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
-- [ ] `homelab-salt` repo: `file_client: local` layout, `.sops.yaml` per-host
-      creation rules, CI apply by rsync over SSH at the merged SHA, by IP.
-      No master VM (D7).
+The repo, the bootstrap script and the rekey workflow are phase 0 boxes (Q7).
+
+- [ ] `homelab-salt` repo layout complete: `.sops.yaml` per-host creation
+      rules, CI apply by rsync over SSH at the merged SHA, by IP. No master
+      VM (D7).
 - [ ] Bootstrap play (Ansible, then cloud-init in the base template): pinned
       Salt onedir held, masterless minion config, host age key generated on
       the host, repo checkout.

@@ -39,7 +39,7 @@ own: the hosts themselves.
 | node006 | Proxmox 8.4, 40 threads, 660 GiB RAM (498 used, ocean holds 366 GiB). VM disks on `local-lvm` (870 EVO 2TB). Runs dns02, ocean, llmeval. |
 | ocean | Debian 12, kernel 6.1, Docker 29.6, cgroup v2, ~60 containers. RTX 3090 (driver 610.43) and the SAS HBA passed through; owns the `data01` pool (87 TiB raw, 72% used) and exports it over NFSv4.2. nginx on 80/443 is the front door for every service. Docker sets `iptables -P FORWARD DROP`. |
 | GPU today | Already shared: llama-server 19.6 GiB and tdarr-ffmpeg 376 MiB on the one card, via Docker. |
-| "harbor" VM | Not Harbor. A `data01_workers` host: nzbget, a CPU tdarr-node, NFS `/data01` with a local state disk over `/data01/services` (`docs/architecture/data01-workers.md`). |
+| "harbor" VM | Not Harbor. A `data01_workers` host: nzbget, a CPU tdarr-node, ml-log-analyzer (two Redis, a Postgres, in no backup), NFS `/data01` with a local state disk over `/data01/services` (`docs/architecture/data01-workers.md`). |
 | registry-cache-01 | Pull-through caches for docker.io, ghcr, gcr, nvcr, gitlab. |
 | `homelab-kube` repo | 2021-era kubeadm cluster config, 479 commits. Has an app-of-apps chart (`charts/argocd-applications`), sops-secrets-operator (GPG), cert-manager, MetalLB, Cilium, ingress-nginx, cloudflare tunnel ingress, kube-prometheus-stack, promtail, and charts for plex, tdarr, sonarr, radarr, lidarr, tautulli, overseerr, nzbget. |
 
@@ -194,9 +194,19 @@ Known limit of the media mount: the pool is one dataset (`data01`, plus
 `media` and `services` are sibling directories in it. Hardlinks need
 downloads and library under one mount, and their only common parent is the
 pool root. So every pod with the media mount can also reach
-`/data01/services/*`, other apps' databases included, and per-service
-filesystem isolation is not delivered for those pods. PRD Q12 asks what to do
-about it.
+`/data01/services/*`, and with one shared `media` uid it could read other
+apps' databases too.
+
+Decided (Q12): the mount stays whole and the isolation comes from ownership.
+Each service runs as its own uid, allocated from one registry file in
+`homelab-kube` in the managed range above the fleet ids (terrac 2000, media
+2100), and its state directory is owned by that uid at `0700`. The `media`
+gid stays as a supplementary group on pods that write the media tree, so
+hardlinks and shared library access keep working. The change is not part of
+a cutover: backout needs the Docker container to read the state under the
+old uid. It lands after the service's soak, as a `homelab-kube` PR that
+chowns the directory in a one-shot init container and switches the pod's
+`runAsUser`. Until then the exposure above stands for that service.
 
 Two guards the charts and hosts must carry:
 
@@ -267,7 +277,7 @@ collisions. Mitigations:
    Gateway, verify with the service's health check and blackbox probe. Then
    check that its alert rules and dashboard panels still return series.
 4. Soak: the play, the compose files and the stopped container stay in place
-   for the soak period (PRD Q13). Backout during the soak is the window in
+   for the 14-day soak (PRD Q13). Backout during the soak is the window in
    reverse: scale to 0, bring the compose project back up through its play,
    nginx upstream back. It works because the pod runs the same image against
    the same state directory.
@@ -687,7 +697,7 @@ path that runs on the thing that died sends nothing.
   there is no cloud-init there; VMs run the same script from cloud-init
   user-data that `terraform-root` attaches. During the migration one Ansible
   play calls the script on existing hosts, so there is a single code path from
-  day one. Salt's upstream package repo has moved before, so the script never
+  day one. This is phase 0 work (Q7), not phase 6. Salt's upstream package repo has moved before, so the script never
   fetches from it: the pinned `.deb` is mirrored to GCS and verified by hash.
   CI runs the script in a clean Debian container on every change to it.
 - **Ownership**: a host concern is owned by exactly one of Ansible or Salt at a
@@ -725,11 +735,12 @@ path that runs on the thing that died sends nothing.
   three. And ocean's host states exist before phase 5b, so the replacement
   VM is built by Salt and is their first full apply, not built by Ansible
   and ported afterwards.
-- **Write once**: if Q7 is answered yes in phase 0, the bootstrap and the
-  first base states move up to phase 0 and 1, and the D28 timer, the patch
-  pipeline (1b) and the watchdog are written in Salt from the start. Written
-  in Ansible first, each is built twice inside two quarters. D3 keeps the
-  k3s play in Ansible either way.
+- **Write once** (Q7, decided): the repo, the bootstrap and the first base
+  states are phase 0 and 1 work, and the D28 timer, the patch pipeline (1b)
+  and the watchdog are written in Salt from the start. Written in Ansible
+  first, each would be built twice inside two quarters. New VMs are born
+  under Salt from `k3s-server01` on. D3 keeps the k3s play in Ansible until
+  it has passed the drill.
 
 ### DNS and DHCP under Salt
 
@@ -885,9 +896,13 @@ exists.
   App state on ocean needs none of this for a host rebuild: it is a local PV
   on `/data01/services/<svc>` (Storage, above) and survives.
 - **D35: Postgres runs under CloudNativePG with WAL archiving.** Today there
-  are three Postgres containers (`jellystat-db`, `mem0-postgres`,
-  `archmap-postgres`, `files/db-backup/db-backup.sh:61`), each dumped once a
-  night, so a bad day loses up to 24 hours. mem0 is why that matters: it is
+  are four Postgres containers. Three are on ocean (`jellystat-db`,
+  `mem0-postgres`, `archmap-postgres`, `files/db-backup/db-backup.sh:61`),
+  each dumped once a night, so a bad day loses up to 24 hours. The fourth is
+  ml-log-analyzer's on harbor (`files/ml-log-analyzer/docker-compose.yml.j2:55`),
+  which is in no dump at all; it is added to `db-backup.sh` and
+  `db-restore.sh` in phase 0 and is the first database to move, in phase 2,
+  so the operator and the import are learned on the least critical one. mem0 is why that matters: it is
   the agents' shared memory and changes all day. Each database becomes a
   CloudNativePG `Cluster` with `instances: 1`. No replicas, because each app
   runs one pod and its state is pinned to one node anyway, so a standby buys
@@ -915,9 +930,7 @@ exists.
   operand image that ships pgvector at the same or a newer version. If the
   uplink is down, archiving stalls and segments pile up in `pg_wal` (288 a
   day per database at the five-minute timeout, 16 MB each before
-  compression), so R22 also alerts on `pg_wal` size. A fourth Postgres,
-  ml-log-analyzer's (`playbooks/individual/workers/ml_log_analyzer.yaml`,
-  targets harbor, in no backup today), is PRD Q14. Plugin versus the
+  compression), so R22 also alerts on `pg_wal` size. Plugin versus the
   in-tree `barmanObjectStore`, and the exact metric names behind the R22
   alerts, are confirmed when it is built.
 - **D32: a recovery age key** (table above).
