@@ -77,16 +77,15 @@ The old GCP KMS playbook (`gcloud_sdk.yaml` with `tasks/gcloud.yaml` and
 `tasks/pki_gcloud_kms.yaml`) is deleted too. Its vars were defined nowhere, and
 the empty `homelab-sops-key` ring it left behind is modeled in terraform-root.
 
-**Cloudflare Access (tunnel) user emails.** The allow lists live only in
-`vault/secrets.yaml` under `cloudflare.access_allow_emails` (`plex-users` for
-friends, `admin`). That vault entry is the source of truth for terraform-root
-too: its `.envrc` reads it locally, and CI reads a copy in the terraform-root
-repo secret `TF_VAR_ACCESS_PLEX_USER_EMAILS`. They never go in git in either
-repo. Changing who can get in means editing the vault **and** resetting that
-secret (command in terraform-root's agents.md, "Where the Access (tunnel)
-user emails live"); a vault edit alone changes nothing, because terraform-root
-applies the secret's copy. Nothing in this repo reads these keys any more;
-they stay until they move to SOPS in terraform-root.
+**Cloudflare Access (tunnel) user emails.** The friends' allow list lives in
+terraform-root, in the SOPS file `secrets/access.enc.yaml` (key `plex_users`,
+terraform-root #53), and merging a change there is what applies it. The admin
+address is inline in its `allow_admin` policy. The old vault copies under
+`cloudflare.access_allow_emails` and terraform-root's
+`TF_VAR_ACCESS_PLEX_USER_EMAILS` repo secret are no longer read by anything.
+To resync from Plex invites, pipe `scripts/plex-shared-users.py` into that SOPS
+file (the command is in terraform-root's agents.md, "Where the Access (tunnel)
+user emails live").
 
 Proxmox VMs are still created here with `qm clone` playbooks for now. They're
 the next candidate to move to terraform-root (bpg/proxmox, applied from the
