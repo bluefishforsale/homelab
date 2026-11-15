@@ -24,14 +24,9 @@ env:
   ANSIBLE_FORCE_COLOR: "true"
   ANSIBLE_HOST_KEY_CHECKING: "false"
 
-# Read-only like the sibling deploy workflows. This one does record the
-# deployed image tag back into the playbook, but protect-master only lets a
-# deploy key push straight to master, so that write goes through the
-# MEM0_PIN_DEPLOY_KEY environment secret, not GITHUB_TOKEN.
-#
-# That key can push to master past every rule. The marginal risk is small in
-# context: this job already holds ANSIBLE_VAULT_PASSWORD and applies ansible to
-# production, so it can already rewrite the fleet's secrets and services.
+# Read-only like the sibling deploy workflows. The record-pin job does write to
+# master, but protect-master only lets a deploy key push there, so that write
+# goes through MEM0_PIN_DEPLOY_KEY, not GITHUB_TOKEN.
 permissions:
   contents: read
 
@@ -40,6 +35,8 @@ jobs:
     name: Deploy mem0
     runs-on: [self-hosted, homelab, ansible]
     environment: Github Actions CI
+    outputs:
+      version: ${{ steps.params.outputs.version }}
     steps:
       - name: Checkout homelab repository
         uses: actions/checkout@v4
@@ -126,50 +123,6 @@ jobs:
             exit 1
           fi
 
-      # The playbook's mem0_version is the deployed version, not a floor. The
-      # --extra-vars override above lives only for this run, so without writing
-      # it back the next apply of this playbook silently redeploys the older
-      # pinned tag -- and main-apply fires on any change under playbooks/,
-      # files/, roles/ or vars/. That happened: an unrelated mem0.env.j2 edit
-      # rolled ocean back four merged PRs while the container stayed healthy.
-      - name: Record the deployed version in the playbook
-        if: success() && steps.params.outputs.version != ''
-        env:
-          VERSION: ${{ steps.params.outputs.version }}
-          PIN_DEPLOY_KEY: ${{ secrets.MEM0_PIN_DEPLOY_KEY }}
-        run: |
-          PLAYBOOK="playbooks/individual/workers/mem0.yaml"
-          # VERSION is already validated as 40 hex chars by the params step.
-          if grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK"; then
-            echo "pin already current, nothing to write back"
-            exit 0
-          fi
-          sed -i -E "s|^(    mem0_version: )[0-9a-f]{40}$|\1${VERSION}|" "$PLAYBOOK"
-          grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK" || {
-            echo "::error::failed to rewrite mem0_version in $PLAYBOOK"; exit 1; }
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$PLAYBOOK"
-          # [skip ci] matters: this commit touches playbooks/, which is a
-          # main-apply trigger. Without it every deploy causes a second,
-          # pointless production apply.
-          git commit -m "chore(mem0): record deployed image ${VERSION:0:7} [skip ci]"
-          # Rebase, never force: master moves for unrelated reasons and this
-          # must not clobber someone else's commit.
-          git pull --rebase origin master
-
-          # GITHUB_TOKEN gets GH013 from protect-master; only a deploy key
-          # bypasses it. Port 443 because the runner's reach to github.com:22
-          # is unproven, and the host key is pinned from `gh api meta`.
-          KEYDIR=$(mktemp -d)
-          trap 'rm -rf "$KEYDIR"' EXIT
-          printf '%s\n' "$PIN_DEPLOY_KEY" > "$KEYDIR/key"
-          chmod 600 "$KEYDIR/key"
-          echo "[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$KEYDIR/known_hosts"
-          GIT_SSH_COMMAND="ssh -i $KEYDIR/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KEYDIR/known_hosts -o StrictHostKeyChecking=yes" \
-            git push ssh://git@ssh.github.com:443/bluefishforsale/homelab.git HEAD:master
-
       - name: Cleanup vault password
         if: always()
         run: rm -f /tmp/.vault_pass
@@ -225,3 +178,71 @@ jobs:
           | MCP bridge | harbor.home:8766 on the LAN, https://mem0.terrac.com/mcp off it |
 
           EOF
+
+  # The playbook's mem0_version is the deployed version, not a floor. The
+  # --extra-vars override above lives only for this run, so without writing it
+  # back the next apply of this playbook silently redeploys the older pinned
+  # tag -- and main-apply fires on any change under playbooks/, files/, roles/
+  # or vars/. That happened: an unrelated mem0.env.j2 edit rolled ocean back
+  # four merged PRs while the container stayed healthy.
+  #
+  # NOTE: MEM0_PIN_DEPLOY_KEY bypasses every protect-master rule, so this job
+  # is fenced three ways. The mem0-pin environment only deploys from master, so
+  # a branch that rewrites this file still can't read the key. The commit is
+  # built on a fresh master checkout, never on the deploy job's ref, so a
+  # dispatch from a branch can't carry that branch's commits along. And the
+  # diff is checked to be exactly the one pin line before anything is pushed.
+  record-pin:
+    name: Record the deployed version in the playbook
+    needs: deploy
+    if: github.ref == 'refs/heads/master' && needs.deploy.outputs.version != ''
+    runs-on: ubuntu-latest
+    environment: mem0-pin
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Commit and push the pin
+        env:
+          VERSION: ${{ needs.deploy.outputs.version }}
+          PIN_DEPLOY_KEY: ${{ secrets.MEM0_PIN_DEPLOY_KEY }}
+        run: |
+          PLAYBOOK="playbooks/individual/workers/mem0.yaml"
+          # VERSION is already validated as 40 hex chars by the deploy job.
+          if grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK"; then
+            echo "pin already current, nothing to write back"
+            exit 0
+          fi
+          sed -i -E "s|^(    mem0_version: )[0-9a-f]{40}$|\1${VERSION}|" "$PLAYBOOK"
+          grep -q "^    mem0_version: ${VERSION}$" "$PLAYBOOK" || {
+            echo "::error::failed to rewrite mem0_version in $PLAYBOOK"; exit 1; }
+          if [ "$(git diff --numstat)" != "$(printf '1\t1\t%s' "$PLAYBOOK")" ]; then
+            echo "::error::pin diff is not exactly one line in $PLAYBOOK"
+            git diff --stat
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$PLAYBOOK"
+          # [skip ci] matters: this commit touches playbooks/, which is a
+          # main-apply trigger. Without it every deploy causes a second,
+          # pointless production apply.
+          git commit -m "chore(mem0): record deployed image ${VERSION:0:7} [skip ci]"
+
+          # Port 443 with GitHub's host key pinned from `gh api meta`.
+          KEYDIR=$(mktemp -d)
+          trap 'rm -rf "$KEYDIR"' EXIT
+          printf '%s\n' "$PIN_DEPLOY_KEY" > "$KEYDIR/key"
+          chmod 600 "$KEYDIR/key"
+          echo "[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$KEYDIR/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $KEYDIR/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KEYDIR/known_hosts -o StrictHostKeyChecking=yes"
+          REMOTE=ssh://git@ssh.github.com:443/bluefishforsale/homelab.git
+          # Rebase, never force: master moves for unrelated reasons and this
+          # must not clobber someone else's commit. Only the pin commit is
+          # replayed, since HEAD started at master.
+          git pull --rebase "$REMOTE" master
+          git push "$REMOTE" HEAD:master
