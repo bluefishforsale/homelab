@@ -4,7 +4,6 @@
   hosts: all:!macos
   strategy: free
   vars:
-    SYSLOG: "192.168.1.65"
     LOKI_URL: "http://192.168.1.143:3100"
   tasks:
   ########### Syslog
@@ -28,17 +27,15 @@
     notify:
     - Restart rsyslogd
 
-  - name: Rsyslog remote server configuration
-    ansible.builtin.copy:
-      force: true
-      dest: "/etc/rsyslog.d/99-remote-syslog.conf"
-      content: |
-        # This file is managed by ansible
-
-        module(load="omprog")
-        module(load="mmutf8fix")
-        action(type="mmutf8fix" replacementChar="?")
-        action(type="omfwd" protocol="tcp" target="{{SYSLOG}}" port="1514" Template="RSYSLOG_SyslogProtocol23Format" TCP_Framing="octet-counted")
+  # NOTE: journald has ForwardToSyslog=false, so rsyslog only ever sees
+  # kernel lines, and those already reach Loki through promtail's journal
+  # scrape. The old forward pointed at 192.168.1.65, which no longer exists,
+  # and logged "No route to host" on every host. Removing the file stops that
+  # without sending a second copy of the kernel log to Loki.
+  - name: Remove the dead rsyslog remote forward
+    ansible.builtin.file:
+      path: /etc/rsyslog.d/99-remote-syslog.conf
+      state: absent
     notify:
     - Restart rsyslogd
 
