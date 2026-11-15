@@ -24,17 +24,16 @@ env:
   ANSIBLE_FORCE_COLOR: "true"
   ANSIBLE_HOST_KEY_CHECKING: "false"
 
-# contents: write, unlike its sibling deploy workflows, because this one records
-# the deployed image tag back into the playbook. Without that write-back the
-# pin goes stale and the next unrelated apply rolls mem0 backwards.
+# Read-only like the sibling deploy workflows. This one does record the
+# deployed image tag back into the playbook, but protect-master only lets a
+# deploy key push straight to master, so that write goes through the
+# MEM0_PIN_DEPLOY_KEY environment secret, not GITHUB_TOKEN.
 #
-# The marginal risk is small in context: this job already holds
-# ANSIBLE_VAULT_PASSWORD and applies ansible to production. A job that can
-# rewrite the fleet's secrets and services is not meaningfully constrained by
-# being unable to push a commit. Kept at the workflow level, not the repo
-# default, so the other deploy workflows stay read-only.
+# That key can push to master past every rule. The marginal risk is small in
+# context: this job already holds ANSIBLE_VAULT_PASSWORD and applies ansible to
+# production, so it can already rewrite the fleet's secrets and services.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   deploy:
@@ -137,6 +136,7 @@ jobs:
         if: success() && steps.params.outputs.version != ''
         env:
           VERSION: ${{ steps.params.outputs.version }}
+          PIN_DEPLOY_KEY: ${{ secrets.MEM0_PIN_DEPLOY_KEY }}
         run: |
           PLAYBOOK="playbooks/individual/workers/mem0.yaml"
           # VERSION is already validated as 40 hex chars by the params step.
@@ -158,7 +158,17 @@ jobs:
           # Rebase, never force: master moves for unrelated reasons and this
           # must not clobber someone else's commit.
           git pull --rebase origin master
-          git push origin HEAD:master
+
+          # GITHUB_TOKEN gets GH013 from protect-master; only a deploy key
+          # bypasses it. Port 443 because the runner's reach to github.com:22
+          # is unproven, and the host key is pinned from `gh api meta`.
+          KEYDIR=$(mktemp -d)
+          trap 'rm -rf "$KEYDIR"' EXIT
+          printf '%s\n' "$PIN_DEPLOY_KEY" > "$KEYDIR/key"
+          chmod 600 "$KEYDIR/key"
+          echo "[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$KEYDIR/known_hosts"
+          GIT_SSH_COMMAND="ssh -i $KEYDIR/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KEYDIR/known_hosts -o StrictHostKeyChecking=yes" \
+            git push ssh://git@ssh.github.com:443/bluefishforsale/homelab.git HEAD:master
 
       - name: Cleanup vault password
         if: always()
