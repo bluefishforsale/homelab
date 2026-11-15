@@ -107,6 +107,7 @@ where merge is deploy.
 | D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, needs terrac's sign-off |
 | D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
+| D35 | Every Postgres database runs as a single-instance CloudNativePG cluster with continuous WAL archiving to GCS: RPO about five minutes, 14 days of point-in-time recovery. The nightly logical dump stays. No Postgres replicas. | terrac (2026-11-15); shape is a design call |
 
 ## Open questions for terrac
 
@@ -208,13 +209,17 @@ where merge is deploy.
   `k3s-agent01` (passed-through scratch disk) before it is used on ocean.
 - **R19.** The fleet rebuilds from git plus GCS plus `/data01`, in the order in
   the design's "Disaster recovery" section, with no Ansible. Every input
-  outside git (age keys, Terraform state, DB dumps, the k3s backup, the
-  Proxmox config DBs, the Salt `.deb`, the Debian image) has a named home and
+  outside git (age keys, Terraform state, DB dumps, Postgres WAL archives,
+  the k3s backup, the Proxmox config DBs, the Salt `.deb`, the Debian image) has a named home and
   a freshness alert or test.
 - **R20.** No hypervisor keeps VM disks on its boot disk, and every boot disk
   is mirrored (D27).
 - **R21.** A reinstalled node006 never imports `/data01` on the host: HBA bound
   to vfio-pci before `mpt3sas`, pool auto-import off (D34).
+- **R22.** Every Postgres database archives WAL to GCS (D35). An alert fires
+  when the newest archived segment is older than 15 minutes or the newest base
+  backup is older than 8 days, and a monthly recovery into a scratch cluster
+  proves the archive restores.
 
 ## Acceptance (per phase gate)
 

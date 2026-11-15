@@ -220,6 +220,18 @@ probes -> `homelab` PR removes the play, files, port entry and vault keys.
 Database services: the `db-backup` entry becomes a CronJob writing the same
 GCS object name, verified with `db_restore_test.yaml`.
 
+Postgres (D35), before the first Postgres cutover:
+
+- [ ] `terraform-root`: `gs://homelab-pg-wal` bucket and a write-only service
+      account.
+- [ ] CloudNativePG operator and Barman Cloud plugin as tier 1 apps in Argo.
+- [ ] R22 alerts (archive age 15 minutes, base backup age 8 days) firing on a
+      test cluster with archiving stopped.
+- [ ] Each of jellystat, archmap and mem0 cuts over by `initdb.import` from the
+      running container; its first base backup lands before the Docker
+      container is removed.
+- [ ] Monthly mem0 scratch recovery scheduled and passed once.
+
 **Gate:** only W6 and W7 services remain in Docker on ocean.
 
 ## Phase 5: monitoring and the front door (2027 Q4)

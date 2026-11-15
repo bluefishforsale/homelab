@@ -267,7 +267,7 @@ rebuilt by swap, never upgraded in place.
   | `cloudflared` | Stays on the host (Salt); config in `terraform-root`. |
   | `exim4` smarthost | Stays on the host until Alertmanager moves; then tier 0 (see dead-man alert). |
   | `cloudflare_ddns`, `certbot-renew` | Retire into the cluster: a CronJob and cert-manager. |
-  | `db-backup` | Per-database CronJobs. |
+  | `db-backup` | Per-database CronJobs; Postgres also gets WAL archiving (D35). |
   | `plex-autoheal`, `kometa-metrics`, `mem0-metrics`, `tdarr-playback-window`, `wordpress-cron`, `wordpress-update`, `audible-download` | Move with their service, as CronJobs or sidecars, in that service's cutover. |
   | `promtail` | Replaced by Alloy. |
   | `avahi-daemon`, `netatalk`, `glances` | terrac decides: keep on host or drop. |
@@ -430,7 +430,7 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 | Metrics | Prometheus on ocean, file-based scrape config | Phases 1 to 4: an Alloy (or Prometheus agent) in the cluster discovers ServiceMonitors and remote-writes to ocean's Prometheus, because pod IPs are not reachable from outside the cluster and a migrated service must not lose its metrics. Phase 5: kube-prometheus-stack in cluster, TSDB at the path it uses today on ocean, the agent retires. |
 | Logs | Loki plus promtail | Alloy in the cluster pushes pod logs to ocean's Loki from phase 1. Phase 5: Loki moves in cluster. Promtail is end of life and is not carried over. |
 | Dead-man alert | none outside ocean | "Cluster is down" goes to email and ntfy (terrac, D17). Both of those run on ocean today (exim smarthost, ntfy container), so neither can be allowed to depend on the thing being reported dead. See "Dead-man alert" below. |
-| DB backups | `files/db-backup/db-backup.sh` | Per-database CronJobs writing the same GCS object names, so `db-restore.sh` keeps working. Both remain authoritative until the last database moves. |
+| DB backups | `files/db-backup/db-backup.sh` | Per-database CronJobs writing the same GCS object names, so `db-restore.sh` keeps working. Both remain authoritative until the last database moves. Postgres additionally archives WAL through CloudNativePG (D35). |
 
 ### App charts
 
@@ -712,6 +712,7 @@ exists.
 | terrac's age key | terrac's machines | Plus an offline **recovery** age key (D32), printed and on a USB stick in two places. Every sops file in every repo is also encrypted to it. A quarterly decrypt test proves it still works. |
 | Terraform state | GCS, versioned | Already so. |
 | DB dumps, k3s SQLite backup, Proxmox config DBs | `gs://homelab-db-backups`, versioned | Each has a freshness metric and alert. |
+| Postgres WAL and base backups | `gs://homelab-pg-wal`, unversioned, pruned by CloudNativePG's retention policy | Archive-age and base-backup-age alerts, monthly scratch recovery (D35). |
 | `/data01` | The HBA disks | RAIDZ2; imported by hand only. Not backed up off-site by this plan (see non-goals). |
 | Images | GHCR | Rebuildable from each app repo's CI. |
 | Salt `.deb`, Debian cloud image | GCS mirror, pinned by hash | Upstream URLs are not trusted to stay put. |
@@ -758,6 +759,32 @@ exists.
   `db_restore.yaml`. The nightly restore test runs it against a scratch PVC.
   App state on ocean needs none of this for a host rebuild: it is `hostPath`
   on `/data01/services/<svc>` (Storage, above) and survives.
+- **D35: Postgres runs under CloudNativePG with WAL archiving.** Today there
+  are three Postgres containers (`jellystat-db`, `mem0-postgres`,
+  `archmap-postgres`, `files/db-backup/db-backup.sh:61`), each dumped once a
+  night, so a bad day loses up to 24 hours. mem0 is why that matters: it is
+  the agents' shared memory and changes all day. Each database becomes a
+  CloudNativePG `Cluster` with `instances: 1`. No replicas, because each app
+  runs one pod and its state is pinned to one node anyway, so a standby buys
+  failover for a database whose only client is already down. The operator is
+  a tier 1 platform app synced by Argo. WAL ships continuously to
+  `gs://homelab-pg-wal` through the Barman Cloud plugin with
+  `archive_timeout` at five minutes, plus a weekly base backup and a 14-day
+  retention policy, which puts RPO at about five minutes with point-in-time
+  recovery inside the window. The bucket and a service account that can only
+  write to it live in `terraform-root`; the key reaches the cluster like any
+  other cluster secret. The D31 nightly logical dump stays beside it, because
+  a dump restores across Postgres majors and does not need the operator to be
+  healthy. Restore is a new `Cluster` bootstrapped with `recovery` from the
+  object store, optionally to a target time, run by hand like D31; a monthly
+  job recovers mem0 into a scratch cluster and compares row counts. PGDATA
+  stays node-local (a static local PV on ocean, `local-path` on
+  `k3s-agent01`). Cutover is not zero-copy, unlike the rest of ocean's state:
+  CloudNativePG cannot adopt the Docker data directory, so each database moves
+  in its window through `bootstrap.initdb.import` from the running container,
+  which also allows a major-version bump on the way. Plugin versus the
+  in-tree `barmanObjectStore`, and the exact metric names behind the R22
+  alerts, are confirmed when it is built.
 - **D32: a recovery age key** (table above).
 - **D33: the DNS pair gate has a rebuild mode.** The pair pre-flight refuses a
   degraded pair, which as written would block rebuilding a dead peer. A
@@ -809,7 +836,8 @@ exists.
    NVIDIA and zed; the k3s agent's `/data01` mount guard lets it start; Argo
    reschedules the pods onto their `hostPath` state.
 7. **Everything else**: llmeval and any other VM from Terraform plus Salt;
-   pods with node-local databases on lost disks restore through D31.
+   pods with node-local databases on lost disks restore through D31;
+   Postgres recovers from its WAL archive to the last five minutes (D35).
 8. **Verify**: drift metrics zero on every host, Argo all Synced and Healthy,
    the dead-man fires on a stopped API, `terraform-root` plans clean.
 
