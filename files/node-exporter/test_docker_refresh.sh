@@ -168,6 +168,31 @@ refute "a gutted project is never pulled" "PULLED" "$OUT"
 refute "a gutted project is never recreated" "RECREATED" "$OUT"
 check "the refusal says so in the journal" "project=github-runners has unset compose variables, refusing to recreate" "$LOG"
 
+# 2026-11-15: github-runners-terraform-root has two services, so compose warned
+# twice. `grep -q` left after the first line, compose died writing the second,
+# and pipefail turned the match into a failed pipeline: the guard read that as
+# "no unset variables" and both runners were recreated with a blank token.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls -a --format json"|"compose ls --format json")
+    echo '[{"Name":"github-runners-terraform-root","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*)
+    echo 'level=warning msg="The \"GITHUB_TOKEN\" variable is not set. Defaulting to a blank string."' >&2
+    sleep 0.3
+    echo 'level=warning msg="The \"GITHUB_TOKEN\" variable is not set. Defaulting to a blank string."' >&2
+    exit 255 ;;
+  *pull*) echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *) : ;;
+esac
+STUBEOF
+: > "$LOG"
+run_with_stub "$STUB" github-runners-terraform-root
+exited "a second unset-variable warning still fails the unit" 1
+refute "a project warned about twice is never pulled" "PULLED" "$OUT"
+refute "a project warned about twice is never recreated" "RECREATED" "$OUT"
+check "the twice-warned refusal says so in the journal" "project=github-runners-terraform-root has unset compose variables, refusing to recreate" "$LOG"
+
 # A project assembled from several compose files would be rebuilt from a partial
 # definition if only the first were used. Refusing is loud; corrupting is not.
 cat > "$STUB" <<'STUBEOF'
