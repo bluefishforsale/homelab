@@ -57,9 +57,14 @@ must leave room for it.
 
 ## Phase 0: decide and clean up (2026 Q4)
 
-- [ ] terrac reviews spec and PRD; answers Q5 (reboot window), Q6 (internal CA), Q8 (stray host daemons), Q9 (masterless pillar keys), Q10 (third
-      resolver); signs off D19, D21, D23, D26 (VMs are cattle), D32 (recovery
-      key). Q7 (is Salt still worth it) answered before phase 6 work starts.
+- [x] terrac answers Q5 (Wednesday 03:00 to 05:00), Q6 (a), Q8 (drop
+      glances; avahi and netatalk to pods), Q9 (a), Q10 (no); signs off D21,
+      D23, D26, D32 (2026-11-15).
+- [ ] terrac signs off D19 (ntfy and watchdog on agentbox). Q7 (is Salt
+      still worth it) answered before phase 6 work starts.
+- [ ] `homelab-ca` spec (2026-10-14) amended per Q6: `pathlen:1` root, cluster
+      intermediate, and whether the root's name constraints admit the
+      cluster's IP ranges. Lands before the CA is built.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
 - [ ] `homelab-kube`: sops from GPG to age; age private key into the vault at
@@ -99,8 +104,6 @@ Rebuild gaps that exist today, so they do not wait for 2027:
 - [ ] D32: recovery age key generated offline, added as a recipient to every
       `.sops.yaml` (`terraform-root`, `homelab-kube`), files rekeyed; first
       decrypt test recorded.
-- [ ] Q10 answered; if yes, the third resolver is built under Ansible now and
-      ported with the DNS pair in phase 6.
 
 **Gate:** all Phase 0 boxes checked; PRD phase 0 acceptance.
 
@@ -124,7 +127,7 @@ Everything here is new VMs and a new cluster; nothing in production moves.
       manages itself from `homelab-kube`.
 - [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
       NetworkPolicy controller disabled), Hubble, cert-manager with the
-      Let's Encrypt issuer (internal CA per Q6), sops-secrets-operator (age),
+      Let's Encrypt issuer, internal issuer from the cluster intermediate (Q6), sops-secrets-operator (age),
       Cilium Gateway (D20), local-path, the `/data01` NFS PV, metrics-server.
 - [ ] `k3s-agent01` added to ocean's NFS export client list before the NFS PV
       is used.
@@ -155,7 +158,7 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 
 - [ ] `unattended-upgrades` (security origin only) on the k3s VMs; package
       holds for kernel, NVIDIA and ZFS where they apply.
-- [ ] kured on the cluster, window per Q5, one node at a time.
+- [ ] kured on the cluster, Wednesday 03:00 to 05:00 Pacific (Q5), one node at a time.
 - [ ] Textfile metrics: pending security updates, `reboot-required`; alerts at
       7 and 14 days.
 - [ ] `docs/operations/os-lifecycle.md`: patch policy, held-package monthly
@@ -212,7 +215,7 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
       cutover; `docs/operations/deploy-pattern.md` gains the k8s pattern before
       the first one)
 - [ ] W4 GPU services; plex in quiet hours; mem0 with no agent run in flight
-- [ ] W5 homeassistant (hostNetwork)
+- [ ] W5 homeassistant, avahi, netatalk (hostNetwork); glances removed
 
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0) -> window:
 retire play stops the container, scale to 1, flip the nginx upstream, verify

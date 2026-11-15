@@ -145,7 +145,8 @@ scheduling and reconciliation stop.
   `homelab-kube` are archived: the first would fight `terraform-root` over
   tunnel config, the second needs an IP pool this design does not have.
 - **hostNetwork pods** where the app needs the LAN: Home Assistant (discovery),
-  Plex (GDM discovery, real client IPs for local-network detection).
+  Plex (GDM discovery, real client IPs for local-network detection), avahi
+  and netatalk (mDNS advertisement, AFP).
 - **Ports lockdown**: a default-deny NetworkPolicy per app namespace, with
   explicit allows. `vars/vars_service_ports.yaml` entries retire with their
   service. Limit: NetworkPolicy does not apply to `hostNetwork` pods (Plex,
@@ -270,7 +271,8 @@ rebuilt by swap, never upgraded in place.
   | `db-backup` | Per-database CronJobs; Postgres also gets WAL archiving (D35). |
   | `plex-autoheal`, `kometa-metrics`, `mem0-metrics`, `tdarr-playback-window`, `wordpress-cron`, `wordpress-update`, `audible-download` | Move with their service, as CronJobs or sidecars, in that service's cutover. |
   | `promtail` | Replaced by Alloy. |
-  | `avahi-daemon`, `netatalk`, `glances` | terrac decides: keep on host or drop. |
+  | `avahi-daemon`, `netatalk` | Pods on ocean in W5, `hostNetwork` (mDNS needs the LAN); netatalk mounts its share from `/data01` (Q8). |
+  | `glances` | Dropped (Q8). |
   | host exporter containers (node, smart, process, fail2ban, cadvisor, nvidia-gpu, dcgm) | DaemonSets on cluster nodes. On tier 0 VMs they stay as they are, owned by Salt. |
 - Node labels and taint chosen up front, so pods pin to a role, not a host
   name: label `homelab.role/data01=local`, `homelab.role/gpu=rtx3090`; taint
@@ -304,7 +306,7 @@ above. Waves, lowest risk first:
 | W2 | sonarr, radarr, lidarr, prowlarr, bazarr, overseerr, tautulli, kometa | WAL state via `hostPath` on ocean; hardlinks need the one whole-pool mount |
 | W3 | archmap, photonic_inventory, my_ta_jose, paia, etrading_boy, blog_saetnere_com_wp | external repos; each repo switches its deploy pattern in the same cutover |
 | W4 | tdarr server and nodes, llama.cpp, open-webui, mem0 stack, plex | GPU; plex in quiet hours; mem0 is the agents' shared memory, so cut it over with no agent run in flight |
-| W5 | homeassistant | hostNetwork |
+| W5 | homeassistant, avahi, netatalk | hostNetwork |
 | W6 | prometheus, loki, grafana, alertmanager | this is phase 5, after the external dead-man alert exists |
 | W7 | nginx | Cilium Gateway takes 80/443 on ocean in host-network mode; certbot retires to cert-manager |
 
@@ -331,8 +333,8 @@ Two different things, handled differently:
   `dkms status` shows both the NVIDIA and ZFS modules built for the new kernel
   **before** rebooting. A ZFS module that failed to build means a pool that
   does not import on boot.
-- Reboots on k8s nodes: kured, in a weekly window that does not overlap the
-  Sunday 08:00 to 14:00 Pacific image refresh, one node at a time, drain first.
+- Reboots on k8s nodes: kured, Wednesday 03:00 to 05:00 Pacific (Q5), clear
+  of the Sunday 08:00 to 14:00 image refresh, one node at a time, drain first.
 - **Ocean is not in kured's rota.** An unattended reboot would skip the
   `dkms status` check above, and during the overlap it would also take down
   every Docker service. Ocean reboots only in the supervised monthly window.
@@ -426,7 +428,7 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 | Third-party images | `docker-refresh@<project>` timers pull floating tags weekly | See "Keeping images current": Renovate watches registries and opens PRs that bump the pinned tag. |
 | Secrets | ansible-vault | SOPS with age, decrypted in-cluster by sops-secrets-operator (already in `homelab-kube`, switched from GPG to age). The age private key is the one bootstrap secret; it stays in the vault and the bootstrap play installs it. |
 | Public cert | certbot on ocean, Cloudflare DNS-01 | cert-manager `ClusterIssuer` for Let's Encrypt, Cloudflare DNS-01, same token. |
-| Internal TLS | `homelab-ca` (spec 2026-10-14, not yet implemented) | Unresolved, PRD Q6. That spec's root never expires, has no revocation, and is `pathlen:0`, so it cannot sign an intermediate for the cluster; the only way cert-manager could issue from it is to hold the root key itself in a cluster Secret. Its name constraints also exclude pod and service IPs. Until Q6 is answered, internal TLS in the cluster is out of scope and pods use the public cert at the Gateway. |
+| Internal TLS | `homelab-ca` (spec 2026-10-14, not yet implemented) | Unresolved, PRD Q6. That spec's root never expires, has no revocation, and is `pathlen:0`, so it cannot sign an intermediate for the cluster; the only way cert-manager could issue from it is to hold the root key itself in a cluster Secret. Its name constraints also exclude pod and service IPs. Q6 answered (a): the CA design moves to a `pathlen:1` root before it is built, and cert-manager issues from a replaceable cluster intermediate; the root key never enters the cluster. Until that CA exists, pods use the public cert at the Gateway. |
 | Metrics | Prometheus on ocean, file-based scrape config | Phases 1 to 4: an Alloy (or Prometheus agent) in the cluster discovers ServiceMonitors and remote-writes to ocean's Prometheus, because pod IPs are not reachable from outside the cluster and a migrated service must not lose its metrics. Phase 5: kube-prometheus-stack in cluster, TSDB at the path it uses today on ocean, the agent retires. |
 | Logs | Loki plus promtail | Alloy in the cluster pushes pod logs to ocean's Loki from phase 1. Phase 5: Loki moves in cluster. Promtail is end of life and is not carried over. |
 | Dead-man alert | none outside ocean | "Cluster is down" goes to email and ntfy (terrac, D17). Both of those run on ocean today (exim smarthost, ntfy container), so neither can be allowed to depend on the thing being reported dead. See "Dead-man alert" below. |
@@ -596,7 +598,7 @@ path that runs on the thing that died sends nothing.
   not a fleet compromise. How pillar gets decrypted at render time (a sops
   renderer, an `ext_pillar`, or a wrapper that decrypts to tmpfs before
   `salt-call`) is the builder's call; verify Salt's support for it at phase 6
-  start (not checked here). Q9 covers the alternative of hosts holding no key.
+  start (not checked here). Q9 settled on per-host keys over CI-pushed pillar.
   The vault cannot be archived until every key has a new home, including the
   cluster's age key and the Cloudflare Access email lists that `terraform-root`
   still reads from it.
@@ -858,7 +860,8 @@ on real hardware.
 
 Both DNS servers and pihole are VMs on the two hypervisors, so losing both
 hosts takes name resolution away from every device in the house until step 1
-finishes. Q10 asks whether a third resolver should live off the hypervisors.
+finishes. There is no hardware off the hypervisors to host a third resolver
+(Q10), so this risk is accepted and the recovery order is the mitigation.
 
 ## What stays in Ansible until Salt replaces it
 

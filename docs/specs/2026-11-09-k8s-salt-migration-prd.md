@@ -93,34 +93,24 @@ where merge is deploy.
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
 | D19 | The dead-man watchdog and ntfy live on agentbox (tier 0); ntfy never moves into the cluster. Email leaves by a relay that does not pass through ocean. | design call, needs terrac's sign-off |
 | D20 | North-south traffic uses Cilium's Gateway API in host-network mode on ocean. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call |
-| D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, needs terrac's sign-off |
+| D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, signed off by terrac (2026-11-15) |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
-| D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, needs terrac's sign-off |
+| D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, signed off by terrac (2026-11-15) |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac (2026-11-14) |
-| D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, needs terrac's sign-off |
+| D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, signed off by terrac (2026-11-15) |
 | D27 | Both hypervisors: VM disks on a ZFS mirror `vmpool` separate from boot, and a mirrored boot disk. node006's VM storage moves first, in 2026, not 2027. | terrac asked for every rebuild gap closed (2026-11-14); shape is a design call |
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
 | D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
 | D30 | The VM base image is stock Debian genericcloud, pinned by hash, mirrored to GCS, downloaded per node by `terraform-root`. No custom template build. | design call |
 | D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. | design call |
-| D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, needs terrac's sign-off |
+| D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, signed off by terrac (2026-11-15) |
 | D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
 | D35 | Every Postgres database runs as a single-instance CloudNativePG cluster with continuous WAL archiving to GCS: RPO about five minutes, 14 days of point-in-time recovery. The nightly logical dump stays. No Postgres replicas. | terrac (2026-11-15); shape is a design call |
 
 ## Open questions for terrac
 
-- **Q5.** Weekly reboot window for kured: proposal Tuesday 03:00 to 05:00
-  Pacific (clear of the Sunday image refresh).
-- **Q6.** Internal TLS in the cluster. The `homelab-ca` root (never expires,
-  no revocation, `pathlen:0`, names limited to `home`, `cluster.local` and
-  192.168.1.0/24) cannot sign an intermediate, so cert-manager could only use
-  it by holding the root key in the cluster. Options: (a) change the CA design
-  before it is built, to `pathlen:1` with a cluster intermediate that can be
-  replaced; (b) keep it for hosts only and give the cluster its own CA;
-  (c) no internal TLS in the cluster for 2027. Recommendation: (a), because
-  the CA is not implemented yet and this is the cheap moment to change it.
 - **Q7.** Is Salt still worth it? After this migration, services are in
   Kubernetes and VMs are in `terraform-root`. What is left for a host tool is
   small: base packages, users, exporters, the k3s install, NFS and drivers, on
@@ -132,22 +122,26 @@ where merge is deploy.
   The alternative is a slimmed-down Ansible in a renamed repo plus a `--check`
   drift timer. Salt stays in the plan as decided; this asks for a deliberate
   yes before phase 6 work starts.
-- **Q8.** `avahi-daemon`, `netatalk` and `glances` run on ocean outside any
-  container: keep on the host or drop.
-- **Q10.** A third resolver off the hypervisors. With dns01, dns02 and pihole
-  all VMs on node005 and node006, losing both hosts takes DNS away from the
-  whole house until node005 is back. Option: the Raspberry Pi
-  (`raspberry_pi.yaml` exists) as a third DHCP-advertised resolver, a
-  recursor with a copy of the `.home` zone rendered from the same address
-  table, managed by Salt like the pair. Recommendation: yes; it is cheap, and
-  it is the only item here that keeps the house online during the outage
-  itself rather than shortening it.
-- **Q9.** Masterless pillar secrets: (a) each host holds its own age key and
-  decrypts only the pillar encrypted to it; (b) hosts hold no key and CI
-  decrypts and pushes just that host's pillar to tmpfs for each run.
-  Recommendation: (a), because the drift timer and a break-glass local apply
-  both need pillar on the host when CI is not there; (b) keeps keys off hosts
-  but means secret-bearing states cannot be drift-checked or applied by hand.
+
+## Answered questions
+
+- **Q5 (2026-11-15).** kured's weekly window is Wednesday 03:00 to 05:00
+  Pacific, one node at a time, clear of the Sunday image refresh.
+- **Q6 (2026-11-15).** Option (a): the `homelab-ca` design changes before it
+  is built to a `pathlen:1` root, and the cluster gets its own replaceable
+  intermediate for cert-manager. The root key never enters the cluster. The
+  root already permits `cluster.local` but not pod or service IPs, and an
+  intermediate cannot widen its root's constraints, so the CA change also
+  decides whether the root admits the cluster's IP ranges.
+- **Q8 (2026-11-15).** `glances` is dropped. `avahi-daemon` and `netatalk`
+  move to pods on ocean (W5, hostNetwork, since mDNS needs the LAN).
+- **Q9 (2026-11-15).** Option (a): each host holds its own age key and
+  decrypts only the pillar encrypted to it, so the drift timer and a
+  break-glass local apply work without CI.
+- **Q10 (2026-11-15).** No third resolver. There is no Raspberry Pi in the
+  fleet (pihole is a VM on the hypervisors, like dns01 and dns02), so nothing
+  off the hypervisors exists to host one. Losing both hypervisors still takes
+  DNS down until node005 is back; the recovery order is what shortens that.
 
 ## Requirements
 
