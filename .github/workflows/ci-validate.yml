@@ -301,10 +301,10 @@ jobs:
 
       # The receiver ships its own defect ledger but nothing ran it, so it sat
       # broken from #378 (which started refusing kernel device names) until
-      # 2026-09-08. Env vars are the two it reads at import; it never opens a
-      # socket in selftest mode.
+      # 2026-09-08. ALERT_NTFY_URL is the one env var it requires at import; it
+      # never opens a socket in selftest mode.
       - name: Alert receiver selftest
-        run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
+        run: ALERT_NTFY_URL=http://ci.invalid python3 files/agentbox/alert-receiver.py --selftest
 
       # Agents run these without a permission prompt and both splice arguments
       # into an ssh command string, so a regression is remote exec on the fleet.
@@ -342,11 +342,6 @@ jobs:
       # restart and stays dark for minutes, with the unit looking healthy.
       - name: RC launcher can recover from a stale registration
         run: bash .github/workflows/lib/agentbox-rc-launch.test.sh
-
-      # The only automation that closes hardware issues, on the pool where data
-      # loss is the worst outcome. Asserts what it must REFUSE to close.
-      - name: Replace-issue reconciler guard rails
-        run: bash .github/workflows/lib/agentbox-replace-reconcile.test.sh
 
       # "I could not look" must never render as "nothing is wrong". Three
       # places in this repo got that backwards at once.

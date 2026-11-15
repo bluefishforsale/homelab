@@ -70,10 +70,10 @@ this repo's master, is a production change, not a checkpoint.
 ## The agent fleet (agentbox)
 
 `agentbox` is an always-on VM on the homelab network, drivable live from the
-phone. It runs the RC sessions, the Alertmanager receiver (ntfy plus a GitHub
-issue per alert) and the media timers. It no longer drafts fixes for open
-issues on its own: the issue watcher, escalation tier and roadmap reconciler
-were retired on 2026-11-08 in favour of axiomd. Vocabulary:
+phone. It runs the RC sessions, the Alertmanager receiver (one ntfy push per
+alert) and the media timers. Nothing opens GitHub issues from alerts any more:
+the receiver's issue per alert and axiomd's [log-anomaly] and [flap-report]
+issues were retired as noise on 2026-11-15, and axiomd is stopped. Vocabulary:
 
 - **RC session** - a persistent `claude remote-control` process run as a
   systemd template instance (`agentbox-rc@repositories-root.service`), drivable
