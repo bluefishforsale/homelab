@@ -171,8 +171,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 
 ## Phase 2: retire the harbor VM (2027 Q2)
 
-- [ ] node005 RAM upgrade installed and verified (D16). Phase 2 does not
-      start without it.
+- [x] node005 RAM upgrade installed and verified (D16): 252 GiB, read from
+      Prometheus 2026-11-15.
 - [ ] Prove Docker plus k3s coexistence on `k3s-agent01` (spec, "Docker and k3s
       side by side"), including a Docker container reaching a NodePort on its
       own host, and a reboot.

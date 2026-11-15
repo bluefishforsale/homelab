@@ -35,7 +35,7 @@ own: the hosts themselves.
 
 | Thing | Reality |
 |---|---|
-| node005 | Proxmox 8.1, 56 threads, 125 GiB RAM (92 used; RAM upgrade before phase 2). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
+| node005 | Proxmox 8.1, 56 threads, 252 GiB RAM (upgraded from 125 GiB, D16; `node_memory_MemTotal_bytes` read 2026-11-15). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
 | node006 | Proxmox 8.4, 40 threads, 660 GiB RAM (498 used, ocean holds 366 GiB). VM disks on `local-lvm` (870 EVO 2TB). Runs dns02, ocean, llmeval. |
 | ocean | Debian 12, kernel 6.1, Docker 29.6, cgroup v2, ~60 containers. RTX 3090 (driver 610.43) and the SAS HBA passed through; owns the `data01` pool (87 TiB raw, 72% used) and exports it over NFSv4.2. nginx on 80/443 is the front door for every service. Docker sets `iptables -P FORWARD DROP`. |
 | GPU today | Already shared: llama-server 19.6 GiB and tdarr-ffmpeg 376 MiB on the one card, via Docker. |

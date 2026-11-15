@@ -88,7 +88,7 @@ where merge is deploy.
 | D13 | Ocean runs Docker and k3s side by side until Docker is completely drained. Only then does the first passthrough swap move ocean to a clean Debian 13 k8s-only VM, by end of 2027. | design call, confirmed by terrac |
 | D14 | Pods pin to node role labels, never to a hostname, so they follow a replaced VM unchanged. | design call |
 | D15 | CNI is Cilium. | terrac |
-| D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). | terrac |
+| D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). Done: 252 GiB, verified 2026-11-15. | terrac |
 | D17 | "Cluster is down" is reported by email and ntfy. | terrac |
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
 | D19 | The dead-man watchdog and ntfy live on agentbox (tier 0); ntfy never moves into the cluster. Email leaves by a relay that does not pass through ocean. | design call, needs terrac's sign-off |
@@ -222,7 +222,7 @@ where merge is deploy.
 | 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5, Q6, Q8, Q9 and Q10 answered, D19, D21, D23, D26 and D32 signed off. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
 | 1 | Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
-| 2 | node005 RAM upgrade done before work starts. harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
+| 2 | harbor VM workloads (nzbget, tdarr-node, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
 | 4 | Every Docker service on ocean is a pod or explicitly parked. |
 | 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Docker nginx retired; the Cilium Gateway owns 80/443 on ocean. Docker removed from ocean. |
