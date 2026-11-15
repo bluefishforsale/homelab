@@ -9,10 +9,10 @@
     - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
 
   vars:
-    image: ghcr.io/haveagitgat/tdarr
+    image: registry-cache.home:5002/haveagitgat/tdarr
     version: latest
     service: tdarr
-    node_image: ghcr.io/haveagitgat/tdarr_node
+    node_image: registry-cache.home:5002/haveagitgat/tdarr_node
     node_version: latest
     service_node: tdarr-node
     tdarr_port_web: "{{ service_ports.tdarr.port }}"   # host-facing web UI

@@ -10,7 +10,7 @@
 
   vars:
     service: open-webui
-    image: ghcr.io/open-webui/open-webui
+    image: registry-cache.home:5002/open-webui/open-webui
     version: main
     port: "{{ service_ports.open_webui.port }}"
     data: /data01

@@ -73,6 +73,11 @@ cmd_logs() {
 }
 
 [ $# -ge 1 ] || usage 1
+# NOTE: container names and line counts are spliced into the remote shell
+# string, so any character outside this set would run as a command on the host.
+for a in "${@:2}"; do
+  [[ $a =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || die "bad argument: '$a'"
+done
 case "$1" in
   ps)     cmd_ps "${2:-}" ;;
   where)  cmd_where "${2:-}" ;;

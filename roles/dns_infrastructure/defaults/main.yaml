@@ -75,3 +75,15 @@ nginx_lb_vhosts:
   - tautulli
   - tdarr
   - unpoller
+
+# Image registries. Hosts in dns_cache_hosts pull through registry-cache-01,
+# the rest straight from upstream. The upstream prefixes render to exactly what
+# the refs were before the cache, so moving one host over leaves the other's
+# compose file byte-identical and its stack untouched.
+# NOTE: dns01 and dns02 resolve registry-cache.home themselves. A pull while
+# both resolvers are down cannot reach the cache; a restart never pulls, so
+# only a deploy or refresh in that window is exposed. Move one host at a time,
+# on a weekday morning (docs/specs/2026-11-08-docker-weekly-restart-design.md).
+dns_cache_hosts: [dns01, dns02]
+dns_reg_hub: "{{ 'registry-cache.home:5001/' if inventory_hostname in dns_cache_hosts else '' }}"
+dns_reg_ghcr: "{{ 'registry-cache.home:5002/' if inventory_hostname in dns_cache_hosts else 'ghcr.io/' }}"

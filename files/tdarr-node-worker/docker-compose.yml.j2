@@ -9,7 +9,7 @@
 # schedule would split them (it did on ocean, 2026-10-12, 3.00.00 vs 2.94.03).
 services:
   tdarr-node:
-    image: "ghcr.io/haveagitgat/tdarr_node:{{ tdarr_node_version }}"
+    image: "registry-cache.home:5002/haveagitgat/tdarr_node:{{ tdarr_node_version }}"
     container_name: tdarr-node
     hostname: "tdarr-node-{{ inventory_hostname }}"
     environment:

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
+    image: registry-cache.home:5004/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
     container_name: dcgm-exporter
     restart: unless-stopped
     privileged: true

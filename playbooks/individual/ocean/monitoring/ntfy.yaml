@@ -12,7 +12,7 @@
 
   vars:
     ntfy_service: ntfy
-    ntfy_image: binwiederhier/ntfy
+    ntfy_image: registry-cache.home:5001/binwiederhier/ntfy
     ntfy_version: latest
     ntfy_port: 8090
     ntfy_home: /data01/services/ntfy

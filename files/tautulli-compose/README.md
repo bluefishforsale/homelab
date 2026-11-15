@@ -30,7 +30,6 @@ ansible-playbook -i inventories/production/hosts.ini \
 | `docker-compose.yml.j2` | Tautulli + Exporter containers |
 | `tautulli-compose.service.j2` | Systemd service |
 | `tautulli.env.j2` | Environment variables |
-| `config.ini.j2` | Tautulli configuration with Plex connection |
 
 ---
 

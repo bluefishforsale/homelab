@@ -77,16 +77,15 @@ The old GCP KMS playbook (`gcloud_sdk.yaml` with `tasks/gcloud.yaml` and
 `tasks/pki_gcloud_kms.yaml`) is deleted too. Its vars were defined nowhere, and
 the empty `homelab-sops-key` ring it left behind is modeled in terraform-root.
 
-**Cloudflare Access (tunnel) user emails.** The allow lists live only in
-`vault/secrets.yaml` under `cloudflare.access_allow_emails` (`plex-users` for
-friends, `admin`). That vault entry is the source of truth for terraform-root
-too: its `.envrc` reads it locally, and CI reads a copy in the terraform-root
-repo secret `TF_VAR_ACCESS_PLEX_USER_EMAILS`. They never go in git in either
-repo. Changing who can get in means editing the vault **and** resetting that
-secret (command in terraform-root's agents.md, "Where the Access (tunnel)
-user emails live"); a vault edit alone changes nothing, because terraform-root
-applies the secret's copy. Nothing in this repo reads these keys any more;
-they stay until they move to SOPS in terraform-root.
+**Cloudflare Access (tunnel) user emails.** The friends' allow list lives in
+terraform-root, in the SOPS file `secrets/access.enc.yaml` (key `plex_users`,
+terraform-root #53), and merging a change there is what applies it. The admin
+address is inline in its `allow_admin` policy. The old vault copies under
+`cloudflare.access_allow_emails` and terraform-root's
+`TF_VAR_ACCESS_PLEX_USER_EMAILS` repo secret are no longer read by anything.
+To resync from Plex invites, pipe `scripts/plex-shared-users.py` into that SOPS
+file (the command is in terraform-root's agents.md, "Where the Access (tunnel)
+user emails live").
 
 Proxmox VMs are still created here with `qm clone` playbooks for now. They're
 the next candidate to move to terraform-root (bpg/proxmox, applied from the
@@ -109,8 +108,21 @@ These bite every agent that doesn't know them up front:
   still reports the job green. For real health verification use `health-check.yml`
   (exits 1 on unhealthy), the `scripts/*-check.sh` tools, or `scripts/homelab-health.sh`
   (fleet-wide diff).
-- **Squash-merge only.** `main-apply` detects impact via `git diff HEAD~1 HEAD`, which
-  assumes one commit per merge.
+- **Squash-merge only.** Keeps one commit per merge, which is what the rest of the
+  tooling (rollback's `HEAD~1`, the deploy summary) assumes.
+- **A push deploy applies master as it is now, and covers everything since the last
+  clean deploy.** `main-apply` diffs from the `deployed` branch (moved forward only
+  after an apply with no failures) to the pushed commit, and the apply job checks out
+  the tip of master rather than the pushed commit. So a run that waited in the queue
+  can't render older templates over a newer deploy, and a run cancelled while
+  pending, or one that failed, has its changes picked up by the next push. Only paths
+  in main-apply's push filter count, so an inventory or vault commit in the range
+  still deploys nothing. Every fleet deploy workflow holds `deploy-ocean`.
+  A playbook that keeps failing holds `deployed` back, and every push re-runs it until
+  it is fixed. Fix forward. If a change truly must be skipped, fast-forward the
+  marker past it by hand (`git push origin <sha>:refs/heads/deployed`; the remote
+  refuses anything but a fast-forward). If `deployed` is ever off master's history
+  the diff falls back to one commit.
 - **Deploy path filter.** `main-apply` runs only on `playbooks/**`, `files/**`,
   `roles/**`, `vars/**/*.yaml` and `group_vars/**`. CI (`ci-validate.yml`) covers most
   of those plus `vault/**` and `.github/workflows/**`, but not `group_vars/**`, so a
@@ -132,7 +144,7 @@ runs only those. The model is **explicit ownership**, not best-effort guessing:
   `service_ports.<key>` changed**, not the filename: a single port bump deploys only the
   service(s) referencing that key; a comment/format-only edit deploys nothing; if the
   key-diff can't be computed it falls back to every consumer. Needs `pyyaml` on the
-  runner (installed in the workflow) and the base commit (`fetch-depth: 2`).
+  runner (installed in the workflow) and the base commit (`fetch-depth: 0`).
 - **`roles/<role>/**`** → playbooks importing that role.
 - **`inventories/**`, `group_vars/all*`** → the ONLY inputs that replay the site-wide
   orchestrators (`01_base_system`, `02_core_infrastructure`, `03_ocean_services`).

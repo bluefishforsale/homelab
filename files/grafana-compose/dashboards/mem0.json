@@ -104,7 +104,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "probe_success{instance=\"http://ocean.home:8888/docs\"}",
+          "expr": "probe_success{instance=\"http://harbor.home:8888/docs\"}",
           "refId": "A",
           "range": true
         }
@@ -185,7 +185,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "probe_success{instance=\"http://ocean.home:8766/mcp\"}",
+          "expr": "probe_success{instance=\"http://harbor.home:8766/mcp\"}",
           "refId": "A",
           "range": true
         }

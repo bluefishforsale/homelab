@@ -9,14 +9,21 @@
     - ../../../vault/secrets.yaml
 
   vars:
+    # NOTE: every other host pulls through registry-cache-01. Not these two:
+    # the cache host pulling its own exporters through itself means a dead cache
+    # also takes down the monitoring that would show it, and gh-runner-01's
+    # dockerd has no insecure-registries, so a cache ref there cannot pull.
+    image_upstream: "{{ inventory_hostname in groups['registry_cache'] + groups['github_runners'] }}"
+    reg_hub: "{{ 'docker.io' if image_upstream | bool else 'registry-cache.home:5001' }}"
+    reg_gcr: "{{ 'gcr.io' if image_upstream | bool else 'registry-cache.home:5006' }}"
     cadvisor_service: cadvisor
-    cadvisor_image: gcr.io/cadvisor/cadvisor
+    cadvisor_image: "{{ reg_gcr }}/cadvisor/cadvisor"
     cadvisor_version: v0.55.1
     cadvisor_port: "{{ service_ports.cadvisor.port }}"
     cadvisor_home: "/data01/services/{{ cadvisor_service }}"
     cadvisor_files: "{{ playbook_dir }}/../../../files/node-exporter"
     node_exporter_service: node-exporter
-    node_exporter_image: prom/node-exporter
+    node_exporter_image: "{{ reg_hub }}/prom/node-exporter"
     node_exporter_version: v1.8.2
     node_exporter_port: "{{ service_ports.node_exporter.port }}"
     node_exporter_textfiles: "/data01/services/{{ node_exporter_service }}/text_files"
@@ -42,20 +49,20 @@
     docker_refresh_exclude:
       - github-runners
     process_exporter_service: process-exporter
-    process_exporter_image: ncabatoff/process-exporter
+    process_exporter_image: "{{ reg_hub }}/ncabatoff/process-exporter"
     process_exporter_version: latest
     process_exporter_port: "{{ service_ports.process_exporter.port }}"
     process_exporter_compose_dir: /opt/compose/process-exporter
     # NVIDIA GPU Exporter (Docker Compose deployment)
     nvidia_gpu_exporter_service: nvidia-gpu-exporter
-    nvidia_gpu_exporter_image: utkuozdemir/nvidia_gpu_exporter
+    nvidia_gpu_exporter_image: "{{ reg_hub }}/utkuozdemir/nvidia_gpu_exporter"
     nvidia_gpu_exporter_version: 1.4.0
     nvidia_gpu_exporter_port: "{{ service_ports.nvidia_gpu_exporter.port }}"
     nvidia_gpu_exporter_home: "/data01/services/{{ nvidia_gpu_exporter_service }}"
     nvidia_gpu_exporter_files: "{{ playbook_dir }}/../../../files/node-exporter"
     # SMART monitoring (Docker Compose deployment)
     smart_exporter_service: smart-exporter
-    smart_exporter_image: prometheuscommunity/smartctl-exporter
+    smart_exporter_image: "{{ reg_hub }}/prometheuscommunity/smartctl-exporter"
     smart_exporter_version: latest
     smart_exporter_port: "{{ service_ports.smart_exporter.port }}"
     smart_exporter_home: "/data01/services/{{ smart_exporter_service }}"

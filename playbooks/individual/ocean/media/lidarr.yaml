@@ -12,11 +12,11 @@
 
   vars:
     service: lidarr
-    image: lscr.io/linuxserver/lidarr
+    image: registry-cache.home:5002/linuxserver/lidarr
     version: latest
     lidarr_port: "{{ service_ports.lidarr.port }}"
     exporter_service: lidarr-exporter
-    exporter_image: ghcr.io/onedr0p/exportarr
+    exporter_image: registry-cache.home:5002/onedr0p/exportarr
     exporter_version: latest
     exporter_port: "{{ service_ports.lidarr_exporter.port }}"
     files: "{{ playbook_dir }}/../../../../files/ocean-lidarr"

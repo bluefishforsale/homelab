@@ -10,7 +10,7 @@
     - "{{ playbook_dir }}/../../../../vars/vars_service_ports.yaml"
 
   vars:
-    image: sctx/overseerr
+    image: registry-cache.home:5001/sctx/overseerr
     version: latest
     service: overseerr
     files: "{{ playbook_dir }}/../../../../files/ocean-overseerr"

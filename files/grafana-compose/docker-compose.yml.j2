@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mysql:
-    image: percona/percona-server:5.7
+    image: registry-cache.home:5001/percona/percona-server:5.7
     container_name: grafana-mysql
     hostname: mysql
     restart: unless-stopped

@@ -4,10 +4,15 @@
 # rewrite of the existing facts, not an append, so two instances fed the same
 # input produce different rows with different ids and can never be reconciled.
 #
-# Published on the LAN address only. Off-network access is an ssh port-forward
-# to {{ ansible_default_ipv4.address }}:{{ port_api }}, deliberately not a
-# cloudflared ingress: memory contents are the most personal data in the fleet
-# and CF terminates TLS at its edge.
+# Published on the LAN address only. Off-network clients come in through
+# mem0.terrac.com: Cloudflare tunnel to the gateway below, gated by an Access
+# service token, with mem0's own keys still required behind it.
+#
+# NOTE: Cloudflare terminates TLS at its edge, so it sees memory contents in
+# the clear. That was the reason this stayed off cloudflared behind an ssh
+# forward until 2026-11-12; terrac chose the tunnel anyway, for clients that
+# need no ssh. The backout is the ssh forward to :{{ port_api }}, which still
+# works because the LAN ports are unchanged.
 services:
   mem0:
     # Built and smoke-tested by the mem0 repo's build-and-push workflow, which
@@ -75,7 +80,7 @@ services:
         tag: "{{ service }}"
 
   postgres:
-    image: ankane/pgvector:v0.5.1
+    image: registry-cache.home:5001/ankane/pgvector:v0.5.1
     container_name: {{ service }}-postgres
     hostname: postgres
     restart: unless-stopped
@@ -87,7 +92,9 @@ services:
       - POSTGRES_PASSWORD={{ ai_services.mem0.postgres_password }}
 
     volumes:
-      - {{ home }}/postgres-data:/var/lib/postgresql/data
+      # On the 870 EVO, not the state disk: the store's reads and its WAL are
+      # the latency mem0 search pays.
+      - {{ pg_data }}:/var/lib/postgresql/data
       # Creates mem0_app (users, api keys). Mounted from the clone so it cannot
       # drift from the schema code that expects it.
       - {{ home }}/src/server/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -108,17 +115,18 @@ services:
   # NOTE: the collection is 768-dim. Changing this model or MEM0_EMBEDDING_DIMS
   # orphans every vector already stored.
   ollama:
-    image: ollama/ollama:latest
+    image: registry-cache.home:5001/ollama/ollama:latest
     container_name: {{ service }}-ollama
     hostname: ollama
     restart: unless-stopped
 
     environment:
       - TZ=America/Los_Angeles
-      # Force sequential evaluation. Setting this >1 causes thread oversubscription
-      # since each request uses 6 threads (the quota), which thrashes the CPU and
-      # degrades search latency past the 6s recall budget.
-      - OLLAMA_NUM_PARALLEL=1
+      # Concurrent embeds, so a burst of recalls stops queueing behind each
+      # other (13-16s per search in bursts at 1). Each slot runs
+      # embedder_threads threads; the quota below is slots x threads, so the
+      # pool never outgrows its CPUs, which is what thrashed at 6 threads x 1.
+      - OLLAMA_NUM_PARALLEL={{ embedder_parallel }}
       # Never unload. The default 5-minute idle timeout meant a session's one
       # recall almost always paid full model-load cost, and the recall hook
       # gives the entire search 6 seconds.
@@ -145,7 +153,7 @@ services:
     # set, embeddings went from sub-second to 6.9s while the other five cores
     # sat 83-99% idle. A quota lets the scheduler place all six threads on
     # whatever is free.
-    cpus: '6.0'
+    cpus: '{{ embedder_parallel * embedder_threads }}.0'
     mem_limit: 2048m
 
     logging:
@@ -203,3 +211,41 @@ services:
       driver: journald
       options:
         tag: "{{ service }}-bridge"
+
+  # Off-LAN front door: cloudflared on ocean routes mem0.terrac.com here, behind
+  # a Cloudflare Access service token. /mcp goes to the bridge, the rest to the
+  # API. Both still demand their own keys.
+  gateway:
+    image: nginx:stable-alpine
+    container_name: {{ service }}-gateway
+    hostname: gateway
+    restart: unless-stopped
+
+    volumes:
+      - {{ home }}/gateway-nginx.conf:/etc/nginx/nginx.conf:ro
+
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ port_gateway }}:80"
+
+    # Started after both upstreams are healthy, so the first requests land.
+    depends_on:
+      mem0:
+        condition: service_healthy
+      bridge:
+        condition: service_healthy
+
+    # End to end: a pass means the API answered through this hop.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/docs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    cpus: '0.5'
+    mem_limit: 64m
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-gateway"

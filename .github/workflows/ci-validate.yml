@@ -15,6 +15,9 @@ on:
       - "vars/**/*.yaml"
       - "vault/**"
       - ".github/workflows/**"
+      - "scripts/docker.sh"
+      - "scripts/fleet-systemctl.sh"
+      - "scripts/test_fleet_script_args.py"
   pull_request:
     branches:
       - main
@@ -27,6 +30,9 @@ on:
       - "vars/**/*.yaml"
       - "vault/**"
       - ".github/workflows/**"
+      - "scripts/docker.sh"
+      - "scripts/fleet-systemctl.sh"
+      - "scripts/test_fleet_script_args.py"
 
 env:
   ANSIBLE_FORCE_COLOR: "true"
@@ -287,8 +293,8 @@ jobs:
       - name: Detector unit tests
         run: bash .github/workflows/lib/detect-impacted-playbooks.test.sh
 
-      - name: Concurrency-group unit tests
-        run: bash .github/workflows/lib/resolve-concurrency-group.test.sh
+      - name: Deploy marker unit tests
+        run: bash .github/workflows/lib/deploy-marker.test.sh
 
       - name: Ownership coverage (no un-owned inputs)
         run: bash .github/workflows/lib/ownership-coverage.test.sh
@@ -299,6 +305,11 @@ jobs:
       # socket in selftest mode.
       - name: Alert receiver selftest
         run: ALERT_NTFY_URL=http://ci.invalid ALERT_ISSUE_REPO=ci/none python3 files/agentbox/alert-receiver.py --selftest
+
+      # Agents run these without a permission prompt and both splice arguments
+      # into an ssh command string, so a regression is remote exec on the fleet.
+      - name: fleet script argument validation
+        run: python3 scripts/test_fleet_script_args.py
 
       # nzbget-prune runs rm -rf on harbor scratch and data01 daily; its keep rules are the defect ledger.
       - name: nzbget-prune rules

@@ -9,7 +9,7 @@
 
   vars:
     service: homeassistant
-    image: ghcr.io/home-assistant/home-assistant
+    image: registry-cache.home:5002/home-assistant/home-assistant
     version: stable
     port: 8123
     data: /data01

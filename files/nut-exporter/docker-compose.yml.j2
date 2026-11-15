@@ -7,7 +7,7 @@
 # its health signal.
 services:
   nut-exporter:
-    image: "ghcr.io/druggeri/nut_exporter:{{ nut_exporter_version }}"
+    image: "registry-cache.home:5002/druggeri/nut_exporter:{{ nut_exporter_version }}"
     container_name: "{{ service }}"
     hostname: "{{ service }}"
     environment:

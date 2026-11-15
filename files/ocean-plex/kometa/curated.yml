@@ -265,22 +265,15 @@ collections:
 
   Gold Rush:
     sort_title: "!Gold Rush"
-    summary: The California gold rush and the mining camps it left behind, plus Chaplin's Klondike classic.
+    summary: The California gold rush and the mining camps it left behind, plus Chaplin's Klondike classic and Peckinpah's Ride the High Country.
     tmdb_movie:
-      - 20391    # Paint Your Wagon (1969)
       - 440161   # The Sisters Brothers (2018)
       - 8879     # Pale Rider (1985)
       - 44853    # The Claim (2000)
       - 36206    # Ride the High Country (1962)
       - 537996   # The Ballad of Buster Scruggs (2018)
-      - 76499    # Barbary Coast (1935)
-      - 171858   # The Outcasts of Poker Flat (1937)
-      - 26777    # The Outcasts of Poker Flat (1952)
-      - 43325    # Tennessee's Partner (1955)
       - 18660    # The Apple Dumpling Gang (1975)
-      - 262249   # Sutter's Gold (1936)
       - 962      # The Gold Rush (1925)
-      - 111459   # California (1947)
     collection_order: release
     sync_mode: sync
     radarr_add_missing: true
@@ -651,15 +644,288 @@ collections:
       - 1051     # The French Connection (1971)
       - 984      # Dirty Harry (1971)
       - 916      # Bullitt (1968)
-      - 1654     # The Dirty Dozen (1967)
       - 658      # Goldfinger (1964)
       - 5925     # The Great Escape (1963)
-      - 10907    # The Adventures of Robin Hood (1938)
     collection_order: release
     sync_mode: sync
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  I'm on a Boat:
+    sort_title: "!I'm on a Boat"
+    summary: "Life on the water: tall ships, subs, survival adrift, pirates, sailing and surf, and documentaries from the open sea. Pre-1970 only for the all-time greats."
+    tmdb_movie:
+      - 12311    # Mutiny on the Bounty (1935)
+      - 20088    # Kon-Tiki (1950)
+      - 488      # The African Queen (1951)
+      - 21       # The Endless Summer (1966)
+      - 551      # The Poseidon Adventure (1972)
+      - 578      # Jaws (1975)
+      - 387      # Das Boot (1981)
+      - 2669     # The Bounty (1984)
+      - 10493    # Dead Calm (1989)
+      - 1669     # The Hunt for Red October (1990)
+      - 14361    # Captain Ron (1992)
+      - 28881    # Wind (1992)
+      - 26391    # Cabin Boy (1994)
+      - 8963     # Crimson Tide (1995)
+      - 9804     # Waterworld (1995)
+      - 10874    # Muppet Treasure Island (1996)
+      - 10534    # White Squall (1996)
+      - 597      # Titanic (1997)
+      - 2133     # The Perfect Storm (2000)
+      - 3536     # U-571 (2000)
+      - 12590    # Below (2002)
+      - 8665     # K-19: The Widowmaker (2002)
+      - 24982    # Ghosts of the Abyss (2003)
+      - 8619     # Master and Commander: The Far Side of the World (2003)
+      - 22       # Pirates of the Caribbean: The Curse of the Black Pearl (2003)
+      - 291      # Riding Giants (2004)
+      - 421      # The Life Aquatic with Steve Zissou (2004)
+      - 15030    # Deep Water (2006)
+      - 36970    # Oceans (2009)
+      - 18947    # The Boat That Rocked (2009)
+      - 23128    # The Cove (2009)
+      - 39333    # 180° South (2010)
+      - 70667    # Kon-Tiki (2012)
+      - 127962   # Leviathan (2012)
+      - 87827    # Life of Pi (2012)
+      - 152747   # All Is Lost (2013)
+      - 109424   # Captain Phillips (2013)
+      - 205775   # In the Heart of the Sea (2015)
+      - 277834   # Moana (2016)
+      - 300673   # The Finest Hours (2016)
+      - 432615   # Chasing Coral (2017)
+      - 374720   # Dunkirk (2017)
+      - 429300   # Adrift (2018)
+      - 543093   # Maiden (2018)
+      - 414001   # The Mercy (2018)
+      - 401200   # Kursk (2018)
+      - 682110   # My Octopus Teacher (2020)
+      - 560057   # The Sea Beast (2022)
+      - 947763   # Endurance (2024)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+  Spycraft:
+    sort_title: "!Spycraft"
+    summary: "CIA, MI6, the KGB and the Cold War: tradecraft, moles, covert ops and the people who blow the whistle on them. 1980 on, best of the best only."
+    tmdb_movie:
+      - 26578    # The Falcon and the Snowman (1985)
+      - 10083    # No Way Out (1987)
+      - 1669     # The Hunt for Red October (1990)
+      - 10170    # The Russia House (1990)
+      - 9869     # Patriot Games (1992)
+      - 9331     # Clear and Present Danger (1994)
+      - 710      # GoldenEye (1995)
+      - 954      # Mission: Impossible (1996)
+      - 9798     # Enemy of the State (1998)
+      - 8195     # Ronin (1998)
+      - 11973    # Thirteen Days (2000)
+      - 1535     # Spy Game (2001)
+      - 2501     # The Bourne Identity (2002)
+      - 2502     # The Bourne Supremacy (2004)
+      - 612      # Munich (2005)
+      - 231      # Syriana (2005)
+      - 36557    # Casino Royale (2006)
+      - 1247     # The Good Shepherd (2006)
+      - 582      # The Lives of Others (2006)
+      - 4169     # Breach (2007)
+      - 6538     # Charlie Wilson's War (2007)
+      - 2503     # The Bourne Ultimatum (2007)
+      - 56292    # Mission: Impossible - Ghost Protocol (2011)
+      - 49517    # Tinker Tailor Soldier Spy (2011)
+      - 68734    # Argo (2012)
+      - 37724    # Skyfall (2012)
+      - 97630    # Zero Dark Thirty (2012)
+      - 157849   # A Most Wanted Man (2014)
+      - 293310   # Citizenfour (2014)
+      - 296098   # Bridge of Spies (2015)
+      - 177677   # Mission: Impossible - Rogue Nation (2015)
+      - 203801   # The Man from U.N.C.L.E. (2015)
+      - 341013   # Atomic Blonde (2017)
+      - 353081   # Mission: Impossible - Fallout (2018)
+      - 393624   # Official Secrets (2019)
+      - 524348   # The Report (2019)
+      - 522241   # The Courier (2020)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+  How the West Was Really Won:
+    sort_title: "!How the West Was Really Won"
+    summary: "The frontier without the myth: land grabs, immigrants, outlaws, the Civil War and the people pushed off the map, from Unforgiven to Killers of the Flower Moon."
+    tmdb_movie:
+      - 10935    # Heaven's Gate (1980)
+      - 14729    # The Long Riders (1980)
+      - 11509    # Silverado (1985)
+      - 11967    # Young Guns (1988)
+      - 9665     # Glory (1989)
+      - 581      # Dances with Wolves (1990)
+      - 9086     # Young Guns II (1990)
+      - 123938   # Thousand Pieces of Gold (1991)
+      - 11259    # Far and Away (1992)
+      - 9361     # The Last of the Mohicans (1992)
+      - 33       # Unforgiven (1992)
+      - 11969    # Tombstone (1993)
+      - 4476     # Legends of the Fall (1994)
+      - 12160    # Wyatt Earp (1994)
+      - 922      # Dead Man (1995)
+      - 10212    # Ravenous (1999)
+      - 22267    # Ride with the Devil (1999)
+      - 3131     # Gangs of New York (2002)
+      - 2289     # Cold Mountain (2003)
+      - 11400    # The New World (2005)
+      - 13249    # Seraphim Falls (2007)
+      - 4512     # The Assassination of Jesse James by the Coward Robert Ford (2007)
+      - 7345     # There Will Be Blood (2007)
+      - 44264    # True Grit (2010)
+      - 57120    # Meek's Cutoff (2011)
+      - 68718    # Django Unchained (2012)
+      - 72976    # Lincoln (2012)
+      - 76203    # 12 Years a Slave (2013)
+      - 152599   # The Immigrant (2013)
+      - 264656   # The Homesman (2014)
+      - 284284   # The Keeping Room (2014)
+      - 294963   # Bone Tomahawk (2015)
+      - 223485   # Slow West (2015)
+      - 273248   # The Hateful Eight (2015)
+      - 281957   # The Revenant (2015)
+      - 324560   # Brimstone (2016)
+      - 316152   # Free State of Jones (2016)
+      - 384680   # Hostiles (2017)
+      - 399019   # The Beguiled (2017)
+      - 537996   # The Ballad of Buster Scruggs (2018)
+      - 440161   # The Sisters Brothers (2018)
+      - 558582   # First Cow (2020)
+      - 581032   # News of the World (2020)
+      - 785663   # Old Henry (2021)
+      - 618162   # The Harder They Fall (2021)
+      - 600583   # The Power of the Dog (2021)
+      - 843846   # Butcher's Crossing (2023)
+      - 466420   # Killers of the Flower Moon (2023)
+      - 932086   # Horizon: An American Saga - Chapter 1 (2024)
+      - 1032425  # The Dead Don't Hurt (2024)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+  Quiet Heroes:
+    sort_title: "!Quiet Heroes"
+    summary: "Ordinary people being decent to each other: teachers, neighbors, stubborn widows and kind strangers. No violence, and you leave smiling."
+    tmdb_movie:
+      - 29154    # Stand and Deliver (1988)
+      - 2054     # Mr. Holland's Opus (1995)
+      - 462      # Erin Brockovich (2000)
+      - 69       # Walk the Line (2005)
+      - 205220   # Philomena (2013)
+      - 140823   # Saving Mr. Banks (2013)
+      - 239563   # St. Vincent (2014)
+      - 334543   # Lion (2016)
+      - 501907   # A Beautiful Day in the Neighborhood (2019)
+      - 617784   # Military Wives (2020)
+      - 645689   # The Duke (2021)
+      - 603206   # Dream Horse (2021)
+      - 754609   # Mrs. Harris Goes to Paris (2022)
+      - 914216   # The Lost King (2022)
+      - 937278   # A Man Called Otto (2022)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  The Long Way Round:
+    sort_title: "!The Long Way Round"
+    summary: "Road trips, pilgrimages and detours that end with someone a little more themselves. No violence, and you leave smiling."
+    tmdb_movie:
+      - 403      # Driving Miss Daisy (1989)
+      - 153      # Lost in Translation (2003)
+      - 1653     # The Motorcycle Diaries (2004)
+      - 9621     # Elizabethtown (2005)
+      - 9912     # The World's Fastest Indian (2005)
+      - 773      # Little Miss Sunshine (2006)
+      - 232572   # A Walk in the Woods (2015)
+      - 334533   # Captain Fantastic (2016)
+      - 844409   # The Unlikely Pilgrimage of Harold Fry (2023)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  Underdogs:
+    sort_title: "!Underdogs"
+    summary: "Long shots, misfits and nobodies who show up anyway: bobsledders, rowers, walk-ons and one dodgeball team. No violence, and you leave smiling."
+    tmdb_movie:
+      - 5693     # Hoosiers (1986)
+      - 11287    # A League of Their Own (1992)
+      - 14534    # Rudy (1993)
+      - 864      # Cool Runnings (1993)
+      - 14635    # The Rookie (2002)
+      - 455      # Bend It Like Beckham (2002)
+      - 4464     # Seabiscuit (2003)
+      - 14292    # Miracle (2004)
+      - 9472     # DodgeBall: A True Underdog Story (2004)
+      - 11652    # Invincible (2006)
+      - 39486    # Secretariat (2010)
+      - 60308    # Moneyball (2011)
+      - 198185   # Million Dollar Arm (2014)
+      - 228203   # McFarland, USA (2015)
+      - 319888   # Eddie the Eagle (2016)
+      - 317557   # Queen of Katwe (2016)
+      - 359724   # Ford v Ferrari (2019)
+      - 823452   # The Boys in the Boat (2023)
+      - 895549   # NYAD (2023)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  Eureka!:
+    sort_title: "!Eureka!"
+    summary: "Rockets, chess, math and heart surgery: brilliant people working the problem until it gives. No violence, and you leave smiling."
+    tmdb_movie:
+      - 14291    # Searching for Bobby Fischer (1993)
+      - 568      # Apollo 13 (1995)
+      - 13466    # October Sky (1999)
+      - 5257     # The Dish (2000)
+      - 20544    # Something the Lord Made (2004)
+      - 33602    # Temple Grandin (2010)
+      - 266856   # The Theory of Everything (2014)
+      - 286217   # The Martian (2015)
+      - 264337   # Spare Parts (2015)
+      - 381284   # Hidden Figures (2016)
+      - 400928   # Gifted (2017)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  The Cure:
+    sort_title: "!The Cure"
+    summary: "Doctors, parents and patients who would not take no for an answer, and the medical breakthroughs they forced into being."
+    tmdb_movie:
+      - 26142    # The Doctor (1991)
+      - 2007     # Lorenzo's Oil (1992)
+      - 9096     # Medicine Man (1992)
+      - 26716    # ...First Do No Harm (1997)
+      - 90324    # The English Surgeon (2007)
+      - 30849    # Living Proof (2008)
+      - 27569    # Extraordinary Measures (2010)
+      - 340027   # Brain on Fire (2017)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s

@@ -53,8 +53,8 @@ graph TB
 | Pool | Type | Location | Size |
 |------|------|----------|------|
 | data01 | ZFS raidz2 | ocean VM (node006) | 8x 12TB |
-| local-lvm | LVM | node005 | VM boot disks |
-| local-lvm | LVM | node006 | VM boot disks |
+| vmpool (`vmpool-storage`) | ZFS mirror, 2x 860 EVO 1TB | node005 | Every node005 VM disk; separate from the SATADOM boot disk |
+| local-lvm | LVM thin on the boot SSD (870 EVO 2TB) | node006 | dns02, llmeval and ocean's root disk; lost with the boot disk |
 
 Ocean services mount `/data01/services/` for persistent storage.
 

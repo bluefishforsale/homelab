@@ -1,6 +1,6 @@
 ---
 # Docker Registry Pull-Through Cache
-# Six registry:2 containers (docker-hub, ghcr, ghcr-private, gitlab, nvcr, gcr)
+# Six registry:3 containers (docker-hub, ghcr, ghcr-private, gitlab, nvcr, gcr)
 # + promtail sidecar.
 #
 # Prerequisites:

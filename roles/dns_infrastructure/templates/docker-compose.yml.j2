@@ -7,7 +7,7 @@ services:
   # Serves internal zones (home., cluster.local., reverse) on port 5300
   # Recursor forwards .home queries here via 127.0.0.1:5300
   powerdns:
-    image: powerdns/pdns-auth-49:latest
+    image: {{ dns_reg_hub }}powerdns/pdns-auth-49:latest
     container_name: powerdns
     restart: unless-stopped
     network_mode: host
@@ -39,7 +39,7 @@ services:
   # Forwards all other queries to upstream DNS (8.8.8.8, 8.8.4.4)
   # dnsdist routes non-AXFR, non-internal queries here
   pdns-recursor:
-    image: powerdns/pdns-recursor-49:latest
+    image: {{ dns_reg_hub }}powerdns/pdns-recursor-49:latest
     container_name: pdns-recursor
     restart: unless-stopped
     network_mode: host
@@ -74,7 +74,7 @@ services:
   #   .home/cluster.local/reverse → authoritative on 5300
   #   Everything else → recursor on 5353
   dnsdist:
-    image: powerdns/dnsdist-19:latest
+    image: {{ dns_reg_hub }}powerdns/dnsdist-19:latest
     container_name: dnsdist
     restart: unless-stopped
     network_mode: host
@@ -110,7 +110,7 @@ services:
   # ── Kea Exporter (Prometheus Metrics) ───────────────────────────────────
   # Uses Kea Control Agent HTTP API instead of Unix sockets for reliability
   kea-exporter:
-    image: ghcr.io/mweinelt/kea-exporter:latest
+    image: {{ dns_reg_ghcr }}mweinelt/kea-exporter:latest
     container_name: kea-exporter
     restart: unless-stopped
     network_mode: host
@@ -134,7 +134,7 @@ services:
 
   # ── Promtail (Loki Log Collector) ───────────────────────────────────────
   promtail:
-    image: grafana/promtail:latest
+    image: {{ dns_reg_hub }}grafana/promtail:latest
     container_name: dns-promtail
     restart: unless-stopped
     volumes:
@@ -159,7 +159,7 @@ services:
   # ── Kea DHCP4 Server ────────────────────────────────────────────────────
   # Host network required for DHCP broadcast packets on ports 67/68
   kea-dhcp4:
-    image: jonasal/kea-dhcp4:2
+    image: {{ dns_reg_hub }}jonasal/kea-dhcp4:2
     container_name: kea-dhcp4
     restart: unless-stopped
     network_mode: host
@@ -192,7 +192,7 @@ services:
   # ── Kea DHCP-DDNS Daemon ────────────────────────────────────────────────
   # Receives DDNS requests from Kea DHCP4, sends RFC 2136 updates to PowerDNS
   kea-dhcp-ddns:
-    image: jonasal/kea-dhcp-ddns:2
+    image: {{ dns_reg_hub }}jonasal/kea-dhcp-ddns:2
     container_name: kea-dhcp-ddns
     restart: unless-stopped
     network_mode: host
@@ -217,7 +217,7 @@ services:
 
   # ── Kea Control Agent (REST API) ────────────────────────────────────────
   kea-ctrl-agent:
-    image: jonasal/kea-ctrl-agent:2
+    image: {{ dns_reg_hub }}jonasal/kea-ctrl-agent:2
     container_name: kea-ctrl-agent
     restart: unless-stopped
     network_mode: host
@@ -242,7 +242,7 @@ services:
 
   # ── netboot.xyz (PXE/TFTP/HTTP Boot Menu) ──────────────────────────────
   netbootxyz:
-    image: ghcr.io/netbootxyz/netbootxyz:latest
+    image: {{ dns_reg_ghcr }}netbootxyz/netbootxyz:latest
     container_name: netbootxyz
     restart: unless-stopped
     ports:

@@ -148,6 +148,8 @@ def fake_movie_search(year, titles):
             if path == "/api/v3/release":
                 return [{"title": t, "downloadAllowed": True, "rejections": [EXISTING], "releaseWeight": w}
                         for w, t in enumerate(titles)]
+            if path == "/api/v3/blocklist/movie":
+                return []
             return {"year": year}
     return Fake()
 
@@ -512,7 +514,7 @@ def test_movie_search_gets_the_same_time_as_a_season_search():
     class Fake:
         def get(self, app, path, timeout=120, **kw):
             seen.append((path, timeout))
-            return [] if path.endswith("/release") else {"year": 2024}
+            return [] if path.endswith(("/release", "/blocklist/movie")) else {"year": 2024}
 
     refetch.mc = Fake()
     BEST_RELEASE(1)
@@ -539,13 +541,6 @@ def test_arr_hdr_paths_are_the_tdarr_paths_of_files_recorded_as_hdr():
                 {"path": "/tv/Ozark/Season 1/Ozark - S01E01.mkv", "mediaInfo": {}}]
     assert refetch.arr_hdr_paths(movies, episodes) == {
         "/media/movies/Ballerina (2025)/Ballerina.mkv", "/media/tv/Ozark/Season 4/Ozark - S04E01.mkv"}
-
-
-if __name__ == "__main__":
-    for name, fn in sorted(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            print("ok  ", name)
 
 
 def test_movie_refetched_into_4k_is_planned_again():
@@ -585,6 +580,25 @@ def test_listed_movie_already_in_flight_is_not_planned_twice():
     assert refetch.listed_movies([m], {1}, plex, {}, ledger) == []
 
 
+def test_listed_movie_already_refetched_from_a_list_is_not_planned_again():
+    # 2026-11-11: the third 100 from squeezed-first.txt re-planned ~80 films the
+    # first two hundred had already finished (Empire of the Sun, 12 Years a
+    # Slave), mostly grabbing the very release they already had.
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    ledger = {"/media/movies/Arrival (2016)/Old.mkv": {"movie_id": 1, "state": "done", "reasons": ["listed"]}}
+    assert refetch.listed_movies([m], {1}, plex, {}, ledger) == []
+
+
+def test_listed_movie_refetched_for_another_reason_can_be_listed():
+    # A REMUX refetched for its size in October is squeezed and banded now;
+    # the list is how it gets its second pass.
+    m = _movie(1, "Arrival", "Arrival.mkv")
+    plex = {"/movies/Arrival (2016)/Arrival.mkv": (500, 1600000000, None)}
+    ledger = {"/media/movies/Arrival (2016)/Old.mkv": {"movie_id": 1, "state": "done", "reasons": ["over-bitrate"]}}
+    assert [t["movie_id"] for t in refetch.listed_movies([m], {1}, plex, {}, ledger)] == [1]
+
+
 def test_listed_movie_missing_from_plex_is_skipped():
     # Without a Plex rating key the added date can't be put back afterwards.
     assert refetch.listed_movies([_movie(1, "Arrival", "Arrival.mkv")], {1}, {}, {}, {}) == []
@@ -604,3 +618,184 @@ def test_tv_refetch_in_flight_or_done_holds_by_default():
     ledger = {"tv:5:3": {"kind": "tv", "state": "done", "episode_ids": [11, 12]}}
     eps, seasons = refetch.tv_held(ledger, relist=False)
     assert eps == {11, 12} and seasons == {"tv:5:3"}
+
+
+class FakeRadarr:
+    """One movie with an old file; records every write."""
+
+    def __init__(self, new=False, queue=(), subs_ok=True):
+        old = refetch.now() - refetch.dt.timedelta(days=400)
+        self.file = {"id": 9 if new else 7, "relativePath": "new.mkv" if new else "old.mkv",
+                     "dateAdded": (refetch.now() if new else old).isoformat()}
+        self.queue, self.writes = list(queue), []
+
+    def get(self, app, path, **kw):
+        if path.endswith("/queue/details"):
+            return self.queue
+        if "/history/movie" in path:
+            return [{"id": 3, "date": refetch.now().isoformat()}]
+        return {"hasFile": True, "path": "/movies/Film (2016)", "movieFile": self.file}
+
+    def delete(self, app, path, **kw):
+        self.writes.append(("delete", path))
+
+    def post(self, app, path, data):
+        self.writes.append(("post", path, data))
+
+
+def run_step(item, fake, subs=("eng",)):
+    cmds = []
+    saved = refetch.ssh, refetch.subs, refetch.mc, refetch.best_release
+    refetch.mc, refetch.subs = fake, lambda file: list(subs)
+    refetch.best_release = lambda mid: {"title": "x", "size": 1e9, "indexer": "i", "guid": "g", "indexerId": 1}
+    refetch.ssh = lambda cmd, stdin=None: cmds.append(cmd) or ""
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.ssh, refetch.subs, refetch.mc, refetch.best_release = saved
+    return cmds
+
+
+HOLD = refetch.HOLD + "/1/old.mkv"
+OLD = "/data01/complete/movies/Film (2016)/old.mkv"
+
+
+def grabbed_item(**kw):
+    return {"movie_id": 1, "state": "grabbed", "attempts": 0, "title": "t", "log": [], "held": [[OLD, HOLD]],
+            "grabbed_at": (refetch.now() - refetch.dt.timedelta(hours=1)).isoformat(), **kw}
+
+
+def test_movie_grab_leaves_the_old_file_playable():
+    # Free State of Jones (2026-11-10): the old file went at grab time, so the film
+    # was gone from Plex for the whole download and both failed attempts.
+    fake = FakeRadarr()
+    item = {"movie_id": 1, "state": "planned", "title": "t", "log": []}
+    cmds = run_step(item, fake)
+    assert not [w for w in fake.writes if w[0] == "delete"], fake.writes
+    assert item["state"] == "grabbed" and item["held"] == [[OLD, HOLD]]
+    assert any("ln" in c and OLD in c and HOLD in c for c in cmds), cmds
+
+
+def test_movie_import_refused_as_no_upgrade_swaps_the_old_file_out():
+    # With the old file still there, Radarr refuses a release that is not an
+    # upgrade on paper (same quality, the squeeze does not show in the name).
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "statusMessages": [{"messages": ["Not an upgrade for existing movie file(s)"]}]}
+    fake = FakeRadarr(queue=[q])
+    item = grabbed_item()
+    run_step(item, fake)
+    assert ("delete", "/api/v3/moviefile/7") in fake.writes, fake.writes
+    assert not [w for w in fake.writes if "/queue/" in w[1]], "must not blocklist the release"
+    scan = [w for w in fake.writes if w[0] == "post" and w[1] == "/api/v3/command"]
+    assert scan and scan[0][2]["name"] == "DownloadedMoviesScan" and scan[0][2]["downloadClientId"] == "D"
+    assert item["state"] == "grabbed"
+
+
+def test_movie_release_blocklisted_after_the_swap_puts_the_old_file_back():
+    # The swap took the old file out, then Radarr still would not import: the
+    # film must not sit missing until some later attempt lands.
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "id": 5, "statusMessages": [{"messages": ["Unable to parse file"]}]}
+    fake = FakeRadarr(queue=[q])
+    fake.get_movie = fake.get
+    fake.get = lambda app, path, **kw: ({"hasFile": False, "path": "/movies/Film (2016)"}
+                                        if path == "/api/v3/movie/1" else fake.get_movie(app, path, **kw))
+    item = grabbed_item()
+    cmds = run_step(item, fake)
+    assert any("ln" in c and c.index(HOLD) < c.index(OLD) for c in cmds if HOLD in c and OLD in c), cmds
+    assert item["state"] == "planned"
+
+
+def test_movie_new_file_that_passes_drops_the_held_copy():
+    item = grabbed_item()
+    cmds = run_step(item, FakeRadarr(new=True))
+    assert item["state"] == "imported" and "held" not in item
+    assert any("rm" in c and HOLD in c for c in cmds), cmds
+
+
+def test_movie_new_file_without_english_puts_the_old_file_back():
+    fake = FakeRadarr(new=True)
+    item = grabbed_item()
+    cmds = run_step(item, fake, subs=())
+    assert ("delete", "/api/v3/moviefile/9") in fake.writes
+    assert any("ln" in c and c.index(HOLD) < c.index(OLD) for c in cmds if HOLD in c and OLD in c), cmds
+    assert ("post", "/api/v3/command", {"name": "RescanMovie", "movieIds": [1]}) in fake.writes, fake.writes
+    assert item["state"] == "planned" and item["held"] == [[OLD, HOLD]]
+
+
+def test_put_back_recreates_the_movie_folder_as_media():
+    # A.I. (2026-11-11): Radarr removed the emptied folder, `sudo mkdir -p` made
+    # it again as root, and every later delete Radarr tried there was
+    # "Access to the path is denied" (HTTP 500), so the swap looped forever.
+    cmds = []
+    saved = refetch.ssh, refetch.mc
+    refetch.ssh, refetch.mc = (lambda cmd, stdin=None: cmds.append(cmd) or ""), FakeRadarr()
+    try:
+        refetch.put_back({"movie_id": 1, "held": [[OLD, HOLD]]})
+    finally:
+        refetch.ssh, refetch.mc = saved
+    assert not any("mkdir" in c for c in cmds), cmds
+    assert any("install -d -o media -g media" in c for c in cmds), cmds
+
+
+def test_movie_kept_after_the_last_attempt_drops_the_held_copy():
+    item = grabbed_item(attempts=refetch.MAX_ATTEMPTS - 1)
+    cmds = run_step(item, FakeRadarr(new=True), subs=())
+    assert item["state"] == "imported" and item.get("no_subs") and "held" not in item
+    assert any("rm" in c and HOLD in c for c in cmds), cmds
+
+
+def test_movie_swap_waits_for_radarrs_scan_instead_of_blocklisting_it():
+    # Slow West (2026-11-12): the run loop stepped again 7s after the swap, before
+    # DownloadedMoviesScan ran, saw no file and the row still blocked, and
+    # blocklisted the download it had just asked Radarr to import.
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "id": 5, "statusMessages": [{"messages": ["Not an upgrade for existing movie file(s)"]}]}
+    fake = FakeRadarr(queue=[q])
+    item = grabbed_item()
+    run_step(item, fake)
+    fake.get_movie = fake.get
+    fake.get = lambda app, path, **kw: ({"hasFile": False, "path": "/movies/Film (2016)"}
+                                        if path == "/api/v3/movie/1" else fake.get_movie(app, path, **kw))
+    cmds = run_step(item, fake)
+    assert not [w for w in fake.writes if "/queue/" in w[1]], fake.writes
+    assert not any(OLD in c for c in cmds), cmds
+    assert item["state"] == "grabbed"
+
+
+def test_movie_swap_radarr_still_will_not_import_later_is_blocklisted():
+    q = {"status": "completed", "trackedDownloadStatus": "warning", "downloadId": "D", "outputPath": "/downloads/x",
+         "title": "x", "id": 5, "statusMessages": [{"messages": ["Unable to parse file"]}]}
+    fake = FakeRadarr(queue=[q])
+    fake.get_movie = fake.get
+    fake.get = lambda app, path, **kw: ({"hasFile": False, "path": "/movies/Film (2016)"}
+                                        if path == "/api/v3/movie/1" else fake.get_movie(app, path, **kw))
+    item = grabbed_item(swapped_at=(refetch.now() - refetch.IMPORT_GRACE).isoformat())
+    run_step(item, fake)
+    assert ("delete", "/api/v3/queue/5") in fake.writes, fake.writes
+    assert item["state"] == "planned" and "swapped_at" not in item
+
+
+def test_reposted_copy_of_a_blocklisted_release_is_not_grabbed():
+    # Slow West (2026-11-11): BHDStudio was blocklisted for no English subtitle and
+    # grabbed again 51 minutes later as another post of the same title. Radarr's
+    # blocklist only matches the one post.
+    class Fake:
+        def get(self, app, path, **kw):
+            if path == "/api/v3/release":
+                return [{"title": "Film.2016.1080p-BHD", "releaseWeight": 1, "downloadAllowed": True, "rejections": []},
+                        {"title": "Film.2016.1080p-OTHER", "releaseWeight": 2, "downloadAllowed": True,
+                         "rejections": []}]
+            if path == "/api/v3/blocklist/movie":
+                return [{"sourceTitle": "Film.2016.1080p-BHD"}]
+            return {"year": 2016}
+
+    refetch.mc = Fake()
+    assert BEST_RELEASE(1)["title"] == "Film.2016.1080p-OTHER"
+
+
+if __name__ == "__main__":
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_"):
+            fn()
+            print("ok  ", name)

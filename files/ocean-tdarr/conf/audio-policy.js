@@ -25,6 +25,11 @@ module.exports = async (args) => {
   const lang = (s) => (tags(s).LANGUAGE || 'und').toLowerCase();
   const title = (s) => tags(s).TITLE || '';
   const isCommentary = (s) => /comment/i.test(title(s)) || (s.disposition || {}).comment === 1;
+  // Audio description narrates the picture for blind viewers. Like commentary it
+  // is kept as is but never feeds the dialogue track (Amelie, 2026-11-11: its
+  // English AD became the default over the French original).
+  const isDescription = (s) => /descri/i.test(title(s)) || (s.disposition || {}).visual_impaired === 1;
+  const isSide = (s) => isCommentary(s) || isDescription(s);
   const isLossless = (s) => ['truehd', 'flac', 'alac', 'mlp'].includes(s.codec_name)
     || s.codec_name.startsWith('pcm_')
     || (s.codec_name === 'dts' && /MA|HRA|X/.test(s.profile || ''));
@@ -100,17 +105,19 @@ module.exports = async (args) => {
   // dialogue track of a foreign film. Kiss of the Spider Woman came as a German
   // release whose default was German, beside an English AC3 5.1.
   const isEnglish = (s) => ['eng', 'en'].includes(lang(s));
-  const sources = audio.filter((s) => !isCommentary(s) && title(s) !== DIALOGUE_TITLE);
+  const sources = audio.filter((s) => !isSide(s) && title(s) !== DIALOGUE_TITLE);
   const english = sources.filter(isEnglish);
   // Idempotent: a file that already has the dialogue track was done by this
-  // policy, unless it was built from another language and English is there.
+  // policy, unless it was built from another language and English is there,
+  // or built in English when only a side track was English.
   const done = audio.find((s) => title(s) === DIALOGUE_TITLE);
-  if (done && (isEnglish(done) || english.length === 0)) {
+  const fromSide = done && isEnglish(done) && english.length === 0 && sources.length > 0;
+  if (done && !fromSide && (isEnglish(done) || english.length === 0)) {
     log('dialogue track present, already processed');
     return { outputFileObj: args.inputFileObj, outputNumber: 1, variables: args.variables };
   }
   if (done) {
-    log(`drop ${lang(done)} ${DIALOGUE_TITLE}, rebuilding it from English`);
+    log(`drop ${lang(done)} ${DIALOGUE_TITLE}, rebuilding it from ${english.length ? 'English' : lang(sources[0])}`);
     done.removed = true;
     audio.splice(audio.indexOf(done), 1);
   }
@@ -122,7 +129,7 @@ module.exports = async (args) => {
   const main = pool.find((s) => (s.disposition || {}).default === 1) || pool[0] || audio[0];
 
   const byLang = {};
-  audio.filter((s) => !isCommentary(s)).forEach((s) => { (byLang[lang(s)] = byLang[lang(s)] || []).push(s); });
+  audio.filter((s) => !isSide(s)).forEach((s) => { (byLang[lang(s)] = byLang[lang(s)] || []).push(s); });
   Object.entries(byLang).forEach(([l, tracks]) => {
     const surround = tracks.filter((s) => (s.channels || 0) > 2);
     const keep = surround.find((s) => LOSSY_SURROUND.has(s.codec_name));
@@ -149,7 +156,7 @@ module.exports = async (args) => {
       }
     });
   });
-  audio.filter(isCommentary).forEach((s) => {
+  audio.filter(isSide).forEach((s) => {
     if (!OK_STEREO.has(s.codec_name)) toAac(s);
   });
 

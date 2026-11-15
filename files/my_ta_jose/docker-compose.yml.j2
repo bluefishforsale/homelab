@@ -49,7 +49,7 @@ services:
   # pre-pass. Internal only: no published ports, reachable solely over the
   # compose network by the my_ta_jose service via service-name DNS.
   languagetool:
-    image: erikvl87/languagetool
+    image: registry-cache.home:5001/erikvl87/languagetool
     container_name: languagetool
     hostname: languagetool
     restart: unless-stopped

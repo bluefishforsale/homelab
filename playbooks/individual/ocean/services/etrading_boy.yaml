@@ -18,7 +18,7 @@
 
   vars:
     service: etrading_boy
-    image: ghcr.io/bluefishforsale/etrading-boy
+    image: registry-cache.home:5005/bluefishforsale/etrading-boy
     version: latest
     port_ext: "{{ service_ports.etrading_boy.port }}"
     port_int: 8093
@@ -31,9 +31,9 @@
 
   tasks:
 
-  - name: Log ocean into GHCR to pull private etrading-boy image
+  - name: Log ocean into ghcr-private-cache to pull private etrading-boy image
     ansible.builtin.shell: |
-      echo "{{ development.github.packages_read_token }}" | docker login ghcr.io -u bluefishforsale --password-stdin
+      echo "{{ infrastructure.registry_cache.ghcr_private.password }}" | docker login registry-cache.home:5005 -u {{ infrastructure.registry_cache.ghcr_private.username }} --password-stdin
     no_log: true
 
   - name: Ensure base directory exists

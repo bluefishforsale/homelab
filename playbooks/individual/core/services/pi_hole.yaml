@@ -121,27 +121,20 @@
       register: password_result
       until: password_result.rc == 0
 
-    # Host metrics: native node_exporter (pihole runs no docker), same as agentbox.
-    # Placed before DNS validation so a validation failure doesn't skip it.
-    - name: Install Prometheus node exporter
+    # NOTE: node_exporter.yaml's compose node-exporter owns :9100 on every
+    # docker host, pihole included. The package one held the port and left the
+    # compose one crash-looping on "bind: address already in use", reading a
+    # textfile dir nothing in this repo writes to.
+    - name: Remove the package node exporter
       ansible.builtin.apt:
         name: prometheus-node-exporter
-        state: present
+        state: absent
+        purge: true
 
-    - name: Enable systemd + processes collectors
-      ansible.builtin.copy:
-        dest: /etc/default/prometheus-node-exporter
-        content: |
-          # Managed by ansible (pi_hole.yaml)
-          ARGS="--collector.systemd --collector.processes"
-        mode: '0644'
-      notify: Restart node exporter
-
-    - name: Enable and start node exporter
-      ansible.builtin.systemd:
-        name: prometheus-node-exporter
-        enabled: true
-        state: started
+    - name: The compose node exporter took :9100
+      ansible.builtin.wait_for:
+        port: 9100
+        timeout: 120
 
     ############  DNS validation #####################
     - name: Wait for DNS service to be fully ready
@@ -152,7 +145,9 @@
       ansible.builtin.command: dig +short @127.0.0.1 ocean.home
       register: local_dns_result
       changed_when: false
-      failed_when: local_dns_result.stdout != '192.168.1.143'
+      # ocean.home is a CNAME (to ocean-bond0.home), so +short prints the
+      # target first and the address last.
+      failed_when: local_dns_result.stdout_lines[-1] | default('') != hostvars['ocean'].ansible_ssh_host
 
     - name: Test external DNS resolution (google.com)
       ansible.builtin.command: dig +short @127.0.0.1 google.com
@@ -163,7 +158,7 @@
     - name: Display DNS validation results
       ansible.builtin.debug:
         msg:
-          - "✓ Local DNS working - ocean.home resolves to: {{ local_dns_result.stdout }}"
+          - "✓ Local DNS working - ocean.home resolves to: {{ local_dns_result.stdout_lines[-1] }}"
           - "✓ External DNS working - google.com resolves to: {{ external_dns_result.stdout_lines[0] }}"
 
   handlers:
@@ -171,9 +166,3 @@
       ansible.builtin.service:
         name: pihole-FTL
         state: restarted
-
-    - name: Restart node exporter
-      ansible.builtin.systemd:
-        name: prometheus-node-exporter
-        state: restarted
-
