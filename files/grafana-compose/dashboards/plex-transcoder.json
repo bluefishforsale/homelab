@@ -1,0 +1,1884 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Plex transcoder: what is transcoding now and whether it keeps up, and which clients transcode and why. From plex-client-metrics (files/ocean-plex/plex-client-metrics.py).",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "plex",
+    "media",
+    "transcode"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "user",
+        "label": "User",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bf02tpxiz6m0wf"
+        },
+        "query": {
+          "query": "label_values(plex_client_sessions, user)",
+          "refId": "user"
+        },
+        "definition": "label_values(plex_client_sessions, user)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "",
+  "title": "Plex Transcoder",
+  "uid": "plex-transcoder",
+  "version": 1,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Now: the transcoder, live (Tautulli get_activity, 1-minute timer)",
+      "collapsed": false,
+      "id": 1,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Sessions",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\"}) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Active Plex sessions."
+    },
+    {
+      "type": "stat",
+      "title": "Video transcodes",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", video_decision=\"transcode\"}) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Active sessions whose video is being transcoded."
+    },
+    {
+      "type": "stat",
+      "title": "On CPU (fell back)",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", video_decision=\"transcode\", hw_requested=\"true\", hw_encode=\"false\"}) or vector(0)",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "none"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Video transcodes where Plex asked for hardware and is encoding in software. Above 0 for 10m raises PlexTranscodeCpuFallback."
+    },
+    {
+      "type": "stat",
+      "title": "Least buffer ahead",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "min(plex_client_live_transcode_buffer_seconds{user=~\"$user\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 15
+              },
+              {
+                "color": "green",
+                "value": 60
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Smallest number of seconds any transcoder is ahead of its viewer. Under 15s at under 1x for 5m raises PlexTranscodeStarved. Empty when nothing is transcoding."
+    },
+    {
+      "type": "stat",
+      "title": "Slowest transcode",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "min(plex_client_live_transcode_speed{user=~\"$user\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Lowest transcoder speed across sessions (x real time). Below 1 only matters when the buffer is also small."
+    },
+    {
+      "type": "stat",
+      "title": "NVENC",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(DCGM_FI_DEV_ENC_UTIL{instance=\"ocean.home\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "GPU encoder utilisation on ocean's 3090. Shared with Tdarr; near 100% is when Plex transcodes risk falling back to CPU."
+    },
+    {
+      "type": "table",
+      "title": "Live sessions",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_session_info{user=~\"$user\"}",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_transcode_speed{user=~\"$user\"}",
+          "refId": "B",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_transcode_buffer_seconds{user=~\"$user\"}",
+          "refId": "C",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_bandwidth_kbps{user=~\"$user\"}",
+          "refId": "D",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "speed"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "buffer ahead"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "bandwidth"
+              },
+              {
+                "id": "unit",
+                "value": "Kbits"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "description": "One row per active session: what was asked for, what the server is doing about it, and how far ahead the transcoder is.",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value #A": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "session": true,
+              "platform": true,
+              "product": true,
+              "container_decision": true,
+              "source_dynamic_range": true,
+              "stream_dynamic_range": true,
+              "stream_audio_codec": true,
+              "hw_decode": true,
+              "hw_full_pipeline": true,
+              "relayed": true,
+              "secure": true,
+              "transcode_decision": true
+            },
+            "indexByName": {
+              "user": 0,
+              "player": 1,
+              "state": 2,
+              "media_type": 3,
+              "video_decision": 4,
+              "audio_decision": 5,
+              "subtitle_decision": 6,
+              "quality_profile": 7,
+              "source_resolution": 8,
+              "stream_resolution": 9,
+              "source_video_codec": 10,
+              "stream_video_codec": 11,
+              "hw_requested": 12,
+              "hw_encode": 13,
+              "location": 14,
+              "title": 15,
+              "Value #B": 16,
+              "Value #C": 17,
+              "Value #D": 18
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Transcode speed",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_transcode_speed{user=~\"$user\"}",
+          "refId": "A",
+          "legendFormat": "{{user}} \u00b7 {{player}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "x real time per transcoding session. The dashed line is 1x."
+    },
+    {
+      "type": "timeseries",
+      "title": "Transcoder buffer ahead of viewer",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_transcode_buffer_seconds{user=~\"$user\"}",
+          "refId": "A",
+          "legendFormat": "{{user}} \u00b7 {{player}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 15
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Seconds transcoded beyond where the viewer is. Falling toward 0 means a stall is coming; the dashed line is the 15s alert threshold."
+    },
+    {
+      "type": "timeseries",
+      "title": "Sessions by what the server does",
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", video_decision=\"transcode\", hw_encode=\"true\"}) or vector(0)",
+          "refId": "A",
+          "legendFormat": "video transcode, GPU"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", video_decision=\"transcode\", hw_encode=\"false\"}) or vector(0)",
+          "refId": "B",
+          "legendFormat": "video transcode, CPU"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", video_decision!=\"transcode\", transcode_decision!=\"direct play\"}) or vector(0)",
+          "refId": "C",
+          "legendFormat": "direct stream (audio or container changed)"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "count(plex_client_live_session_info{user=~\"$user\", transcode_decision=\"direct play\"}) or vector(0)",
+          "refId": "D",
+          "legendFormat": "direct play"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "showPoints": "never",
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Concurrent sessions, stacked by how the server delivers them. One axis: session count."
+    },
+    {
+      "type": "row",
+      "title": "Clients: rolling 30 days (Tautulli history, refreshed every 10 minutes)",
+      "collapsed": false,
+      "id": 12,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Clients by video transcode share",
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 14,
+        "x": 0,
+        "y": 21
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\", video_decision=\"transcode\"}) or 0 * sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\"}))",
+          "refId": "B",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\", video_decision=\"transcode\"}) or 0 * sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\"})) / sum by (user, player, platform, product) (plex_client_sessions{user=~\"$user\"})",
+          "refId": "C",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (user, player, platform, product) (plex_client_video_transcode_seconds{user=~\"$user\"})",
+          "refId": "D",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max by (user, player, platform, product) (plex_client_last_played_timestamp_seconds{user=~\"$user\"}) * 1000",
+          "refId": "E",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "sessions"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "video transcodes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "video transcoded"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-blues"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "time transcoding"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #E"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "last played"
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeFromNow"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "video transcoded",
+            "desc": true
+          }
+        ]
+      },
+      "description": "Every client seen in the window. A share near 100% is a client that cannot direct play, usually a quality setting or subtitle choice on that client; the cause table to the right says which.",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "user": 0,
+              "player": 1,
+              "platform": 2,
+              "product": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Why video transcodes",
+      "id": 14,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 10,
+        "x": 14,
+        "y": 21
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (cause) (plex_client_video_transcode_cause_sessions{user=~\"$user\"})",
+          "refId": "A",
+          "legendFormat": "{{cause}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "text",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Video transcodes in the window by the first reason that forces one: subtitle_burn (image subtitles burned in), quality_cap (client asked for less than Original), codec (client cannot decode the source codec), resolution (downscale), other (none of these: a remote bitrate limit or a container the client cannot take).",
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Value",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Transcode causes by client",
+      "id": 15,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 26
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (user, player, cause, quality_profile, subtitle_decision, source_video_codec, stream_video_codec, source_resolution, stream_resolution) (plex_client_video_transcode_cause_sessions{user=~\"$user\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "transcodes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "transcodes",
+            "desc": true
+          }
+        ]
+      },
+      "description": "The facts behind each cause: which quality profile, subtitle decision, codec and resolution change.",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "user": 0,
+              "player": 1,
+              "cause": 2,
+              "Value": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Video transcode share, whole server",
+      "id": 16,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum(plex_client_sessions{user=~\"$user\", video_decision=\"transcode\"}) / sum(plex_client_sessions{user=~\"$user\"})",
+          "refId": "A",
+          "legendFormat": "30-day video transcode share"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Share of sessions in the rolling window whose video was transcoded. Falls as clients are fixed and their old sessions age out."
+    },
+    {
+      "type": "bargauge",
+      "title": "Quality profiles clients ask for",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum by (quality_profile) (plex_client_quality_profile_sessions{user=~\"$user\"})",
+          "refId": "A",
+          "legendFormat": "{{quality_profile}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "text",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Sessions by the quality the client requested. Anything other than Original forces a transcode for most files.",
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Value",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Video transcodes by encoder",
+      "id": 18,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"true\"})",
+          "refId": "A",
+          "legendFormat": "GPU (NVENC)",
+          "instant": true,
+          "range": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"false\"})",
+          "refId": "B",
+          "legendFormat": "CPU",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "text",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "description": "Finished video transcodes in the window by whether the GPU encoded them."
+    },
+    {
+      "type": "row",
+      "title": "Collector health (plex-client-metrics on ocean)",
+      "collapsed": false,
+      "id": 19,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Live calls",
+      "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_live_ok",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILING",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Last get_activity call succeeded."
+    },
+    {
+      "type": "stat",
+      "title": "History calls",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_history_ok",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FAILING",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Last get_history refresh succeeded."
+    },
+    {
+      "type": "stat",
+      "title": "Since last run",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "time() - plex_client_metrics_last_run_timestamp_seconds",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "The timer runs every minute. Over 10 minutes for 15 raises PlexClientMetricsStale."
+    },
+    {
+      "type": "stat",
+      "title": "Sessions cached",
+      "id": 23,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_history_sessions_cached",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "Finished sessions in the window with stream data cached."
+    },
+    {
+      "type": "stat",
+      "title": "Stream data errors",
+      "id": 24,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_history_stream_data_errors",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "get_stream_data calls that failed at the last history refresh."
+    },
+    {
+      "type": "stat",
+      "title": "History truncated",
+      "id": 25,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 40
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "plex_client_history_truncated",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "no"
+                },
+                "1": {
+                  "text": "YES",
+                  "color": "orange"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "description": "1 if the window holds more sessions than MAX_ROWS, so the oldest are missing."
+    }
+  ]
+}
