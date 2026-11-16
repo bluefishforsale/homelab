@@ -400,7 +400,7 @@
   - name: Sort the probe results into unrefreshable and unreadable
     ansible.builtin.set_fact:
       unrefreshable_projects: "{{ compose_config_probe.results | selectattr('stderr', 'defined') | selectattr('stderr', 'search', 'variable is not set|no such file or directory') | map(attribute='item.Name') | list }}"
-      unprobed_projects: "{{ compose_config_probe.results | selectattr('rc', 'defined') | rejectattr('rc', 'equalto', 0) | rejectattr('stderr', 'search', 'variable is not set|no such file or directory') | map(attribute='item.Name') | list }}"
+      unprobed_projects: "{{ compose_config_probe.results | selectattr('rc', 'defined') | rejectattr('rc', 'equalto', 0) | selectattr('stderr', 'defined') | rejectattr('stderr', 'search', 'variable is not set|no such file or directory') | map(attribute='item.Name') | list }}"
     when: refreshable_projects is defined
 
   - name: Drop the projects a refresh could only break
@@ -413,7 +413,7 @@
   - name: Say which projects get no refresh timer, and which could not be probed
     ansible.builtin.debug:
       msg: "no refresh timer: {{ unrefreshable_projects }}; render failed, timer kept: {{ unprobed_projects }}"
-    when: refreshable_projects is defined and (unrefreshable_projects or unprobed_projects)
+    when: refreshable_projects is defined and (unrefreshable_projects | length > 0 or unprobed_projects | length > 0)
 
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
