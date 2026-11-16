@@ -162,16 +162,22 @@ groups:
   # healthy runner restarts more often than a broken one. What separates them is
   # whether any single incarnation survives: cadvisor exports Docker's
   # RestartCount as a label, so each restart is a new series, and during the
-  # loop the longest-lived one was seen for 1 scrape in 30m while healthy
-  # runners under heavy churn never dropped below 25. 8 scrapes is 2 minutes at
-  # the 15s interval. Backtested over five days of fleet history: it matches
-  # only those two runners, from 22:20Z to the restart that fixed them.
+  # loop the longest-lived one was seen for 1 scrape in 30m. Healthy runners
+  # stayed at 25 or more through a heavy CI day, but over 14 days the worst
+  # window (2026-11-07, a run of short back-to-back jobs) had them at 10. So the
+  # line is 4 scrapes, 1 minute at the 15s interval: well clear of 10, and still
+  # four times what the loop managed. Backtested over seven days on the runner
+  # host it matches only the two looping runners.
   #
   # The second arm keeps this to containers Docker itself restarted. Without it
   # a short one-off that ran and exited (a backup job, a compose run) matches.
+  #
+  # What it does not catch: a slow loop, where each incarnation lasts longer
+  # than a minute before it dies. Docker's backoff puts a fast crasher at about
+  # one restart a minute, which is the case this exists for.
   - alert: ContainerRestartLoop
     expr: >
-      (max by (instance, name) (count_over_time(container_last_seen{name!=""}[30m])) < 8)
+      (max by (instance, name) (count_over_time(container_last_seen{name!=""}[30m])) < 4)
        and on (instance, name)
       (count by (instance, name) (last_over_time(container_last_seen{container_label_restartcount!=""}[30m])) >= 1)
     for: 10m
@@ -179,7 +185,7 @@ groups:
       severity: warning
     annotations:
       summary: "container {{ "{{ $labels.name }}" }} is restart-looping on {{ "{{ $labels.instance }}" }}"
-      description: "Docker keeps restarting {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} and no incarnation has stayed up 2 minutes in the last 30. Its systemd unit will look healthy; read `docker logs {{ "{{ $labels.name }}" }}` on the host."
+      description: "Docker keeps restarting {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} and no incarnation has stayed up 1 minute in the last 30. Its systemd unit will look healthy; read `docker logs {{ "{{ $labels.name }}" }}` on the host."
 
   # A compose project whose image refresh failed is a failed docker-refresh@
   # instance, so SystemdUnitFailed above already carries it. The two rules here
