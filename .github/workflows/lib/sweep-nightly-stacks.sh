@@ -13,9 +13,15 @@
 # bench container behind because it is a `compose run` one-off, and a project
 # whose containers are already gone still owns images and a network.
 #
+# What it cannot see is anything without the prefix: build cache, and dangling
+# layers from a build that was killed halfway. Those are the runner's nightly
+# docker-prune's job, and nothing here should be read as covering them.
+#
 # NOTE: this removes EVERY nightly stack, not just the calling run's. That is
 # only safe because the workflow's concurrency group allows one run at a time.
 # Drop that group and a second run's sweep takes the first run's stack with it.
+# The same goes for run.sh started by hand on the runner host: the next nightly
+# removes that stack out from under it.
 set -uo pipefail
 
 prefix='^mem0-nightly-'
@@ -32,10 +38,14 @@ sweep() { # sweep <remove command...>, names on stdin
   "$@" $names > /dev/null
 }
 
-# -v takes the anonymous volumes with it, which is where ollama keeps its model.
+# -v so an anonymous volume goes with its container. Once the container is gone
+# such a volume has a hash for a name and nothing here could find it again.
 docker ps -a --format '{{.Names}}' | sweep docker rm -f -v || left=1
 docker network ls --format '{{.Name}}' | sweep docker network rm || left=1
 docker volume ls --format '{{.Name}}' | sweep docker volume rm || left=1
 docker images --format '{{.Repository}}:{{.Tag}}' | sweep docker rmi || left=1
 
+if [ "$left" -ne 0 ]; then
+  echo "::error::a mem0 nightly stack could not be removed; docker's reason is above, and gh-runner-01's disk fills until it is"
+fi
 exit "$left"

@@ -80,6 +80,33 @@ run_with_stub "$STUB"
 exited "a removal that fails fails the step" 1
 check "a failed container removal does not stop the network sweep" "network rm mem0-nightly-111_default"
 
+# Each kind of removal has to be able to fail the step on its own. With only
+# the container case pinned, losing the status of the other three still passed.
+for doomed in "network rm" "volume rm" "rmi mem0"; do
+  cat > "$STUB" <<STUBEOF
+case "\$1 \$2" in
+  "ps -a"|"network ls"|"volume ls") printf '%s\n' mem0-nightly-111_thing ;;
+  "images --format") printf '%s\n' mem0-nightly-111-mem0:latest ;;
+  "$doomed"*) exit 1 ;;
+  *) echo "\$*" >> "\$CALLS" ;;
+esac
+STUBEOF
+  : > "$CALLS"
+  run_with_stub "$STUB"
+  exited "a failed '${doomed%% mem0}' fails the step" 1
+done
+
+# A docker that cannot list is not a host with nothing on it. Reading an
+# unreachable daemon as "clean" is the same absence-is-not-health mistake the
+# sweep exists to stop.
+cat > "$STUB" <<'STUBEOF'
+echo "Cannot connect to the Docker daemon" >&2
+exit 1
+STUBEOF
+: > "$CALLS"
+run_with_stub "$STUB"
+exited "a docker that cannot list fails the step" 1
+
 rm -f "$CALLS" "$STUB"
 echo "Results: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
