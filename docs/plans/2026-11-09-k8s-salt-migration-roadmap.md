@@ -81,8 +81,9 @@ Phases gate on what they need, not on their number (D37).
       minors); signs off D36 (2026-11-15).
 - [x] Q16 answered (agentbox is slimmed, not retired); D19 signed off
       (2026-11-15).
-- [ ] terrac answers Q17 (PVE 9 in place now), Q18 (ocean's k3s upgrades in
-      its monthly window), Q19 (fallback for an nginx feature).
+- [x] terrac answers Q17 (PVE 9 in place, in phase 0), Q18 (ocean's k3s
+      upgrades in its monthly window), Q19 (nginx fallback decided per
+      feature) (2026-11-15).
 - [ ] Salt, moved up from phase 6 (Q7): `homelab-salt` repo; the D29
       bootstrap script (pinned `.deb` from the GCS mirror, verified by hash,
       tested by CI in a clean Debian container, wrapped by one Ansible play
@@ -94,7 +95,7 @@ Phases gate on what they need, not on their number (D37).
       group name).
 - [ ] ml-log-analyzer's Postgres added to `db-backup.sh` and `db-restore.sh`
       (it is live on harbor and in no backup).
-- [ ] PVE 8 reached end of life in August 2026. Working assumption (Q17):
+- [ ] PVE 8 reached end of life in August 2026 (Q17):
       node005, then node006, upgraded in place to PVE 9, one per window, DNS
       pair pre-flight green before each.
 - [ ] `homelab-ca` spec (2026-10-14) amended per Q6: `pathlen:1` root, cluster

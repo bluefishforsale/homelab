@@ -116,20 +116,7 @@ where merge is deploy.
 
 ## Open questions for terrac
 
-Each has a working assumption already written into the design, so the docs
-read consistently until it is answered.
-
-- **Q17.** PVE 8 reached end of life in August 2026, so both hypervisors are
-  unsupported today. Working assumption: upgrade each in place to PVE 9 in
-  phase 0, node005 first, and keep the D27 boot-mirror reinstall as a later,
-  separate step. Alternative: wait and reach PVE 9 by the reinstall.
-- **Q18.** Every k3s minor upgrade needs a drain, and draining ocean stops
-  nearly everything. Working assumption: ocean's agent upgrades only in its
-  supervised monthly window, trailing the server in between.
-- **Q19.** What to do with an nginx feature that has no Gateway equivalent.
-  Working assumption: decided per feature at the phase 1 gate, preferring a
-  Cloudflare rule for a public vhost and an nginx pod behind the Gateway for
-  a LAN-only one, over dropping the feature.
+None open.
 
 ## Answered questions
 
@@ -172,6 +159,15 @@ read consistently until it is answered.
   for the three things that must work when the cluster is down: the dead-man
   watchdog, ntfy, and the remote-control sessions and break-glass applies
   used to repair the cluster. D19 is signed off on that basis.
+- **Q17 (2026-11-15).** PVE 8 reached end of life in August 2026. Both
+  hypervisors are upgraded in place to PVE 9 in phase 0, node005 first, one
+  per window. The D27 boot-mirror reinstall stays a later, separate step.
+- **Q18 (2026-11-15).** Ocean's k3s agent upgrades only in its supervised
+  monthly window, trailing the server in between (R29). A minor upgrade
+  needs a drain, and draining ocean stops nearly everything.
+- **Q19 (2026-11-15).** An nginx feature with no Gateway equivalent is decided
+  per feature at the phase 1 gate: a Cloudflare rule for a public vhost, an
+  nginx pod behind the Gateway for a LAN-only one, dropping it last.
 
 ## Requirements
 
@@ -285,7 +281,7 @@ read consistently until it is answered.
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5 to Q16 answered, D19, D21, D23, D26, D32 and D36 signed off. `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. Both hypervisors on a supported PVE major (Q17). Pillar decryption settled and the per-host deploy lock (R27) in place. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5 to Q16 answered, D19, D21, D23, D26, D32 and D36 signed off. `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. Both hypervisors on PVE 9 (Q17). Pillar decryption settled and the per-host deploy lock (R27) in place. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
 | 1 | The dead-man watchdog and ntfy on agentbox, tested by stopping the API. The Gateway in host-network mode on alternate ports, with the sonarr reference chart behind it; each nginx feature in use has an equivalent proven on it or a decided fallback (Q19); a listener bound on 80/443 on `k3s-agent01` once. Cluster access written down (R28). Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
 | 2 | harbor VM workloads (nzbget, tdarr-node, ml-log-analyzer on CloudNativePG, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |

@@ -112,8 +112,7 @@ brings monitoring and the front door back after a node006 power cycle.
   rehearsed in phase 1.
 - **Upgrades and ocean**: upstream requires a drain before a minor kubelet
   upgrade, and draining ocean stops nearly every service on the fleet. So
-  ocean's agent is not upgraded with the others (working assumption, PRD
-  Q18). The server and `k3s-agent01` upgrade on dispatch; ocean's agent
+  ocean's agent is not upgraded with the others (decided, PRD Q18). The server and `k3s-agent01` upgrade on dispatch; ocean's agent
   follows in its next supervised monthly window, where it is drained and
   rebooted anyway. Its kubelet trails the API server in between, inside
   upstream's skew policy. R23 measures the server.
@@ -497,8 +496,8 @@ Two different things, handled differently:
   it, so it runs only when the pair pre-flight is green. PVE major upgrades
   are in place by necessity (bare metal) and get their own runbook, one node
   at a time. Both nodes are on PVE 8 (8.1 and 8.4), which reached end of life
-  in August 2026, so both are unsupported today. Working assumption (PRD
-  Q17): each is upgraded in place to PVE 9 in phase 0 by Proxmox's documented
+  in August 2026, so both are unsupported today. Decided (PRD Q17):
+  each is upgraded in place to PVE 9 in phase 0 by Proxmox's documented
   8-to-9 path, one node per window with the pair pre-flight green, node005
   first. The D27 boot-mirror reinstall stays where it is, as the recovery
   rehearsal, and installs whichever PVE major is current then; the D28
