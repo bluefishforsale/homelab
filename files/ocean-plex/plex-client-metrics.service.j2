@@ -10,6 +10,9 @@ Type=oneshot
 # get_stream_data for unseen sessions every HISTORY_REFRESH_SECONDS, written
 # to plex_client.prom. It never changes a session, a client setting or the
 # library. Short-lived; the timer re-runs it.
+# Runs as root, like kometa-metrics: Tautulli's config.ini holds the API key
+# and is not readable by an unprivileged user on ocean (scripts/plex-playback.py
+# reads it with sudo for the same reason).
 Environment=TEXTFILE_DIR={{ node_exporter_textfiles }}
 Environment=TAUTULLI_URL={{ plex_client_metrics_tautulli_url }}
 Environment=TAUTULLI_CFG={{ plex_client_metrics_tautulli_cfg }}

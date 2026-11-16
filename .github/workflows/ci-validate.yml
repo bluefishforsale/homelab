@@ -324,12 +324,12 @@ jobs:
       - name: tdarr-exporter job math
         run: python3 files/tdarr-exporter/test_exporter.py
 
-      # A bad profile body is rejected by Lidarr mid-deploy, or silently allows lossless.
       # Units differ across Tautulli fields (view_offset ms, max_offset s), and
       # a cache from an older schema must rebuild rather than crash every run.
       - name: plex-client-metrics math
         run: python3 files/ocean-plex/test_plex_client_metrics.py
 
+      # A bad profile body is rejected by Lidarr mid-deploy, or silently allows lossless.
       - name: lidarr quality profile
         run: python3 files/ocean-lidarr/test_lidarr_configure.py
 

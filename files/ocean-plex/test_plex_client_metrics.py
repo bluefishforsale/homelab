@@ -77,6 +77,23 @@ def test_two_sessions_on_one_player_stay_distinct():
     assert len(s["plex_client_live_session_info"]) == 2
 
 
+def test_sessions_without_a_key_still_get_distinct_label_sets():
+    # A duplicate label set makes node_exporter reject the whole file.
+    nokey = {k: v for k, v in TRANSCODE.items() if k != "session_key"}
+    s = live([nokey, nokey])
+    assert len(s["plex_client_live_session_info"]) == 2
+    assert len(s["plex_client_live_transcode_speed"]) == 2
+
+
+def test_history_and_live_read_subtitle_decision_the_same_way():
+    # Only subtitle_decision set: live and history must agree, since cause()
+    # keys on it first.
+    sd = {"subtitle_decision": "burn", "video_decision": "transcode"}
+    hist = pcm.compact({"player": "p"}, sd)
+    labels, _ = only(live([{**DIRECT, **sd, "stream_subtitle_decision": ""}]), "plex_client_live_session_info")
+    assert hist["subtitle_decision"] == labels["subtitle_decision"] == "burn"
+
+
 def row(**kw):
     base = pcm.compact(
         {"started": 100, "stopped": 200, "friendly_name": "alice", "player": "Roku Premere",

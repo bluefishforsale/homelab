@@ -128,8 +128,34 @@ def resolution(full, height):
     return "sd"
 
 
-def hw(v):
+def flag(v):
+    """Tautulli's 0/1 (int or string) as a "true"/"false" label value."""
     return "true" if str(v).strip() in ("1", "True", "true") else "false"
+
+
+def stream_labels(x):
+    """Decision and format labels, read the same way from a live session and
+    from a finished session's stream data, so the live and history series
+    cannot drift apart. Tautulli fills either the plain or the stream_ name
+    depending on the endpoint and version, so each reads both."""
+    def either(a, b, default="none"):
+        return s(x.get(a) or x.get(b), default)
+    return {
+        "video_decision": either("video_decision", "stream_video_decision"),
+        "audio_decision": either("audio_decision", "stream_audio_decision"),
+        "subtitle_decision": either("stream_subtitle_decision", "subtitle_decision"),
+        "container_decision": either("stream_container_decision", "container_decision"),
+        "quality_profile": s(x.get("quality_profile")),
+        "source_resolution": resolution(x.get("video_full_resolution"), x.get("video_height")),
+        "stream_resolution": resolution(x.get("stream_video_full_resolution"), x.get("stream_video_height")),
+        "source_video_codec": s(x.get("video_codec"), "none"),
+        "stream_video_codec": s(x.get("stream_video_codec"), "none"),
+        "source_dynamic_range": s(x.get("video_dynamic_range"), "none"),
+        "stream_dynamic_range": s(x.get("stream_video_dynamic_range"), "none"),
+        "stream_audio_codec": s(x.get("stream_audio_codec"), "none"),
+        "hw_decode": flag(x.get("transcode_hw_decoding")),
+        "hw_encode": flag(x.get("transcode_hw_encoding")),
+    }
 
 
 def base_labels(r):
@@ -147,7 +173,7 @@ def base_labels(r):
 
 # Bump when compact() gains or renames a field: an older cache is dropped and
 # rebuilt (one cold refresh, ~20s) instead of crashing history_series.
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 
 def load_cache():
@@ -179,25 +205,12 @@ def compact(h, sd):
         "play_duration": num(h.get("play_duration")) or 0,
         "paused": num(h.get("paused_counter")) or 0,
         "percent_complete": num(h.get("percent_complete")),
-        "relayed": hw(h.get("relayed")),
-        "secure": hw(h.get("secure")),
-        "video_decision": s(sd.get("video_decision") or sd.get("stream_video_decision"), "none"),
-        "audio_decision": s(sd.get("audio_decision") or sd.get("stream_audio_decision"), "none"),
-        "subtitle_decision": s(sd.get("stream_subtitle_decision"), "none"),
-        "container_decision": s(sd.get("stream_container_decision"), "none"),
-        "quality_profile": s(sd.get("quality_profile")),
-        "source_resolution": resolution(sd.get("video_full_resolution"), sd.get("video_height")),
-        "stream_resolution": resolution(sd.get("stream_video_full_resolution"), sd.get("stream_video_height")),
-        "source_video_codec": s(sd.get("video_codec"), "none"),
-        "stream_video_codec": s(sd.get("stream_video_codec"), "none"),
-        "source_dynamic_range": s(sd.get("video_dynamic_range"), "none"),
-        "stream_dynamic_range": s(sd.get("stream_video_dynamic_range"), "none"),
+        "relayed": flag(h.get("relayed")),
+        "secure": flag(h.get("secure")),
+        **stream_labels(sd),
         "source_audio_codec": s(sd.get("audio_codec"), "none"),
-        "stream_audio_codec": s(sd.get("stream_audio_codec"), "none"),
         "stream_audio_channels": s(sd.get("stream_audio_channels"), "none"),
         "stream_container": s(sd.get("stream_container"), "none"),
-        "hw_decode": hw(sd.get("transcode_hw_decoding")),
-        "hw_encode": hw(sd.get("transcode_hw_encoding")),
         "source_bitrate": num(sd.get("bitrate")),
         "stream_bitrate": num(sd.get("stream_bitrate")),
     }
@@ -355,36 +368,24 @@ def history_series(cache):
 def live_series(key):
     data = call(key, "get_activity") or {}
     out = {}
-    for x in data.get("sessions") or []:
+    for i, x in enumerate(data.get("sessions") or []):
         b = base_labels(x)
         # session_key keeps two streams from one user on one player apart; a
-        # duplicate label set would make node_exporter drop the whole file.
-        b["session"] = s(x.get("session_key") or x.get("session_id"))
+        # duplicate label set would make node_exporter drop the whole file, so
+        # a session with no key gets its position instead of a shared default.
+        b["session"] = s(x.get("session_key") or x.get("session_id"), f"idx{i}")
         info = {**b,
                 "state": s(x.get("state")),
                 "media_type": s(x.get("media_type")),
                 "transcode_decision": s(x.get("transcode_decision")),
-                "video_decision": s(x.get("video_decision") or x.get("stream_video_decision"), "none"),
-                "audio_decision": s(x.get("audio_decision") or x.get("stream_audio_decision"), "none"),
-                "subtitle_decision": s(x.get("stream_subtitle_decision") or x.get("subtitle_decision"), "none"),
-                "container_decision": s(x.get("stream_container_decision") or x.get("container_decision"), "none"),
-                "quality_profile": s(x.get("quality_profile")),
-                "source_resolution": resolution(x.get("video_full_resolution"), x.get("video_height")),
-                "stream_resolution": resolution(x.get("stream_video_full_resolution"), x.get("stream_video_height")),
-                "source_video_codec": s(x.get("video_codec"), "none"),
-                "stream_video_codec": s(x.get("stream_video_codec"), "none"),
-                "source_dynamic_range": s(x.get("video_dynamic_range"), "none"),
-                "stream_dynamic_range": s(x.get("stream_video_dynamic_range"), "none"),
-                "stream_audio_codec": s(x.get("stream_audio_codec"), "none"),
+                **stream_labels(x),
                 # hw_requested true with hw_encode false is a GPU transcode that
                 # fell back to CPU (NVENC session limit, VRAM pressure from
                 # llama.cpp on the shared 3090, a driver fault).
-                "hw_requested": hw(x.get("transcode_hw_requested")),
-                "hw_full_pipeline": hw(x.get("transcode_hw_full_pipeline")),
-                "hw_decode": hw(x.get("transcode_hw_decoding")),
-                "hw_encode": hw(x.get("transcode_hw_encoding")),
-                "relayed": hw(x.get("relayed")),
-                "secure": hw(x.get("secure")),
+                "hw_requested": flag(x.get("transcode_hw_requested")),
+                "hw_full_pipeline": flag(x.get("transcode_hw_full_pipeline")),
+                "relayed": flag(x.get("relayed")),
+                "secure": flag(x.get("secure")),
                 "title": s(x.get("full_title"))}
         out.setdefault("plex_client_live_session_info", {})[tuple(info.items())] = 1
         bk = tuple(b.items())
@@ -433,6 +434,14 @@ HELP = {
     "plex_client_live_progress_percent": "Progress through the item of the active session",
     "plex_client_live_transcode_speed": "Transcoder speed for the active session; below 1 the client will buffer",
     "plex_client_live_transcode_buffer_seconds": "Seconds the transcoder is ahead of the viewer for the active session; near 0 the client will buffer",
+    "plex_client_live_ok": "1 if this run's get_activity call succeeded",
+    "plex_client_history_ok": "1 if the last history refresh succeeded (or none was due this run)",
+    "plex_client_history_refreshed_timestamp_seconds": "Unix time of the last successful history refresh",
+    "plex_client_history_sessions_cached": "Finished sessions in the window with stream data cached",
+    "plex_client_history_truncated": "1 if the window holds more sessions than MAX_ROWS, so the oldest are missing",
+    "plex_client_history_stream_data_errors": "get_stream_data calls that failed at the last history refresh",
+    "plex_client_window_seconds": "Length of the rolling history window",
+    "plex_client_metrics_last_run_timestamp_seconds": "Unix time this collector last wrote plex_client.prom",
     "plex_client_live_throttled": "1 if the transcode for the active session is throttled (ahead of playback)",
 }
 
