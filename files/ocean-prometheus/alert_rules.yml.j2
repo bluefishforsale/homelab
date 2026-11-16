@@ -446,15 +446,15 @@ groups:
   - alert: PlexClientMetricsStale
     expr: |
       absent(plex_client_metrics_last_run_timestamp_seconds)
-      or time() - plex_client_metrics_last_run_timestamp_seconds > 600
+      or time() - plex_client_metrics_last_run_timestamp_seconds > 300
       or plex_client_live_ok == 0
       or plex_client_history_ok == 0
-    for: 15m
+    for: 10m
     labels:
       severity: warning
     annotations:
       summary: "plex-client-metrics on ocean is stale or failing"
-      description: "plex_client.prom has not been rewritten in 10 minutes, or its Tautulli calls are failing. `journalctl -u plex-client-metrics` on ocean says which; Tautulli down or a rotated API key are the usual causes."
+      description: "plex_client.prom (rewritten every minute) is over 5 minutes old, or its Tautulli calls are failing, for 10m. `journalctl -u plex-client-metrics` on ocean says which; Tautulli down or a rotated API key are the usual causes."
 
   # A GPU transcode that ran on CPU: Plex asked for hardware and did not get
   # the encoder. On ocean that is NVENC refusing a session (driver fault, or
