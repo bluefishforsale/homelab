@@ -1486,7 +1486,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"true\"})",
+          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"true\"}) or vector(0)",
           "refId": "A",
           "legendFormat": "GPU (NVENC)",
           "instant": true,
@@ -1498,7 +1498,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"false\"})",
+          "expr": "sum(plex_client_video_transcode_hw_sessions{user=~\"$user\", hw_encode=\"false\"}) or vector(0)",
           "refId": "B",
           "legendFormat": "CPU",
           "instant": true,
