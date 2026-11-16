@@ -953,6 +953,25 @@
       agentbox_mcp_present: "{{ dict(claude_mcp_list.results | map(attribute='item.name') | zip(claude_mcp_list.results | map(attribute='stdout', default=''))) }}"
     when: agentbox_mcp_servers | length > 0
 
+  # NOTE: the gates below match "name: url", the line `claude mcp list` prints,
+  # not the bare name. A name-only match treats a server registered at an old
+  # URL as present, so a moved server (mem0, ocean to harbor) stays pointed at
+  # the dead address through every redeploy. A stdio server has no url and
+  # falls back to matching "name: ".
+  - name: Drop shared MCP servers registered at a stale URL
+    ansible.builtin.command: timeout 30 claude mcp remove {{ item.1.name | quote }} --scope user
+    become_user: "{{ item.0.name }}"
+    environment:
+      HOME: "{{ item.0.home }}"
+      PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
+    loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
+    loop_control:
+      label: "{{ item.0.name }}: {{ item.1.name }}"
+    when:
+      - agentbox_mcp_servers | length > 0
+      - "(item.1.name ~ ': ') in (agentbox_mcp_present[item.0.name] | default(''))"
+      - "(item.1.name ~ ': ' ~ (item.1.url | default(''))) not in (agentbox_mcp_present[item.0.name] | default(''))"
+
   - name: Register shared MCP servers in Claude Code (user scope)
     ansible.builtin.command: >
       timeout 30 claude mcp add-json {{ item.1.name | quote }}
@@ -966,7 +985,7 @@
     loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
     when:
       - agentbox_mcp_servers | length > 0
-      - item.1.name not in (agentbox_mcp_present[item.0.name] | default(''))
+      - "(item.1.name ~ ': ' ~ (item.1.url | default(''))) not in (agentbox_mcp_present[item.0.name] | default(''))"
     no_log: true
     notify: Restart RC sessions
 
