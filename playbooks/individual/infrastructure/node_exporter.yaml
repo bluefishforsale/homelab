@@ -359,6 +359,37 @@
       refreshable_projects: "{{ compose_projects.stdout | from_json | map(attribute='Name') | difference(docker_refresh_exclude) }}"
     when: docker_check.rc == 0 and compose_projects.rc == 0
 
+  # The name list above only knows the projects someone remembered to add.
+  # github-runners-terraform-root was created on 2026-11-09 with the same
+  # EnvironmentFile-only token, was not on the list, got a timer, and on
+  # 2026-11-15 the refresh recreated both runners with a blank token. So ask
+  # compose instead: any project whose variables resolve unset from here is one
+  # a refresh would gut, whatever it is called. docker-refresh.sh refuses those
+  # at run time as well, but a timer that exists only to be refused fails its
+  # unit every week and pages for it.
+  #
+  # NOTE: --quiet is what keeps this safe to register. Without it stdout is the
+  # fully rendered config, every project's secrets included, in the play log.
+  # NOTE: only the warning itself drops a project. A failed render (daemon blip,
+  # unreadable file) proves nothing, and treating it as "unset" would disable a
+  # host's timers over a transient docker problem.
+  - name: Render each candidate's compose config to find unset variables
+    ansible.builtin.command:
+      argv: "{{ ['docker', 'compose', '-p', item.Name] + (item.ConfigFiles.split(',') | map('trim') | select | map('regex_replace', '^', '--file=') | list) + ['config', '--quiet'] }}"
+    loop: "{{ compose_projects.stdout | from_json | selectattr('Name', 'in', refreshable_projects) | list }}"
+    loop_control:
+      label: "{{ item.Name }}"
+    register: compose_config_probe
+    changed_when: false
+    check_mode: false
+    failed_when: false
+    when: refreshable_projects is defined
+
+  - name: Drop the projects a refresh would recreate with blank variables
+    ansible.builtin.set_fact:
+      refreshable_projects: "{{ refreshable_projects | difference(compose_config_probe.results | selectattr('stderr', 'defined') | selectattr('stderr', 'search', 'variable is not set') | map(attribute='item.Name') | list) }}"
+    when: refreshable_projects is defined
+
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
       name: "docker-refresh@{{ item }}.timer"
