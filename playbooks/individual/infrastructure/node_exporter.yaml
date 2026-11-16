@@ -413,7 +413,7 @@
   - name: Say which projects get no refresh timer, and which could not be probed
     ansible.builtin.debug:
       msg: "no refresh timer: {{ unrefreshable_projects }}; render failed, timer kept: {{ unprobed_projects }}"
-    when: refreshable_projects is defined and (unrefreshable_projects or unprobed_projects)
+    when: refreshable_projects is defined and (unrefreshable_projects | length > 0 or unprobed_projects | length > 0)
 
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
