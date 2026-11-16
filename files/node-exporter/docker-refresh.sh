@@ -124,8 +124,14 @@ while IFS= read -r f; do CFG_ARGS+=(-f "$f"); done <<< "$CFG_LIST"
 # writing the second, and the failed pipeline reads as "nothing unset". That
 # recreated both terraform-root runners with a blank token on 2026-11-15.
 cfg_warnings=$(docker compose -p "$PROJECT" "${CFG_ARGS[@]}" config 2>&1 >/dev/null)
+cfg_rc=$?
 if grep -q 'variable is not set' <<< "$cfg_warnings"; then
   logger -t docker-refresh "project=$PROJECT has unset compose variables, refusing to recreate"
+  exit 1
+fi
+if [ "$cfg_rc" -ne 0 ]; then
+  logger -t docker-refresh \
+    "project=$PROJECT compose config failed rc=$cfg_rc, refusing to recreate: $(printf '%s' "$cfg_warnings" | tr '\n' ' ' | cut -c1-200)"
   exit 1
 fi
 

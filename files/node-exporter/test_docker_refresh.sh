@@ -193,6 +193,26 @@ refute "a project warned about twice is never pulled" "PULLED" "$OUT"
 refute "a project warned about twice is never recreated" "RECREATED" "$OUT"
 check "the twice-warned refusal says so in the journal" "project=github-runners-terraform-root has unset compose variables, refusing to recreate" "$LOG"
 
+# A config that cannot be rendered at all never reaches the warning check, so
+# the guard has decided nothing. Recreating on the strength of that is the same
+# fail-open as above with a different trigger.
+cat > "$STUB" <<'STUBEOF'
+case "$*" in
+  "compose ls -a --format json"|"compose ls --format json")
+    echo '[{"Name":"plex","ConfigFiles":"/a/docker-compose.yml"}]' ;;
+  *config*) echo 'open /a/runner.env: permission denied' >&2; exit 1 ;;
+  *pull*) echo PULLED ;;
+  *up\ -d*) echo RECREATED ;;
+  *) : ;;
+esac
+STUBEOF
+: > "$LOG"
+run_with_stub "$STUB" plex
+exited "an unrenderable config fails the unit" 1
+refute "an unrenderable project is never pulled" "PULLED" "$OUT"
+refute "an unrenderable project is never recreated" "RECREATED" "$OUT"
+check "the unrenderable refusal carries compose's reason" "project=plex compose config failed rc=1, refusing to recreate: open /a/runner.env: permission denied" "$LOG"
+
 # A project assembled from several compose files would be rebuilt from a partial
 # definition if only the first were used. Refusing is loud; corrupting is not.
 cat > "$STUB" <<'STUBEOF'
