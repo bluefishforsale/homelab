@@ -1,339 +1,51 @@
-# Homelab Infrastructure — Agent Reference
+# Homelab Infrastructure: Agent Reference
 
-Ansible-driven homelab managing Bare metal, VMs, Docker services, GPU passthrough, and CI/CD across a multi-host Proxmox cluster.
+Ansible-driven homelab managing bare metal, VMs, Docker services, GPU
+passthrough, and CI/CD across a multi-host Proxmox cluster.
 
----
+This file is the only one loaded into every session, so it holds the rules
+that apply to any change and an index to the rest. Open the linked file for the
+task in front of you before acting on it; the detail and the reasons live there.
 
-## Where to look
+## Always true
 
-- **Docs index** (setup, architecture, operations, troubleshooting, CI/CD) -> [`docs/README.md`](docs/README.md)
-- **Diagnostic + admin tooling** -> [`scripts/README.md`](scripts/README.md). Reach for
-  `scripts/` before hand-rolling `ssh host 'docker ...'` or `curl prometheus | jq`:
-  `prom.sh` (metrics), `loki.sh` (logs), `fleet-systemctl.sh` / `docker.sh` (fleet state),
-  `alerts.sh`, `cf.sh` (Cloudflare), `vault.py` (secrets), `fleet-restart.sh` (the only
-  mutating one).
-- **data01 workers** (harbor: docker hosts on ocean's pool over NFS, local state) ->
-  [`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)
-- **Onboarding a new external-repo service** -> [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)
-- **Anything in Cloudflare, GCP or Azure** -> not this repo. It lives in
-  [`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root).
-  See [Cloud infrastructure lives in terraform-root](#cloud-infrastructure-lives-in-terraform-root).
-- **Validate:** `make validate`
+- **Default branch is `master`.** PRs target it and are squash-merged.
+- **Merge to `master` is a production deploy.** `main-apply.yml` runs a real
+  `ansible-playbook` apply on push. CI green is lint and syntax only, so watch
+  the `main-apply` run and then verify with `scripts/homelab-health.sh`.
+- **Never run `ansible-playbook` on the laptop.** Non-mutating runs (`--check`,
+  `--syntax-check`) happen on agentbox; mutating applies go through CI.
+- **Never automate ZFS.** No committed playbook mutates `zfs` or `zpool`, and a
+  drive is always named by WWN, never `/dev/sdX`.
+- **Nothing with a write-ahead log or journal goes on NFS.** A service's state
+  dir is on a local disk of the host that runs it.
+- **One branch and worktree per change.** Never commit to `master`, and stage
+  explicit paths, never `git add -A`.
+- **Fix through code.** A playbook or workflow change is the fix; a hand edit
+  on a host is drift the next apply overwrites.
+- **Cloud resources are not created here.** Cloudflare, GCP, Azure and Proxmox
+  VMs belong to `terraform-root`.
+- **Every service ships monitored**, as a compose project with a health check.
+- No `Co-Authored-By` trailers, no em dashes, terse commits.
 
----
+## Read before you act
 
-## Cloud infrastructure lives in terraform-root
+| When you are about to | Read |
+|---|---|
+| Ship any change, or wonder why a deploy did or didn't run | [`docs/agents/deploy.md`](docs/agents/deploy.md) |
+| Change `files/`, `vars/`, `roles/` or inventory, or add a service | [`docs/agents/impact-detection.md`](docs/agents/impact-detection.md) |
+| Touch disks, ZFS, `/data01`, NFS, or where a service keeps its state | [`docs/agents/storage.md`](docs/agents/storage.md) |
+| Need DNS, a tunnel, an Access app, a bucket, or a VM | [`docs/agents/cloud-boundary.md`](docs/agents/cloud-boundary.md) |
+| Hit a 403 or an odd result from `gh` or the GitHub API | [`docs/agents/github-traps.md`](docs/agents/github-traps.md) |
+| Work alongside another agent, deploy outside CI, or decide who merges | [`docs/agents/coordination.md`](docs/agents/coordination.md) |
+| Choose how to build something (monitoring, Ansible style, vault layout, PRDs) | [`docs/agents/preferences.md`](docs/agents/preferences.md) |
+| Need the vocabulary, topology, or the two deployment shapes | [`CONTEXT.md`](CONTEXT.md) |
+| Diagnose the fleet (metrics, logs, alerts, containers, secrets) | [`scripts/README.md`](scripts/README.md), before hand-rolling `ssh` or `curl` |
+| Run a service on a data01 worker such as harbor | [`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md) |
+| Onboard a new external-repo service | [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md) |
+| Look for anything else (setup, architecture, operations, troubleshooting) | [`docs/README.md`](docs/README.md) |
 
-**Ansible in this repo no longer creates cloud infrastructure.** Cloudflare, GCP
-and Azure resources are owned by
-[`bluefishforsale/terraform-root`](https://github.com/bluefishforsale/terraform-root)
-(local checkout `../terraform-root`), applied by its GitHub Actions on merge to
-`main`, with a daily drift check. If a change here needs a cloud resource to
-exist, that resource gets added in terraform-root first, merged and applied,
-and only then does the homelab change that depends on it ship.
+Validate with `make validate`.
 
-What terraform-root owns:
-
-- **Cloudflare:** the three zones (terrac.com, saetnere.com,
-  radiantatmospheres.com) and every DNS record in them, Cloudflare Tunnels
-  (the tunnel objects, including the per-host `ssh-<host>` ones), Access apps
-  and the reusable Access policies, the Zero Trust org and identity provider,
-  zone rulesets (rate limits, redirects, cache rules, security header
-  transforms, WAF custom rules), zone TLS/security settings, Email Routing,
-  R2 buckets and Pages projects.
-- **GCP** (`homelab-390805`): service accounts, the `homelab-db-backups`
-  bucket and its IAM, KMS, enabled APIs, project IAM.
-- **Azure:** the Artifact Signing account and app registrations for
-  signal-agent.
-
-What stays here, because it's host config or runtime operations rather than
-creating cloud resources:
-
-- Running `cloudflared` on each host. Its rendered `/etc/cloudflared/config.yaml`
-  holds process settings only; every tunnel's ingress is remote config in
-  terraform-root (`cloudflare-tunnel-configs.tf`).
-- The DDNS timer rewriting `home.terrac.com`'s IP (terraform-root ignores that
-  record's content on purpose), certbot's short-lived DNS-01 TXT records, and
-  cache purges.
-- Using cloud resources: db-backup writing to `gs://homelab-db-backups`, the
-  cloudflare exporter reading analytics.
-
-Nothing here creates Cloudflare resources any more. `cloudflared.yaml` only
-looks up the host's `ssh-<host>` tunnel and fetches its token, and it fails if
-the tunnel is missing rather than creating it, so a new host's tunnel, CNAME,
-ingress and Access app come from terraform-root first. The old Cloudflare
-write scripts (`cloudflare-harden.py`, `cloudflare-waf.py`,
-`cloudflare-pages-domain.sh`, `cf.sh dns-add`) are deleted; their settings
-live in terraform-root's `cloudflare-<zone>-config.tf`.
-
-Proxmox VMs are terraform-root's too (`lan/proxmox-node005-vms.tf`,
-`lan/proxmox-node006-vms.tf`, applied from the terraform-lan runners). The
-`qm clone` playbooks, `vm_multiqueue.yaml` and `ocean_cpu_host.yaml` are
-deleted; a new VM, or a CPU, memory, disk or NIC change, is a PR there, and a
-hand `qm set` shows up as lan drift. Homelab configures what runs inside a VM
-once it boots.
-
-The old GCP KMS playbook (`gcloud_sdk.yaml` with `tasks/gcloud.yaml` and
-`tasks/pki_gcloud_kms.yaml`) is deleted too. Its vars were defined nowhere, and
-the empty `homelab-sops-key` ring it left behind is modeled in terraform-root.
-
-**Cloudflare Access (tunnel) user emails.** The friends' allow list lives in
-terraform-root, in the SOPS file `secrets/access.enc.yaml` (key `plex_users`,
-terraform-root #53), and merging a change there is what applies it. The admin
-address is inline in its `allow_admin` policy. The old vault copies under
-`cloudflare.access_allow_emails` and terraform-root's
-`TF_VAR_ACCESS_PLEX_USER_EMAILS` repo secret are no longer read by anything.
-To resync from Plex invites, pipe `scripts/plex-shared-users.py` into that SOPS
-file (the command is in terraform-root's agents.md, "Where the Access (tunnel)
-user emails live").
-
-Proxmox VMs are still created here with `qm clone` playbooks for now. They're
-the next candidate to move to terraform-root (bpg/proxmox, applied from the
-self-hosted runner), so expect that to change.
-
----
-
-## Deploy gotchas (READ before shipping a change)
-
-These bite every agent that doesn't know them up front:
-
-- **Default branch is `master`, not `main`.** Open PRs against `master`.
-- **Merge to `master` auto-deploys to production.** `main-apply.yml` runs a real
-  `ansible-playbook` apply (not a dry run) on push to master. Merge IS deploy —
-  there is no separate deploy step to gate.
-- **CI green is lint/syntax only.** `ci-validate.yml` never touches live hosts, so a
-  playbook can pass CI and still fail at deploy. After merging, watch the
-  `main-apply.yml` run — that is where the deploy actually succeeds or fails.
-- **`main-apply`'s own post-deploy health is `continue-on-error`.** A DEGRADED deploy
-  still reports the job green. For real health verification use `health-check.yml`
-  (exits 1 on unhealthy), the `scripts/*-check.sh` tools, or `scripts/homelab-health.sh`
-  (fleet-wide diff).
-- **Squash-merge only.** Keeps one commit per merge, which is what the rest of the
-  tooling (rollback's `HEAD~1`, the deploy summary) assumes.
-- **A push deploy applies master as it is now, and covers everything since the last
-  clean deploy.** `main-apply` diffs from the `deployed` branch (moved forward only
-  after an apply with no failures) to the pushed commit, and the apply job checks out
-  the tip of master rather than the pushed commit. So a run that waited in the queue
-  can't render older templates over a newer deploy, and a run cancelled while
-  pending, or one that failed, has its changes picked up by the next push. Only paths
-  in main-apply's push filter count, so an inventory or vault commit in the range
-  still deploys nothing. Every fleet deploy workflow holds `deploy-ocean`.
-  A playbook that keeps failing holds `deployed` back, and every push re-runs it until
-  it is fixed. Fix forward. If a change truly must be skipped, fast-forward the
-  marker past it by hand (`git push origin <sha>:refs/heads/deployed`; the remote
-  refuses anything but a fast-forward). If `deployed` is ever off master's history
-  the diff falls back to one commit.
-- **Deploy path filter.** `main-apply` runs only on `playbooks/**`, `files/**`,
-  `roles/**`, `vars/**/*.yaml` and `group_vars/**`. CI (`ci-validate.yml`) covers most
-  of those plus `vault/**` and `.github/workflows/**`, but not `group_vars/**`, so a
-  vault-only or workflow-only change runs CI and deploys nothing (dispatch
-  `main-apply` by hand for a vault fix). Changes outside both (e.g. `scripts/`,
-  `docs/`, `.claude/`) silently get no CI and no apply.
-
-### How a change maps to playbooks (impact detection)
-
-`main-apply` does NOT run the whole site. `.github/workflows/lib/detect-impacted-playbooks.sh`
-maps each changed file to the fewest playbooks — ideally one — and `apply-playbooks`
-runs only those. The model is **explicit ownership**, not best-effort guessing:
-
-- **`files/<svc>/**`** → the playbook that references `files/<svc>` literally, else the
-  one declaring `service: <svc>`, else a playbook named `<svc>.yaml`. So a new service
-  maps cleanly if it follows any one of those conventions.
-- **`vars/vars_<name>.yaml`** → the playbook(s) that load it by name.
-- **`vars/vars_service_ports.yaml`** (the shared port registry) → mapped by **which
-  `service_ports.<key>` changed**, not the filename: a single port bump deploys only the
-  service(s) referencing that key; a comment/format-only edit deploys nothing; if the
-  key-diff can't be computed it falls back to every consumer. Needs `pyyaml` on the
-  runner (installed in the workflow) and the base commit (`fetch-depth: 0`).
-- **`roles/<role>/**`** → playbooks importing that role.
-- **`inventories/**`, `group_vars/all*`** → the ONLY inputs that replay the site-wide
-  orchestrators (`01_base_system`, `02_core_infrastructure`, `03_ocean_services`).
-- **Unmapped owned input → hard error (exit 3).** A `files/`/`vars/`/`roles/` change that
-  resolves to no playbook FAILS the run with a message, instead of silently fanning out
-  across the fleet. Wire it to an owner (or, if it is genuinely deployed by nothing, add
-  it to `is_known_unowned()` — that allowlist is the dead-input cleanup ledger).
-- **Enforced in CI.** `ci-validate.yml`'s **Validate Deploy Mapping** job runs
-  `detect-impacted-playbooks.test.sh` (pinned mappings) and `ownership-coverage.test.sh`
-  (asserts every `files/`, `vars/`, `roles/` input resolves to an owner or a declared
-  no-op). A new unwired service is caught at PR time, not as a fleet-wide fan-out on push.
-
-### GitHub API / CLI traps (each of these cost hours)
-
-- **The Checks API is restricted to GitHub Apps.** No PAT can read check runs, and
-  the `Checks` permission is not offered in the fine-grained token UI at all — on a
-  new token or an old one. Do not go looking for the checkbox, and do not "fix" it
-  with a classic `repo`-scoped token. `gh pr list --json statusCheckRollup` expands
-  to the per-check `contexts` and 403s forever; the GraphQL rollup **aggregate**
-  (`commits(last:1){nodes{commit{statusCheckRollup{state}}}}`) needs no extra
-  permission and is what the retired agentbox issue watcher used.
-- **`gh`'s `--jq` is not jq.** One expression, no `--arg`. Passing one makes `gh`
-  reject the whole command. Pipe to real jq: `gh ... --json ... | jq -r --arg ...`.
-- **`x-accepted-github-permissions`** on any response names the exact permission an
-  endpoint wants. Read it instead of guessing at a 403.
-- **Listings lie.** Google's models endpoint advertises models that error on every
-  call (`gemini-2.5-pro`, 2026-08-31). Round-trip a model before wiring it in, and
-  remember reachability is not capability — make it do the real task.
-- **Two similarly-named checks are not the same check.** This repo has both
-  `Validate Ansible Playbooks` (`ci-validate.yml`) and `Validate Playbooks`
-  (`pr-deploy.yml`). Match job names exactly via `gh run view <id> --json jobs`.
-
-### ZFS / storage: NEVER automate (data-safety invariant)
-
-`/data01` (the ZFS pool) is the most critical infrastructure in the fleet; losing data
-is the worst possible outcome. So storage is exempt from "merge = deploy":
-
-- **No committed playbook may mutate ZFS.** Enforced by CI: `check-no-zfs-mutations.sh`
-  (in the Validate Deploy Mapping job) fails the build on any mutating `zfs`/`zpool` verb
-  (`create/destroy/set/mount/unmount/import/export/rollback/replace/...`), the
-  `community.general.zfs|zpool` modules, or a `fstype: zfs` mount. Reads (`zpool list`,
-  `zfs get`) and non-ZFS mounts (tmpfs) are fine.
-- **Storage playbooks are dispatch-only.** The detector treats any `playbooks/**/*zfs*.yaml`
-  as never-auto-apply (like terminalbench). Name a storage play `*zfs*.yaml` to inherit the
-  guard; run it deliberately via `workflow_dispatch`.
-- **The only in-repo ZFS play is read-only.** `playbooks/individual/ocean/data01_zfs.yaml`
-  runs `become: false` (unprivileged — cannot mutate), timeout-bounds every command (a
-  suspended pool blocks `zfs`/`zpool` forever), asserts `/data01` is mounted (fails if not),
-  warns on non-ONLINE health, and records the live layout. It treats the running config as
-  gold: it asserts reality is functional, never imposes config.
-- **Real pool changes** (replacing a degraded disk, dataset work) are coordinated, hand-run,
-  snapshot-first tasks with a backout plan — a runbook, not a committed auto-runnable play.
-  Beware side effects: an unmount with open file handles makes services write into the empty
-  mountpoint on root (invisible after remount), and property changes (`mountpoint`,
-  `canmount`) silently trigger remounts.
-- **Always identify a drive by WWN, never by `/dev/sdX`.** `zpool replace pool device
-  [new-device]` takes an ordinary vdev path in *both* positions, so
-  `/dev/disk/by-id/wwn-*` is always available and is the only form to use. `sdX` names are
-  reassigned across reboots, so a command, an alert matcher or a silence keyed on one can
-  silently come to mean a different physical disk.
-  This is not hypothetical: of four `data01` replacements in August 2026, three passed a
-  `wwn-` path and the 2026-08-18 one passed `ata-ST12000NM0127_ZJV3KB10`. That member is
-  still imported under its ATA ID, and nothing detected the deviation because nothing was
-  checking. A convention honoured three times in four reads as a convention that works.
-  Both are stable by-id paths so no data was at risk, but anything matching on a `wwn-`
-  prefix skips that disk. `disk_wwn_info` (`files/node-exporter/zpool-metrics.sh`) now maps
-  kernel name -> wwn -> serial for every disk, so monitoring is no longer blind to it.
-- **Every part swap gets a row in [`docs/operations/hardware-repair-log.md`](docs/operations/hardware-repair-log.md)**
-  in the same change: part number, serial, WWN, date, vendor, order, price, and FARM vs SMART
-  hours for used Seagate drives. It is the source of truth for hardware history; don't
-  reconstruct that history from `zpool history`, Prometheus or email when the log can say it.
-  Full record and the rename options: [`docs/operations/zfs-disk-replacement.md`](docs/operations/zfs-disk-replacement.md).
-
-### Nothing with a write-ahead log goes over NFS
-
-`/data01` is exported over NFS to worker hosts (architecture:
-[`docs/architecture/data01-workers.md`](docs/architecture/data01-workers.md)),
-and every service on ocean keeps its config and database under `/data01/services/<svc>`.
-Those two facts together are a trap: run a service on a worker with its config dir on the
-NFS mount and its database corrupts.
-
-The rule is anything that keeps a WAL or journal, not just SQLite. These stores rely on
-local-filesystem guarantees NFS doesn't give: POSIX byte-range locks that hold, `fsync`
-ordering, and (for SQLite WAL mode) a shared-memory `-shm` index that is mmapped and only
-works on one host. Over NFS the locks hold until a lease expires or a client stalls
-mid-write, and then two writers share the file. SQLite (every *arr app, Plex, Jellyfin,
-Grafana, ntfy), MySQL InnoDB, Postgres, Prometheus TSDB, Loki, etcd and Kafka logs are all
-in scope. The *arr apps, Plex and Jellyfin document "no config on a network share" for
-this reason.
-
-- A service's state dir (anything with a database, WAL or journal) is always on a
-  **local** disk on the host that runs it. On a worker that is the local disk mounted over
-  `/data01/services`, never the NFS view of ocean's.
-- Bulk media and download payloads are what NFS is for.
-- Moving a service to a worker means copying its state to the worker's local disk, not
-  pointing the container at ocean's copy over NFS. Two hosts never open one DB.
-
----
-
-## Multi-agent coordination
-
-Rules for when more than one agent (or a human plus agents) changes this repo.
-The repo drives a production homelab, so coordination is about preventing drift,
-deploy races, and resource hijacking.
-
-1. **One source of truth.** `master` is desired state; deployed state must equal
-   it. Never hand-edit files on a host or run ad-hoc `docker`/`compose` — changes
-   flow repo → branch → PR → merge → playbook. Drift is a defect, not a shortcut.
-
-2. **Branch per change; isolated trees.** Never commit to `master`. One logical
-   change per PR. Stage explicit paths (`git add <path>`), never `-A` / `.`. Use a
-   separate git worktree or clone per concurrent agent; if a clone is shared, run
-   `git status` first and leave any foreign uncommitted changes untouched.
-
-3. **PRs are the coordination ledger.** Open a draft PR (or claim an issue) early
-   to signal intent; scan open PRs and branches before starting overlapping work.
-
-4. **Serialize deploys; check before triggering.** Host deploys run under the
-   `deploy-ocean` concurrency group (`cancel-in-progress: false`) — keep it.
-   Before triggering a deploy, confirm nothing else is actively managing or using
-   that service. Don't deploy an unmerged branch except for deliberate testing.
-
-5. **Explicit ownership; no hijacking.** Each service has one owner = its playbook
-   plus compose path. A task must never rewrite or restart another service to
-   borrow it; if you need another instance, run a separate one (own
-   dir/container/port) with CPU/RAM caps. The single GPU is allocated
-   deliberately — production keeps it; experiments run on CPU or a declared VRAM
-   budget. Exception: a docker-compose collection, or a playbook deploying a
-   service alongside its exporters/sidecars, is one owned unit — co-deployed
-   from the same playbook.
-
-6. **CI-mediated vs manual.** Ordinary ocean services deploy via CI/dispatch.
-   Self-referential infra (the GitHub Actions runners themselves) and anything
-   that would kill the job mid-run are applied **manually on the homelab network,
-   never via CI** — a runner cannot redeploy itself. "Manually on the homelab
-   network" means from **agentbox**, not the laptop; before a mutating run,
-   confirm no deploy is in flight, because running outside CI means running
-   outside the `deploy-ocean` concurrency group that would otherwise serialize
-   you. Non-mutating runs (`--check`, `--syntax-check`, report-mode plays) need
-   no such ceremony and are the expected way to verify a play from agentbox.
-
-7. **Propose → review → merge → deploy → verify.** Agents propose via PR; merge
-   per the authority rule below; the owning agent then deploys and reports
-   evidence. Deploys stay manually triggered (not push-to-deploy) by design.
-
-8. **Detect drift; fix shared CI first.** Run the apply playbooks in `--check` on
-   a schedule so deployed-≠-repo surfaces on its own. When shared CI breaks,
-   fixing it unblocks every agent — prioritize it and fix at the root.
-
-**Merge authority:** humans merge by default; agents open PRs and do not merge
-their own changes. Low-risk classes (CI fixes, dashboards, docs) may be delegated
-to a designated reviewer once checks are green.
-
-**Isolation:** a git worktree or clone per concurrent agent is preferred;
-shared-clone work is allowed only with strict branch discipline and
-explicit-path staging.
-
----
-
-## Choice preferences (how terrac wants homelab work done)
-
-Distilled from prior decisions. Defaults, not laws, but don't override without a reason.
-
-- **Live through CI/CD.** Push, watch the pipeline, iterate. Keep responses terse and
-  evidence-backed; terrac is a strong critic of his own ideas, so push back rather than agree.
-- **PRD before code.** For non-trivial work, write a zero-ambiguity PRD with explicit
-  goals AND anti-goals first, then implement only against that scope. Grill the
-  requirements before writing code.
-- **New repos inherit the CI/CD deploy pattern** ([`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)) automatically.
-- **Every service is monitored — no exceptions.** Part of shipping any new service:
-  (1) it has at least a **health check** (compose `healthcheck:` / systemd health / a
-  blackbox probe) so failure is visible, and (2) if it exposes a **Prometheus metrics
-  endpoint, add a scrape job** (`files/ocean-prometheus/prometheus.yml.j2`) so the metrics
-  land in Prometheus and a Grafana panel, and (3) it runs as a **compose project**, which
-  is what enables its `docker-refresh@<project>` timer and keeps a floating tag current
-  (a bare `docker run` service never gets a new image again — see
-  [`docs/operations/deploy-pattern.md`](docs/operations/deploy-pattern.md)).
-  A service that ships unmonitored is unfinished.
-  Verify with [`scripts/exporter-scrape-check.sh`](scripts/exporter-scrape-check.sh) (targets down)
-  and [`scripts/prom.sh`](scripts/prom.sh) `targets`.
-- **Fix through code, never manual SSH.** A playbook / workflow / runner-config change
-  is the fix; manual SSH to a host is the escape hatch, not the default. Manual edits
-  drift from IaC and get overwritten by the next apply.
-- **No `Co-Authored-By: Claude` trailers** on commits. Considered weak; never add them.
-- **Ansible house style:** FQCN modules (`ansible.builtin.*`), bare `true`/`false` (not
-  `yes`/`no`), quoted octal file modes, and pass package lists to `apt`'s `name` rather
-  than looping per item.
-- **Vault is a nested tree** (`ai_services.openai.api_key`, `network.unifi.monitoring_user`).
-  Reuse existing keys; never duplicate a secret across two locations.
-- **Local-first for sensitive data.** PII / FERPA / HIPAA-adjacent work defaults to
-  on-prem inference; cloud LLMs are explicit opt-in phase 2, never suggested unprompted.
-
+When a rule here and a linked file disagree, the linked file is the detail and
+this file is the summary, so fix whichever is stale in the same change.
