@@ -47,6 +47,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Clear stacks an earlier run left behind
+        # A run that died with its runner (a host reboot, a killed container)
+        # never reached the teardown step at the bottom, so nothing but the next
+        # run can clean up after it.
+        run: bash .github/workflows/lib/sweep-nightly-stacks.sh
+
       - name: Resolve parameters
         id: params
         # Payload through env vars, never inline expansion: client_payload is
@@ -127,6 +133,11 @@ jobs:
           printf '%s\n%s\n' "$extraction" "$judge" > "$RUNNER_TEMP/.nightly_keys"
 
       - name: Run LOCOMO against a stack built from the mem0 checkout
+        # NOTE: shorter than the job's timeout on purpose. When the job's own
+        # limit expires the whole job is cancelled; when a step's does, the step
+        # fails and the always() steps below still get their turn. The gap is
+        # what the upload and the teardown run in.
+        timeout-minutes: 330
         env:
           JUDGE_BASE_URL: http://ocean.home:8080/v1
           JUDGE_MODEL: qwen3-coder-30b-a3b
@@ -160,3 +171,10 @@ jobs:
             ${{ runner.temp }}/locomo/locomo_results_*.json
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Tear the stack down
+        # run.sh does this from an EXIT trap, which a timeout or a cancel kills
+        # before it finishes. The stack's containers are not children of the
+        # job, so they keep running until something removes them.
+        if: always()
+        run: bash .github/workflows/lib/sweep-nightly-stacks.sh
