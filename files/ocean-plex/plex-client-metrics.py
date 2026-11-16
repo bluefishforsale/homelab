@@ -145,15 +145,20 @@ def base_labels(r):
 # ---------------------------------------------------------------- history
 
 
+# Bump when compact() gains or renames a field: an older cache is dropped and
+# rebuilt (one cold refresh, ~20s) instead of crashing history_series.
+CACHE_VERSION = 2
+
+
 def load_cache():
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
             c = json.load(f)
-        if isinstance(c, dict) and isinstance(c.get("rows"), dict):
+        if isinstance(c, dict) and c.get("version") == CACHE_VERSION and isinstance(c.get("rows"), dict):
             return c
     except (OSError, ValueError):
         pass
-    return {"refreshed": 0, "filtered": 0, "rows": {}}
+    return {"version": CACHE_VERSION, "refreshed": 0, "filtered": 0, "errors": 0, "rows": {}}
 
 
 def save_cache(c):
@@ -232,6 +237,9 @@ def refresh_history(key, cache, now):
     # Drop sessions that left the window (or were deleted from Tautulli).
     cache["rows"] = {k: v for k, v in cache["rows"].items() if k in seen}
     cache["refreshed"] = now
+    # Kept in the cache so runs between refreshes report the last refresh's
+    # count instead of a misleading 0.
+    cache["errors"] = errors
     log(f"history: {len(rows)} rows, {fetched} new fetched, {errors} errors, {len(cache['rows'])} cached")
     return errors
 
@@ -279,6 +287,19 @@ def history_series(cache):
         if r["video_decision"] == "transcode":
             add("plex_client_video_transcode_hw_sessions", {**b,
                 "hw_decode": r["hw_decode"], "hw_encode": r["hw_encode"]})
+            # Why it transcoded, as the facts in one series so they can be read
+            # together: a quality cap, a subtitle burn and an unsupported codec
+            # each look the same in transcode_decision. Only video transcodes,
+            # so the label product stays small.
+            add("plex_client_video_transcode_cause_sessions", {**b,
+                "quality_profile": r["quality_profile"],
+                "subtitle_decision": r["subtitle_decision"],
+                "source_video_codec": r["source_video_codec"],
+                "stream_video_codec": r["stream_video_codec"],
+                "source_dynamic_range": r["source_dynamic_range"],
+                "source_resolution": r["source_resolution"],
+                "stream_resolution": r["stream_resolution"]})
+            add("plex_client_video_transcode_seconds", b, r["play_duration"])
         if r["relayed"] == "true":
             add("plex_client_relayed_sessions", b)
         add("plex_client_watch_seconds", b, r["play_duration"])
@@ -337,6 +358,11 @@ def live_series(key):
                 "source_dynamic_range": s(x.get("video_dynamic_range"), "none"),
                 "stream_dynamic_range": s(x.get("stream_video_dynamic_range"), "none"),
                 "stream_audio_codec": s(x.get("stream_audio_codec"), "none"),
+                # hw_requested true with hw_encode false is a GPU transcode that
+                # fell back to CPU (NVENC session limit, VRAM pressure from
+                # llama.cpp on the shared 3090, a driver fault).
+                "hw_requested": hw(x.get("transcode_hw_requested")),
+                "hw_full_pipeline": hw(x.get("transcode_hw_full_pipeline")),
                 "hw_decode": hw(x.get("transcode_hw_decoding")),
                 "hw_encode": hw(x.get("transcode_hw_encoding")),
                 "relayed": hw(x.get("relayed")),
@@ -354,6 +380,13 @@ def live_series(key):
         speed = num(x.get("transcode_speed"))
         if speed is not None:
             out.setdefault("plex_client_live_transcode_speed", {})[bk] = speed
+        # Seconds the transcoder is ahead of the viewer. Speed alone misleads:
+        # 0.8x is harmless with ten minutes buffered and a stall with five
+        # seconds. max_offset is seconds, view_offset milliseconds.
+        ahead = num(x.get("transcode_max_offset_available"))
+        viewed = num(x.get("view_offset"))
+        if s(x.get("transcode_key"), "") and ahead is not None and viewed is not None:
+            out.setdefault("plex_client_live_transcode_buffer_seconds", {})[bk] = ahead - viewed / 1000
         out.setdefault("plex_client_live_throttled", {})[bk] = 1 if str(x.get("throttled")) == "1" or x.get("transcode_throttled") in (1, "1") else 0
     return out
 
@@ -366,6 +399,8 @@ HELP = {
     "plex_client_quality_profile_sessions": "Sessions in the window by the quality profile the client requested",
     "plex_client_format_sessions": "Sessions in the window by source and delivered codecs, dynamic range and container",
     "plex_client_video_transcode_hw_sessions": "Video transcodes in the window by hardware decode/encode use",
+    "plex_client_video_transcode_cause_sessions": "Video transcodes in the window by quality profile, subtitle decision, codec and resolution",
+    "plex_client_video_transcode_seconds": "Seconds played through a video transcode in the window",
     "plex_client_relayed_sessions": "Sessions in the window that went through the Plex relay (bandwidth-capped)",
     "plex_client_watch_seconds": "Seconds played in the window",
     "plex_client_paused_seconds": "Seconds paused in the window",
@@ -379,6 +414,7 @@ HELP = {
     "plex_client_live_source_bitrate_kbps": "Bitrate of the source file of the active session",
     "plex_client_live_progress_percent": "Progress through the item of the active session",
     "plex_client_live_transcode_speed": "Transcoder speed for the active session; below 1 the client will buffer",
+    "plex_client_live_transcode_buffer_seconds": "Seconds the transcoder is ahead of the viewer for the active session; near 0 the client will buffer",
     "plex_client_live_throttled": "1 if the transcode for the active session is throttled (ahead of playback)",
 }
 
@@ -419,11 +455,10 @@ def main():
         status["plex_client_live_ok"] = 0
 
     cache = load_cache()
-    errors = 0
     history_ok = 1
     if now - int(cache.get("refreshed") or 0) >= HISTORY_REFRESH_SECONDS:
         try:
-            errors = refresh_history(key, cache, now)
+            refresh_history(key, cache, now)
             save_cache(cache)
         except Exception as e:
             # Keep publishing from the cache: a finished session's numbers do
@@ -437,7 +472,7 @@ def main():
         "plex_client_history_refreshed_timestamp_seconds": int(cache.get("refreshed") or 0),
         "plex_client_history_sessions_cached": len(cache["rows"]),
         "plex_client_history_truncated": 1 if int(cache.get("filtered") or 0) > MAX_ROWS else 0,
-        "plex_client_history_stream_data_errors": errors,
+        "plex_client_history_stream_data_errors": int(cache.get("errors") or 0),
         "plex_client_window_seconds": WINDOW_DAYS * 86400,
         "plex_client_metrics_last_run_timestamp_seconds": now,
     })
