@@ -971,6 +971,9 @@
       - agentbox_mcp_servers | length > 0
       - "(item.1.name ~ ': ') in (agentbox_mcp_present[item.0.name] | default(''))"
       - "(item.1.name ~ ': ' ~ (item.1.url | default(''))) not in (agentbox_mcp_present[item.0.name] | default(''))"
+    # The loop item carries the server's Authorization header, and a failed
+    # item is dumped whole regardless of the label.
+    no_log: true
 
   - name: Register shared MCP servers in Claude Code (user scope)
     ansible.builtin.command: >
