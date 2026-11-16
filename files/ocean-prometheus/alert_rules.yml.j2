@@ -150,6 +150,37 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} stuck activating on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been activating for 30m on {{ "{{ $labels.instance }}" }}, which means it is failing and restarting rather than starting"
 
+  # A container Docker keeps restarting under a unit that looks fine. Compose
+  # units here are oneshots: `up -d` returns, the unit reports active, and from
+  # then on the restart policy is Docker's business, so neither rule above can
+  # see a container that dies every minute. Both terraform-root runners did that
+  # 96 times over two hours on 2026-11-15 with a blank token, and it was found
+  # only because a disk alert on the same host made someone look.
+  #
+  # NOTE: this is not a restart count, and it must not become one. The GitHub
+  # runners are ephemeral and restart after every job, so on a busy CI day a
+  # healthy runner restarts more often than a broken one. What separates them is
+  # whether any single incarnation survives: cadvisor exports Docker's
+  # RestartCount as a label, so each restart is a new series, and during the
+  # loop the longest-lived one was seen for 1 scrape in 30m while healthy
+  # runners under heavy churn never dropped below 25. 8 scrapes is 2 minutes at
+  # the 15s interval. Backtested over five days of fleet history: it matches
+  # only those two runners, from 22:20Z to the restart that fixed them.
+  #
+  # The second arm keeps this to containers Docker itself restarted. Without it
+  # a short one-off that ran and exited (a backup job, a compose run) matches.
+  - alert: ContainerRestartLoop
+    expr: >
+      (max by (instance, name) (count_over_time(container_last_seen{name!=""}[30m])) < 8)
+       and on (instance, name)
+      (count by (instance, name) (last_over_time(container_last_seen{container_label_restartcount!=""}[30m])) >= 1)
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "container {{ "{{ $labels.name }}" }} is restart-looping on {{ "{{ $labels.instance }}" }}"
+      description: "Docker keeps restarting {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} and no incarnation has stayed up 2 minutes in the last 30. Its systemd unit will look healthy; read `docker logs {{ "{{ $labels.name }}" }}` on the host."
+
   # A compose project whose image refresh failed is a failed docker-refresh@
   # instance, so SystemdUnitFailed above already carries it. The two rules here
   # cover only what unit state cannot say: that a timer stopped firing.
