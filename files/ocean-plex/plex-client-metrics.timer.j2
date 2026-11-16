@@ -1,0 +1,13 @@
+[Unit]
+Description=Run plex-client-metrics every minute
+
+[Timer]
+# Each run is one get_activity call for the live half. The history half
+# refreshes itself only every HISTORY_REFRESH_SECONDS (10min) and only fetches
+# sessions it has not cached, so a one-minute cadence stays cheap.
+OnBootSec=3min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
