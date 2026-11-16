@@ -46,9 +46,10 @@ jobs:
     # answers, and the one run that was left to finish on it took 13.8h
     # (mem0_locomo_duration_seconds 49706, pushed 2026-11-15 06:13Z by a bench
     # container that outlived its cancelled job). 16h is that plus headroom.
-    # NOTE: this holds one of the four homelab runners for most of a day, and
-    # the next run starts at 10:00Z regardless. If a run ever needs more than
-    # 24h the concurrency group queues the next one behind it, so they stack.
+    # NOTE: this holds one of the four homelab runners for most of a day. An
+    # on-demand run dispatched from the mem0 repo while a nightly is going now
+    # waits up to 16h for it, and the concurrency group keeps only one waiting
+    # run, so a second dispatch replaces the first rather than queueing behind it.
     timeout-minutes: 960
     steps:
       - name: Checkout homelab repository
