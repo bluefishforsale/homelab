@@ -37,8 +37,8 @@
     # (no DNS means no route to anything that could fix it), so they never
     # refresh on the same day.
     docker_refresh_schedule: "{{ 'Wed *-*-* 08:00:00 America/Los_Angeles' if inventory_hostname == 'dns02' else 'Sun *-*-* 08:00:00 America/Los_Angeles' }}"
-    # NOTE: github-runners must never get a refresh timer. Its compose file is
-    # the only one in this repo that interpolates a runtime value
+    # NOTE: github-runners must never get a refresh timer. The runner compose
+    # files are the only ones in this repo that interpolate a runtime value
     # (ACCESS_TOKEN: "${GITHUB_TOKEN}"), and the only thing that supplies it is
     # the EnvironmentFile on github-docker-runners.service. A refresh unit has
     # no such file, so `up -d` from here recreates all four runners with an
@@ -46,6 +46,8 @@
     # That is exactly what happened on 2026-09-06: the old sweep recreated them
     # at 04:10 and CI was dead for two days. A runner also cannot recreate
     # itself mid-job without killing the job that is doing the recreating.
+    # This list is a second fence for the project that already burned us. The
+    # rule itself is the compose probe further down, which needs no names.
     docker_refresh_exclude:
       - github-runners
     process_exporter_service: process-exporter
@@ -352,12 +354,66 @@
   # enumeration yields empty stdout, which would resolve to an empty project
   # list, and the teardown below would then read that as "every project is gone"
   # and disable the entire host's refresh timers. Leaving the fact undefined
-  # skips all three tasks instead, so a sick docker daemon costs one apply's
+  # skips every task gated on it instead, so a sick docker daemon costs one apply's
   # worth of timer reconciliation rather than the whole host's coverage.
   - name: Select the compose projects that may be refreshed
     ansible.builtin.set_fact:
       refreshable_projects: "{{ compose_projects.stdout | from_json | map(attribute='Name') | difference(docker_refresh_exclude) }}"
+      refresh_candidates: "{{ compose_projects.stdout | from_json | rejectattr('Name', 'in', docker_refresh_exclude) | list }}"
     when: docker_check.rc == 0 and compose_projects.rc == 0
+
+  # The name list above only knows the projects someone remembered to add.
+  # github-runners-terraform-root was created on 2026-11-09 with the same
+  # EnvironmentFile-only token, was not on the list, got a timer, and on
+  # 2026-11-15 the refresh recreated both runners with a blank token. So ask
+  # compose instead: any project whose variables resolve unset from here is one
+  # a refresh would gut, whatever it is called. docker-refresh.sh refuses those
+  # at run time as well, but a timer that exists only to be refused fails its
+  # unit every week and pages for it.
+  #
+  # A missing compose file is the same story for a different class: a stack a CI
+  # job started from inside a runner container (mem0-nightly-<run id>) reports a
+  # path that only exists in that container, so nothing on this host can ever
+  # refresh it.
+  #
+  # NOTE: --quiet is what keeps this safe to register. Without it stdout is the
+  # fully rendered config, every project's secrets included, in the play log.
+  # NOTE: only those two messages drop a project. Any other failed render
+  # (daemon blip, unreadable file) proves nothing, and treating it as a reason
+  # would disable a host's timers over a transient docker problem.
+  # NOTE: the loop reads a fact set under the same condition as this task's
+  # `when`, never compose_projects.stdout directly. Ansible templates a loop
+  # before it tests `when`, and an empty stdout from a down daemon would fail
+  # from_json here and abort the host, which the enumeration above forbids.
+  - name: Render each candidate's compose config to find the unrefreshable ones
+    ansible.builtin.command:
+      argv: "{{ ['docker', 'compose', '-p', item.Name] + (item.ConfigFiles.split(',') | map('trim') | select | map('regex_replace', '^', '--file=') | list) + ['config', '--quiet'] }}"
+    loop: "{{ refresh_candidates | default([]) }}"
+    loop_control:
+      label: "{{ item.Name }}"
+    register: compose_config_probe
+    changed_when: false
+    check_mode: false
+    failed_when: false
+    when: refreshable_projects is defined
+
+  - name: Sort the probe results into unrefreshable and unreadable
+    ansible.builtin.set_fact:
+      unrefreshable_projects: "{{ compose_config_probe.results | selectattr('stderr', 'defined') | selectattr('stderr', 'search', 'variable is not set|no such file or directory') | map(attribute='item.Name') | list }}"
+      unprobed_projects: "{{ compose_config_probe.results | selectattr('rc', 'defined') | rejectattr('rc', 'equalto', 0) | rejectattr('stderr', 'search', 'variable is not set|no such file or directory') | map(attribute='item.Name') | list }}"
+    when: refreshable_projects is defined
+
+  - name: Drop the projects a refresh could only break
+    ansible.builtin.set_fact:
+      refreshable_projects: "{{ refreshable_projects | difference(unrefreshable_projects) }}"
+    when: refreshable_projects is defined
+
+  # A dropped project otherwise leaves no trace in the play log, and one whose
+  # render failed for some other reason keeps its timer and looks just as clean.
+  - name: Say which projects get no refresh timer, and which could not be probed
+    ansible.builtin.debug:
+      msg: "no refresh timer: {{ unrefreshable_projects }}; render failed, timer kept: {{ unprobed_projects }}"
+    when: refreshable_projects is defined and (unrefreshable_projects or unprobed_projects)
 
   - name: Enable a refresh timer per compose project
     ansible.builtin.systemd:
