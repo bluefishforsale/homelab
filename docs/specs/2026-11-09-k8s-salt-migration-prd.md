@@ -94,7 +94,7 @@ where merge is deploy.
 | D16 | node005 RAM upgrade lands before phase 2 (the harbor VM and its replacement overlap). Done: 252 GiB, verified 2026-11-15. | terrac |
 | D17 | "Cluster is down" is reported by email and ntfy. | terrac |
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
-| D19 | Open, pending Q16 (whether agentbox survives at all). As drafted: the dead-man watchdog and ntfy live on agentbox (tier 0), built in phase 1; ntfy never moves into the cluster. The watchdog's email leaves by a relay that does not pass through ocean. Alertmanager keeps the exim smarthost on the ocean host as its own email route, so node005 dying is still reported. | design call, amended 2026-11-15, needs terrac's sign-off |
+| D19 | The dead-man watchdog and ntfy live on agentbox (tier 0), built in phase 1; ntfy never moves into the cluster. The watchdog's email leaves by a relay that does not pass through ocean. Alertmanager keeps the exim smarthost on the ocean host as its own email route, so node005 dying is still reported. agentbox is slimmed to what must survive the cluster (Q16): the watchdog, ntfy, the remote-control sessions and break-glass applies. Its alert receiver and media timers become pods. | design call, amended and signed off by terrac (2026-11-15) |
 | D20 | North-south traffic uses Cilium's Gateway API in host-network mode: on alternate host ports from phase 1, with nginx proxying each migrated service to it, then on 80/443 on ocean at W7. No per-service NodePorts. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call; staging on alternate ports folded in at terrac's direction (2026-11-15) |
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, signed off by terrac (2026-11-15) |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. | design call |
@@ -116,9 +116,7 @@ where merge is deploy.
 
 ## Open questions for terrac
 
-- **Q16.** Can agentbox be retired, with everything on it running as pods?
-  Raised by terrac on 2026-11-15 in place of signing off D19. See the design's
-  "Dead-man alert" for what can and cannot move.
+None open.
 
 ## Answered questions
 
@@ -156,6 +154,11 @@ where merge is deploy.
   D35 database, moves to `k3s-agent01` in phase 2 with harbor's other
   workloads, and gets a nightly dump now, since it is in no backup today.
 - **Q15 (2026-11-15).** Never more than two minors behind k3s stable (R23).
+- **Q16 (2026-11-15).** Can agentbox be retired? Not fully: it is slimmed.
+  The alert receiver and the media timers become pods. The VM stays, small,
+  for the three things that must work when the cluster is down: the dead-man
+  watchdog, ntfy, and the remote-control sessions and break-glass applies
+  used to repair the cluster. D19 is signed off on that basis.
 
 ## Requirements
 

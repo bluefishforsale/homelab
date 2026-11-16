@@ -639,6 +639,15 @@ path that runs on the thing that died sends nothing.
   Alertmanager's email route, agentbox gets its own relay config for the
   watchdog, and each hypervisor reports the other's death. Both dying at once
   is still silent, and stays out of scope.
+- agentbox is slimmed, not retired (Q16). What stays on the VM is what has to
+  work with the cluster down: this watchdog, ntfy, the remote-control
+  sessions, and the break-glass apply role (coordination rule 6). What leaves
+  for the cluster: the alert receiver (`agentbox-alert-receiver`) moves with
+  Alertmanager in W6, and the media timers move as CronJobs with the service
+  each one drives (`agentbox-media-refetch` and `agentbox-replace-reconcile`
+  with the *arrs in W2, `agentbox-tdarr-drive` and `agentbox-x265-watch` with
+  tdarr in W4). With the receiver in the cluster, alert pushes depend on the
+  cluster, which is exactly the case the watchdog covers.
 
 ### Salt
 

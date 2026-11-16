@@ -76,7 +76,8 @@ Phases gate on what they need, not on their number (D37).
 - [x] terrac answers Q7 (yes, bootstrap now), Q11 (no), Q12 (per-service
       uid, `0700`), Q13 (14 days), Q14 (ml-log-analyzer is live), Q15 (two
       minors); signs off D36 (2026-11-15).
-- [ ] Q16 (can agentbox be retired) answered; D19 settled from it.
+- [x] Q16 answered (agentbox is slimmed, not retired); D19 signed off
+      (2026-11-15).
 - [ ] Salt, moved up from phase 6 (Q7): `homelab-salt` repo, the D29
       bootstrap script with its CI test, the rekey workflow, and one state
       applied to one host through CI.
@@ -262,11 +263,13 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
       `k3s-agent01`; startable after the phase 1 soak.
 - [ ] Before W2: service-to-service URLs held in app databases repointed to
       front-door names.
-- [ ] W2 *arr stack (WAL state on local PVs)
+- [ ] W2 *arr stack (WAL state on local PVs); agentbox's media-refetch and
+      replace-reconcile timers move with it as CronJobs (Q16)
 - [ ] W3 external-repo apps (each repo's deploy pattern switches in the same
       cutover; `docs/operations/deploy-pattern.md` gains the k8s pattern before
       the first one)
-- [ ] W4 GPU services; plex in quiet hours; mem0 with no agent run in flight
+- [ ] W4 GPU services; plex in quiet hours; mem0 with no agent run in flight;
+      agentbox's tdarr-drive and x265-watch timers move with tdarr (Q16)
 - [ ] W5 homeassistant, avahi, netatalk (hostNetwork); glances removed
 
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0) -> window,
@@ -295,7 +298,7 @@ what is left here:
       ntfy.
 - [ ] Stop agentbox; Alertmanager still emails through ocean's exim (D19).
 - [ ] W6: kube-prometheus-stack, Loki plus Alloy, Grafana, Alertmanager,
-      blackbox, pushgateway and karma in
+      blackbox, pushgateway, karma and agentbox's alert receiver (Q16) in
       cluster; TSDB and Loki on ocean local disk. Scrape configs become
       ServiceMonitors. Old file-based scrape config retires.
 - [ ] W7: the Gateway moves from its alternate ports to 80/443 on ocean;
