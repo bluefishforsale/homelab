@@ -25,10 +25,10 @@
           "uid": "bf02tpxiz6m0wf"
         },
         "query": {
-          "query": "label_values(plex_client_sessions, user)",
+          "query": "label_values({__name__=~\"plex_client_sessions|plex_client_live_session_info\"}, user)",
           "refId": "user"
         },
-        "definition": "label_values(plex_client_sessions, user)",
+        "definition": "label_values({__name__=~\"plex_client_sessions|plex_client_live_session_info\"}, user)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
@@ -367,12 +367,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": null
-              },
-              {
                 "color": "text",
-                "value": 1
+                "value": null
               }
             ]
           },
@@ -393,7 +389,7 @@
         "textMode": "auto",
         "justifyMode": "auto"
       },
-      "description": "Lowest transcoder speed across sessions (x real time). Below 1 only matters when the buffer is also small."
+      "description": "Lowest transcoder speed across sessions (x real time). Not colored: below 1 is normal once the transcoder is far ahead (it throttles on purpose), and only matters when the buffer is also small."
     },
     {
       "type": "stat",
@@ -654,7 +650,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 12
       },
@@ -729,8 +725,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 6,
         "y": 12
       },
       "targets": [
@@ -804,8 +800,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 6,
+        "x": 12,
         "y": 12
       },
       "targets": [
@@ -881,13 +877,94 @@
           "sort": "desc"
         }
       },
-      "description": "Concurrent sessions, stacked by how the server delivers them. One axis: session count."
+      "description": "Concurrent sessions, stacked by how the server delivers them. 'video transcode, CPU' is every software encode, whether or not hardware was requested; the 'On CPU (fell back)' stat counts only those where it was."
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU: encoder, decoder, memory",
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bf02tpxiz6m0wf"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(DCGM_FI_DEV_ENC_UTIL{instance=\"ocean.home\"})",
+          "refId": "A",
+          "legendFormat": "NVENC"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(DCGM_FI_DEV_DEC_UTIL{instance=\"ocean.home\"})",
+          "refId": "B",
+          "legendFormat": "NVDEC"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bf02tpxiz6m0wf"
+          },
+          "editorMode": "code",
+          "expr": "max(DCGM_FI_DEV_FB_USED{instance=\"ocean.home\"} / (DCGM_FI_DEV_FB_USED{instance=\"ocean.home\"} + DCGM_FI_DEV_FB_FREE{instance=\"ocean.home\"}) * 100)",
+          "refId": "C",
+          "legendFormat": "VRAM used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisSoftMin": 0,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "ocean's 3090, shared by Plex, Tdarr and llama.cpp. NVENC pinned near 100% or VRAM near full is when a Plex transcode can fall back to CPU. One axis: percent."
     },
     {
       "type": "row",
       "title": "Clients: rolling 30 days (Tautulli history, refreshed every 10 minutes)",
       "collapsed": false,
-      "id": 12,
+      "id": 13,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -899,7 +976,7 @@
     {
       "type": "table",
       "title": "Clients by video transcode share",
-      "id": 13,
+      "id": 14,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1113,7 +1190,7 @@
     {
       "type": "bargauge",
       "title": "Why video transcodes",
-      "id": 14,
+      "id": 15,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1163,7 +1240,7 @@
           "values": false
         }
       },
-      "description": "Video transcodes in the window by the first reason that forces one: subtitle_burn (image subtitles burned in), quality_cap (client asked for less than Original), codec (client cannot decode the source codec), resolution (downscale), other (none of these: a remote bitrate limit or a container the client cannot take).",
+      "description": "Video transcodes in the window by the first reason that forces one: subtitle_burn (image subtitles burned in), quality_cap (the session's quality was capped below Original, by the client's setting or Plex's remote auto quality; every such transcode delivered below the source bitrate), codec (client cannot decode the source codec), resolution (downscale), other (none of these: a remote bitrate limit or a container the client cannot take).",
       "transformations": [
         {
           "id": "sortBy",
@@ -1181,7 +1258,7 @@
     {
       "type": "table",
       "title": "Transcode causes by client",
-      "id": 15,
+      "id": 16,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1260,8 +1337,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Video transcode share, whole server",
-      "id": 16,
+      "title": "Video transcode share, whole server, 30-day rolling",
+      "id": 17,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1279,7 +1356,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(plex_client_sessions{user=~\"$user\", video_decision=\"transcode\"}) / sum(plex_client_sessions{user=~\"$user\"})",
+          "expr": "(sum(plex_client_sessions{user=~\"$user\", video_decision=\"transcode\"}) or 0 * sum(plex_client_sessions{user=~\"$user\"})) / sum(plex_client_sessions{user=~\"$user\"})",
           "refId": "A",
           "legendFormat": "30-day video transcode share"
         }
@@ -1323,7 +1400,7 @@
     {
       "type": "bargauge",
       "title": "Quality profiles clients ask for",
-      "id": 17,
+      "id": 18,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1391,7 +1468,7 @@
     {
       "type": "bargauge",
       "title": "Video transcodes by encoder",
-      "id": 18,
+      "id": 19,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1459,7 +1536,7 @@
       "type": "row",
       "title": "Collector health (plex-client-metrics on ocean)",
       "collapsed": false,
-      "id": 19,
+      "id": 20,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1471,7 +1548,7 @@
     {
       "type": "stat",
       "title": "Live calls",
-      "id": 20,
+      "id": 21,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1546,7 +1623,7 @@
     {
       "type": "stat",
       "title": "History calls",
-      "id": 21,
+      "id": 22,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1621,7 +1698,7 @@
     {
       "type": "stat",
       "title": "Since last run",
-      "id": 22,
+      "id": 23,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1660,7 +1737,7 @@
               },
               {
                 "color": "red",
-                "value": 600
+                "value": 300
               }
             ]
           }
@@ -1680,12 +1757,12 @@
         "textMode": "auto",
         "justifyMode": "auto"
       },
-      "description": "The timer runs every minute. Over 10 minutes for 15 raises PlexClientMetricsStale."
+      "description": "The timer runs every minute. Over 5 minutes for 10 raises PlexClientMetricsStale."
     },
     {
       "type": "stat",
       "title": "Sessions cached",
-      "id": 23,
+      "id": 24,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1745,7 +1822,7 @@
     {
       "type": "stat",
       "title": "Stream data errors",
-      "id": 24,
+      "id": 25,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -1809,7 +1886,7 @@
     {
       "type": "stat",
       "title": "History truncated",
-      "id": 25,
+      "id": 26,
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
