@@ -348,6 +348,11 @@ jobs:
       - name: Replace-issue reconciler guard rails
         run: bash .github/workflows/lib/agentbox-replace-reconcile.test.sh
 
+      # Runs on a docker host the CI runners share, so what it must never
+      # remove matters as much as what it does.
+      - name: Nightly stack sweep removes only nightly stacks
+        run: bash .github/workflows/lib/sweep-nightly-stacks.test.sh
+
       # "I could not look" must never render as "nothing is wrong". Three
       # places in this repo got that backwards at once.
       - name: Absence is not health

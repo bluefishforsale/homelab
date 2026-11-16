@@ -47,6 +47,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Clear stacks an earlier run left behind
+        # A run that died with its runner (a host reboot, a killed container)
+        # never reached the teardown step at the bottom, so nothing but the next
+        # run can clean up after it.
+        run: bash .github/workflows/lib/sweep-nightly-stacks.sh
+
       - name: Resolve parameters
         id: params
         # Payload through env vars, never inline expansion: client_payload is
@@ -127,6 +133,12 @@ jobs:
           printf '%s\n%s\n' "$extraction" "$judge" > "$RUNNER_TEMP/.nightly_keys"
 
       - name: Run LOCOMO against a stack built from the mem0 checkout
+        # NOTE: shorter than the job's timeout on purpose. When the job's own
+        # limit expires the job is cancelled and the always() steps below get
+        # only the short cancellation window. When a step's limit expires the
+        # step fails and they run on the job's remaining time, which is the gap
+        # between the two numbers.
+        timeout-minutes: 330
         env:
           JUDGE_BASE_URL: http://ocean.home:8080/v1
           JUDGE_MODEL: qwen3-coder-30b-a3b
@@ -149,6 +161,20 @@ jobs:
             OUT_DIR="$RUNNER_TEMP/locomo" \
             bash mem0/tests/quality/nightly/run.sh
 
+      - name: Save what the bench wrote if run.sh never got to
+        # run.sh copies results out and prints the stack's logs from its EXIT
+        # trap. A timeout kills that trap, and the teardown below then deletes
+        # the only copy, so a run that died slowly would leave nothing to read.
+        if: always()
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          bench="mem0-nightly-${RUN_ID}-bench"
+          docker inspect "$bench" > /dev/null 2>&1 || exit 0
+          docker logs --tail 200 "mem0-nightly-${RUN_ID}-mem0-1" || true
+          mkdir -p "$RUNNER_TEMP/locomo"
+          docker cp "$bench:/out/." "$RUNNER_TEMP/locomo/" || true
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -160,3 +186,12 @@ jobs:
             ${{ runner.temp }}/locomo/locomo_results_*.json
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Tear the stack down
+        # run.sh does this from an EXIT trap, which a timeout or a cancel kills
+        # before it finishes. The stack's containers are not children of the
+        # job, so they keep running until something removes them.
+        # The hashFiles half only skips this when the checkout itself failed,
+        # where "no such file" would bury the real error under a second one.
+        if: always() && hashFiles('.github/workflows/lib/sweep-nightly-stacks.sh') != ''
+        run: bash .github/workflows/lib/sweep-nightly-stacks.sh
