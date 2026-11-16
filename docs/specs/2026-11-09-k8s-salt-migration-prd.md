@@ -112,11 +112,24 @@ where merge is deploy.
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
 | D35 | Every Postgres database runs as a single-instance CloudNativePG cluster with continuous WAL archiving to GCS: RPO about five minutes, 14 days of point-in-time recovery. The nightly logical dump stays. No Postgres replicas. | terrac (2026-11-15); shape is a design call |
 | D36 | A second self-hosted runner on node006, so losing node005 does not also lose CI. A runner is never applied or rebooted by its own job. | design call, signed off by terrac (2026-11-15) |
-| D37 | Phases gate on what they depend on, not on their number: phases 2 and 3 run in parallel after phase 1, and W1 starts on `k3s-agent01` after the phase 1 soak. Blackbox, pushgateway and karma move in W6, not W1. | design call, folded in at terrac's direction (2026-11-15) |
+| D37 | Phases gate on what they depend on, not on their number: phases 2 and 3 run in parallel after phase 1, and W1 starts on `k3s-agent01` after the phase 1 soak and the coexistence proof. Blackbox, pushgateway and karma move in W6, not W1. | design call, folded in at terrac's direction (2026-11-15) |
 
 ## Open questions for terrac
 
-None open.
+Each has a working assumption already written into the design, so the docs
+read consistently until it is answered.
+
+- **Q17.** PVE 8 reached end of life in August 2026, so both hypervisors are
+  unsupported today. Working assumption: upgrade each in place to PVE 9 in
+  phase 0, node005 first, and keep the D27 boot-mirror reinstall as a later,
+  separate step. Alternative: wait and reach PVE 9 by the reinstall.
+- **Q18.** Every k3s minor upgrade needs a drain, and draining ocean stops
+  nearly everything. Working assumption: ocean's agent upgrades only in its
+  supervised monthly window, trailing the server in between.
+- **Q19.** What to do with an nginx feature that has no Gateway equivalent.
+  Working assumption: decided per feature at the phase 1 gate, preferring a
+  Cloudflare rule for a public vhost and an nginx pod behind the Gateway for
+  a LAN-only one, over dropping the feature.
 
 ## Answered questions
 
@@ -184,7 +197,10 @@ None open.
   timers), preceded where needed by a `terraform-root` PR (tunnel rule, bucket)
   and a PR in the service's own repo (dispatch target). The window runs as one
   dispatch workflow with a `back` direction, and the `homelab` retire PR
-  waits out the 14-day soak (Q13).
+  waits out the 14-day soak (Q13). Through the soak a committed per-service
+  flag makes the play hold the Docker side down, units masked, and the
+  service's image is frozen. A chart's CronJobs are suspended until its
+  window.
 - **R8.** Upgrade log: each upgrade records add-on compatibility checked,
   removed APIs found, what broke, what the play missed, API downtime and app
   downtime.
@@ -208,7 +224,8 @@ None open.
   kernel packages held on passthrough and module-building hosts, and moved in
   a supervised monthly window.
 - **R11.** kured reboots k8s nodes one at a time in the agreed window, draining
-  first. Ocean is excluded (D22).
+  first. Ocean is excluded (D22). CloudNativePG clusters set `enablePDB:
+  false` so a drain is not blocked by a single-instance database.
 - **R15.** Every image the cluster runs is pinned to an immutable tag or
   digest. Nothing runs `:latest`. Tags change only by commit to `homelab-kube`.
 - **R16.** Metrics and logs for a migrated service keep flowing to the existing
@@ -232,7 +249,9 @@ None open.
 - **R20.** No hypervisor keeps VM disks on its boot disk, and every boot disk
   is mirrored (D27).
 - **R21.** A reinstalled node006 never imports `/data01` on the host: HBA bound
-  to vfio-pci before `mpt3sas`, pool auto-import off (D34).
+  to vfio-pci before `mpt3sas`, pool auto-import off (D34). Until that state
+  has applied, the first boot runs with the shelf disconnected or `mpt3sas`
+  blacklisted.
 - **R22.** Every Postgres database archives WAL to GCS (D35). An alert fires
   when the newest archived segment is older than 15 minutes or the newest base
   backup is older than 8 days, and a monthly recovery into a scratch cluster
@@ -248,14 +267,26 @@ None open.
 - **R26.** Every service runs as its own uid, allocated from one registry
   file in `homelab-kube`, and its state directory is `0700` to that uid
   (Q12). The change lands after the service's soak, never in its cutover
-  window.
+  window. Cross-uid hardlinks on the media tree are proven first (umask 002,
+  setgid directories).
+- **R27.** Every apply to a host, from any repo or runner, holds a lock on
+  that host. A concurrency group alone does not serialize across repos.
+- **R28.** Cluster access is written down before phase 1 ends: terrac's
+  break-glass kubeconfig, a read-only default for agents, and a sync-only
+  Argo token for CI.
+- **R29.** Ocean's k3s agent upgrades in its supervised monthly window, not
+  with the other nodes (Q18).
+- **R30.** The dead-man watchdog alerts only past a ten-minute outage, so a
+  planned server reboot does not page.
+- **R31.** The rekey workflow reads a host's public key from the host. It
+  never accepts a key as an input.
 
 ## Acceptance (per phase gate)
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5 to Q16 answered, D19, D21, D23, D26, D32 and D36 signed off. `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. PVE 8's end-of-support date checked. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
-| 1 | The dead-man watchdog and ntfy on agentbox, tested by stopping the API. The Gateway in host-network mode on alternate ports, with the sonarr reference chart behind it and each nginx feature in use proven on it. Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age), Q5 to Q16 answered, D19, D21, D23, D26, D32 and D36 signed off. `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. Both hypervisors on a supported PVE major (Q17). Pillar decryption settled and the per-host deploy lock (R27) in place. node006's VM disks off its boot disk (D27), the config DB backup live on both hypervisors (D28), and the recovery age key in place (D32). |
+| 1 | The dead-man watchdog and ntfy on agentbox, tested by stopping the API. The Gateway in host-network mode on alternate ports, with the sonarr reference chart behind it; each nginx feature in use has an equivalent proven on it or a decided fallback (Q19); a listener bound on 80/443 on `k3s-agent01` once. Cluster access written down (R28). Three upgrades completed with Argo CD and three test apps running; the third upgrade needs no step outside the play. One deliberate restore from backup onto a fresh server succeeds. 14-day soak with no unplanned API outage. |
 | 1b | Patch pipeline live on the new VMs: unattended-upgrades, kured, update and reboot metrics and alerts. |
 | 2 | harbor VM workloads (nzbget, tdarr-node, ml-log-analyzer on CloudNativePG, the nightly DB restore test) run on `k3s-agent01`; harbor VM decommissioned. |
 | 3 | Docker and k3s coexist on ocean through a reboot with no Docker service impact; GPU time-slicing runs llama.cpp plus an NVENC transcode in pods; NVENC session cap measured and recorded. |
@@ -271,4 +302,5 @@ None open.
   entry or firewall rule.
 - Moving a stateless service between nodes is a values change.
 - A minor-version k3s upgrade is a PR plus one dispatch, with app downtime of
-  zero for stateless apps.
+  zero for stateless apps off ocean. Ocean's share of an upgrade is one
+  planned drain in its monthly window.
