@@ -244,6 +244,23 @@ def refresh_history(key, cache, now):
     return errors
 
 
+def cause(r):
+    """The first reason that forces a video transcode, in precedence order.
+    A subtitle burn transcodes at any quality and a client quality cap on any
+    codec, so those win; a codec or resolution change is only the reason when
+    neither applies. 'other' is a transcode none of these explains (a remote
+    bitrate limit, a container the client cannot take)."""
+    if r["subtitle_decision"] in ("burn", "transcode"):
+        return "subtitle_burn"
+    if r["quality_profile"] not in ("Original", "unknown"):
+        return "quality_cap"
+    if r["source_video_codec"] != r["stream_video_codec"]:
+        return "codec"
+    if r["source_resolution"] != r["stream_resolution"]:
+        return "resolution"
+    return "other"
+
+
 def pct(values, q):
     v = sorted(values)
     if not v:
@@ -292,6 +309,7 @@ def history_series(cache):
             # each look the same in transcode_decision. Only video transcodes,
             # so the label product stays small.
             add("plex_client_video_transcode_cause_sessions", {**b,
+                "cause": cause(r),
                 "quality_profile": r["quality_profile"],
                 "subtitle_decision": r["subtitle_decision"],
                 "source_video_codec": r["source_video_codec"],

@@ -102,6 +102,25 @@ def test_cause_metric_crosses_quality_subtitle_and_codec_for_video_transcodes_on
         ("4 Mbps 720p", "burn", "hevc", "h264", "1080p", "720p")
 
 
+def test_cause_is_the_first_reason_that_forces_a_video_transcode():
+    # Precedence: a burn forces a transcode at any quality, a client cap
+    # forces one on any codec, then codec, then resolution.
+    cases = [
+        (row(), "subtitle_burn"),
+        (row(subtitle_decision="none"), "quality_cap"),
+        (row(subtitle_decision="none", quality_profile="Original"), "codec"),
+        (row(subtitle_decision="none", quality_profile="Original", stream_video_codec="hevc"), "resolution"),
+        (row(subtitle_decision="none", quality_profile="Original", stream_video_codec="hevc",
+             stream_resolution="1080p"), "other"),
+        (row(subtitle_decision="none", quality_profile="unknown", stream_video_codec="hevc",
+             stream_resolution="1080p"), "other"),
+    ]
+    for r, want in cases:
+        assert pcm.cause(r) == want, (want, pcm.cause(r))
+    labels, _ = only(pcm.history_series({"rows": {"1": row()}}), "plex_client_video_transcode_cause_sessions")
+    assert labels["cause"] == "subtitle_burn"
+
+
 def test_video_transcode_seconds_sums_play_duration_of_video_transcodes():
     cache = {"rows": {"1": row(), "2": row(), "3": row(video_decision="direct play")}}
     _, v = only(pcm.history_series(cache), "plex_client_video_transcode_seconds")
