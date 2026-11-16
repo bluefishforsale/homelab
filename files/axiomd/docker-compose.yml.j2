@@ -1,6 +1,7 @@
 # axiomd ops: read-only triage notes on low-priority alerts (bluefishforsale/axiomd). It reads
 # Alertmanager, Prometheus, and Loki on ocean, asks ocean's llama.cpp, and comments on homelab's alert
-# issues as the axiomd GitHub App. No ports: nothing calls in.
+# issues as the axiomd GitHub App. The one port is /metrics for Prometheus on ocean: counts and timings,
+# read only. Nothing else calls in.
 services:
   ops:
     image: {{ image }}:{{ version }}
@@ -14,6 +15,8 @@ services:
       LLAMA_API_KEY: "{{ llama_api_key }}"
       AXIOMD_APP_PRIVATE_KEY: |
         {{ axiomd.github_app.private_key | trim | indent(8) }}
+    ports:
+      - "{{ service_ports.axiomd.port }}:{{ service_ports.axiomd.port }}"
     volumes:
       - {{ home }}/state:/state
     logging:
