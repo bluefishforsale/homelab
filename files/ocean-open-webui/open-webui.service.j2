@@ -19,8 +19,12 @@ Environment=COMPOSE_HTTP_TIMEOUT=60
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
 # Pre-start commands (idempotent)
-ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
+# NOTE: pull before down. The image is several GB and :main moves often, so
+# pulling after down kept the UI offline for the whole download, and during
+# the 2026-11-17 fleet deploy that ran past the start timeout and failed the
+# deploy. The old container keeps serving while the new image comes in.
 ExecStartPre=-/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose pull --quiet'
+ExecStartPre=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose down'
 
 # Start command
 ExecStart=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose up -d'
@@ -34,7 +38,8 @@ ExecReload=/bin/bash -c 'cd {{ home }} && /usr/bin/docker compose restart'
 # Service behavior
 Restart=on-failure
 RestartSec=30
-TimeoutStartSec=300
+# Covers a cold pull of the multi-GB image through a busy registry cache.
+TimeoutStartSec=900
 TimeoutStopSec=60
 
 # Security
@@ -46,10 +51,6 @@ ReadOnlyPaths=/var/run/docker.sock
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier={{ service }}
-
-[Install]
-WantedBy=multi-user.target
-
 
 [Install]
 WantedBy=multi-user.target
