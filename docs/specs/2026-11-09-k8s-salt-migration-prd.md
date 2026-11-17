@@ -97,7 +97,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D5 | No new cluster VMs and no new hardware. The k3s server runs on ocean, configured as it is today, and harbor is the node005 agent. | terrac |
 | D6 | Argo CD, Helm charts, app-of-apps, in `homelab-kube` brought up to date. | terrac |
 | D7 | Salt runs masterless: `salt-call --local` on each host from a checkout of `homelab-salt`, driven by CI over SSH. No master VM, no minion daemon. | terrac |
-| D8 | Upgrade drill: start three minors behind stable, upgrade three times with Argo CD and test apps running, before any real service moves. It runs on the rehearsal VM (D51), so ocean is never the first host to see an upgrade. | terrac (drill), design call (where it runs) |
+| D8 | Upgrade drill: start three minors behind stable, upgrade three times with Argo CD and test apps running, before any real service moves. It runs on the rehearsal VM (D51), so ocean is never the first host to see an upgrade. | terrac (drill), design call, approved (where it runs) |
 | D9 | `/data01` reaches the cluster via NFS from the ZFS passthrough on ocean, as today. | terrac |
 | D10 | No new IP ranges and no DNS changes; ocean's IP stays the front door. | design call |
 | D11 | Patches and package upgrades are continuous, for CVEs. OS majors, and replacing ocean or harbor, are out of this plan: they are planned after everything is on Salt and k3s and upgrades have been proven in operation. | terrac |
@@ -137,8 +137,8 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D48 | Both hypervisors are upgraded in place to PVE 9 in phase 0, node005 first, one per window, because PVE 8 reached end of life in August 2026. | terrac |
 | D49 | k3s upgrades run only in ocean's supervised monthly window (R29): ocean is the server, a minor upgrade needs a drain, and draining ocean stops nearly everything. harbor's agent follows in the same window. | terrac (window), design call (whole cluster in it) |
 | D50 | An nginx feature with no Gateway equivalent is decided per feature at the phase 1 gate: a Cloudflare rule for a public vhost, an nginx pod behind the Gateway for a LAN-only one, dropping it last. | terrac |
-| D51 | A throwaway rehearsal VM on node005's existing `vmpool-storage`, with Docker installed, takes every risky step before ocean does: the Docker coexistence proof, the upgrade drill, the break-and-restore, and each later upgrade. It is never a member of the real cluster. | design call |
-| D52 | node006's boot disk stays a single point: it holds Proxmox and every VM disk on that node, and nothing mirrors it. Neither hypervisor's boot disk is mirrored. The protection is rebuild from git, the nightly k3s server backup (R2) and the config DB backup (D28). | terrac (no physical change), design call (what covers the gap) |
+| D51 | A throwaway rehearsal VM on node005's existing `vmpool-storage`, with Docker installed, takes every risky step before ocean does: the Docker coexistence proof, the upgrade drill, the break-and-restore, and each later upgrade. It is never a member of the real cluster. | design call, approved |
+| D52 | node006's boot disk stays a single point: it holds Proxmox and every VM disk on that node, and nothing mirrors it. Neither hypervisor's boot disk is mirrored. The protection is rebuild from git, the nightly k3s server backup (R2) and the config DB backup (D28). | terrac (no physical change), design call, approved (what covers the gap) |
 
 No questions are open.
 
