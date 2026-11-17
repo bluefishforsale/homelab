@@ -38,7 +38,8 @@
 #   dns01, dns02   they ARE the resolvers. Bouncing dns-stack while the fleet still
 #                  depends on that node is the dns01 outage again, and both already point
 #                  at two nameservers, so they are not what this exists to fix.
-#   gh-runner-01   its containers are the CI runner that executes deploys; a restart
+#   gh-runner-01, gh-runner-02
+#                  their containers are the CI runners that execute deploys; a restart
 #                  kills whatever job is in flight. Run it by hand when CI is idle.
 #
 # Usage:
@@ -69,7 +70,7 @@ PROBE="${FLEET_RECREATE_PROBE:-ocean.home}"
 SETTLE="${FLEET_RECREATE_SETTLE:-90}"
 RUN_TIMEOUT="${FLEET_RECREATE_TIMEOUT:-900}"
 DEFAULT_ORDER="registry-cache-01 agentbox pihole node005 node006 ocean"
-DEFAULT_SKIP="dns01 dns02 gh-runner-01"
+DEFAULT_SKIP="dns01 dns02 gh-runner-01 gh-runner-02"
 IFS=, read -ra RESOLVERS <<<"${FLEET_RECREATE_RESOLVERS:-192.168.1.2,192.168.1.3}"
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
