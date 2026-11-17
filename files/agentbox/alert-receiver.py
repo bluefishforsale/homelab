@@ -115,11 +115,17 @@ def _selftest():
         {"status": "firing", "labels": {"alertname": "ZfsDiskErrors", "severity": "critical",
                                         "remediation": "manual", "device": "wwn-0x5000c500a1b2c3d4"}},
         {"status": "resolved", "labels": {"alertname": "HighCpuUsage", "instance": "ocean.home"}},
+        {"status": "resolved", "labels": {"alertname": "ZfsDiskErrors", "remediation": "manual",
+                                          "device": "wwn-0x5000c500a1b2c3d4"}},
     ]})
-    assert len(pushes) == 3, pushes
+    assert len(pushes) == 4, pushes
     assert pushes[0][1]["click"] == RC_URL, "critical software alert taps into the RC console"
+    assert pushes[0][0][2:] == ("urgent", "rotating_light,homelab"), pushes[0]
     assert pushes[1][1]["click"] == "", "hardware needs hands, not the RC console"
+    assert pushes[1][0][2:] == ("urgent", "wrench,homelab"), pushes[1]
     assert pushes[2][0][0] == "resolved: HighCpuUsage", pushes[2]
+    assert pushes[2][0][2:] == ("min", "white_check_mark,homelab"), pushes[2]
+    assert pushes[3][0][0].startswith("cleared: ZfsDiskErrors"), pushes[3]
 
     # 2026-09-08: DockerRefreshStale pushed "ocean.home / docker image refresh
     # stale on ocean.home" for a host running 31 compose projects, naming none
