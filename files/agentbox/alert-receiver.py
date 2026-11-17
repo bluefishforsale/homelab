@@ -34,6 +34,7 @@ SUBJECT_LABELS = ("project", "name", "service", "container", "unit", "pool",
 # Trailing systemd type, which is noise once the unit is already identified.
 _UNIT_SUFFIX = re.compile(r"\.(service|timer|mount|socket|target)$")
 
+
 def subject(labels):
     """The 'which one' half of a notification title.
 
@@ -134,7 +135,6 @@ def _selftest():
     # stripped here or urllib raises and the push is lost entirely.
     assert subject({"name": "café.service"}) == "caf"
     print("selftest ok")
-
 
 
 class Handler(BaseHTTPRequestHandler):
