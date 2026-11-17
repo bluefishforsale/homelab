@@ -35,6 +35,26 @@
         - sudo
       ignore_errors: yes
 
+    # NOTE: git over ssh to GitHub goes out on 443, not 22. The UCG Max's IPS
+    # rule "ET SCAN Potential SSH Scan OUTBOUND" (sid 2003068) blocks any LAN
+    # host that opens 5 connections to port 22 in 120s, and a deploy that
+    # clones a few repos trips it: tdarr.yaml failed on 2026-11-17 with "ssh:
+    # connect to host github.com port 22: Connection timed out". The rule
+    # only matches port 22. HostKeyAlias keeps the github.com known_hosts
+    # entries (and the pinned known_hosts.github below) matching.
+    - name: Route ssh to github.com through ssh.github.com:443
+      ansible.builtin.copy:
+        dest: /etc/ssh/ssh_config.d/50-github-443.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Managed by ansible (playbooks/individual/base/users.yaml).
+          Host github.com
+              HostName ssh.github.com
+              Port 443
+              HostKeyAlias github.com
+
     # Define user details with centralized uid/gid from vault.
     # 'debian' is the cloud-init login user Ansible connects as on VMs;
     # usermod can't modify an in-use account, so it is not managed here.
