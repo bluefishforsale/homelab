@@ -557,8 +557,8 @@ groups:
   # SMART health alert. smartctl_exporter exports smartctl_device_smart_status
   # (1 = PASSED); the rule used to read smart_device_health_ok, which it has never
   # exported, so this critical alert matched nothing on any host. Joined to
-  # disk_wwn_info like the sector alerts below so the receiver files the
-  # [replace] issue under a stable by-id name.
+  # disk_wwn_info like the sector alerts below so the push names the drive by
+  # its stable by-id name.
   # NOTE: the `or` keeps disks with no wwn link (6 of 18 on 2026-10-15) under
   # their kernel name. The join alone silently drops them, and a health alert
   # that skips a third of the disks is the bug this rule just had.

@@ -1,7 +1,12 @@
 ---
-# axiomd: the fleet's autonomous engineer (bluefishforsale/axiomd). Phase one runs `axiomd ops` only:
+# axiomd: the fleet's autonomous engineer (bluefishforsale/axiomd). Phase one ran `axiomd ops` only:
 # read-only triage notes on low-priority alerts, written by ocean's local model and posted to homelab's
 # alert issues as the axiomd GitHub App. It changes nothing on any host and spends nothing metered.
+#
+# Stopped on 2026-11-15. Its only outputs were GitHub issues ([log-anomaly], [flap-report]) and triage
+# notes on the receiver's alert issues, and alert-driven issues were retired as noise the same day. The play
+# still renders everything and pulls the image, so starting it again is flipping the last task back
+# and restoring its scrape job in prometheus.yml.j2.
 #
 # On agentbox beside the repositories-root checkout and its remote-control lane. The image comes through
 # ghcr-private-cache (#1511), floating on latest: AxiomD's CI tags latest only from main, and the weekly
@@ -126,19 +131,13 @@
       dest: /etc/systemd/system/axiomd.service
       mode: '0644'
 
-  # Always restart so a deploy runs the image pulled above, even when every template was byte-identical.
-  - name: Enable and restart axiomd
+  # NOTE: stopped, not removed. An axiomd release dispatches this play, so enabling it here would quietly
+  # bring the issue stream back on the next AxiomD merge. Its scrape job left prometheus.yml.j2 with it,
+  # since ServiceDown pages critical on any job whose target is down; starting axiomd again means putting
+  # that job back too, or a dead triager goes unnoticed.
+  - name: Stop and disable axiomd
     ansible.builtin.systemd:
       name: axiomd.service
-      enabled: true
-      state: restarted
+      enabled: false
+      state: stopped
       daemon_reload: true
-
-  # A bad key or config exits the container at startup, which a foreground unit reports as failed.
-  - name: Give axiomd time to fail on a bad config
-    ansible.builtin.wait_for:
-      timeout: 20
-
-  - name: axiomd is still running
-    ansible.builtin.command: systemctl is-active axiomd.service
-    changed_when: false

@@ -69,11 +69,10 @@
           - { k: user.name, v: Terrac Skiens }
           - { k: user.email, v: "3721396+bluefishforsale@users.noreply.github.com" }
     files: "{{ playbook_dir }}/../../../files/agentbox"
-    # Alert receiver: Alertmanager -> ntfy push + GitHub issues on the infra repo.
+    # Alert receiver: Alertmanager -> ntfy push.
     # Ports hardcoded (not in vars_service_ports) so this deploy stays scoped.
     alert_receiver_port: 9098
     alert_ntfy_url: "http://ntfy.home:8090/homelab"
-    alert_issue_repo: bluefishforsale/homelab
     # Deployable repos (Shape A/B) whose open issues the fleet resolves, plus
     # homelab itself.
     #
@@ -642,14 +641,37 @@
       - Restart RC sessions
       - Restart alert receiver
 
-  # Installed with copy, NOT template: the PromQL inside contains `{{device=...}}`
-  # (an f-string brace escape) which jinja would try to evaluate. It reads its
-  # config from the environment instead.
-  - name: Install the [replace] issue reconciler
-    ansible.builtin.copy:
-      src: "{{ files }}/replace-issue-reconcile.py"
-      dest: /usr/local/bin/agentbox-replace-issue-reconcile.py
-      mode: '0755'
+  # The [replace] reconciler only ever closed [replace] issues, and the receiver
+  # stopped opening those on 2026-11-15. Stopped before its unit files go, since
+  # systemd cannot stop a unit it no longer has a file for.
+  - name: Look for the retired [replace] reconciler timer
+    ansible.builtin.stat:
+      path: /etc/systemd/system/agentbox-replace-reconcile.timer
+    register: replace_reconcile_timer
+
+  - name: Stop and disable the retired [replace] reconciler
+    ansible.builtin.systemd:
+      name: agentbox-replace-reconcile.timer
+      state: stopped
+      enabled: false
+    when: replace_reconcile_timer.stat.exists
+
+  # The timer going quiet does not end a run it already started.
+  - name: Stop a [replace] reconciler run still in flight
+    ansible.builtin.systemd:
+      name: agentbox-replace-reconcile.service
+      state: stopped
+    when: replace_reconcile_timer.stat.exists
+
+  - name: Remove the retired [replace] reconciler
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/systemd/system/agentbox-replace-reconcile.timer
+      - /etc/systemd/system/agentbox-replace-reconcile.service
+      - /usr/local/bin/agentbox-replace-issue-reconcile.py
+    notify: Reload systemd daemon
 
   # Renaming a script installs the new name but leaves the old one on PATH, so
   # the box keeps a copy of code that master no longer has. Harmless until
@@ -703,8 +725,6 @@
       dest: "/etc/systemd/system/{{ item }}"
       mode: '0644'
     loop:
-      - agentbox-replace-reconcile.service
-      - agentbox-replace-reconcile.timer
       - agentbox-alert-receiver.service
       - "agentbox-rc@.service"
       - agentbox-media-refetch.service
@@ -725,7 +745,6 @@
       state: started
       daemon_reload: yes
     loop:
-      - agentbox-replace-reconcile.timer
       - agentbox-media-refetch.timer
       - agentbox-tdarr-drive.timer
       - agentbox-x265-watch.timer
