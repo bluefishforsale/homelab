@@ -314,6 +314,43 @@ collisions. Mitigations:
 3. Fallback if coexistence cannot be made clean: k3s's `--docker` mode on ocean
    only (one runtime, cri-dockerd), revisited once Docker is empty.
 
+### The Docker gate
+
+Docker, and the ability to run containers under it, is never broken by the
+k3s rollout (R32). That holds on each host from the first k3s step there
+until Docker is removed from it: harbor through phase 2, ocean through
+phase 5. It is not enough for it to be true; every step confirms it.
+
+"Docker works" is one committed check, the same script every time, so that
+forty windows do not each invent their own idea of it. It runs on the host
+and from a second host, and it passes only if all of these do:
+
+- The daemon answers, and every container that was running before the step
+  is running after it, compared against a list taken just before. Services
+  the step moved on purpose are the only allowed difference.
+- A new container can be created: pull an image through the registry cache,
+  run it on a bridge network with a published port, and reach that port from
+  the LAN.
+- That container can resolve a name, reach another container on its network,
+  reach the internet, and reach the Gateway's host port on its own host.
+- On ocean, a container started with the NVIDIA runtime sees the GPU.
+- Every Docker service's blackbox probe is green.
+
+Where it runs, before and after each:
+
+- the k3s install on ocean and the agent join on harbor;
+- every k3s upgrade, and every Cilium upgrade or datapath change (kube-proxy
+  replacement, the host firewall going from audit to enforce);
+- every reboot of a host that has both runtimes;
+- every service cutover, in both directions.
+
+A failed "before" means the step does not start: the host was already
+unhealthy and the step would only muddy why. A failed "after" halts the
+workflow, alerts, and the step's own backout runs. No automatic rollback
+beyond that, per the standing default. The rehearsal VM runs the same gate
+through its coexistence proof and all three upgrades, so the script has been
+exercised, and has failed on purpose once, before ocean depends on it.
+
 ### Cutover of one service (the unit of migration)
 
 1. Chart and values in `homelab-kube`, Application added to the app-of-apps but
@@ -325,7 +362,9 @@ collisions. Mitigations:
 3. Window: retire the Docker side ("Staying down", below), scale the
    Deployment to 1 and unsuspend its CronJobs, repoint the nginx upstream to
    the Gateway, verify with the service's health check and blackbox probe. Then
-   check that its alert rules and dashboard panels still return series.
+   check that its alert rules and dashboard panels still return series. The
+   Docker gate runs before and after: moving one service must not disturb the
+   ones still in Docker.
 4. Soak: the play, the compose files and the stopped container stay in place
    for the 14-day soak (D45). Backout during the soak is the window in
    reverse: scale to 0, bring the compose project back up through its play,
@@ -453,9 +492,9 @@ later distro-lifecycle plan (D11).
    stays as is).
 3. Install k3s (the server, which carries ocean's kubelet) at the version
    the rehearsal VM ended its drill on, with the labels and taint above.
-4. Verify: every Docker service's blackbox probe is still green, Docker's
-   `FORWARD DROP` has not broken pod traffic, then reboot ocean and verify both
-   again.
+4. Verify: the Docker gate passes (it also ran before step 1), and Docker's
+   `FORWARD DROP` has not broken pod traffic. Then reboot ocean and verify
+   both again.
 5. Backout: `k3s-uninstall.sh`, restart Docker, re-verify probes.
 
 **Step 3: GPU gate (phase 3).** Device plugin with time-slicing; run an NVENC transcode

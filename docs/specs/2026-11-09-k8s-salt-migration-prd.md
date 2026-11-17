@@ -76,6 +76,10 @@ where merge is deploy.
   committed, runnable play.
 - **A12.** A kernel reboot on a ZFS or NVIDIA host before `dkms status` shows
   both modules built for the new kernel.
+- **A13.** Any step of the k3s rollout that leaves Docker on a host unable to
+  keep its containers running, start a new one, or route to one, while that
+  host still has Docker services. A step that was not checked for this counts
+  the same as one that failed it.
 
 ## Decisions
 
@@ -237,8 +241,20 @@ No questions are open.
   planned ocean reboot does not page.
 - **R31.** The rekey workflow reads a host's public key from the host. It
   never accepts a key as an input.
+- **R32.** Deploying k3s never breaks Docker or the ability to run containers
+  under it (terrac). On every host with Docker services, from its first k3s
+  step until its last container has moved to containerd under k3s, each step
+  is bracketed by the Docker gate in the design: before and after the k3s
+  install or join, every k3s and Cilium upgrade or datapath change, every
+  reboot, and every service cutover. A failed gate halts the step and its
+  backout runs. The gate is one committed check, proven on the rehearsal VM
+  first.
 
 ## Acceptance (per phase gate)
+
+Every gate from phase 1 through phase 5 also requires that the Docker gate
+(R32) ran before and after each step in that phase and never ended a step
+failing.
 
 | Phase | Gate |
 |---|---|

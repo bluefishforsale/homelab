@@ -23,6 +23,10 @@ hard limits so a phase plan cannot quietly drop one.
   services or a site-wide orchestrator.
 - Nothing with a write-ahead log on NFS. WAL state lives on a node-local disk.
 - Never a Docker container and a pod against the same state at once.
+- Docker keeps working at every step (R32). On a host that still has Docker
+  services, every k3s install, upgrade, Cilium change, reboot and cutover runs
+  the Docker gate before and after, and stops on a failure. This ends per
+  host only when its last container has moved under k3s.
 - k3s install and upgrade plays are dispatch-only (never-auto-apply list in
   `.github/workflows/lib/detect-impacted-playbooks.sh`).
 - No mutating ZFS verb in any committed play.
@@ -167,10 +171,14 @@ On the rehearsal VM:
       on alternate host ports (D20), a `local-path` class with
       `reclaimPolicy: Retain` as the default (stock class removed),
       metrics-server. App namespaces at Pod Security `baseline`.
+- [ ] The Docker gate script (spec, "The Docker gate"; R32) written, run on
+      this VM before k3s is installed, and made to fail once on purpose so a
+      red result is known to stop a workflow.
 - [ ] Docker plus k3s coexistence proven (spec, "Docker and k3s side by
       side"), including a Docker container reaching the Gateway's host port
-      on its own host, and a reboot. Nothing goes onto ocean before this is
-      recorded.
+      on its own host, and a reboot. The Docker gate brackets the install,
+      the reboot and each of the three upgrades below. Nothing goes onto
+      ocean before this is recorded.
 - [ ] Three toy apps: one behind the Gateway with a cert, one with a local
       PV, one reading a sops secret.
 - [ ] Each nginx feature in use today (rate limit, body size, websocket
@@ -202,9 +210,10 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
 - [ ] Install window (spec, step 2): package holds, the NVIDIA runtime
       configured for k3s's containerd (Docker's config untouched), k3s at the version the
       drill ended on with the `homelab.role/*` labels and the ocean taint, the
-      `/data01` mount guard on the k3s unit (R17), every Docker probe
-      verified, reboot, verified again. Backout (`k3s-uninstall.sh`, restart
-      Docker) tested on the rehearsal VM beforehand.
+      `/data01` mount guard on the k3s unit (R17). The Docker gate passes
+      before the window starts, after the install, and after the reboot.
+      Backout (`k3s-uninstall.sh`, restart Docker, gate again) tested on the
+      rehearsal VM beforehand.
 - [ ] Argo CD and the tier 1 platform on ocean from `homelab-kube`, the same
       charts the rehearsal VM ran. The Gateway on alternate host ports, the
       `/data01` local PVs.
@@ -254,9 +263,9 @@ become pods on it one at a time, through the same cutover workflow ocean's
 services use (first box of phase 4, which therefore lands before the first
 cutover here).
 
-- [ ] Join window: k3s agent on harbor beside Docker, with its role label;
-      nzbget, tdarr-node and ml-log-analyzer verified, reboot, verified again.
-      Backout: `k3s-agent-uninstall.sh`.
+- [ ] Join window: k3s agent on harbor beside Docker, with its role label.
+      The Docker gate passes before the join, after it, and after a reboot.
+      Backout: `k3s-agent-uninstall.sh`, gate again.
 - [ ] The `/data01` NFS PV for harbor, proven with a test pod. It is the first
       NFS mount in the cluster.
 - [ ] Move the nightly DB restore test (`db_restore_test.yaml`, a Docker job
@@ -315,7 +324,8 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0, CronJobs
 suspended) -> window, run by the cutover workflow: the flag takes the Docker
 side down and masks its units, scale to 1, unsuspend, flip the nginx
-upstream to the Gateway, verify probes, alert rules and panels -> 14-day
+upstream to the Gateway, verify probes, alert rules and panels, with the
+Docker gate before and after (R32) -> 14-day
 soak (D45) with the image frozen and `back` as the backout -> `homelab` PR
 removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
 the service to its own uid and a `0700` state directory (R26).
