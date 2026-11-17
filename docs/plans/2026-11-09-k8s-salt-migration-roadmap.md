@@ -9,6 +9,11 @@
 **Spec:** `docs/specs/2026-11-09-k8s-salt-migration-design.md`
 **PRD:** `docs/specs/2026-11-09-k8s-salt-migration-prd.md`
 
+Not in this roadmap: Debian major upgrades, replacing ocean or harbor with
+new VMs, and any new hardware. The cluster is ocean and harbor as they are
+today (D5), and the distro lifecycle gets its own plan after this one has
+proven itself in operation (D11).
+
 ## Global constraints
 
 Every phase inherits these. They restate the PRD anti-goals and `agents.md`
@@ -20,14 +25,13 @@ hard limits so a phase plan cannot quietly drop one.
 - Never a Docker container and a pod against the same state at once.
 - k3s install and upgrade plays are dispatch-only (never-auto-apply list in
   `.github/workflows/lib/detect-impacted-playbooks.sh`).
-- No mutating ZFS verb in any committed play. Pool export and import in the
-  passthrough swap are hand-run by terrac.
+- No mutating ZFS verb in any committed play.
 - No sshd, `authorized_keys`, fleet key or port 22 change by an agent. DNS,
   DHCP and resolver changes go only through a PR terrac merges and the CI pair
   gates (D25, R9a); never both DNS servers in one step, never by hand from an
   agent. Adding new VMs to the inventory replays the site orchestrators,
   so those PRs are merged by terrac, deliberately.
-- No in-place OS major upgrade on a VM.
+- No OS major upgrade on a VM, in place or by replacement.
 - Pods select node role labels (`homelab.role/*`), never hostnames.
 - Every migrated service ships with a health check, blackbox probe, metrics
   scrape (if it has metrics), and a default-deny NetworkPolicy.
@@ -41,35 +45,35 @@ hard limits so a phase plan cannot quietly drop one.
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
 | 2026 Q4 | Phase 0 | | `homelab-salt` repo, bootstrap script, first CI apply (D40) |
-| 2027 Q1 | Phase 1 (build, watchdog, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
-| 2027 Q2 | Phase 2 (harbor) and Phase 3 (ocean joins, GPU gate) in parallel; W1 on `k3s-agent01` | Debian 13 template; patch pipeline fleet-wide | Base system states |
-| 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean host states, move to Salt |
-| 2027 Q4 | Phase 5 (monitoring, ingress), then 5b (ocean swap) by year end | Every VM on Debian 13 | Proxmox, then DNS and DHCP (gated CI, D25) |
+| 2027 Q1 | Phase 1 (rehearsal VM, upgrade drill, restore, k3s onto ocean, watchdog) | Phase 1b on ocean | Masterless bootstrap on every host |
+| 2027 Q2 | Phase 2 (harbor joins) and Phase 3 (GPU gate) in parallel; W1 | Patch pipeline fleet-wide | Base system states |
+| 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean and harbor host states, move to Salt |
+| 2027 Q4 | Phase 5 (monitoring, ingress) | | Proxmox, then DNS and DHCP (gated CI, D25) |
 | 2028 H1 | | | Phase 6 done, Phase 7 archive |
 
-Schedule risk: phase 4 is roughly forty cutovers in one quarter, about three a
-week, with phase 5 and 5b stacked behind it. The June 2028 LTS date gives six
-months of slack; a slip past that is the thing to watch.
+"OS lifecycle track" here means patching only.
 
-Ocean's Debian 12 LTS ends June 2028; phase 5b is the deadline-bearing item. It
-runs only after Docker on ocean is drained (end of phase 5), so phases 4 and 5
-must leave room for it.
+Schedule risk: phase 4 is roughly forty cutovers in one quarter, about three a
+week, with phase 5 stacked behind it. Nothing in this roadmap carries a hard
+date, but ocean's Debian 12 LTS ends June 2028, and the distro-lifecycle plan
+that follows this one has to fit in front of that. A slip here eats that
+plan's room.
 
 ## Phase dependencies
 
 Phases gate on what they need, not on their number (D37).
 
-- Phase 1 needs from phase 0: node006's `vmpool`, the Debian image, the GCS
-  bucket, and the `homelab-kube` defects fixed. The rest of
-  phase 0 runs beside it.
-- Phase 2 and phase 3 each need phase 1 and the coexistence proof. They run
-  in parallel; neither waits for the other. Phase 3 also needs phase 0's
-  full gate.
-- W1 needs phase 1 and the coexistence proof, which installs Docker on
-  `k3s-agent01` and reboots it, so it finishes before production pods live
-  there. W2 to W5 need phase 3.
-- Phase 5 needs phase 4. Phase 5b needs phase 5, phase 2's swap rehearsal,
-  and ocean's host states in Salt.
+- Phase 1's rehearsal work needs from phase 0: the base image (for the
+  rehearsal VM), the GCS bucket, the `homelab-kube` defects fixed with the
+  sonarr reference chart and the Renovate and dispatch workflows, and the
+  Salt bootstrap (the watchdog is a Salt state). The rest of phase 0 runs
+  beside it.
+- Phase 1's ocean install needs the rehearsal boxes checked and phase 0's
+  full gate closed. It is the first time production is touched.
+- Phase 2 and phase 3 each need phase 1. They run in parallel; neither waits
+  for the other.
+- W1, W2, W3 and W5 need phase 1. W4 (the GPU wave) also needs phase 3.
+- Phase 5 needs phase 4.
 
 ## Phase 0: clean up and bootstrap (2026 Q4 into 2027 Q1)
 
@@ -114,19 +118,17 @@ decision table (D1 to D50). What is left is work.
       backup.
 - [ ] Agree the branch and merge policy for `homelab-kube` (merge is deploy
       under Argo CD auto-sync); add it to `docs/architecture/agent-autonomy.md`.
-- [ ] Debian 13 base image per D30: stock genericcloud pinned by sha512,
-      mirrored to GCS, downloaded per node by `terraform-root` (9999 stays
-      until nothing uses it).
+- [ ] Base image per D30: stock Debian genericcloud at the major the fleet
+      runs today, pinned by sha512, mirrored to GCS, downloaded per node by
+      `terraform-root` (9999 stays until nothing uses it).
 
 Rebuild gaps that exist today, so they do not wait for 2027:
 
 - [ ] Fix `docs/architecture/overview.md`: node005's VM disks are on
       `vmpool-storage`, not `local-lvm`.
-- [ ] D27, node006: two SSDs as ZFS mirror `vmpool` (terrac, by hand: free
-      bays and parts checked first); confirm whether `terraform-root` moves a
-      disk in place on `datastore_id`; then dns02, llmeval and ocean's root
-      disk moved off `local-lvm`, one per window, `terraform-root` updated in
-      the same change.
+- [ ] D52: list everything on ocean's root disk that is in none of git, GCS
+      or `/data01`, and give each a home. node006's boot disk holds that
+      root disk and nothing mirrors it.
 - [ ] D28: config DB backup timer on both hypervisors (a Salt state), GCS
       prefix and write-only service account in `terraform-root`, freshness
       metric and alert; one restore tested onto a nested Proxmox VM.
@@ -134,140 +136,156 @@ Rebuild gaps that exist today, so they do not wait for 2027:
       `.sops.yaml` (`terraform-root`, `homelab-kube`), files rekeyed; first
       decrypt test recorded.
 
-**Gate:** all Phase 0 boxes checked; PRD phase 0 acceptance. Phase 1 starts
-on the subset in "Phase dependencies"; this full gate closes before phase 3.
+**Gate:** all Phase 0 boxes checked; PRD phase 0 acceptance. Phase 1's
+rehearsal work starts on the subset in "Phase dependencies"; this full gate
+closes before k3s goes onto ocean.
 
-## Phase 1: build, then upgrade three times (2027 Q1)
+## Phase 1: rehearse, then k3s onto ocean (2027 Q1)
 
-Everything here is new VMs and a new cluster; nothing in production moves.
+The rehearsal VM (D51) takes every risk first. Ocean is touched once, in one
+window, after the play has been through three upgrades and a restore.
+
+On the rehearsal VM:
 
 - [ ] `vars/vars_k3s.yaml`: `k3s_version` (stable minus 3 minors at build time;
       on 2026-11-09 stable is v1.37, so v1.34), node labels, taints,
       `registries.yaml` mirrors to registry-cache-01.
-- [ ] `terraform-root` PR: `k3s-server01` (node006, disk on `vmpool`, never
-      `local-lvm`) and `k3s-agent01` (node005), Debian 13, static IPs from the
-      free infrastructure range. Proxmox startup order on node006 puts the
-      server before ocean (R25).
-      Then the `homelab` inventory PR, merged by terrac.
+- [ ] `terraform-root` PR: `k3s-rehearsal` on node005's `vmpool-storage`, the
+      same Debian major as ocean, a static IP from the free infrastructure
+      range, Docker installed. Then the `homelab` inventory PR, merged by
+      terrac.
 - [ ] `k3s.yaml` install and upgrade play: server first, then agents with
-      cordon, drain, upgrade, uncordon, `serial: 1`. Ocean's agent is a
-      separate target, run only in its monthly window (R29). Added to the
+      cordon, drain, upgrade, uncordon, `serial: 1`. Added to the
       never-auto-apply list, with a pinned test in
       `detect-impacted-playbooks.test.sh`.
-- [ ] Nightly server backup (SQLite `.backup`, token, `server/tls`) to GCS;
-      covered by `ownership-coverage.test.sh`.
 - [ ] Bootstrap Argo CD with Helm once from the play; from then on Argo CD
       manages itself from `homelab-kube`.
 - [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
       NetworkPolicy controller disabled), Hubble, cert-manager with the
       Let's Encrypt issuer, internal issuer from the cluster intermediate
-      (D39), sops-secrets-operator (age),
-      Cilium Gateway in host-network mode on alternate host ports (D20), a
-      `local-path` class with `reclaimPolicy: Retain` as the default (stock
-      class removed), the `/data01` NFS PV, metrics-server. App namespaces at
-      Pod Security `baseline`.
-- [ ] `k3s-agent01` added to ocean's NFS export client list before the NFS PV
-      is used.
-- [ ] Alloy in the cluster: metrics by remote write to ocean's Prometheus,
-      pod logs to ocean's Loki (R16); blackbox probes for the API and each
-      test app.
-- [ ] Registry fallback test: stop registry-cache-01, pull an image.
-- [ ] Renovate opens, and auto-merges, one real update on a test app; one
-      home-grown test image goes push, dispatch, values commit, sync.
-- [ ] Three test apps: one behind the Gateway with a cert (the sonarr
-      reference chart), one with the NFS PV, one reading a sops secret.
+      (D39), sops-secrets-operator (age), Cilium Gateway in host-network mode
+      on alternate host ports (D20), a `local-path` class with
+      `reclaimPolicy: Retain` as the default (stock class removed),
+      metrics-server. App namespaces at Pod Security `baseline`.
+- [ ] Docker plus k3s coexistence proven (spec, "Docker and k3s side by
+      side"), including a Docker container reaching the Gateway's host port
+      on its own host, and a reboot. Nothing goes onto ocean before this is
+      recorded.
+- [ ] Three toy apps: one behind the Gateway with a cert, one with a local
+      PV, one reading a sops secret.
 - [ ] Each nginx feature in use today (rate limit, body size, websocket
       upgrade, IP allowlist) proven on the Gateway with a test route, or its
       fallback decided (D50).
-- [ ] A Gateway listener bound on 80/443 on `k3s-agent01` once, to prove the
-      Envoy capability the alternate ports never exercise.
-- [ ] Cluster access (R28): terrac's kubeconfig on the laptop and agentbox,
-      the agents' read-only ServiceAccount, the CI sync token.
-- [ ] Phase 1 rows of the design's "Assumptions to verify" checked and dated.
-- [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
-- [ ] Watchdog on agentbox: probes the k3s API, ocean and Alertmanager's
-      heartbeat; sends email by a relay that bypasses ocean, and ntfy (D17).
-      Tested by stopping the API and receiving both. In place before the
-      soak, since the soak has to notice an outage. Alerts only past ten
-      minutes (R30), so kured's weekly server reboot does not page.
+- [ ] A Gateway listener bound on 80/443 once, to prove the Envoy capability
+      the alternate ports never exercise.
+- [ ] Registry fallback test: stop registry-cache-01, pull an image.
+- [ ] Renovate opens, and auto-merges, one real update on a toy app; one
+      home-grown test image goes push, dispatch, values commit, sync.
+- [ ] Nightly server backup (SQLite `.backup`, token, `server/tls`) to GCS;
+      covered by `ownership-coverage.test.sh`.
 - [ ] **Upgrade 1, 2, 3** (v1.34 to v1.35 to v1.36 to v1.37, or whatever stable
       minus 3 is then). Each: check every add-on's supported Kubernetes range,
       scan for removed APIs, upgrade add-ons that must move first, bump
       `k3s_version` by PR, dispatch, record the upgrade log entry
       (`docs/operations/k3s-upgrade-log.md`).
 - [ ] **Deliberate failure and restore:** break an upgrade on purpose, then
-      restore the latest backup onto a freshly built server VM with the old IP
-      and MAC. Write `docs/operations/k3s-restore.md` from what actually
+      restore the latest backup onto a freshly built rehearsal VM with the old
+      IP and MAC. Write `docs/operations/k3s-restore.md` from what actually
       happened.
-- [ ] Throwaway rehearsal cluster: the same plays pointed at a disposable
-      inventory, so future upgrades run there first.
+- [ ] Phase 1 rows of the design's "Assumptions to verify" checked and dated.
+
+On ocean, once the boxes above are checked and phase 0's full gate is closed:
+
+- [ ] Ocean migration table (spec, step 1): every container with class, state
+      path, ports, dependants, nginx vhost features, host devices, deploying
+      repo.
+- [ ] Install window (spec, step 2): package holds, the NVIDIA runtime
+      configured for k3s's containerd (Docker's config untouched), k3s at the version the
+      drill ended on with the `homelab.role/*` labels and the ocean taint, the
+      `/data01` mount guard on the k3s unit (R17), every Docker probe
+      verified, reboot, verified again. Backout (`k3s-uninstall.sh`, restart
+      Docker) tested on the rehearsal VM beforehand.
+- [ ] Argo CD and the tier 1 platform on ocean from `homelab-kube`, the same
+      charts the rehearsal VM ran. The Gateway on alternate host ports, the
+      `/data01` local PVs.
+- [ ] Three test apps on ocean: the sonarr reference chart behind the Gateway
+      with a cert, one with the `/data01` PV, one reading a sops secret.
+- [ ] Nightly server backup from ocean to GCS, with its freshness alert (R2).
+- [ ] Alloy in the cluster: metrics by remote write to ocean's Prometheus,
+      pod logs to ocean's Loki (R16); blackbox probes for the API and each
+      test app.
+- [ ] Cluster access (R28): terrac's kubeconfig on the laptop and agentbox,
+      the agents' read-only ServiceAccount, the CI sync token.
+- [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
+- [ ] Watchdog on agentbox: probes the k3s API, ocean and Alertmanager's
+      heartbeat; sends email by a relay that bypasses ocean, and ntfy (D17).
+      Tested by stopping the API and receiving both. In place before the
+      soak, since the soak has to notice an outage. Alerts only past ten
+      minutes (R30), so ocean's monthly window does not page.
 - [ ] 14-day soak.
+
+The rehearsal VM stays after the gate: every later upgrade runs there first
+(R29).
 
 **Gate:** PRD phase 1 acceptance.
 
-## Phase 1b: patch pipeline (2027 Q1, new VMs first)
+## Phase 1b: patch pipeline (2027 Q1)
 
 Written as Salt states from the start (D40), not in Ansible and then ported.
 
-- [ ] `unattended-upgrades` (security origin only) on the k3s VMs; package
-      holds for kernel, NVIDIA and ZFS where they apply.
-- [ ] kured on the cluster, Wednesday 03:00 to 05:00 Pacific (D38), one node at a time.
+- [ ] `unattended-upgrades` (security origin only) on ocean, harbor and the
+      rehearsal VM; package holds for kernel, NVIDIA and ZFS where they apply.
+- [ ] kured on the cluster, Wednesday 03:00 to 05:00 Pacific (D38), one node
+      at a time. Ocean is excluded (D22), so it starts doing real work when
+      harbor joins.
 - [ ] Textfile metrics: pending security updates, `reboot-required`; alerts at
       7 and 14 days.
-- [ ] `docs/operations/os-lifecycle.md`: patch policy, held-package monthly
-      window with the `dkms status` pre-reboot check, replacement patterns per
-      VM kind, Proxmox patch window.
+- [ ] `docs/operations/os-patching.md`: patch policy, held-package monthly
+      window with the `dkms status` pre-reboot check, Proxmox patch window.
 - [ ] Roll the patch pipeline to tier 0 VMs one VM per PR. The DNS pair goes
       last and reboots one at a time behind the existing `dig` gate.
 
 **Gate:** PRD phase 1b acceptance; the alert fires on a deliberately stale VM.
 
-## Phase 2: retire the harbor VM (2027 Q2)
+## Phase 2: harbor joins (2027 Q2)
 
-- [x] node005 RAM upgrade installed and verified (D16): 252 GiB, read from
-      Prometheus 2026-11-15.
-- [ ] Prove Docker plus k3s coexistence on `k3s-agent01` (spec, "Docker and k3s
-      side by side"), including a Docker container reaching the Gateway's
-      host port on its own host, and a reboot. This box also gates phase 3
-      and W1, so it goes first. Docker is removed from `k3s-agent01` once it
-      is recorded.
-- [ ] Move the nightly DB restore test (`db_restore_test.yaml`, runs on harbor
-      today) to `k3s-agent01` as a CronJob before harbor goes.
-- [ ] Move the passed-through 870 EVO (by WWN) and nzbget to `k3s-agent01`;
-      nzbget state on its local disk.
-- [ ] Move tdarr-node (CPU) to `k3s-agent01`.
-- [ ] Postgres prerequisites (D35), moved up from phase 4 because
+harbor stays the VM it is. It gains a k3s agent, and its Docker services
+become pods on it one at a time, through the same cutover workflow ocean's
+services use (first box of phase 4, which therefore lands before the first
+cutover here).
+
+- [ ] Join window: k3s agent on harbor beside Docker, with its role label;
+      nzbget, tdarr-node and ml-log-analyzer verified, reboot, verified again.
+      Backout: `k3s-agent-uninstall.sh`.
+- [ ] The `/data01` NFS PV for harbor, proven with a test pod. It is the first
+      NFS mount in the cluster.
+- [ ] Move the nightly DB restore test (`db_restore_test.yaml`, a Docker job
+      on harbor today) to a CronJob on harbor.
+- [ ] nzbget cutover: its state on a static local PV at the directory it uses
+      today. The passed-through 870 EVO stays attached to harbor as it is.
+- [ ] tdarr-node (CPU) cutover.
+- [ ] Postgres prerequisites (D35), here and not in phase 4 because
       ml-log-analyzer is the first database to move: the `gs://homelab-pg-wal`
       bucket and write-only service account in `terraform-root`, the
       CloudNativePG operator and Barman Cloud plugin as tier 1 apps, and the
       R22 alerts (archive age, base backup age, `pg_wal` size) firing on a
       test cluster with archiving stopped.
-- [ ] Move ml-log-analyzer to `k3s-agent01`: Postgres by `initdb.import`
-      into a CloudNativePG cluster with `enablePDB: false`, both Redis
-      volumes on `local-path`. Then a kured drain of the node, to prove the
-      database does not block it.
-- [ ] **Rehearse the passthrough swap on `k3s-agent01`**: build a replacement
-      VM, swap the scratch disk, reschedule pods, then back out and swap
-      again. Fix the runbook from what happened.
-- [ ] Decommission the harbor VM through the Decommission Service workflow;
-      `data01_workers` group membership follows.
+- [ ] ml-log-analyzer cutover: Postgres by `initdb.import` into a
+      CloudNativePG cluster with `enablePDB: false`, both Redis volumes on
+      `local-path`. Then a kured drain of harbor, to prove the database does
+      not block it.
+- [ ] Docker removed from harbor after the last soak.
 
-**Gate:** PRD phase 2 acceptance plus the swap rehearsal recorded.
+**Gate:** PRD phase 2 acceptance.
 
-## Phase 3: ocean joins, GPU go/no-go (2027 Q2)
+## Phase 3: GPU go/no-go (2027 Q2)
 
-- [ ] Ocean migration table (spec, step 1): every container with class, state
-      path, ports, dependants, nginx vhost features, host devices, deploying
-      repo.
-- [ ] Join window (spec, step 2): holds, NVIDIA runtime for k3s containerd,
-      k3s agent with `homelab.role/*` labels and the ocean taint, verify, reboot,
-      verify. Backout tested on paper beforehand.
 - [ ] NVIDIA device plugin with time-slicing via Argo CD.
 - [ ] GPU gate: CUDA pod plus NVENC transcode pod while Docker llama.cpp runs;
       record the NVENC session cap.
 
 **Gate:** PRD phase 3 acceptance. If the GPU gate fails, stop and re-plan the
-GPU half before phase 4 (fallback: k3s `--docker` mode on ocean).
+GPU half before W4 (fallback: k3s `--docker` mode on ocean).
 
 ## Phase 4: ocean services, one at a time (2027 Q3)
 
@@ -278,10 +296,9 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
       its units masked; the first W1 cutover drills `back` on purpose, and an
       orchestrator replay is run in its soak to prove the container stays
       down.
-- [ ] W1 stateless (app exporters, homepage, languagetool, mtr, ndt) on
-      `k3s-agent01`; startable after the phase 1 soak.
-- [ ] Before W2: every ocean host unit and timer has a destination (R18);
-      k3s agent mount guard on ocean in place (R17).
+- [ ] W1 stateless (app exporters, homepage, languagetool, mtr, ndt);
+      startable after the phase 1 soak.
+- [ ] Before W2: every ocean host unit and timer has a destination (R18).
 - [ ] Before W2: service-to-service URLs held in app databases repointed to
       front-door names.
 - [ ] Before the first R26 change: cross-uid hardlinks proven on the media
@@ -334,20 +351,6 @@ what is left here:
       audit mode, enforced after a clean week (port 22 rules: terrac approves).
 - [ ] Docker removed from ocean.
 
-## Phase 5b: ocean passthrough swap to Debian 13 (after phase 5, by end of 2027)
-
-Starts only once Docker on ocean is drained and removed (D13). The new VM is
-k3s-only.
-
-- [ ] Build and patch the replacement ocean VM (spec, "Passthrough swap
-      procedure", before the window).
-- [ ] `terraform-root` swap PR and its revert PR prepared.
-- [ ] Window, with terrac hand-running the ZFS steps.
-- [ ] 14-day backout period, with no `zpool upgrade` in it; then delete the
-      old VM.
-
-**Gate:** PRD phase 5b acceptance.
-
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
 The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
@@ -370,20 +373,14 @@ The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
       was born in Salt in phase 1b.)
 - [ ] k3s install and upgrade (after phase 3, using the play that survived the
       drill as the reference). One install and one upgrade on the rehearsal
-      cluster under Salt before the real cluster.
-- [ ] Ocean's host states (NFS server, zed, NVIDIA, the metrics timers),
-      before phase 5b, so the replacement VM is built by Salt.
+      VM under Salt before the real cluster.
+- [ ] Ocean's and harbor's host states (NFS server, zed, NVIDIA, the metrics
+      timers).
 - [ ] Proxmox hosts (D34): repos, IOMMU arguments for GRUB and
       `proxmox-boot-tool`, vfio-pci binding with softdep ahead of `mpt3sas` and
       `nvidia`, `zfs-import-*` limited to host pools on node006, `storage.cfg`
       via `pvesm`, the D28 timer, NUT, exporters. Network bridges rendered,
       `test=True` in CI, applied by terrac with the iDRAC console open.
-- [ ] D27 boot mirrors: node005 reinstalled onto a ZFS boot mirror as the
-      first hardware rehearsal of the recovery order, then node006. Each
-      lands on the current PVE major; the `config.db` restore across that
-      jump is tried on the nested host first. node006's first boot runs with
-      the shelf disconnected or `mpt3sas` blacklisted until the import guard
-      state has applied (R21).
 - [ ] DNS `rebuild_peer` mode (D33) built and drilled on the isolated test
       pair (a sixth drill: delete a test peer, rebuild it, survivor untouched).
 - [ ] DNS and DHCP (D25), in this order:
