@@ -593,13 +593,23 @@ stress-ng --cpu 4 --timeout 60s
 **Symptom:** a `.home` name resolves to a different IP on repeat lookups, or works
 sometimes and not others.
 
-**Architecture that makes it happen:** the dns-stack is **dual-primary with no
-replication**. dns01 (192.0.2.2) and dns02 (192.0.2.3) each run their own
-PowerDNS + Kea DHCP + kea-dhcp-ddns, and Kea DDNS-updates only its *local*
-PowerDNS (`127.0.0.1:53`). pihole (192.0.2.9) forwards `.home` to **both**
-(`server=/home/192.0.2.2` and `/home/192.0.2.3` in
-`files/pihole/etc/dnsmasq.d/02-local-dns.conf`), answering from whichever
-replies first. So any per-server divergence surfaces to clients as flapping.
+**Architecture that makes it happen:** dns02 (192.0.2.3) is the PowerDNS
+primary and dns01 (192.0.2.2) is its secondary. Kea's DDNS updates land on the
+primary, which sends dns01 a NOTIFY after each one, and dns01 answers with an
+AXFR. If a NOTIFY is lost, dns01 catches up on the SOA refresh, 60 seconds.
+pihole (192.0.2.9) forwards `.home` to **both** (`server=/home/192.0.2.2` and
+`/home/192.0.2.3` in `files/pihole/etc/dnsmasq.d/02-local-dns.conf`), answering
+from whichever replies first. So any per-server divergence surfaces to clients
+as flapping.
+
+**A name that resolves on dns02 only:** replication is behind. Compare the
+serials with `dig +short @192.0.2.2 home. SOA` and the same against 192.0.2.3;
+dns01's should be within a minute of dns02's. Until 2026-11-17 the primary's
+zones were native, which never send NOTIFY, and the refresh was an hour, so
+every new DHCP host was missing from dns01 for up to that long. If it comes
+back, check that `pdnsutil list-all-zones primary` on dns02 still lists all
+three zones (`import-zones.sh` sets the kind after each rebuild) and look for
+`AXFR-in` lines in dns01's powerdns log.
 
 **Root cause of the divergence:** a multi-interface device announcing **one DHCP
 hostname on two MACs**. Each NIC gets its own pool IP (pool `.150–.239`), each
@@ -620,7 +630,6 @@ fine.
 `files/dns-stack/kea-dhcp4.conf.j2` (`reservations`) with a stable IP and a
 **distinct** hostname (e.g. `tautog` / `tautog-wifi`), deploy, then delete the
 stale dynamic A/PTR records from both PowerDNS via the API. Reservations are how
-stable hosts (ocean-bond0/eth0) already avoid this. There is no lease-DB or zone
-replication between the two servers by design — do not assume AXFR sync.
+stable hosts (ocean-bond0/eth0) already avoid this.
 
 This troubleshooting guide addresses the most common issues encountered in your homelab environment, providing systematic approaches to diagnosis and resolution while maintaining the idempotency principles essential to your infrastructure.
