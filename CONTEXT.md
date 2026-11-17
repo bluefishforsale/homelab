@@ -1,8 +1,8 @@
 # CONTEXT
 
 Orientation and shared vocabulary for the homelab repo. Read this before the
-code; read `agents.md` and `docs/architecture/deployment-flow.md` for the
-deeper mechanics.
+code; `agents.md` indexes the rules by task, and
+`docs/architecture/deployment-flow.md` has the deeper mechanics.
 
 ## What this repo is
 
@@ -19,7 +19,7 @@ zone settings; GCP; Azure) belong to the sibling
 [`terraform-root`](https://github.com/bluefishforsale/terraform-root) repo, and
 new ones are created there, not by Ansible. A homelab service can depend on
 something terraform-root creates, so that change merges and applies first. The
-details are in [agents.md](agents.md#cloud-infrastructure-lives-in-terraform-root).
+details are in [docs/agents/cloud-boundary.md](docs/agents/cloud-boundary.md).
 
 Changes reach hosts through CI and a self-hosted runner inside the homelab
 network. Where you run `ansible-playbook` from decides what you may run:
@@ -36,7 +36,8 @@ network. Where you run `ansible-playbook` from decides what you may run:
   Not bureaucracy: the `deploy-ocean` concurrency group is the only thing
   serializing deploys, and a direct apply bypasses it and can race a running one.
   The exception is self-referential infra CI cannot apply, which is item 6 of the
-  coordination rules in [agents.md](agents.md). agentbox is where those run.
+  coordination rules in [docs/agents/coordination.md](docs/agents/coordination.md).
+  agentbox is where those run.
 
 ## Topology
 
@@ -62,10 +63,11 @@ a homelab host. Two shapes:
   serves the built output directly. No image, no GHCR.
 
 The target host is encoded by the playbook path here, not by the project. A
-push to this repo auto-deploys only on `playbooks/**` changes; `files/**` and
-`vars/**` changes (dashboards, prometheus config, model definitions) need a
-manual `gh workflow run`. A merge to a deployable repo's default branch, or to
-this repo's master, is a production change, not a checkpoint.
+push to this repo's master auto-deploys changes under `playbooks/**`,
+`files/**`, `roles/**`, `vars/**/*.yaml` and `group_vars/**`; anything outside
+those (vault, workflows, scripts, docs) deploys nothing on its own and needs a
+manual `gh workflow run` if it should. A merge to a deployable repo's default
+branch, or to this repo's master, is a production change, not a checkpoint.
 
 ## The agent fleet (agentbox)
 
@@ -75,13 +77,14 @@ issue per alert) and the media timers. It no longer drafts fixes for open
 issues on its own: the issue watcher, escalation tier and roadmap reconciler
 were retired on 2026-11-08 in favour of axiomd. Vocabulary:
 
-- **RC session** - a persistent `claude remote-control` process for one repo,
-  run as a systemd template instance (`agentbox-rc@<repo>.service`, cwd
-  `repos/<repo>`), drivable live from the Android app or desktop. One per repo
-  in the curated interactive set; idle sessions hold a process but spend almost
-  nothing until driven.
-- **Deployable repo** - see the deployment model above. RC sessions run only
-  for the few actively driven.
+- **RC session** - a persistent `claude remote-control` process run as a
+  systemd template instance (`agentbox-rc@repositories-root.service`), drivable
+  live from the Android app or desktop. It runs from `~/repos`, which is a
+  checkout of the workspace root repo (`bluefishforsale/repositories-root`)
+  with every sub-repo inside it, the same way a laptop session starts at
+  `~/Projects/bluefishforsale`. One lane covers every repo; idle sessions hold
+  a process but spend almost nothing until driven.
+- **Deployable repo** - see the deployment model above.
 
 ## Conventions
 

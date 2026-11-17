@@ -17,7 +17,7 @@ dir="$1"
 cfg="${HOME}/.claude.json"
 
 # No config yet means Claude Code has never run / not logged in; nothing to do.
-[ -f "$cfg" ] || exit 0
+[ -f "$cfg" ] || { echo "WARN: ${cfg} missing (not logged in?); ${dir} not marked trusted" >&2; exit 0; }
 
 python3 - "$cfg" "$dir" <<'PY'
 import json, sys

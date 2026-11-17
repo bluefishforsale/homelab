@@ -1,0 +1,26 @@
+[Unit]
+Description=Publish per-client Plex playback metrics to the node_exporter textfile collector
+Documentation=file://{{ home }}/plex-client-metrics.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Read-only collector: Tautulli get_activity every run, get_history plus
+# get_stream_data for unseen sessions every HISTORY_REFRESH_SECONDS, written
+# to plex_client.prom. It never changes a session, a client setting or the
+# library. Short-lived; the timer re-runs it.
+# Runs as root, like kometa-metrics: Tautulli's config.ini holds the API key
+# and is not readable by an unprivileged user on ocean (scripts/plex-playback.py
+# reads it with sudo for the same reason).
+Environment=TEXTFILE_DIR={{ node_exporter_textfiles }}
+Environment=TAUTULLI_URL={{ plex_client_metrics_tautulli_url }}
+Environment=TAUTULLI_CFG={{ plex_client_metrics_tautulli_cfg }}
+Environment=WINDOW_DAYS={{ plex_client_metrics_window_days }}
+Environment=CACHE_FILE={{ home }}/plex-client-metrics-cache.json
+ExecStart=/usr/bin/python3 {{ home }}/plex-client-metrics.py
+# A cold cache fetches stream data for every session in the window (~1300,
+# about 20s from agentbox); bound it so a hung Tautulli cannot pile up runs.
+TimeoutStartSec=5min
+Nice=10
+IOSchedulingClass=idle

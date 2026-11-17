@@ -13,7 +13,7 @@ runner host's `/root/.ssh`, mounted read-only
 (`roles/github_docker_runners/templates/docker-compose.yml.j2:102-105`).
 
 Which files map to which playbooks, the path filters, and the GitHub API traps
-are in [`agents.md`](../../agents.md#how-a-change-maps-to-playbooks-impact-detection).
+are in [`docs/agents/impact-detection.md`](../agents/impact-detection.md).
 Onboarding an external repo is [`deploy-pattern.md`](../operations/deploy-pattern.md).
 
 ## Workflows
@@ -69,7 +69,7 @@ means updating the GitHub secret.
 and 3000 and runs two `dig`s against 192.168.1.2. Targets come from a regex on
 playbook paths (`main-apply.yml:97-108`). Both steps are `continue-on-error`
 (`:366`, `:412`), and the `runners` target is computed but never checked. For real health see
-the [deploy gotchas](../../agents.md#deploy-gotchas-read-before-shipping-a-change).
+the [deploy gotchas](../agents/deploy.md).
 
 ## Rollback
 

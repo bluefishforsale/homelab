@@ -4,7 +4,7 @@ Docker hosts other than ocean that see ocean's `/data01` pool over NFS and keep
 their own service state on a local disk. They exist so work that only needs the
 media (transcodes, downloads) can leave ocean without leaving the pool. Today the
 only one is **harbor**, a VM on node005. The rule they live under is in
-[`agents.md`](../../agents.md#nothing-with-a-write-ahead-log-goes-over-nfs):
+[`docs/agents/storage.md`](../agents/storage.md#nothing-with-a-write-ahead-log-goes-over-nfs):
 nothing with a WAL crosses NFS.
 
 Membership is the `[data01_workers]` inventory group. Adding a host there gets it

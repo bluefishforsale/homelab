@@ -66,6 +66,16 @@
     ramdisk: /mnt/ramdisk
     user: media
     uid: "{{ system_users.media.uid }}"
+    # Per-client playback metrics, from Tautulli. A client can be "up" and
+    # still transcode everything it plays: one Roku did 164 of 164 over five
+    # months with nothing to alert on, because the plex-exporter and
+    # tautulli-exporter transcode metrics are instantaneous server-wide gauges
+    # with no player label. Rolling window so a client whose owner fixes their
+    # settings ages back out.
+    plex_client_metrics_window_days: 30
+    plex_client_metrics_tautulli_url: "http://localhost:{{ service_ports.tautulli.port }}"
+    plex_client_metrics_tautulli_cfg: "{{ data }}/services/tautulli/config/config.ini"
+    node_exporter_textfiles: "{{ data }}/services/node-exporter/text_files"
 
   tasks:
 
@@ -364,6 +374,37 @@
       state: started
       daemon_reload: true
     tags: [service, kometa]
+
+  # Per-client playback metrics -> node_exporter textfile collector.
+  # Read-only against Tautulli (get_activity, get_history, get_stream_data).
+  # Availability alerts (PlexDown, PlexPathDegraded) say nothing about a client
+  # that plays everything through the transcoder.
+  - name: Deploy the Plex client metrics collector
+    ansible.builtin.copy:
+      src: "{{ files }}/plex-client-metrics.py"
+      dest: "{{ plex_home }}/plex-client-metrics.py"
+      mode: '0755'
+    tags: [config, plex]
+
+  - name: Install the Plex client metrics timer
+    ansible.builtin.template:
+      src: "{{ files }}/{{ item }}.j2"
+      dest: "/etc/systemd/system/{{ item }}"
+      mode: '0644'
+    vars:
+      home: "{{ plex_home }}"
+    loop:
+      - plex-client-metrics.service
+      - plex-client-metrics.timer
+    tags: [service, plex]
+
+  - name: Enable the Plex client metrics timer
+    ansible.builtin.systemd:
+      name: plex-client-metrics.timer
+      enabled: true
+      state: started
+      daemon_reload: true
+    tags: [service, plex]
 
   - name: Reload systemd daemon if plex service changed
     ansible.builtin.systemd:

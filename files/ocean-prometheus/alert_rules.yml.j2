@@ -150,6 +150,43 @@ groups:
       summary: "systemd unit {{ "{{ $labels.name }}" }} stuck activating on {{ "{{ $labels.instance }}" }}"
       description: "{{ "{{ $labels.name }}" }} has been activating for 30m on {{ "{{ $labels.instance }}" }}, which means it is failing and restarting rather than starting"
 
+  # A container Docker keeps restarting under a unit that looks fine. Compose
+  # units here are oneshots: `up -d` returns, the unit reports active, and from
+  # then on the restart policy is Docker's business, so neither rule above can
+  # see a container that dies every minute. Both terraform-root runners did that
+  # 96 times over two hours on 2026-11-15 with a blank token, and it was found
+  # only because a disk alert on the same host made someone look.
+  #
+  # NOTE: this is not a restart count, and it must not become one. The GitHub
+  # runners are ephemeral and restart after every job, so on a busy CI day a
+  # healthy runner restarts more often than a broken one. What separates them is
+  # whether any single incarnation survives: cadvisor exports Docker's
+  # RestartCount as a label, so each restart is a new series, and during the
+  # loop the longest-lived one was seen for 1 scrape in 30m. Healthy runners
+  # stayed at 25 or more through a heavy CI day, but over 14 days the worst
+  # window (2026-11-07, a run of short back-to-back jobs) had them at 10. So the
+  # line is 4 scrapes, 1 minute at the 15s interval: well clear of 10, and still
+  # four times what the loop managed. Backtested over seven days on the runner
+  # host it matches only the two looping runners.
+  #
+  # The second arm keeps this to containers Docker itself restarted. Without it
+  # a short one-off that ran and exited (a backup job, a compose run) matches.
+  #
+  # What it does not catch: a slow loop, where each incarnation lasts longer
+  # than a minute before it dies. Docker's backoff puts a fast crasher at about
+  # one restart a minute, which is the case this exists for.
+  - alert: ContainerRestartLoop
+    expr: >
+      (max by (instance, name) (count_over_time(container_last_seen{name!=""}[30m])) < 4)
+       and on (instance, name)
+      (count by (instance, name) (last_over_time(container_last_seen{container_label_restartcount!=""}[30m])) >= 1)
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "container {{ "{{ $labels.name }}" }} is restart-looping on {{ "{{ $labels.instance }}" }}"
+      description: "Docker keeps restarting {{ "{{ $labels.name }}" }} on {{ "{{ $labels.instance }}" }} and no incarnation has stayed up 1 minute in the last 30. Its systemd unit will look healthy; read `docker logs {{ "{{ $labels.name }}" }}` on the host."
+
   # A compose project whose image refresh failed is a failed docker-refresh@
   # instance, so SystemdUnitFailed above already carries it. The two rules here
   # cover only what unit state cannot say: that a timer stopped firing.
@@ -438,6 +475,55 @@ groups:
     annotations:
       summary: "Plex WAN path degraded ({{ "{{ $labels.instance }}" }})"
       description: "TCP/443 probe to {{ "{{ $labels.instance }}" }} failing or losing >15% over 30m, for 10m. Open the WAN Path Diagnosis dashboard to see which hop."
+
+  # plex-client-metrics (files/ocean-plex/plex-client-metrics.py, a 1-minute
+  # timer on ocean) is the only per-session view of the transcoder. If it stops
+  # writing, the two transcoder alerts below go quiet rather than firing, so
+  # its own staleness is the alert that keeps them honest.
+  - alert: PlexClientMetricsStale
+    expr: |
+      absent(plex_client_metrics_last_run_timestamp_seconds)
+      or time() - plex_client_metrics_last_run_timestamp_seconds > 300
+      or plex_client_live_ok == 0
+      or plex_client_history_ok == 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "plex-client-metrics on ocean is stale or failing"
+      description: "plex_client.prom (rewritten every minute) is over 5 minutes old, or its Tautulli calls are failing, for 10m. `journalctl -u plex-client-metrics` on ocean says which; Tautulli down or a rotated API key are the usual causes."
+
+  # A GPU transcode that ran on CPU: Plex asked for hardware and did not get
+  # the encoder. On ocean that is NVENC refusing a session (driver fault, or
+  # VRAM taken by llama.cpp on the shared 3090), and every CPU transcode
+  # competes with everything else on the host.
+  - alert: PlexTranscodeCpuFallback
+    expr: |
+      count by (user, player) (
+        plex_client_live_session_info{video_decision="transcode", hw_requested="true", hw_encode="false"}
+      ) > 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Plex is transcoding {{ "{{ $labels.player }}" }} on CPU"
+      description: "Hardware transcoding was requested for {{ "{{ $labels.user }}" }} on {{ "{{ $labels.player }}" }} but the encode is running in software, for 10m. Check NVENC sessions and VRAM (DCGM_FI_DEV_FB_FREE, DCGM_FI_DEV_ENC_UTIL) on ocean."
+
+  # The transcoder is falling behind the viewer: under real time and less than
+  # 15 seconds buffered while playing. Speed below 1 alone is normal once the
+  # transcoder is far ahead, and a client's own bad network shows as bandwidth,
+  # not as this, so this is server-side.
+  - alert: PlexTranscodeStarved
+    expr: |
+      plex_client_live_transcode_buffer_seconds < 15
+      and on (user, player, session) plex_client_live_transcode_speed < 1
+      and on (user, player, session) plex_client_live_session_info{state="playing"}
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Plex transcoder cannot keep up for {{ "{{ $labels.player }}" }}"
+      description: "{{ "{{ $labels.user }}" }} on {{ "{{ $labels.player }}" }} has had under 15s of transcode buffer at under 1x speed for 5m, so playback is stalling. Look for CPU fallback (PlexTranscodeCpuFallback), GPU contention, or a 4K HDR tone-map."
 
   # General internet WAN path degraded — both Cloudflare and Google anchors
   # losing >5%. Distinguishes 'internet bad' from 'specifically Plex bad'.

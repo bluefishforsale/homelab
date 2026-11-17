@@ -116,6 +116,11 @@ service_ports:
   llamacpp:
     port: 8080
 
+  # axiomd ops on agentbox: Prometheus /metrics only, set in the image by
+  # ops.metrics_port in axiomd's config/axiomd.toml. Change both together.
+  axiomd:
+    port: 9711
+
   # llmeval VM (playbooks/individual/infrastructure/llmeval.yaml): CPU llama.cpp
   # router serving the 395 candidates to axiomd's eval. LAN only.
   llmeval:

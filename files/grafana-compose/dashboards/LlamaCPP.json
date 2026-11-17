@@ -122,11 +122,11 @@
       },
       "targets": [
         {
-          "expr": "llamacpp:kv_cache_usage_ratio{job=\"llamacpp\"}",
+          "expr": "llamacpp:prompt_tokens_cached_total{job=\"llamacpp\"} / (llamacpp:prompt_tokens_cached_total{job=\"llamacpp\"} + llamacpp:prompt_tokens_total{job=\"llamacpp\"})",
           "refId": "A"
         }
       ],
-      "title": "KV Cache Usage",
+      "title": "Prompt Cache Hit Ratio",
       "type": "stat",
       "fieldConfig": {
         "defaults": {
@@ -134,9 +134,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.7 },
-              { "color": "red", "value": 0.9 }
+              { "color": "green", "value": null }
             ]
           }
         }
@@ -155,11 +153,11 @@
       },
       "targets": [
         {
-          "expr": "llamacpp:kv_cache_tokens{job=\"llamacpp\"}",
+          "expr": "llamacpp:n_tokens_max{job=\"llamacpp\"}",
           "refId": "A"
         }
       ],
-      "title": "KV Cache Tokens",
+      "title": "Peak Context Tokens",
       "type": "stat",
       "fieldConfig": {
         "defaults": {
@@ -409,12 +407,12 @@
       },
       "targets": [
         {
-          "expr": "llamacpp:kv_cache_usage_ratio{job=\"llamacpp\"}",
-          "legendFormat": "KV Cache Usage",
+          "expr": "rate(llamacpp:prompt_tokens_cached_total{job=\"llamacpp\"}[5m]) / (rate(llamacpp:prompt_tokens_cached_total{job=\"llamacpp\"}[5m]) + rate(llamacpp:prompt_tokens_total{job=\"llamacpp\"}[5m]))",
+          "legendFormat": "Cache Hit Ratio",
           "refId": "A"
         }
       ],
-      "title": "KV Cache Usage Over Time",
+      "title": "Prompt Cache Hit Ratio (5m)",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -431,9 +429,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.7 },
-              { "color": "red", "value": 0.9 }
+              { "color": "green", "value": null }
             ]
           }
         }
@@ -448,12 +444,12 @@
       },
       "targets": [
         {
-          "expr": "llamacpp:kv_cache_tokens{job=\"llamacpp\"}",
-          "legendFormat": "KV Cache Tokens",
+          "expr": "llamacpp:n_busy_slots_per_decode{job=\"llamacpp\"}",
+          "legendFormat": "Busy Slots",
           "refId": "A"
         }
       ],
-      "title": "KV Cache Tokens Over Time",
+      "title": "Busy Slots Per Decode",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {

@@ -814,6 +814,149 @@ collections:
     radarr_add_missing: true
     radarr_monitor: true
     radarr_search: true
+  Quiet Heroes:
+    sort_title: "!Quiet Heroes"
+    summary: "Ordinary people being decent to each other: teachers, neighbors, stubborn widows and kind strangers. No violence, and you leave smiling."
+    tmdb_movie:
+      - 29154    # Stand and Deliver (1988)
+      - 2054     # Mr. Holland's Opus (1995)
+      - 462      # Erin Brockovich (2000)
+      - 69       # Walk the Line (2005)
+      - 205220   # Philomena (2013)
+      - 140823   # Saving Mr. Banks (2013)
+      - 239563   # St. Vincent (2014)
+      - 334543   # Lion (2016)
+      - 501907   # A Beautiful Day in the Neighborhood (2019)
+      - 617784   # Military Wives (2020)
+      - 645689   # The Duke (2021)
+      - 603206   # Dream Horse (2021)
+      - 754609   # Mrs. Harris Goes to Paris (2022)
+      - 914216   # The Lost King (2022)
+      - 937278   # A Man Called Otto (2022)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  The Long Way Round:
+    sort_title: "!The Long Way Round"
+    summary: "Road trips, pilgrimages and detours that end with someone a little more themselves. No violence, and you leave smiling."
+    tmdb_movie:
+      - 403      # Driving Miss Daisy (1989)
+      - 153      # Lost in Translation (2003)
+      - 1653     # The Motorcycle Diaries (2004)
+      - 9621     # Elizabethtown (2005)
+      - 9912     # The World's Fastest Indian (2005)
+      - 773      # Little Miss Sunshine (2006)
+      - 232572   # A Walk in the Woods (2015)
+      - 334533   # Captain Fantastic (2016)
+      - 844409   # The Unlikely Pilgrimage of Harold Fry (2023)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  Underdogs:
+    sort_title: "!Underdogs"
+    summary: "Long shots, misfits and nobodies who show up anyway: bobsledders, rowers, walk-ons and one dodgeball team. No violence, and you leave smiling."
+    tmdb_movie:
+      - 5693     # Hoosiers (1986)
+      - 11287    # A League of Their Own (1992)
+      - 14534    # Rudy (1993)
+      - 864      # Cool Runnings (1993)
+      - 14635    # The Rookie (2002)
+      - 455      # Bend It Like Beckham (2002)
+      - 4464     # Seabiscuit (2003)
+      - 14292    # Miracle (2004)
+      - 9472     # DodgeBall: A True Underdog Story (2004)
+      - 11652    # Invincible (2006)
+      - 39486    # Secretariat (2010)
+      - 60308    # Moneyball (2011)
+      - 198185   # Million Dollar Arm (2014)
+      - 228203   # McFarland, USA (2015)
+      - 319888   # Eddie the Eagle (2016)
+      - 317557   # Queen of Katwe (2016)
+      - 359724   # Ford v Ferrari (2019)
+      - 823452   # The Boys in the Boat (2023)
+      - 895549   # NYAD (2023)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  Eureka!:
+    sort_title: "!Eureka!"
+    summary: "Rockets, chess, math and heart surgery: brilliant people working the problem until it gives. No violence, and you leave smiling."
+    tmdb_movie:
+      - 14291    # Searching for Bobby Fischer (1993)
+      - 568      # Apollo 13 (1995)
+      - 13466    # October Sky (1999)
+      - 5257     # The Dish (2000)
+      - 20544    # Something the Lord Made (2004)
+      - 33602    # Temple Grandin (2010)
+      - 266856   # The Theory of Everything (2014)
+      - 286217   # The Martian (2015)
+      - 264337   # Spare Parts (2015)
+      - 381284   # Hidden Figures (2016)
+      - 400928   # Gifted (2017)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  The Cure:
+    sort_title: "!The Cure"
+    summary: "Doctors, parents and patients who would not take no for an answer, and the medical breakthroughs they forced into being."
+    tmdb_movie:
+      - 26142    # The Doctor (1991)
+      - 2007     # Lorenzo's Oil (1992)
+      - 9096     # Medicine Man (1992)
+      - 26716    # ...First Do No Harm (1997)
+      - 90324    # The English Surgeon (2007)
+      - 30849    # Living Proof (2008)
+      - 27569    # Extraordinary Measures (2010)
+      - 340027   # Brain on Fire (2017)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
+  London Blood:
+    sort_title: "!London Blood"
+    summary: "Fog, gaslight and something in the alley: Ripper murders, Frankenstein, Dracula, Sweeney Todd, dark Holmes and dark Dickens. Victorian gothic from 1980 on, TMDB 6.5 or better."
+    tmdb_movie:
+      - 1955     # The Elephant Man (1980)
+      - 11904    # Young Sherlock Holmes (1985)
+      - 6114     # Bram Stoker's Dracula (1992)
+      - 768      # From Hell (2001)
+      - 257      # Oliver Twist (2005)
+      - 1124     # The Prestige (2006)
+      - 13885    # Sweeney Todd: The Demon Barber of Fleet Street (2007)
+      - 10528    # Sherlock Holmes (2009)
+      - 17979    # A Christmas Carol (2009)
+      - 38684    # Jane Eyre (2011)
+      - 58574    # Sherlock Holmes: A Game of Shadows (2011)
+      - 207933   # Stonehearst Asylum (2014)
+      - 201085   # Crimson Peak (2015)
+      - 379170   # Sherlock: The Abominable Bride (2016)
+      - 410117   # Lady Macbeth (2016)
+      - 332283   # Mary Shelley (2017)
+      - 635910   # The Last Voyage of the Demeter (2023)
+      - 792307   # Poor Things (2023)
+      - 426063   # Nosferatu (2024)
+      - 1062722  # Frankenstein (2025)
+      - 1246049  # Dracula: A Love Tale (2025)
+    collection_order: release
+    sync_mode: sync
+    radarr_add_missing: true
+    radarr_monitor: true
+    radarr_search: true
+
   Best of the 1980s:
     sort_title: "!Best of the 1980s"
     summary: A collection of the Top Content of the 1980s

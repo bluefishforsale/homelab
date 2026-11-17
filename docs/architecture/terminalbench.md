@@ -57,7 +57,7 @@ extra_vars: terminalbench_enabled=true terminalbench_n_tasks=1
 - Port 8082 is not in `vars/vars_service_ports.yaml`.
 - `harbor` and `uv` are unpinned (`curl ... install.sh | sh`, `uv tool install harbor`).
 - Comments in `terminalbench.yaml` and `detect-impacted-playbooks.sh` still say
-  "GPU benchmark". The compose is CPU-only by design (agents.md rule 5: the GPU
+  "GPU benchmark". The compose is CPU-only by design (docs/agents/coordination.md rule 5: the GPU
   stays with production).
 
 ## Results and metrics
