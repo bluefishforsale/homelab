@@ -35,7 +35,7 @@ own: the hosts themselves.
 
 | Thing | Reality |
 |---|---|
-| node005 | Proxmox 8.1, 56 threads, 252 GiB RAM (upgraded from 125 GiB, D16; `node_memory_MemTotal_bytes` read 2026-11-15). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
+| node005 | Proxmox 8.1, 56 threads, 252 GiB RAM (D16; `node_memory_MemTotal_bytes` read 2026-11-15). VM disks on `vmpool-storage` (ZFS on SATA/NVMe SSDs). Runs dns01, pihole, netboot01, gh-runner-01, harbor, registry-cache-01, agentbox. |
 | node006 | Proxmox 8.4, 40 threads, 660 GiB RAM (498 used, ocean holds 366 GiB). VM disks on `local-lvm` (870 EVO 2TB). Runs dns02, ocean, llmeval. |
 | ocean | Debian 12, kernel 6.1, Docker 29.6, cgroup v2, ~60 containers. RTX 3090 (driver 610.43) and the SAS HBA passed through; owns the `data01` pool (87 TiB raw, 72% used) and exports it over NFSv4.2. nginx on 80/443 is the front door for every service. Docker sets `iptables -P FORWARD DROP`. |
 | GPU today | Already shared: llama-server 19.6 GiB and tdarr-ffmpeg 376 MiB on the one card, via Docker. |
@@ -112,9 +112,9 @@ brings monitoring and the front door back after a node006 power cycle.
   rehearsed in phase 1.
 - **Upgrades and ocean**: upstream requires a drain before a minor kubelet
   upgrade, and draining ocean stops nearly every service on the fleet. So
-  ocean's agent is not upgraded with the others (decided, PRD Q18). The server and `k3s-agent01` upgrade on dispatch; ocean's agent
-  follows in its next supervised monthly window, where it is drained and
-  rebooted anyway. Its kubelet trails the API server in between, inside
+  ocean's agent is not upgraded with the others (D49). The server and
+  `k3s-agent01` upgrade on dispatch; ocean's agent follows in its next
+  supervised monthly window, where it is drained and rebooted anyway. Its kubelet trails the API server in between, inside
   upstream's skew policy. R23 measures the server.
 - **Images**: k3s `registries.yaml` mirrors docker.io, ghcr.io, gcr.io and
   nvcr.io through registry-cache-01. A mirror is a preference, not a
@@ -159,7 +159,7 @@ brings monitoring and the front door back after a node006 power cycle.
     allowlist. Each needs a Gateway or Cilium equivalent, proven on a test app
     in phase 1, and the migration table records which ones a service uses. A
     feature with no equivalent is settled at the phase 1 gate, not found at
-    W7 (PRD Q19): a Cloudflare rule in `terraform-root` for a public vhost,
+    W7 (D50): a Cloudflare rule in `terraform-root` for a public vhost,
     an nginx pod behind the Gateway for a LAN-only one, or dropping it.
   - Two things the alternate ports cannot prove. Cilium's Envoy has no
     capability to bind ports below 1024 unless `NET_BIND_SERVICE` is kept
@@ -214,7 +214,7 @@ pool root. So every pod with the media mount can also reach
 `/data01/services/*`, and with one shared `media` uid it could read other
 apps' databases too.
 
-Decided (Q12): the mount stays whole and the isolation comes from ownership.
+The mount stays whole and the isolation comes from ownership (D44).
 Each service runs as its own uid, allocated from one registry file in
 `homelab-kube` in the managed range above the fleet ids (terrac 2000, media
 2100), and its state directory is owned by that uid at `0700` (on
@@ -304,7 +304,7 @@ collisions. Mitigations:
    the Gateway, verify with the service's health check and blackbox probe. Then
    check that its alert rules and dashboard panels still return series.
 4. Soak: the play, the compose files and the stopped container stay in place
-   for the 14-day soak (PRD Q13). Backout during the soak is the window in
+   for the 14-day soak (D45). Backout during the soak is the window in
    reverse: scale to 0, bring the compose project back up through its play,
    nginx upstream back. It works because the pod runs the same image against
    the same state directory, so the service's image is frozen for the soak:
@@ -411,8 +411,8 @@ rebuilt by swap, never upgraded in place.
   | `db-backup` | Per-database CronJobs; Postgres also gets WAL archiving (D35). |
   | `plex-autoheal`, `kometa-metrics`, `mem0-metrics`, `tdarr-playback-window`, `wordpress-cron`, `wordpress-update`, `audible-download` | Move with their service, as CronJobs or sidecars, in that service's cutover. |
   | `promtail` | Replaced by Alloy. |
-  | `avahi-daemon`, `netatalk` | Pods on ocean in W5, `hostNetwork` (mDNS needs the LAN); netatalk mounts its share from `/data01` (Q8). |
-  | `glances` | Dropped (Q8). |
+  | `avahi-daemon`, `netatalk` | Pods on ocean in W5, `hostNetwork` (mDNS needs the LAN); netatalk mounts its share from `/data01` (D41). |
+  | `glances` | Dropped (D41). |
   | host exporter containers (node, smart, process, fail2ban, cadvisor, nvidia-gpu, dcgm) | DaemonSets on cluster nodes. On tier 0 VMs they stay as they are, owned by Salt. |
 - Node labels and taint chosen up front, so pods pin to a role, not a host
   name: label `homelab.role/data01=local`, `homelab.role/gpu=rtx3090`; taint
@@ -479,7 +479,7 @@ Two different things, handled differently:
   `dkms status` shows both the NVIDIA and ZFS modules built for the new kernel
   **before** rebooting. A ZFS module that failed to build means a pool that
   does not import on boot.
-- Reboots on k8s nodes: kured, Wednesday 03:00 to 05:00 Pacific (Q5), clear
+- Reboots on k8s nodes: kured, Wednesday 03:00 to 05:00 Pacific (D38), clear
   of the Sunday 08:00 to 14:00 image refresh, one node at a time, drain first.
 - **Ocean is not in kured's rota.** An unattended reboot would skip the
   `dkms status` check above, and during the overlap it would also take down
@@ -496,7 +496,7 @@ Two different things, handled differently:
   it, so it runs only when the pair pre-flight is green. PVE major upgrades
   are in place by necessity (bare metal) and get their own runbook, one node
   at a time. Both nodes are on PVE 8 (8.1 and 8.4), which reached end of life
-  in August 2026, so both are unsupported today. Decided (PRD Q17):
+  in August 2026, so both are unsupported today. Per D48,
   each is upgraded in place to PVE 9 in phase 0 by Proxmox's documented
   8-to-9 path, one node per window with the pair pre-flight green, node005
   first. The D27 boot-mirror reinstall stays where it is, as the recovery
@@ -593,7 +593,7 @@ The old VM is kept stopped and untouched for 14 days, then deleted.
 | Third-party images | `docker-refresh@<project>` timers pull floating tags weekly | See "Keeping images current": Renovate watches registries and opens PRs that bump the pinned tag. |
 | Secrets | ansible-vault | SOPS with age, decrypted in-cluster by sops-secrets-operator (already in `homelab-kube`, switched from GPG to age). The age private key is the one bootstrap secret; it stays in the vault and the bootstrap play installs it. |
 | Public cert | certbot on ocean, Cloudflare DNS-01 | cert-manager `ClusterIssuer` for Let's Encrypt, Cloudflare DNS-01, same token. |
-| Internal TLS | `homelab-ca` (spec 2026-10-14, not yet implemented) | Decided, PRD Q6. That spec's root never expires, has no revocation, and is `pathlen:0`, so it cannot sign an intermediate for the cluster; the only way cert-manager could issue from it is to hold the root key itself in a cluster Secret. Its name constraints also exclude pod and service IPs. Q6 answered (a): the CA design moves to a `pathlen:1` root before it is built, and cert-manager issues from a replaceable cluster intermediate; the root key never enters the cluster. Until that CA exists, pods use the public cert at the Gateway. |
+| Internal TLS | `homelab-ca` (spec 2026-10-14, not yet implemented) | That spec's root never expires, has no revocation, and is `pathlen:0`, so it cannot sign an intermediate for the cluster; the only way cert-manager could issue from it is to hold the root key itself in a cluster Secret. Its name constraints also exclude pod and service IPs. So the CA design moves to a `pathlen:1` root before it is built (D39), and cert-manager issues from a replaceable cluster intermediate; the root key never enters the cluster. Until that CA exists, pods use the public cert at the Gateway. |
 | Metrics | Prometheus on ocean, file-based scrape config | Phases 1 to 4: an Alloy (or Prometheus agent) in the cluster discovers ServiceMonitors and remote-writes to ocean's Prometheus, because pod IPs are not reachable from outside the cluster and a migrated service must not lose its metrics. Phase 5: kube-prometheus-stack in cluster, TSDB at the path it uses today on ocean, the agent retires. |
 | Logs | Loki plus promtail | Alloy in the cluster pushes pod logs to ocean's Loki from phase 1. Phase 5: Loki moves in cluster. Promtail is end of life and is not carried over. |
 | Dead-man alert | none outside ocean | "Cluster is down" goes to email and ntfy (terrac, D17). Both of those run on ocean today (exim smarthost, ntfy container), so neither can be allowed to depend on the thing being reported dead. See "Dead-man alert" below. |
@@ -708,7 +708,7 @@ path that runs on the thing that died sends nothing.
   Alertmanager's email route, agentbox gets its own relay config for the
   watchdog, and each hypervisor reports the other's death. Both dying at once
   is still silent, and stays out of scope.
-- agentbox is slimmed, not retired (Q16). What stays on the VM is what has to
+- agentbox is slimmed, not retired (D19). What stays on the VM is what has to
   work with the cluster down: this watchdog, ntfy, the remote-control
   sessions, and the break-glass apply role (coordination rule 6). What leaves
   for the cluster: the alert receiver (`agentbox-alert-receiver`) moves with
@@ -778,15 +778,16 @@ path that runs on the thing that died sends nothing.
   there is no cloud-init there; VMs run the same script from cloud-init
   user-data that `terraform-root` attaches. During the migration one Ansible
   play calls the script on existing hosts, so there is a single code path from
-  day one. This is phase 0 work (Q7), not phase 6. Salt's upstream package repo has moved before, so the script never
-  fetches from it: the pinned `.deb` is mirrored to GCS and verified by hash.
+  day one. This is phase 0 work (D40). Salt's upstream package repo has moved
+  before, so the script never fetches from it: the pinned `.deb` is mirrored
+  to GCS and verified by hash.
   CI runs the script in a clean Debian container on every change to it.
 - **Ownership**: a host concern is owned by exactly one of Ansible or Salt at a
   time. The PR that turns on a Salt state deletes the Ansible role or play that
   owned the same concern.
 - **Hard limits carry over**: sshd, `authorized_keys`, the fleet key and
   port 22 firewall rules may be ported to Salt only by terrac, by hand. DNS
-  and DHCP are no longer in this list; they are CI-applied with their own
+  and DHCP are not in this list; they are CI-applied with their own
   gates (D25, next section).
 - **Secrets**: host secrets move from ansible-vault to Salt pillar encrypted
   with the same sops/age scheme. With a master, the master decides which host
@@ -801,7 +802,8 @@ path that runs on the thing that died sends nothing.
   not a fleet compromise. How pillar gets decrypted at render time (a sops
   renderer, an `ext_pillar`, or a wrapper that decrypts to tmpfs before
   `salt-call`) is the builder's call, settled in phase 0: the first
-  secret-bearing state, the D28 timer's GCS key, needs it. Q9 settled on per-host keys over CI-pushed pillar.
+  secret-bearing state, the D28 timer's GCS key, needs it. Keys are per host,
+  not pillar pushed by CI (D42).
   The vault cannot be archived until every key has a new home, including the
   cluster's age key and the Cloudflare Access email lists that `terraform-root`
   still reads from it.
@@ -816,7 +818,7 @@ path that runs on the thing that died sends nothing.
   three. And ocean's host states exist before phase 5b, so the replacement
   VM is built by Salt and is their first full apply, not built by Ansible
   and ported afterwards.
-- **Write once** (Q7, decided): the repo, the bootstrap and the first base
+- **Write once** (D40): the repo, the bootstrap and the first base
   states are phase 0 and 1 work, and the D28 timer, the patch pipeline (1b)
   and the watchdog are written in Salt from the start. Written in Ansible
   first, each would be built twice inside two quarters. New VMs are born
@@ -828,7 +830,7 @@ path that runs on the thing that died sends nothing.
 
 ### DNS and DHCP under Salt
 
-Decision D25 (terrac, 2026-11-14): Salt owns DNS and DHCP end to end, applied
+Salt owns DNS and DHCP end to end (D25), applied
 by CI like everything else, not by hand. Today's Ansible play already does
 this from CI, guarded by `serial: 1`, `any_errors_fatal` and a post-host
 `dig` gate (`playbooks/individual/core/services/dns_ha_stack.yaml`); the Salt
@@ -963,7 +965,7 @@ exists.
   This is the reattach path; letting Terraform recreate a VM over existing
   zvols is not one (its behaviour there is unverified, and the VMs carry
   `purge_on_destroy` and `delete_unreferenced_disks_on_destroy`). The timer
-  is a Salt state from the start (Q7).
+  is a Salt state from the start (D40).
 - **D29: one bootstrap script** (in "Salt" above).
 - **D30: the base image is stock.** No custom template build. Each node's base
   is the Debian genericcloud image, pinned by URL and sha512, mirrored to GCS,
@@ -1098,7 +1100,7 @@ on real hardware.
 Both DNS servers and pihole are VMs on the two hypervisors, so losing both
 hosts takes name resolution away from every device in the house until step 1
 finishes. There is no hardware off the hypervisors to host a third resolver
-(Q10), so this risk is accepted and the recovery order is the mitigation.
+(D43), so this risk is accepted and the recovery order is the mitigation.
 
 ## What stays in Ansible until Salt replaces it
 

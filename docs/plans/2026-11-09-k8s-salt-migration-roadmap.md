@@ -40,7 +40,7 @@ hard limits so a phase plan cannot quietly drop one.
 
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
-| 2026 Q4 | Phase 0 | | `homelab-salt` repo, bootstrap script, first CI apply (Q7) |
+| 2026 Q4 | Phase 0 | | `homelab-salt` repo, bootstrap script, first CI apply (D40) |
 | 2027 Q1 | Phase 1 (build, watchdog, upgrade drill, restore) | Phase 1b on new VMs | Masterless bootstrap on every host |
 | 2027 Q2 | Phase 2 (harbor) and Phase 3 (ocean joins, GPU gate) in parallel; W1 on `k3s-agent01` | Debian 13 template; patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean host states, move to Salt |
@@ -60,7 +60,7 @@ must leave room for it.
 Phases gate on what they need, not on their number (D37).
 
 - Phase 1 needs from phase 0: node006's `vmpool`, the Debian image, the GCS
-  bucket, the `homelab-kube` defects fixed, and Q7 answered. The rest of
+  bucket, and the `homelab-kube` defects fixed. The rest of
   phase 0 runs beside it.
 - Phase 2 and phase 3 each need phase 1 and the coexistence proof. They run
   in parallel; neither waits for the other. Phase 3 also needs phase 0's
@@ -71,20 +71,12 @@ Phases gate on what they need, not on their number (D37).
 - Phase 5 needs phase 4. Phase 5b needs phase 5, phase 2's swap rehearsal,
   and ocean's host states in Salt.
 
-## Phase 0: decide and clean up (2026 Q4 into 2027 Q1)
+## Phase 0: clean up and bootstrap (2026 Q4 into 2027 Q1)
 
-- [x] terrac answers Q5 (Wednesday 03:00 to 05:00), Q6 (a), Q8 (drop
-      glances; avahi and netatalk to pods), Q9 (a), Q10 (no); signs off D21,
-      D23, D26, D32 (2026-11-15).
-- [x] terrac answers Q7 (yes, bootstrap now), Q11 (no), Q12 (per-service
-      uid, `0700`), Q13 (14 days), Q14 (ml-log-analyzer is live), Q15 (two
-      minors); signs off D36 (2026-11-15).
-- [x] Q16 answered (agentbox is slimmed, not retired); D19 signed off
-      (2026-11-15).
-- [x] terrac answers Q17 (PVE 9 in place, in phase 0), Q18 (ocean's k3s
-      upgrades in its monthly window), Q19 (nginx fallback decided per
-      feature) (2026-11-15).
-- [ ] Salt, moved up from phase 6 (Q7): `homelab-salt` repo; the D29
+The decisions this phase was waiting on are made and live in the PRD's
+decision table (D1 to D50). What is left is work.
+
+- [ ] Salt (D40): `homelab-salt` repo; the D29
       bootstrap script (pinned `.deb` from the GCS mirror, verified by hash,
       tested by CI in a clean Debian container, wrapped by one Ansible play
       for existing hosts); the rekey workflow, which reads the key from the
@@ -95,10 +87,10 @@ Phases gate on what they need, not on their number (D37).
       group name).
 - [ ] ml-log-analyzer's Postgres added to `db-backup.sh` and `db-restore.sh`
       (it is live on harbor and in no backup).
-- [ ] PVE 8 reached end of life in August 2026 (Q17):
-      node005, then node006, upgraded in place to PVE 9, one per window, DNS
-      pair pre-flight green before each.
-- [ ] `homelab-ca` spec (2026-10-14) amended per Q6: `pathlen:1` root, cluster
+- [ ] PVE 9 (D48): node005, then node006, upgraded in place, one per window,
+      DNS pair pre-flight green before each. PVE 8 reached end of life in
+      August 2026.
+- [ ] `homelab-ca` spec (2026-10-14) amended per D39: `pathlen:1` root, cluster
       intermediate, and whether the root's name constraints admit the
       cluster's IP ranges. Lands before the CA is built.
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
@@ -168,7 +160,8 @@ Everything here is new VMs and a new cluster; nothing in production moves.
       manages itself from `homelab-kube`.
 - [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
       NetworkPolicy controller disabled), Hubble, cert-manager with the
-      Let's Encrypt issuer, internal issuer from the cluster intermediate (Q6), sops-secrets-operator (age),
+      Let's Encrypt issuer, internal issuer from the cluster intermediate
+      (D39), sops-secrets-operator (age),
       Cilium Gateway in host-network mode on alternate host ports (D20), a
       `local-path` class with `reclaimPolicy: Retain` as the default (stock
       class removed), the `/data01` NFS PV, metrics-server. App namespaces at
@@ -185,7 +178,7 @@ Everything here is new VMs and a new cluster; nothing in production moves.
       reference chart), one with the NFS PV, one reading a sops secret.
 - [ ] Each nginx feature in use today (rate limit, body size, websocket
       upgrade, IP allowlist) proven on the Gateway with a test route, or its
-      fallback decided (Q19).
+      fallback decided (D50).
 - [ ] A Gateway listener bound on 80/443 on `k3s-agent01` once, to prove the
       Envoy capability the alternate ports never exercise.
 - [ ] Cluster access (R28): terrac's kubeconfig on the laptop and agentbox,
@@ -214,11 +207,11 @@ Everything here is new VMs and a new cluster; nothing in production moves.
 
 ## Phase 1b: patch pipeline (2027 Q1, new VMs first)
 
-Written as Salt states from the start (Q7), not in Ansible and then ported.
+Written as Salt states from the start (D40), not in Ansible and then ported.
 
 - [ ] `unattended-upgrades` (security origin only) on the k3s VMs; package
       holds for kernel, NVIDIA and ZFS where they apply.
-- [ ] kured on the cluster, Wednesday 03:00 to 05:00 Pacific (Q5), one node at a time.
+- [ ] kured on the cluster, Wednesday 03:00 to 05:00 Pacific (D38), one node at a time.
 - [ ] Textfile metrics: pending security updates, `reboot-required`; alerts at
       7 and 14 days.
 - [ ] `docs/operations/os-lifecycle.md`: patch policy, held-package monthly
@@ -294,19 +287,19 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 - [ ] Before the first R26 change: cross-uid hardlinks proven on the media
       tree with one downloader and one *arr (umask 002, setgid directories).
 - [ ] W2 *arr stack (WAL state on local PVs); agentbox's media-refetch and
-      replace-reconcile timers move with it as CronJobs (Q16)
+      replace-reconcile timers move with it as CronJobs (D19)
 - [ ] W3 external-repo apps (each repo's deploy pattern switches in the same
       cutover; `docs/operations/deploy-pattern.md` gains the k8s pattern before
       the first one)
 - [ ] W4 GPU services; plex in quiet hours; mem0 with no agent run in flight;
-      agentbox's tdarr-drive and x265-watch timers move with tdarr (Q16)
+      agentbox's tdarr-drive and x265-watch timers move with tdarr (D19)
 - [ ] W5 homeassistant, avahi, netatalk (hostNetwork); glances removed
 
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0, CronJobs
 suspended) -> window, run by the cutover workflow: the flag takes the Docker
 side down and masks its units, scale to 1, unsuspend, flip the nginx
 upstream to the Gateway, verify probes, alert rules and panels -> 14-day
-soak (Q13) with the image frozen and `back` as the backout -> `homelab` PR
+soak (D45) with the image frozen and `back` as the backout -> `homelab` PR
 removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
 the service to its own uid and a `0700` state directory (R26).
 Database services: the `db-backup` entry becomes a CronJob writing the same
@@ -329,7 +322,7 @@ what is left here:
       ntfy.
 - [ ] Stop agentbox; Alertmanager still emails through ocean's exim (D19).
 - [ ] W6: kube-prometheus-stack, Loki plus Alloy, Grafana, Alertmanager,
-      blackbox, pushgateway, karma and agentbox's alert receiver (Q16) in
+      blackbox, pushgateway, karma and agentbox's alert receiver (D19) in
       cluster; TSDB and Loki on ocean local disk. Scrape configs become
       ServiceMonitors. Old file-based scrape config retires.
 - [ ] W7: the Gateway moves from its alternate ports to 80/443 on ocean;
@@ -357,7 +350,7 @@ k3s-only.
 
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
-The repo, the bootstrap script and the rekey workflow are phase 0 boxes (Q7).
+The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
 
 - [ ] `homelab-salt` repo layout complete: `.sops.yaml` per-host creation
       rules, CI apply by rsync over SSH at the merged SHA, by IP. No master
