@@ -791,6 +791,18 @@ groups:
       summary: "nzbget-guard has not run in 30 minutes ({{ "{{ $labels.instance }}" }})"
       description: "Nothing is stopping nzbget filling its scratch SSD. Check `systemctl status nzbget-guard.timer nzbget-guard.service` on {{ "{{ $labels.instance }}" }}."
 
+  # Work queued, nothing paused it, and not a byte in an hour. The NewsDemon
+  # billing lapse of 2026-11-12 sat like this for 26h with every server up.
+  # Backtested over 30 days: that outage, plus blips of 20 minutes or less.
+  - alert: NzbgetDownloadStalled
+    expr: increase(nzbget_downloaded_total_bytes[30m]) == 0 and on(instance) nzbget_queue_remaining_bytes > 0 and on(instance) nzbget_download_paused == 0 and on(instance) nzbget_quota_reached == 0
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "nzbget has a queue but has downloaded nothing in an hour ({{ "{{ $labels.instance }}" }})"
+      description: "Downloads are not paused and no quota is hit, so a news server is likely refusing logins (expired billing, connection limit). Check the nzbget log for `502` or auth errors and `nzbget_news_server_active` per server."
+
 - name: sas_phy_alerts
   rules:
   # SAS transport counters are cumulative, so alert on the RATE of increase (a
