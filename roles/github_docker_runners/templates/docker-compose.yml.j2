@@ -26,6 +26,7 @@ services:
     restart: always
     
     environment:
+      TZ: America/Los_Angeles
       # The debian-bookworm base marks system python as PEP 668
       # externally-managed, which makes `pip install` refuse. Workflows on this
       # runner pip-install ansible, so allow it runner-wide (every job inherits
@@ -84,6 +85,7 @@ services:
       ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE: "/action-archive-cache"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
 {% if github_runner_mount_token_file %}
       # GitHub token file (shared by all runners, read-only)
       - {{ github_runners_base_dir }}/.github_token:/runner/.github_token:ro

@@ -16,6 +16,7 @@ services:
     # 2025 install stores artist paths as /music/<artist>; mounting the parent
     # would orphan every one of them.
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}:/config
       - {{ library }}:/music
       - {{ incoming }}:/downloads
@@ -33,6 +34,8 @@ services:
 
   lidarr-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ exporter_service }}
     hostname: {{ exporter_service }}
     restart: unless-stopped

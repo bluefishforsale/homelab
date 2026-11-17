@@ -44,6 +44,7 @@ services:
       - "{{ port_ext }}:{{ port_int }}"
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # User content directory (themes, plugins, uploads) - PERSISTENT on host
       # WordPress core files stay in container (ephemeral) and update with image
       - {{ home }}/wp-content:/var/www/html/wp-content
@@ -90,12 +91,14 @@ services:
     restart: always
     
     environment:
+      - TZ=America/Los_Angeles
       - MYSQL_ROOT_PASSWORD={{ cloud_services.wordpress.database_root_password }}
       - MYSQL_DATABASE=wordpress
       - MYSQL_USER=wordpress
       - MYSQL_PASSWORD={{ cloud_services.wordpress.database_password }}
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/mysql-data:/var/lib/mysql
       - {{ home }}/mysql-logs:/var/log/mysql
       - {{ home }}/mysql-conf/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro

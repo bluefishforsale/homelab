@@ -12,10 +12,12 @@ services:
     
     # Configuration
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ unpoller_home }}/config:/config:ro
     
     # Environment variables
     environment:
+      - TZ=America/Los_Angeles
       - UP_UNIFI_DEFAULT_URL={{ unifi_controller_url }}
       - UP_UNIFI_DEFAULT_USER={{ unifi_username }}
       - UP_UNIFI_DEFAULT_PASS={{ unifi_password }}

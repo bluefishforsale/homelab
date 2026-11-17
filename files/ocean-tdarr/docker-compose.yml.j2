@@ -23,6 +23,7 @@ services:
       - "{{ tdarr_port_web }}:8265"
       - "{{ tdarr_port_api }}:8266"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ path_home }}/plugins/{{ repo }}:/app/server/Tdarr/Plugins/Local
       - {{ path_complete }}:/media
       - {{ path_home }}/server:/app/server
@@ -61,6 +62,7 @@ services:
     ports:
       - "{{ node_port }}:8267"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ path_home }}/plugins/{{ repo }}:/app/server/Tdarr/Plugins/Local
       - {{ path_complete }}:/media
       - {{ path_home }}/server:/app/server

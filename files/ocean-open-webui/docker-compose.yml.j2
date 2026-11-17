@@ -49,6 +49,7 @@ services:
       - PORT={{ port }}
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/data:/data
       - {{ home }}/config:/config
       - {{ home }}/logs:/logs

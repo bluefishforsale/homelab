@@ -9,6 +9,7 @@ services:
     ports:
       - "3100:3100"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ basedir }}/data:/loki
       - {{ basedir }}/config/loki-config.yaml:/etc/loki/local-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml

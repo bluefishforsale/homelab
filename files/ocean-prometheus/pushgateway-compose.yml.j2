@@ -1,6 +1,8 @@
 services:
   pushgateway:
     image: {{ pushgateway_image }}:{{ pushgateway_version }}
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ pushgateway_service }}
     restart: unless-stopped
 
@@ -14,6 +16,7 @@ services:
       - --persistence.interval=5m
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ pushgateway_home }}/data:/data
 
     healthcheck:
