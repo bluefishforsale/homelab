@@ -16,6 +16,7 @@ services:
       PIHOLE_DNS_: 192.168.1.2
     # Volumes store your data between container upgrades
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - '/opt/docker/etc-pihole:/etc/pihole'
       - '/opt/docker/etc-dnsmasq.d:/etc/dnsmasq.d'
     #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities

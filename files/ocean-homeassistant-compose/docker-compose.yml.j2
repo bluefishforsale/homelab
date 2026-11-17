@@ -8,6 +8,7 @@ services:
     environment:
       TZ: "America/Los_Angeles"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - "{{ home }}/config:/config"
       - "/etc/localtime:/etc/localtime:ro"
     devices:

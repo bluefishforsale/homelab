@@ -64,6 +64,23 @@ http {
     limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
     limit_req_zone $binary_remote_addr zone=strict:10m rate=2r/s;
 
+    # LAN and tunnel only. Public sites reach nginx through cloudflared on
+    # ocean (terraform-root cloudflare-tunnel-configs.tf, 192.168.1.143:80),
+    # so every legitimate request comes from a private address.
+    # NOTE: this is what keeps the .home vhosts (Prometheus, Loki,
+    # Alertmanager, the *arr admin pages) off the internet. nginx routes on
+    # the client's Host header, so while WAN 80/443 was forwarded here,
+    # "Host: prometheus.home" against the public IP served Prometheus. The
+    # forward is off now (terraform-root #95); this holds if it ever comes
+    # back. A location with its own allow/deny doesn't inherit these.
+    allow 127.0.0.0/8;
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    allow 192.168.0.0/16;
+    allow ::1;
+    allow fc00::/7;
+    deny all;
+
     # Include service proxy configurations
     include /etc/nginx/conf.d/*.conf;
 

@@ -928,8 +928,10 @@
 
   # MCP into Claude is added (not templated): ~/.claude.json also holds Claude's
   # own runtime state, so we merge via the CLI instead of overwriting the file.
-  # Add-only: a server already registered is skipped, so rotating a header token
-  # needs `claude mcp remove <name>` on the box before the next deploy re-adds it.
+  # A server registered at the configured URL is skipped, and one at any other
+  # URL is removed and re-added. Headers aren't compared, so rotating a header
+  # token still needs `claude mcp remove <name>` on the box before the next
+  # deploy re-adds it.
   # Whole section is gated on having servers so a fresh/unauthenticated `claude`
   # is never invoked at deploy time (it can block on first-run). `timeout` is a
   # belt-and-suspenders guard against any CLI hang.
@@ -965,22 +967,51 @@
       agentbox_mcp_present: "{{ dict(claude_mcp_list.results | map(attribute='item.name') | zip(claude_mcp_list.results | map(attribute='stdout', default=''))) }}"
     when: agentbox_mcp_servers | length > 0
 
-  - name: Register shared MCP servers in Claude Code (user scope)
-    ansible.builtin.command: >
-      timeout 30 claude mcp add-json {{ item.1.name | quote }}
-      {{ ({'type': 'http', 'url': item.1.url, 'headers': item.1.headers | default({})} if item.1.url is defined
-          else {'type': 'stdio', 'command': item.1.command, 'args': item.1.args | default([]), 'env': item.1.env | default({})}) | to_json | quote }}
-      --scope user
-    become_user: "{{ item.0.name }}"
-    environment:
-      HOME: "{{ item.0.home }}"
-      PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
-    loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
-    when:
-      - agentbox_mcp_servers | length > 0
-      - item.1.name not in (agentbox_mcp_present[item.0.name] | default(''))
-    no_log: true
-    notify: Restart RC sessions
+  # NOTE: the gates below match the whole "name: url (" line `claude mcp list`
+  # prints, anchored at both ends, not the bare name. A name-only match treats
+  # a server registered at an old URL as present, so a moved server (mem0,
+  # ocean to harbor) stays pointed at the dead address through every redeploy.
+  # Unanchored, "Gmail: " would also match the "claude.ai Gmail: " connector
+  # line and the remove below would fail the play on a server that was never
+  # registered. A stdio server has no url and matches on "name: " alone.
+  - name: Reconcile shared MCP servers in Claude Code (user scope)
+    when: agentbox_mcp_servers | length > 0
+    vars:
+      agentbox_mcp_listing: "{{ agentbox_mcp_present[item.0.name] | default('') }}"
+      agentbox_mcp_named: "(?m)^{{ (item.1.name ~ ': ') | regex_escape }}"
+      agentbox_mcp_wanted: "{{ agentbox_mcp_named }}{{ ((item.1.url ~ ' (') | regex_escape) if item.1.url is defined else '' }}"
+    block:
+
+    - name: Drop shared MCP servers registered at a stale URL
+      ansible.builtin.command: timeout 30 claude mcp remove {{ item.1.name | quote }} --scope user
+      become_user: "{{ item.0.name }}"
+      environment:
+        HOME: "{{ item.0.home }}"
+        PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
+      loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
+      loop_control:
+        label: "{{ item.0.name }}: {{ item.1.name }}"
+      when:
+        - agentbox_mcp_listing is search(agentbox_mcp_named)
+        - agentbox_mcp_listing is not search(agentbox_mcp_wanted)
+      # The loop item carries the server's Authorization header, and a failed
+      # item is dumped whole regardless of the label.
+      no_log: true
+
+    - name: Register shared MCP servers in Claude Code (user scope)
+      ansible.builtin.command: >
+        timeout 30 claude mcp add-json {{ item.1.name | quote }}
+        {{ ({'type': 'http', 'url': item.1.url, 'headers': item.1.headers | default({})} if item.1.url is defined
+            else {'type': 'stdio', 'command': item.1.command, 'args': item.1.args | default([]), 'env': item.1.env | default({})}) | to_json | quote }}
+        --scope user
+      become_user: "{{ item.0.name }}"
+      environment:
+        HOME: "{{ item.0.home }}"
+        PATH: "{{ item.0.home }}/.local/bin:{{ ansible_env.PATH }}"
+      loop: "{{ agentbox_accounts | product(agentbox_mcp_servers) | list }}"
+      when: agentbox_mcp_listing is not search(agentbox_mcp_wanted)
+      no_log: true
+      notify: Restart RC sessions
 
   # Plugins, like MCP, go in through the CLI rather than a template: they live
   # in ~/.claude/plugins alongside Claude's own runtime state, and installing

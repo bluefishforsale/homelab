@@ -15,6 +15,7 @@ services:
     ports:
       - "{{ radarr_port }}:7878"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /etc/localtime:/etc/localtime:ro
       - {{ home }}:/config
       - {{ incoming }}/movies:/downloads
@@ -33,6 +34,8 @@ services:
 
   radarr-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ exporter_service }}
     hostname: {{ exporter_service }}
     restart: unless-stopped

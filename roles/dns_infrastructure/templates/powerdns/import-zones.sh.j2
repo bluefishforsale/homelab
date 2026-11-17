@@ -55,6 +55,20 @@ keep_serial_ahead() {
   echo "  $zone serial raised to $((floor + 1)) (was $serial)"
 }
 
+# NOTE: the refresh is how often dns01 asks for a newer serial when no NOTIFY
+# reached it, so it bounds how long the two can disagree. At the 3600 from
+# default-soa-content a DDNS name resolved on dns02 alone for up to an hour
+# (tautog-eth, 2026-11-17). 60 is the floor: the secondary only looks once per
+# xfr-cycle-interval. It is set here and not in pdns.conf because pdnsutil in
+# the running container still reads the old bind-mounted file on the apply
+# that changes it, and nothing rebuilds the zones after the restart.
+set_soa_refresh() {
+  local zone="$1" soa
+  soa=$($PDNSUTIL list-zone "$zone" | awk '$4=="SOA"')
+  $PDNSUTIL replace-rrset "$zone" @ SOA "$(echo "$soa" | awk '{print $2}')" \
+    "$(echo "$soa" | awk '{print $5, $6, $7, 60, $9, $10, $11}')"
+}
+
 HOME_FLOOR=$(serial_floor home.)
 CLUSTER_FLOOR=$(serial_floor cluster.local.)
 REVERSE_FLOOR=$(serial_floor 1.168.192.in-addr.arpa.)
@@ -83,6 +97,7 @@ add_record "home." "node006-idrac" A "192.168.1.16"
 
 # A records — GitHub runners
 add_record "home." "gh-runner-01" A "192.168.1.20"
+add_record "home." "gh-runner-02" A "192.168.1.21"
 add_record "home." "gh-test-vm" A "192.168.1.25"
 
 # A records — registry pull-through cache
@@ -190,6 +205,7 @@ add_record "1.168.192.in-addr.arpa." "10" PTR "unifi.home."
 add_record "1.168.192.in-addr.arpa." "15" PTR "node005-idrac.home."
 add_record "1.168.192.in-addr.arpa." "16" PTR "node006-idrac.home."
 add_record "1.168.192.in-addr.arpa." "20" PTR "gh-runner-01.home."
+add_record "1.168.192.in-addr.arpa." "21" PTR "gh-runner-02.home."
 add_record "1.168.192.in-addr.arpa." "25" PTR "gh-test-vm.home."
 add_record "1.168.192.in-addr.arpa." "31" PTR "agentbox.home."
 add_record "1.168.192.in-addr.arpa." "32" PTR "harbor.home."
@@ -226,9 +242,28 @@ echo "  1.168.192.in-addr.arpa. zone: OK"
 
 echo ""
 echo "--- Keeping serials ahead of the secondary ---"
+for zone in home. cluster.local. 1.168.192.in-addr.arpa.; do
+  set_soa_refresh "$zone"
+done
 keep_serial_ahead home. "$HOME_FLOOR"
 keep_serial_ahead cluster.local. "$CLUSTER_FLOOR"
 keep_serial_ahead 1.168.192.in-addr.arpa. "$REVERSE_FLOOR"
+
+# NOTE: create-zone makes a native zone, and PowerDNS never sends NOTIFY for a
+# native zone, so dns01 only heard about a change on its SOA refresh timer and
+# every DDNS registration sat on dns02 alone until then (tautog-eth,
+# 2026-11-17). The kind is set here, after the records and the serial, so the
+# secondary is never told to transfer a zone that is still half built.
+# NOTIFY-DNSUPDATE sends the NOTIFY as part of each DDNS update rather than on
+# the primary's next 60s serial check.
+echo ""
+echo "--- Making the zones primary so changes are pushed to the secondary ---"
+for zone in home. cluster.local. 1.168.192.in-addr.arpa.; do
+  $PDNSUTIL set-kind "$zone" MASTER
+done
+$PDNSUTIL set-meta home. NOTIFY-DNSUPDATE 1
+$PDNSUTIL set-meta 1.168.192.in-addr.arpa. NOTIFY-DNSUPDATE 1
+
 for zone in home. cluster.local. 1.168.192.in-addr.arpa.; do
   pdns_control notify "$zone" >/dev/null 2>&1 || true
 done

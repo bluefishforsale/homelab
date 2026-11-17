@@ -3,6 +3,8 @@ version: '3.8'
 services:
   nvidia-gpu-exporter:
     image: {{ nvidia_gpu_exporter_image }}:{{ nvidia_gpu_exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ nvidia_gpu_exporter_service }}
     hostname: {{ inventory_hostname }}
     restart: unless-stopped
@@ -10,6 +12,7 @@ services:
     # GPU Access
     runtime: nvidia
     environment:
+      - TZ=America/Los_Angeles
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     

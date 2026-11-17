@@ -118,8 +118,20 @@ while IFS= read -r f; do CFG_ARGS+=(-f "$f"); done <<< "$CFG_LIST"
 # directory in a different file. This is the backstop for when those drift
 # apart. Guarding on the class (any unset variable) rather than the name means
 # it keeps working for projects this repo does not own.
-if docker compose -p "$PROJECT" "${CFG_ARGS[@]}" config 2>&1 >/dev/null | grep -q 'variable is not set'; then
+#
+# NOTE: capture the warnings, then match. Piping compose straight into `grep -q`
+# under pipefail fails open: grep leaves on the first warning, compose dies
+# writing the second, and the failed pipeline reads as "nothing unset". That
+# recreated both terraform-root runners with a blank token on 2026-11-15.
+cfg_warnings=$(docker compose -p "$PROJECT" "${CFG_ARGS[@]}" config 2>&1 >/dev/null)
+cfg_rc=$?
+if grep -q 'variable is not set' <<< "$cfg_warnings"; then
   logger -t docker-refresh "project=$PROJECT has unset compose variables, refusing to recreate"
+  exit 1
+fi
+if [ "$cfg_rc" -ne 0 ]; then
+  logger -t docker-refresh \
+    "project=$PROJECT compose config failed rc=$cfg_rc, refusing to recreate: $(printf '%s' "$cfg_warnings" | tr '\n' ' ' | cut -c1-200)"
   exit 1
 fi
 

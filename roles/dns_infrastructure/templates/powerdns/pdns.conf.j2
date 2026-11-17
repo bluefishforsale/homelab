@@ -31,10 +31,14 @@ disable-axfr=no
 # Primary server configuration
 primary=yes
 also-notify={{ pdns_also_notify }}
+# NOTE: also-notify above is the only target that works. A NOTIFY to a zone's NS
+# names goes to port 53, where dnsdist relays it to the authoritative from
+# 127.0.0.1, and the secondary refuses a NOTIFY that doesn't come from its
+# primary's address. Empty turns those off; also-notify is sent regardless.
+only-notify=
 {% else %}
 # Secondary server configuration
 secondary=yes
-secondary-do-renotify=yes
 autosecondary=yes
 {% endif %}
 
@@ -62,5 +66,6 @@ loglevel=4
 # Disable DNSSEC (internal network only)
 default-soa-edit=INCEPTION-INCREMENT
 
-# SOA defaults
+# SOA defaults. import-zones.sh overrides the refresh (the second number) on
+# every zone it builds, so changing it here does nothing.
 default-soa-content=dns01.home. dnsadmin.home. 0 3600 3600 3600 3600

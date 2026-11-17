@@ -19,6 +19,7 @@ services:
       - "3306:3306"
       
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/mysql-data:/var/lib/mysql
       - {{ home }}/mysql-logs:/var/log/mysql
       - {{ home }}/mysql-conf:/etc/mysql/conf.d
@@ -67,6 +68,7 @@ services:
       - "{{ port_ext }}:{{ port_int }}"
     
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/grafana.ini:/etc/grafana/grafana.ini:ro
       - {{ home }}/plugins:/var/lib/grafana/plugins
       - {{ home }}/data:/var/lib/grafana

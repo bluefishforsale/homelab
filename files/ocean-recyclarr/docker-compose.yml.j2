@@ -16,6 +16,7 @@ services:
       - SONARR_API_KEY={{ media_services.sonarr.api_key }}
       - RADARR_API_KEY={{ media_services.radarr.api_key }}
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}:/config
     healthcheck:
       test: ["CMD", "pgrep", "supercronic"]

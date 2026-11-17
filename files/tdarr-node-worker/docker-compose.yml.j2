@@ -23,6 +23,7 @@ services:
       nodeIP: "{{ ansible_default_ipv4.address }}"
       nodePort: "8267"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       # Same in-container paths as ocean's node, so no path translation.
       - /data01/complete:/media
       # Transcode cache on the worker's local disk, not over NFS.

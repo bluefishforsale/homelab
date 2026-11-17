@@ -5,6 +5,8 @@
 services:
   detector-redis:
     image: registry-cache.home:5001/library/redis:7-alpine
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ service }}-detector-redis
     restart: unless-stopped
     user: "999:999"
@@ -13,6 +15,7 @@ services:
       --maxmemory 512mb --maxmemory-policy allkeys-lru
       --save 300 10 --save 60 10000
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/detector-redis:/data
     logging:
       driver: journald
@@ -26,6 +29,7 @@ services:
     ports:
       - "{{ service_ports.ml_log_analyzer_detector.port }}:8085"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/detector-data:/app/data
     environment:
       - TZ=America/Los_Angeles
@@ -56,10 +60,12 @@ services:
     container_name: {{ service }}-postgres
     restart: unless-stopped
     environment:
+      - TZ=America/Los_Angeles
       - POSTGRES_DB=log_anomaly_ml
       - POSTGRES_USER=log_anomaly_ml
       - POSTGRES_PASSWORD={{ log_anomaly_ml.postgres_password }}
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U log_anomaly_ml"]
@@ -74,12 +80,15 @@ services:
 
   processor-redis:
     image: registry-cache.home:5001/library/redis:7-alpine
+    environment:
+      TZ: America/Los_Angeles
     container_name: {{ service }}-processor-redis
     restart: unless-stopped
     command: >
       redis-server --appendonly yes --appendfsync everysec
       --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/processor-redis:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
@@ -95,6 +104,8 @@ services:
   # analysis and email digest: AxiomD triages the alerts it raises.
   processor:
     image: {{ processor_image }}:{{ version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ service }}-processor
     restart: unless-stopped
     ports:

@@ -9,6 +9,7 @@ services:
     
     # Environment variables
     environment:
+      - TZ=America/Los_Angeles
       - DOCKER_API_VERSION=1.44
     
     # Command-line flags for better container name handling
@@ -29,6 +30,7 @@ services:
     
     # Mount host filesystems and Docker for container monitoring
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro

@@ -16,6 +16,7 @@ services:
     
     # Mount config and data directories
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ path_home }}/config:/etc/prometheus:ro
       - {{ path_home }}/data:/prometheus/data
     

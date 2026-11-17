@@ -19,6 +19,7 @@ services:
       - "0.0.0.0:{{ metrics_port }}:{{ metrics_port }}"
 
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/data:/app/data
 
     healthcheck:

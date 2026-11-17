@@ -13,6 +13,10 @@ services:
   cloudflare-exporter:
     build: .
     image: "{{ image }}"
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: "{{ service }}"
     hostname: "{{ service }}"
     env_file:

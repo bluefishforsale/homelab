@@ -12,10 +12,12 @@ services:
     
     # Configuration - mount config file directly
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ karma_home }}/config/karma.yml:/etc/karma.yml:ro
     
     # Environment variables
     environment:
+      - TZ=America/Los_Angeles
       - CONFIG_FILE=/etc/karma.yml
     
     # Health Check (check web interface)

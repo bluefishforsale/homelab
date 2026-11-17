@@ -11,6 +11,7 @@ services:
     ports:
       - "{{ blackbox_exporter_port }}:9115"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ path_home }}/config:/config
     command:
       - --config.file=/config/blackbox.yml

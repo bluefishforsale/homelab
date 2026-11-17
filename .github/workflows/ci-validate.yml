@@ -324,6 +324,11 @@ jobs:
       - name: tdarr-exporter job math
         run: python3 files/tdarr-exporter/test_exporter.py
 
+      # Units differ across Tautulli fields (view_offset ms, max_offset s), and
+      # a cache from an older schema must rebuild rather than crash every run.
+      - name: plex-client-metrics math
+        run: python3 files/ocean-plex/test_plex_client_metrics.py
+
       # A bad profile body is rejected by Lidarr mid-deploy, or silently allows lossless.
       - name: lidarr quality profile
         run: python3 files/ocean-lidarr/test_lidarr_configure.py
@@ -342,6 +347,11 @@ jobs:
       # restart and stays dark for minutes, with the unit looking healthy.
       - name: RC launcher can recover from a stale registration
         run: bash .github/workflows/lib/agentbox-rc-launch.test.sh
+
+      # Runs on a docker host the CI runners share, so what it must never
+      # remove matters as much as what it does.
+      - name: Nightly stack sweep removes only nightly stacks
+        run: bash .github/workflows/lib/sweep-nightly-stacks.test.sh
 
       # "I could not look" must never render as "nothing is wrong". Three
       # places in this repo got that backwards at once.

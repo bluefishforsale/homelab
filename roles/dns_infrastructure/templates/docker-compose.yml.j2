@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/pdns.conf:/etc/powerdns/pdns.conf:ro
       - {{ home }}/data/pdns:/var/lib/powerdns
     environment:
@@ -44,6 +45,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/recursor.conf:/etc/powerdns/recursor.conf:ro
     environment:
       TZ: America/Los_Angeles
@@ -81,6 +83,7 @@ services:
     cap_add:
       - NET_BIND_SERVICE
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/dnsdist.conf:/etc/dnsdist/dnsdist.conf:ro
     environment:
       TZ: America/Los_Angeles
@@ -111,6 +114,10 @@ services:
   # Uses Kea Control Agent HTTP API instead of Unix sockets for reliability
   kea-exporter:
     image: {{ dns_reg_ghcr }}mweinelt/kea-exporter:latest
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: kea-exporter
     restart: unless-stopped
     network_mode: host
@@ -135,9 +142,12 @@ services:
   # ── Promtail (Loki Log Collector) ───────────────────────────────────────
   promtail:
     image: {{ dns_reg_hub }}grafana/promtail:latest
+    environment:
+      TZ: America/Los_Angeles
     container_name: dns-promtail
     restart: unless-stopped
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/log/journal:/var/log/journal:ro
       - /run/log/journal:/run/log/journal:ro
@@ -165,6 +175,7 @@ services:
     network_mode: host
     command: ["-c", "/etc/kea/kea-dhcp4.conf"]
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
       - {{ home }}/data/kea:/kea/leases
       - kea-sockets:/kea/sockets
@@ -198,6 +209,7 @@ services:
     network_mode: host
     command: ["-c", "/etc/kea/kea-dhcp-ddns.conf"]
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/kea-dhcp-ddns.conf:/etc/kea/kea-dhcp-ddns.conf:ro
       - kea-sockets:/kea/sockets
     environment:
@@ -223,6 +235,7 @@ services:
     network_mode: host
     command: ["-c", "/etc/kea/kea-ctrl-agent.conf"]
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config/kea-ctrl-agent.conf:/etc/kea/kea-ctrl-agent.conf:ro
       - kea-sockets:/kea/sockets
     environment:
@@ -250,6 +263,7 @@ services:
       - "{{ service_ports.dns_stack.netboot_http }}:80/tcp"
       - "{{ service_ports.dns_stack.netboot_web }}:3000/tcp"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/data/netboot/config:/config
       - {{ home }}/data/netboot/assets:/assets
     environment:

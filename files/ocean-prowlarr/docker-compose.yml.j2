@@ -13,6 +13,7 @@ services:
     ports:
       - "{{ prowlarr_port }}:9696"
     volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/config:/config
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9696/ping || exit 1"]
@@ -27,6 +28,8 @@ services:
 
   prowlarr-exporter:
     image: {{ exporter_image }}:{{ exporter_version }}
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     container_name: {{ exporter_service }}
     hostname: {{ exporter_service }}
     restart: unless-stopped

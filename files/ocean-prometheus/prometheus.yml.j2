@@ -341,6 +341,15 @@ scrape_configs:
     static_configs:
     - targets: ['agentbox.home:9464']
 
+  # axiomd ops: triage outcomes, model call time and poll liveness. A dead triager looks
+  # like a quiet fleet from the issue tracker, so `up` here is how it gets noticed.
+  - job_name: 'axiomd'
+    relabel_configs: *dropPortNumber
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+    - targets: ['agentbox.home:{{ service_ports.axiomd.port }}']
+
   # my-ta-jose paper grading app. /metrics is unauthenticated, so it is only
   # ever scraped over the internal host port (ocean.home -> 192.168.1.143),
   # never via the public ta.terrac.com tunnel (nginx blocks /metrics there).
@@ -624,18 +633,38 @@ scrape_configs:
     scrape_interval: 1m
     static_configs:
       - targets:
-        # SSH services
-        - github.com:22
-        - gitlab.com:22
-        labels:
-          probe_type: "tcp"
-          category: "ssh"
-      - targets:
         # SMTP services
         - smtp.gmail.com:587
         labels:
           probe_type: "tcp"
           category: "smtp"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ocean.home:9115
+
+  # TCP Probes - SSH to the git hosts.
+  # NOTE: keep this at 5m. The UCG Max's IPS rule "ET SCAN Potential SSH Scan
+  # OUTBOUND" (sid 2003068) blocks any LAN host that opens 5 connections to
+  # port 22 within 120s. At 1m these two probes tripped it about 5 times an
+  # hour, which then blocked the probes themselves and any git push from ocean
+  # in that window. filipowm/unifi can't write an IPS suppression for it
+  # (terraform-root #91 and #92), so the fix is staying under the threshold.
+  - job_name: 'blackbox-tcp-ssh'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    scrape_interval: 5m
+    static_configs:
+      - targets:
+        - github.com:22
+        - gitlab.com:22
+        labels:
+          probe_type: "tcp"
+          category: "ssh"
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
