@@ -656,6 +656,13 @@
       enabled: false
     when: replace_reconcile_timer.stat.exists
 
+  # The timer going quiet does not end a run it already started.
+  - name: Stop a [replace] reconciler run still in flight
+    ansible.builtin.systemd:
+      name: agentbox-replace-reconcile.service
+      state: stopped
+    when: replace_reconcile_timer.stat.exists
+
   - name: Remove the retired [replace] reconciler
     ansible.builtin.file:
       path: "{{ item }}"

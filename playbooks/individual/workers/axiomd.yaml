@@ -1,5 +1,5 @@
 ---
-# axiomd: the fleet's autonomous engineer (bluefishforsale/axiomd). Phase one runs `axiomd ops` only:
+# axiomd: the fleet's autonomous engineer (bluefishforsale/axiomd). Phase one ran `axiomd ops` only:
 # read-only triage notes on low-priority alerts, written by ocean's local model and posted to homelab's
 # alert issues as the axiomd GitHub App. It changes nothing on any host and spends nothing metered.
 #
