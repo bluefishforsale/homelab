@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Picks the commit a push deploy diffs from: the `deployed` branch, which only
-# moves after an apply with no failures. Diffing from it instead of HEAD~1
-# carries a cancelled or failed run's changes into the next run, where a
-# one-commit diff dropped them for good.
+# moves once an apply has run every playbook. Diffing from it instead of HEAD~1
+# carries a cancelled run's changes into the next run, where a one-commit diff
+# dropped them for good.
 # Usage: deploy-base.sh <head> [remote]   prints a commit sha
 set -euo pipefail
 
