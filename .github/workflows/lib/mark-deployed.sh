@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Moves the `deployed` branch on the remote to the commit a clean apply
+# Moves the `deployed` branch on the remote to the commit a completed apply
 # covered. It is a plain push, so the remote itself refuses anything but a
 # fast-forward: a slower run can never drag the marker back over changes a
 # newer run already applied.

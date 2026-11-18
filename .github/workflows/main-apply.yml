@@ -296,8 +296,14 @@ jobs:
             echo "✅ All playbooks applied successfully"
           fi
 
+      # Moves on any apply that ran every playbook, failures included. Holding
+      # it back on a failure made every later push replay the whole range (a
+      # fleet-wide change meant 50 playbooks per push, for hours). A failed
+      # playbook is red here and gets redeployed by the commit that fixes it.
+      # NOTE: `total` is written only after the loop, so a step cancelled or
+      # crashed mid-loop leaves it empty and the marker stays put.
       - name: Mark deployed
-        if: success() && github.event_name == 'push'
+        if: always() && github.event_name == 'push' && steps.apply.outputs.total != ''
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ needs.detect-changes.outputs.head-sha }}
