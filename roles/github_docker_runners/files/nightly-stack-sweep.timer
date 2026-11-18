@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for an orphaned mem0 nightly stack on the runner host
+
+[Timer]
+# With the script's 10 minute grace period, a dead stack is gone 10 to 15
+# minutes after its job is, or after boot when the job died with the host.
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

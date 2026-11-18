@@ -353,6 +353,11 @@ jobs:
       - name: Nightly stack sweep removes only nightly stacks
         run: bash .github/workflows/lib/sweep-nightly-stacks.test.sh
 
+      # The same sweep from a timer on the runner host. Run at the wrong moment
+      # it takes a live benchmark's stack, or the one its own job is tearing down.
+      - name: Orphan sweep waits for a run that is really gone
+        run: bash .github/workflows/lib/sweep-orphan-nightly-stacks.test.sh
+
       # "I could not look" must never render as "nothing is wrong". Three
       # places in this repo got that backwards at once.
       - name: Absence is not health
