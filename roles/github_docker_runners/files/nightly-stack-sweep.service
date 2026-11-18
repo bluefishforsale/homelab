@@ -6,3 +6,6 @@ Requires=docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/sweep-orphan-nightly-stacks.sh
+# A oneshot has no start timeout by default. A docker that hangs would leave
+# this activating forever and the timer would never fire again.
+TimeoutStartSec=5min
