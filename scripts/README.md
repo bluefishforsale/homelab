@@ -16,7 +16,7 @@ here never trigger CI or a deploy**, so a scripts-only PR merges with no checks.
 | Script | What | Example |
 |---|---|---|
 | `offsite.sh` | off-LAN access: SOCKS tunnel via the gateway (`up` / `down` / `status`), `env` for `ALL_PROXY`, `ssh-config` for a `Match` block that proxies fleet ssh only while off-LAN | `offsite.sh up && eval "$(scripts/offsite.sh env)"` |
-| `prom.sh` | Prometheus: `q '<promql>'`, `raw`, `names [regex]`, `labels <metric>`, `targets [up\|down]` | `prom.sh q 'up==0'` |
+| `prom.sh` | Prometheus: `q '<promql>'` (or `query`), `raw`, `names [regex]`, `labels <metric>`, `targets [up\|down]` | `prom.sh q 'up==0'` |
 | `loki.sh` | logs for a service on a host (auto container→unit; `-c`/`-u` to force) | `loki.sh blog_saetnere_com_wp ocean 2h 200 error` |
 | `fleet-systemctl.sh` | systemd across the fleet: `all` / `list [host]` / `<service> [host]` / `host <host>` | `fleet-systemctl.sh all` |
 | `docker.sh` | containers across the fleet: `ps [host]` / `where <c>` / `status <c> [host]` / `logs <c> [host] [n]` | `docker.sh where plex` |

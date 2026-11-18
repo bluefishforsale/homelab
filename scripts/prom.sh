@@ -7,6 +7,7 @@
 #
 # Usage:
 #   prom.sh q '<promql>'                 instant query -> "value  {labels}" per series, desc
+#   prom.sh query '<promql>'             same as q
 #   prom.sh raw '<promql>'               instant query -> raw JSON (pipe to jq)
 #   prom.sh names [regex]                list metric names (__name__), optional grep filter
 #   prom.sh labels <metric>              show the distinct label sets for a metric
@@ -38,7 +39,9 @@ _query() {
 cmd=$1; shift
 
 case "$cmd" in
-  q)
+  # NOTE: `query` is the name people and agents reach for first. It failed as an
+  # unknown command in five agent sessions in one week before it was an alias.
+  q|query)
     [ $# -ge 1 ] || die "usage: prom.sh q '<promql>'"
     # "value  {label=val,...}" per series, numeric-desc; __name__ dropped from labels.
     _query "$1" | jq -r '
