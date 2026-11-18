@@ -1,7 +1,7 @@
-# axiomd ops: read-only triage notes on low-priority alerts (bluefishforsale/axiomd). It reads
-# Alertmanager, Prometheus, and Loki on ocean, asks ocean's llama.cpp, and comments on homelab's alert
-# issues as the axiomd GitHub App. The one port is /metrics for Prometheus on ocean: counts and timings,
-# read only. Nothing else calls in.
+# axiomd ops: read-only triage of low-priority alerts (bluefishforsale/axiomd). It reads Alertmanager,
+# Prometheus, and Loki on ocean, asks ocean's llama.cpp, and pushes an incident to ntfy only when it judges
+# it real. The GitHub App only reads homelab's apply runs, for the deploys it shows the model. The one port
+# is /metrics for Prometheus on ocean: counts and timings, read only. Nothing else calls in.
 services:
   ops:
     image: {{ image }}:{{ version }}
@@ -14,6 +14,9 @@ services:
       TZ: America/Los_Angeles
       AXIOMD_APP_CLIENT_ID: "{{ axiomd.github_app.client_id }}"
       LLAMA_API_KEY: "{{ llama_api_key }}"
+      # Same publisher alert-receiver uses: ntfy is deny-all, so a push needs basic auth.
+      NTFY_USER: "{{ ntfy.user }}"
+      NTFY_PASS: "{{ ntfy.password }}"
       AXIOMD_APP_PRIVATE_KEY: |
         {{ axiomd.github_app.private_key | trim | indent(8) }}
     ports:
