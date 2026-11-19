@@ -5,9 +5,9 @@
 # Ephemeral homelab runners, four per host on every [github_runners] host.
 #
 # Applying this recreates the runners on the hosts it targets, so a job must
-# never apply it to the host it is running on. main-apply splits it out of the
-# normal apply and runs it twice, one host at a time, each from a runner on the
-# other host: the on-<host> label below is what lets a job pick its side.
+# never apply it to the host it is running on. main-apply never does that for
+# any playbook: it applies a runner host from a job on the other one, and the
+# on-<host> label below is what lets that job pick its side.
 # NOTE: a runner host with no homelab runners (a new one) has no on-<host>
 # label yet, so its first apply is by hand from agentbox.
 #

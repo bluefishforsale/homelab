@@ -90,11 +90,12 @@ The detector's `emit()` drops these on push, however they are reached
 `operations/backup/**`, `operations/decommission/**`, `archive/**`,
 `deprecated/**`, and `netboot_image.yaml`.
 
-`github_docker_runners.yaml` does auto-apply, but not in the normal apply job.
-main-apply splits it into `apply-runners`, which applies gh-runner-01 from a
-runner on gh-runner-02 and then gh-runner-02 from gh-runner-01, picking the
-side with the `on-<host>` runner label. A job never recreates the runner it is
-running on, and one host's runners stay up the whole time.
+No job applies to the runner host it is running on. `apply-playbooks` reads its
+host from the runner name and applies with `--limit 'all:localhost:!<own>'`;
+`apply-own-host` then runs on a runner on the other host (its `on-<host>`
+label) and applies the same list with `--limit <own>`. The `deployed` marker
+moves in its own job, only after both halves succeed. That covers
+`github_docker_runners.yaml` like any other playbook.
 
 ## Phase 1 tracers
 
