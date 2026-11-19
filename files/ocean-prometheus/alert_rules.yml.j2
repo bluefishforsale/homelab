@@ -300,6 +300,28 @@ groups:
       summary: "Kometa has not had a clean run in over 48h"
       description: "No Kometa run without a CRITICAL in 48h, or no kometa_* metrics at all. Check `scripts/loki.sh` for job=kometa, or /data01/services/kometa/config/logs/meta.log. If the series are missing rather than stale, check that /data01/services/node-exporter/text_files/kometa.prom is valid exposition -- one bad line drops the whole file. Collections and overlays are not being updated."
 
+  # tradey-boy-quant refreshes quant.db every 3h, and etrading_boy's Stack3
+  # veto reads the short_vol signals it publishes. Its container healthcheck
+  # only proves quant.db opens, and the bot drops expired signals without a
+  # word, so a dead daemon just turns the veto off. The daemon PUTs
+  # quanty_step_ok{step} to the pushgateway after every cycle, and the gateway
+  # stamps push_time_seconds. 8h is two missed cycles plus slack; a step has to
+  # fail every push for 7h (two cycles or more) before it counts.
+  # NOTE: the absent() arm is what catches a daemon that never pushed at all,
+  # e.g. QUANTY_PUSHGATEWAY missing from its env. Dropping it leaves this rule
+  # silent in exactly that case.
+  - alert: QuantySignalsStale
+    expr: >
+      absent(push_time_seconds{job="tradey_boy_quant"})
+      or (time() - push_time_seconds{job="tradey_boy_quant"} > 28800)
+      or (max_over_time(quanty_step_ok{job="tradey_boy_quant"}[7h]) == 0)
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "tradey-boy-quant signals are going stale"
+      description: "No push from the quanty daemon in 8h, or step {{ "{{ $labels.step }}" }} failed every cycle for 7h. etrading_boy's Stack3 short-vol veto goes inactive as signals expire. Read `scripts/docker.sh logs tradey_boy_quant ocean 200` for `step ... failed` and `cycle done`."
+
   # A run that finishes instantly did nothing. The original 8-month outage
   # looked exactly like this every night: Run Time 0:00:00, no crash visible
   # from outside, nothing updated.
