@@ -2,17 +2,19 @@
 # tracer 2d: validate after gh-runner-01 ssh key sync
 # tracer 2c: validate after exit-code fix + ssh key sync
 # tracer: see docs/operations/deploy-tracer.md
-# GitHub Actions ephemeral Docker-based runners playbook
-# Configures the runner host VM with Docker and deploys ephemeral runner containers
+# Ephemeral homelab runners, four per host on every [github_runners] host.
+#
+# Applying this recreates the runners on the hosts it targets, so a job must
+# never apply it to the host it is running on. main-apply splits it out of the
+# normal apply and runs it twice, one host at a time, each from a runner on the
+# other host: the on-<host> label below is what lets a job pick its side.
+# NOTE: a runner host with no homelab runners (a new one) has no on-<host>
+# label yet, so its first apply is by hand from agentbox.
 #
 # Prerequisites:
-# - Runner VM defined in terraform-root lan/proxmox-node005-vms.tf
+# - Runner VM defined in terraform-root lan/proxmox-node00X-vms.tf
 # - VM added to inventory under [github_runners] group
-# - GitHub PAT stored in Vault at development.github.vault_github_pat
-#
-# Usage:
-#   ansible-playbook -i inventories/github_runners/hosts.ini \
-#     playbooks/individual/infrastructure/github_docker_runners.yaml --ask-vault-pass
+# - GitHub PAT stored in Vault at development.github.token
 #
 # The PAT is used by runner containers to automatically generate registration tokens
 
@@ -22,11 +24,18 @@
   gather_facts: true
   vars_files:
     - ../../../vault/secrets.yaml
-  
+
   vars:
     github_pat_token: "{{ development.github.token }}"
     github_scope: "repo"
     github_repo: "bluefishforsale/homelab"
-  
+    github_runner_labels:
+      - self-hosted
+      - homelab
+      - ansible
+      - ephemeral
+      - docker
+      - "on-{{ inventory_hostname }}"
+
   roles:
     - github_docker_runners
