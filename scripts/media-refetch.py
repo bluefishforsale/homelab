@@ -673,7 +673,7 @@ def step(item, yes):
                 return True
             return False
         # Radarr may still name the .mp4 the flow already remuxed to .mkv.
-        file = flowed("/media" + movie["path"] + "/" + mf["relativePath"])
+        file = flowed("/media" + os.path.join(movie["path"].rstrip("/"), mf["relativePath"]))
         path = file.removeprefix("/media")
         langs = subs(file)
         item["attempts"] += 1
@@ -700,7 +700,8 @@ def step(item, yes):
         return True
 
     if item["state"] == "imported":
-        item["file"] = flowed(item["file"])
+        # normpath heals ledger entries recorded with a "//" before the grabbed step joined paths properly.
+        item["file"] = flowed(os.path.normpath(item["file"]))
         item["path"] = item["file"].removeprefix("/media")
         why = conformance.reasons(probe(item["file"]))
         if "no-dialogue-track" in why or "video-not-hevc" in why:
