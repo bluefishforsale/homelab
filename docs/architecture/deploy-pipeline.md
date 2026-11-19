@@ -88,8 +88,13 @@ alone, so the next main-apply puts the bad change back. The durable rollback is
 The detector's `emit()` drops these on push, however they are reached
 (`lib/detect-impacted-playbooks.sh:104-113`): terminalbench, `*zfs*`,
 `operations/backup/**`, `operations/decommission/**`, `archive/**`,
-`deprecated/**`, `netboot_image.yaml`, and `github_docker_runners.yaml`, because
-main-apply runs on those runners and would recreate itself mid-apply.
+`deprecated/**`, and `netboot_image.yaml`.
+
+`github_docker_runners.yaml` does auto-apply, but not in the normal apply job.
+main-apply splits it into `apply-runners`, which applies gh-runner-01 from a
+runner on gh-runner-02 and then gh-runner-02 from gh-runner-01, picking the
+side with the `on-<host>` runner label. A job never recreates the runner it is
+running on, and one host's runners stay up the whole time.
 
 ## Phase 1 tracers
 

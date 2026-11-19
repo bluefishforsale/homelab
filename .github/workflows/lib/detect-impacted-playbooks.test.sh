@@ -94,14 +94,12 @@ out=$(printf 'roles/dns_infrastructure/templates/foo.j2\n' | bash "$SCRIPT")
 assert_eq "dns_infrastructure role" \
   '["playbooks/individual/core/services/dns_ha_stack.yaml"]' "$out"
 
-# 11. github_docker_runners.yaml is self-referential infra (main-apply runs ON
-#     those runners), so a role edit must never map to it and recreate the
-#     runner mid-apply; it is hand-applied on the homelab network. The same role
-#     also drives terraform_root_runners.yaml, a separate compose project and
-#     unit that main-apply doesn't run on, so a role edit deploys only that.
+# 11. A runner role edit deploys both runner sets. The detector only names the
+#     playbooks; main-apply is what keeps github_docker_runners.yaml off the host
+#     a job is running on, by applying it one host at a time from the other.
 out=$(printf 'roles/github_docker_runners/defaults/main.yml\n' | bash "$SCRIPT")
-assert_eq "github_docker_runners role never maps to the self-referential playbook" \
-  '["playbooks/individual/infrastructure/terraform_root_runners.yaml"]' "$out"
+assert_eq "github_docker_runners role maps to both runner playbooks" \
+  '["playbooks/individual/infrastructure/github_docker_runners.yaml","playbooks/individual/infrastructure/terraform_root_runners.yaml"]' "$out"
 
 # 12. README / docs changes are not in the workflow's paths filter,
 #     but if smuggled in (e.g., trailing-doc edit), they should be no-op (fallback skipped — empty).
@@ -215,10 +213,11 @@ assert_eq "dashboard change maps to grafana_compose only (backup excluded)" \
 out=$(printf 'playbooks/operations/backup/grafana_dashboards.yaml\n' | bash "$SCRIPT")
 assert_eq "backup playbook never auto-applies" "[]" "$out"
 
-# 32. A direct edit to the runner playbook is also dispatch-only (self-referential
-#     infra; role coverage is asserted in test 11).
+# 32. A direct edit to the runner playbook maps to it like any other playbook
+#     (main-apply routes it cross-host; role coverage is in test 11).
 out=$(printf 'playbooks/individual/infrastructure/github_docker_runners.yaml\n' | bash "$SCRIPT")
-assert_eq "runner playbook never auto-applies" "[]" "$out"
+assert_eq "runner playbook edit maps to itself" \
+  '["playbooks/individual/infrastructure/github_docker_runners.yaml"]' "$out"
 
 # 33. Deprecated playbooks are reference material and nothing maintains them, so
 #     they rot: dns02_standalone.yaml includes a tasks file at a path that no

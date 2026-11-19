@@ -49,6 +49,7 @@ jobs:
       playbooks: ${{ steps.find-playbooks.outputs.playbooks }}
       has-changes: ${{ steps.find-playbooks.outputs.has-changes }}
       playbook-count: ${{ steps.find-playbooks.outputs.count }}
+      runners: ${{ steps.find-playbooks.outputs.runners }}
       targets: ${{ steps.find-playbooks.outputs.targets }}
       concurrency-group: ${{ steps.find-playbooks.outputs.concurrency-group }}
       head-sha: ${{ steps.find-playbooks.outputs.head-sha }}
@@ -120,25 +121,109 @@ jobs:
             TARGETS=$(echo "$TARGETS" | jq -c '. + ["runners"]')
           fi
 
+          # The homelab runner playbook recreates the runners on whatever host
+          # it touches, this job's included, so it leaves the normal apply and
+          # runs in apply-runners, one host at a time from the other host.
+          RUNNER_PB=playbooks/individual/infrastructure/github_docker_runners.yaml
+          RUNNERS=$(echo "$PLAYBOOK_JSON" | jq --arg p "$RUNNER_PB" 'index($p) != null')
+          PLAYBOOK_JSON=$(echo "$PLAYBOOK_JSON" | jq -c --arg p "$RUNNER_PB" 'map(select(. != $p))')
+          COUNT=$(echo "$PLAYBOOK_JSON" | jq 'length')
+
           echo "Playbooks to apply: $PLAYBOOK_JSON"
+          echo "Runner hosts to apply cross-host: $RUNNERS"
           echo "Concurrency group: $CONCURRENCY_GROUP"
           echo "Health check targets: $TARGETS"
 
           echo "playbooks=$PLAYBOOK_JSON" >> "$GITHUB_OUTPUT"
+          echo "runners=$RUNNERS" >> "$GITHUB_OUTPUT"
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "concurrency-group=$CONCURRENCY_GROUP" >> "$GITHUB_OUTPUT"
           echo "head-sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
-          if [[ "$COUNT" -gt 0 ]]; then
+          # A runner-only change still runs apply-playbooks, with nothing in
+          # it, because that job is the one that moves the deployed marker.
+          if [[ "$COUNT" -gt 0 || "$RUNNERS" == true ]]; then
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has-changes=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Each runner host is applied from a runner on the other one, so a job never
+  # recreates the runner it is running on. max-parallel 1 keeps one host's
+  # runners up throughout, and fail-fast stops the second host if the first
+  # comes back broken. The on-<host> labels come from github_docker_runners.yaml.
+  apply-runners:
+    name: Apply runners on ${{ matrix.target }} (from ${{ matrix.from }})
+    needs: detect-changes
+    if: needs.detect-changes.outputs.runners == 'true'
+    runs-on: [self-hosted, homelab, ansible, "on-${{ matrix.from }}"]
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        include:
+          - { target: gh-runner-01, from: gh-runner-02 }
+          - { target: gh-runner-02, from: gh-runner-01 }
+    concurrency:
+      group: ${{ needs.detect-changes.outputs.concurrency-group }}
+      cancel-in-progress: false
+    environment: Github Actions CI
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Apply github_docker_runners to ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+          LIMIT: ${{ inputs.limit || '' }}
+          EXTRA_VARS: ${{ inputs.extra_vars || '' }}
+        run: |
+          set -euo pipefail
+          # A dispatch limited to other hosts leaves this one alone.
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "$TARGET" ]; then
+            echo "Dispatch limit is '$LIMIT'; skipping $TARGET"
+            exit 0
+          fi
+          EXTRA_VARS_FLAG=()
+          if [ -n "$EXTRA_VARS" ]; then
+            EXTRA_VARS_FLAG=(--extra-vars "$EXTRA_VARS")
+          fi
+          ansible-playbook \
+            -i inventories/production/hosts.ini \
+            --vault-password-file=/tmp/.vault_pass \
+            "${EXTRA_VARS_FLAG[@]}" \
+            --limit "$TARGET" \
+            playbooks/individual/infrastructure/github_docker_runners.yaml
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
   apply-playbooks:
     name: Apply Playbooks to Production
-    needs: detect-changes
-    if: needs.detect-changes.outputs.has-changes == 'true'
+    needs: [detect-changes, apply-runners]
+    # Runs even when apply-runners failed or was skipped: a broken runner apply
+    # shouldn't hold back every other service. It does hold back the deployed
+    # marker (Mark deployed below), so the next push retries it.
+    if: >-
+      always()
+      && needs.detect-changes.result == 'success'
+      && needs.detect-changes.outputs.has-changes == 'true'
     runs-on: [self-hosted, homelab, ansible]
     concurrency:
       group: ${{ needs.detect-changes.outputs.concurrency-group }}
@@ -297,7 +382,10 @@ jobs:
           fi
 
       - name: Mark deployed
-        if: success() && github.event_name == 'push'
+        if: >-
+          success() && github.event_name == 'push'
+          && needs.apply-runners.result != 'failure'
+          && needs.apply-runners.result != 'cancelled'
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ needs.detect-changes.outputs.head-sha }}
