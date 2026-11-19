@@ -78,7 +78,6 @@
       mode: '0644'
     notify:
     - Reload systemd daemon
-    - Restart etrading_boy service
 
   - name: Create etrading_boy environment file
     ansible.builtin.template:
@@ -90,7 +89,6 @@
     no_log: true
     notify:
     - Reload systemd daemon
-    - Restart etrading_boy service
 
   - name: Create etrading_boy systemd service
     ansible.builtin.template:
@@ -101,7 +99,6 @@
     - etrading_boy.service
     notify:
     - Reload systemd daemon
-    - Restart etrading_boy service
 
   - name: Enable etrading_boy service
     ansible.builtin.systemd:
@@ -112,6 +109,9 @@
   # Always restart so a new :latest image is pulled and the container is
   # recreated even when every template was byte-identical. The bot catches
   # up on any cron window the restart straddled.
+  # NOTE: this is the only restart. A template change used to notify a
+  # restart handler too, which stopped the bot a second time at the end of
+  # the play and could cut it off mid-order-submit.
   - name: Restart etrading_boy service to pick up latest image
     ansible.builtin.systemd:
       name: etrading_boy.service
@@ -121,8 +121,3 @@
   - name: Reload systemd daemon
     ansible.builtin.systemd:
       daemon_reload: yes
-
-  - name: Restart etrading_boy service
-    ansible.builtin.systemd:
-      name: etrading_boy.service
-      state: restarted
