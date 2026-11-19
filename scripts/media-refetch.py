@@ -547,8 +547,10 @@ def note(item, msg):
 
 
 def gave_up(grabbed, downloading):
-    """A download still in the client's queue is waited on however long it takes."""
-    return not downloading and now() - grabbed > GRAB_TIMEOUT
+    """A download still in the client's queue is waited on however long it takes,
+    unless the client has paused it: a paused download never finishes on its own."""
+    moving = [q for q in downloading if q.get("status") != "paused"]
+    return not moving and now() - grabbed > GRAB_TIMEOUT
 
 
 def awaiting_redownload(item):
