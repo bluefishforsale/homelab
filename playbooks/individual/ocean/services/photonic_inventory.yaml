@@ -30,6 +30,8 @@
     # SQLite can't open the DB.
     app_uid: 10001
     app_gid: 10001
+    # signal-cli sidecar: its own uid, so the app cannot read the Signal keys
+    signal_uid: 10002
 
   tasks:
 
@@ -61,6 +63,14 @@
       owner: "{{ app_uid }}"
       group: "{{ app_gid }}"
       mode: '0750'
+
+  - name: Ensure signal-cli state directory exists (owned by the sidecar uid)
+    ansible.builtin.file:
+      path: "{{ home }}/signal-cli"
+      state: directory
+      owner: "{{ signal_uid }}"
+      group: "{{ signal_uid }}"
+      mode: '0700'
 
   - name: Create docker-compose.yml
     ansible.builtin.template:
