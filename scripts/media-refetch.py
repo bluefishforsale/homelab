@@ -937,7 +937,7 @@ def lock():
     return fd
 
 
-def main():
+def parser():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
@@ -960,11 +960,16 @@ def main():
     au.add_argument("--min-free-tb", type=float, default=3.0,
                     help="do not start a batch with less than this free on /data01")
     au.add_argument("--yes", action="store_true")
-    au.set_defaults(fn=cmd_auto, show_skipped=False)
+    # The timer plans through auto, so every option plan reads needs a value here.
+    au.set_defaults(fn=cmd_auto, show_skipped=False, tv_files=None, ids=None)
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
     s.set_defaults(fn=cmd_status)
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = parser().parse_args()
     # NOTE: two runs over one ledger both see an item as planned and both grab
     # a release; this happened on batch 1 (Sinners grabbed twice, seconds apart).
     _held = lock()  # noqa: F841

@@ -90,6 +90,15 @@ def test_download_still_in_the_queue_after_grab_timeout_is_not_given_up():
     assert not refetch.gave_up(grabbed, downloading=[{"status": "downloading"}])
 
 
+def test_auto_carries_every_option_plan_reads():
+    # --tv-files and --ids reached plan but not auto, so the first batch the
+    # agentbox timer tried to plan after them died on a.tv_files.
+    ap = refetch.parser()
+    auto = vars(ap.parse_args(["auto", "--yes", "--movies", "50", "--tv-gb", "1000"]))
+    plan = vars(ap.parse_args(["plan"]))
+    assert set(plan) - {"fn"} <= set(auto)
+
+
 def test_download_paused_in_the_client_after_grab_timeout_is_given_up():
     # Doctor Who S08E01 sat paused in NZBGet with 10% left from 2026-11-13; read as
     # still downloading, it held off every batch for six days.
