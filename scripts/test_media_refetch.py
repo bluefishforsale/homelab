@@ -87,7 +87,14 @@ def test_download_still_in_the_queue_after_grab_timeout_is_not_given_up():
     # The 2026-10-20 batch queued 1.5 TB behind NZBGet's 18:00-02:00 pause; 37 items
     # went stuck while still downloading and stuck never restores the added date.
     grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
-    assert not refetch.gave_up(grabbed, downloading=True)
+    assert not refetch.gave_up(grabbed, downloading=[{"status": "downloading"}])
+
+
+def test_download_paused_in_the_client_after_grab_timeout_is_given_up():
+    # Doctor Who S08E01 sat paused in NZBGet with 10% left from 2026-11-13; read as
+    # still downloading, it held off every batch for six days.
+    grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
+    assert refetch.gave_up(grabbed, downloading=[{"status": "paused"}])
 
 
 class FakeArr:
