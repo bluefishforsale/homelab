@@ -24,9 +24,9 @@
 # removes that stack out from under it.
 #
 # NOTE: the runner hosts hold a copy of this file, installed by the
-# github_docker_runners role for nightly-stack-sweep.timer. That role is never
-# applied from CI, so a change here reaches the workflow on merge and the hosts
-# only when the runner playbooks are next applied by hand.
+# github_docker_runners role for nightly-stack-sweep.timer. A change to this
+# file alone maps to no playbook, so it reaches the workflow on merge and the
+# hosts only when something next makes main-apply run the runner playbook.
 set -uo pipefail
 
 prefix='^mem0-nightly-'
