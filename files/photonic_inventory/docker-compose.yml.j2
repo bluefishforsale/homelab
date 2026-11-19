@@ -1,3 +1,4 @@
+{% set signal = photonic_inventory.signal | default({}) %}
 services:
   photonic_inventory:
     image: {{ image }}:{{ version }}
@@ -29,3 +30,42 @@ services:
       driver: journald
       options:
         tag: "{{ service }}"
+
+  # The app's own Signal account (photonic_inventory.signal.number in the
+  # vault), used to post approval reminders to the team group. signal-cli's
+  # JSON-RPC daemon is reachable only on this compose network, as
+  # http://signal-cli:8080/api/v1/rpc; no port is published.
+  #
+  # Until the number is vaulted the service sits behind the "register" profile,
+  # so `up -d` leaves it alone. Register once from a shell on ocean, from the
+  # home network so the captcha's IP matches (see the playbook header):
+  #   cd {{ home }} && docker compose run --rm signal-cli -a +1NUMBER register --captcha 'signalcaptcha://...'
+  #   cd {{ home }} && docker compose run --rm signal-cli -a +1NUMBER verify CODE
+  #   cd {{ home }} && docker compose run --rm signal-cli -a +1NUMBER setPin PIN
+  signal-cli:
+    image: ghcr.io/asamk/signal-cli:0.14.9
+    container_name: {{ service }}_signal_cli
+    hostname: signal-cli
+    restart: unless-stopped
+    user: "{{ signal_uid }}:{{ signal_uid }}"
+{% if signal.number | default('') %}
+    command: ["-a", "{{ signal.number }}", "daemon", "--http", "0.0.0.0:8080"]
+{% else %}
+    profiles: ["register"]
+    command: ["--version"]
+{% endif %}
+
+    volumes:
+      - {{ home }}/signal-cli:/var/lib/signal-cli
+
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /api/v1/check HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}_signal_cli"
