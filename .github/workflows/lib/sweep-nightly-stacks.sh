@@ -22,6 +22,11 @@
 # Drop that group and a second run's sweep takes the first run's stack with it.
 # The same goes for run.sh started by hand on the runner host: the next nightly
 # removes that stack out from under it.
+#
+# NOTE: the runner hosts hold a copy of this file, installed by the
+# github_docker_runners role for nightly-stack-sweep.timer. A change to this
+# file alone maps to no playbook, so it reaches the workflow on merge and the
+# hosts only when something next makes main-apply run the runner playbook.
 set -uo pipefail
 
 prefix='^mem0-nightly-'

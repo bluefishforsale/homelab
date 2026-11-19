@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove a mem0 nightly stack whose job is gone (runner host disk hygiene)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sweep-orphan-nightly-stacks.sh
+# A oneshot has no start timeout by default. A docker that hangs would leave
+# this activating forever and the timer would never fire again.
+TimeoutStartSec=5min

@@ -292,6 +292,46 @@
     enabled: true
     state: started
 
+# The daily prune cannot touch a stack that is still up, and a mem0 nightly run
+# that loses its runner leaves one up. Same rule as above: nothing here notifies
+# the runner restart handler.
+- name: Install the nightly stack sweep the workflow also runs
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../.github/workflows/lib/sweep-nightly-stacks.sh"
+    dest: /usr/local/sbin/sweep-nightly-stacks.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the orphaned nightly stack check
+  ansible.builtin.copy:
+    src: sweep-orphan-nightly-stacks.sh
+    dest: /usr/local/sbin/sweep-orphan-nightly-stacks.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the nightly stack sweep units
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - nightly-stack-sweep.service
+    - nightly-stack-sweep.timer
+
+- name: Reload systemd so the sweep units are known before enabling
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start the nightly stack sweep timer
+  ansible.builtin.systemd:
+    name: nightly-stack-sweep.timer
+    enabled: true
+    state: started
+
 - name: Display runner configuration summary
   ansible.builtin.debug:
     msg:
