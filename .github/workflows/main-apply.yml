@@ -135,6 +135,10 @@ jobs:
             echo "has-changes=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # A job never applies to the runner host it is running on: restarting docker
+  # or the runners there kills the job mid-apply. apply-playbooks takes every
+  # other host, then apply-own-host runs on a runner on another host and
+  # applies the same list to the one this job skipped.
   apply-playbooks:
     name: Apply Playbooks to Production
     needs: detect-changes
@@ -144,13 +148,12 @@ jobs:
       group: ${{ needs.detect-changes.outputs.concurrency-group }}
       cancel-in-progress: false
     environment: Github Actions CI
-    # Write is for one thing: fast-forwarding the `deployed` branch.
-    permissions:
-      contents: write
     outputs:
       total: ${{ steps.apply.outputs.total }}
       passed: ${{ steps.apply.outputs.passed }}
       failed: ${{ steps.apply.outputs.failed }}
+      own-host: ${{ steps.host.outputs.own }}
+      other-host: ${{ steps.host.outputs.other }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -181,10 +184,34 @@ jobs:
           echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
 
+      - name: Find this runner's host
+        id: host
+        env:
+          RUNNER_NAME: ${{ runner.name }}
+        run: |
+          set -euo pipefail
+          # Runners are named <host>-runner-<n> (the role's RUNNER_NAME).
+          OWN="${RUNNER_NAME%-runner-*}"
+          HOSTS=$(ansible-inventory -i inventories/production/hosts.ini \
+            --vault-password-file=/tmp/.vault_pass --list | jq -r '.github_runners.hosts[]')
+          if ! grep -qxF "$OWN" <<< "$HOSTS"; then
+            echo "::error::runner '$RUNNER_NAME' is not on a github_runners host"
+            exit 1
+          fi
+          OTHER=$(grep -vxF "$OWN" <<< "$HOSTS" | head -1)
+          if [ -z "$OTHER" ]; then
+            echo "::error::no other github_runners host to apply $OWN from"
+            exit 1
+          fi
+          echo "Running on $OWN; $OTHER applies $OWN afterwards"
+          echo "own=$OWN" >> "$GITHUB_OUTPUT"
+          echo "other=$OTHER" >> "$GITHUB_OUTPUT"
+
       - name: Apply playbooks to production
         id: apply
         env:
-          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          PLAYBOOKS: ${{ needs.detect-changes.outputs.playbooks }}
+          OWN: ${{ steps.host.outputs.own }}
           EXTRA_VARS: ${{ inputs.extra_vars || '' }}
           LIMIT: ${{ inputs.limit || '' }}
           # Pass untrusted commit fields via env, never inline ${{ }} in run: —
@@ -194,121 +221,13 @@ jobs:
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-
-          PLAYBOOKS='${{ needs.detect-changes.outputs.playbooks }}'
-          INVENTORY="inventories/production/hosts.ini"
-
-          # Optional --extra-vars from workflow_dispatch input (empty on push).
-          EXTRA_VARS_FLAG=()
-          if [ -n "$EXTRA_VARS" ]; then
-            EXTRA_VARS_FLAG=(--extra-vars "$EXTRA_VARS")
-          fi
-          LIMIT_FLAG=()
-          if [ -n "$LIMIT" ]; then
-            LIMIT_FLAG=(--limit "$LIMIT")
-          fi
-
-          echo "================================================"
-          echo "Applying playbooks to production infrastructure"
-          echo "================================================"
-          echo ""
           echo "Detected at: ${{ needs.detect-changes.outputs.head-sha }}"
           echo "Applying tree: $(git rev-parse HEAD)"
           echo "Author: $COMMIT_AUTHOR"
           echo "Message: $COMMIT_MESSAGE"
-          echo ""
-
-          # Initialize counters
-          TOTAL=0
-          PASSED=0
-          FAILED=0
-          RESULTS=""
-          FAILED_PLAYBOOKS=""
-
-          # Apply each playbook
-          for PLAYBOOK in $(echo "$PLAYBOOKS" | jq -r '.[]'); do
-            if [ ! -f "$PLAYBOOK" ]; then
-              echo "Skipping $PLAYBOOK: gone from the current tip"
-              continue
-            fi
-            TOTAL=$((TOTAL + 1))
-            echo "========================================"
-            echo "Applying: $PLAYBOOK"
-            echo "========================================"
-            
-            START_TIME=$(date +%s)
-            
-            ansible-playbook \
-              -i "$INVENTORY" \
-              --vault-password-file=/tmp/.vault_pass \
-              "${EXTRA_VARS_FLAG[@]}" \
-              "${LIMIT_FLAG[@]}" \
-              "$PLAYBOOK" 2>&1 | tee /tmp/playbook-${TOTAL}.log
-            ANSIBLE_EXIT=${PIPESTATUS[0]}
-            if [ "$ANSIBLE_EXIT" -eq 0 ]; then
-              END_TIME=$(date +%s)
-              DURATION=$((END_TIME - START_TIME))
-              PASSED=$((PASSED + 1))
-              
-              # Extract hosts from playbook output
-              HOSTS=$(grep -E "PLAY \[.*\]" /tmp/playbook-${TOTAL}.log | head -1 | sed 's/PLAY \[//' | sed 's/\].*//' || echo "N/A")
-              
-              RESULTS="${RESULTS}| \`$PLAYBOOK\` | ✅ Success | ${DURATION}s | $HOSTS |\n"
-              echo ""
-              echo "✅ SUCCESS: $PLAYBOOK (${DURATION}s)"
-            else
-              END_TIME=$(date +%s)
-              DURATION=$((END_TIME - START_TIME))
-              FAILED=$((FAILED + 1))
-              FAILED_PLAYBOOKS="${FAILED_PLAYBOOKS}${PLAYBOOK}\n"
-              
-              RESULTS="${RESULTS}| \`$PLAYBOOK\` | ❌ Failed | ${DURATION}s | N/A |\n"
-              echo ""
-              echo "❌ FAILED: $PLAYBOOK (${DURATION}s)"
-              echo "Continuing with remaining playbooks..."
-            fi
-            echo ""
-          done
-
-          # Save results for summary
-          echo "total=$TOTAL" >> $GITHUB_OUTPUT
-          echo "passed=$PASSED" >> $GITHUB_OUTPUT
-          echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          echo -e "$RESULTS" > /tmp/apply-results.txt
-
-          if [ -n "$FAILED_PLAYBOOKS" ]; then
-            echo -e "$FAILED_PLAYBOOKS" > /tmp/failed-playbooks.txt
-          fi
-
-          echo "========================================"
-          echo "Deployment Summary"
-          echo "========================================"
-          echo "Total: $TOTAL"
-          echo "Passed: $PASSED"
-          echo "Failed: $FAILED"
-          echo ""
-
-          # Fail job if any playbook failed
-          if [ $FAILED -gt 0 ]; then
-            echo "❌ Some playbooks failed to apply"
-            exit 1
-          else
-            echo "✅ All playbooks applied successfully"
-          fi
-
-      - name: Mark deployed
-        if: success() && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ needs.detect-changes.outputs.head-sha }}
-        run: |
-          # Same header actions/checkout would have persisted, scoped to this
-          # step through env so it never lands in .git/config or argv.
-          export GIT_CONFIG_COUNT=1
-          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          export GIT_CONFIG_VALUE_0
-          bash .github/workflows/lib/mark-deployed.sh "$HEAD_SHA"
+          # NOTE: implicit localhost is outside `all`, so an unlimited run names
+          # it or every `hosts: localhost` play is skipped.
+          bash .github/workflows/lib/apply-playbooks.sh "$PLAYBOOKS" "${LIMIT:-all:localhost}:!$OWN"
 
       - name: Cleanup vault password
         if: always()
@@ -386,11 +305,103 @@ jobs:
           rm -f /tmp/failed-playbooks.txt
           rm -f /tmp/playbook-*.log
 
+  apply-own-host:
+    name: Apply to ${{ needs.apply-playbooks.outputs.own-host }} (from ${{ needs.apply-playbooks.outputs.other-host }})
+    needs: [detect-changes, apply-playbooks]
+    # Runs after a failed apply-playbooks too, as long as it got far enough to
+    # name its host: one bad playbook elsewhere shouldn't leave this host behind.
+    if: >-
+      always()
+      && needs.detect-changes.outputs.has-changes == 'true'
+      && needs.apply-playbooks.outputs.other-host != ''
+    runs-on: [self-hosted, homelab, ansible, "on-${{ needs.apply-playbooks.outputs.other-host }}"]
+    concurrency:
+      group: ${{ needs.detect-changes.outputs.concurrency-group }}
+      cancel-in-progress: false
+    environment: Github Actions CI
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet ansible
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Setup vault password
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          echo "$ANSIBLE_VAULT_PASSWORD" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Apply playbooks to ${{ needs.apply-playbooks.outputs.own-host }}
+        env:
+          PLAYBOOKS: ${{ needs.detect-changes.outputs.playbooks }}
+          OWN: ${{ needs.apply-playbooks.outputs.own-host }}
+          EXTRA_VARS: ${{ inputs.extra_vars || '' }}
+          LIMIT: ${{ inputs.limit || '' }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          bash .github/workflows/lib/apply-playbooks.sh "$PLAYBOOKS" "${LIMIT:-all}:&$OWN"
+
+      - name: Cleanup vault password
+        if: always()
+        run: rm -f /tmp/.vault_pass
+
+      - name: Upload playbook logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playbook-logs-${{ github.run_number }}-${{ needs.apply-playbooks.outputs.own-host }}
+          path: /tmp/playbook-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The deployed marker moves only once both halves applied cleanly; a failure
+  # in either leaves it, so the next push retries what didn't land.
+  mark-deployed:
+    name: Mark deployed
+    needs: [detect-changes, apply-playbooks, apply-own-host]
+    if: >-
+      always() && github.event_name == 'push'
+      && needs.apply-playbooks.result == 'success'
+      && needs.apply-own-host.result == 'success'
+    runs-on: [self-hosted, homelab, ansible]
+    # Write is for one thing: fast-forwarding the `deployed` branch.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mark deployed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.detect-changes.outputs.head-sha }}
+        run: |
+          # Same header actions/checkout would have persisted, scoped to this
+          # step through env so it never lands in .git/config or argv.
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          bash .github/workflows/lib/mark-deployed.sh "$HEAD_SHA"
+
   # Post-deployment health verification
   verify-deployment:
     name: Verify Deployment Health
-    needs: [detect-changes, apply-playbooks]
-    if: always() && needs.apply-playbooks.result == 'success'
+    needs: [detect-changes, apply-playbooks, apply-own-host]
+    if: >-
+      always()
+      && needs.apply-playbooks.result == 'success'
+      && needs.apply-own-host.result == 'success'
     runs-on: [self-hosted, homelab, ansible]
     steps:
       - name: Checkout repository

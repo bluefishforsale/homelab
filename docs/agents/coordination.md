@@ -31,9 +31,12 @@ deploy races, and resource hijacking.
    from the same playbook.
 
 6. **CI-mediated vs manual.** Ordinary ocean services deploy via CI/dispatch.
-   Self-referential infra (the GitHub Actions runners themselves) and anything
-   that would kill the job mid-run are applied **manually on the homelab network,
-   never via CI** — a runner cannot redeploy itself. "Manually on the homelab
+   The runner hosts deploy through CI too, but never from themselves: main-apply
+   applies every playbook to every host except the runner host its job is on,
+   then a second job on a runner on another host applies the same list to that
+   one host. So no apply restarts docker or the runners under its own job. The
+   first apply of a runner host that has no homelab runners (no `on-<host>`
+   label) yet is applied **manually on the homelab network, never via CI**. "Manually on the homelab
    network" means from **agentbox**, not the laptop; before a mutating run,
    confirm no deploy is in flight, because running outside CI means running
    outside the `deploy-ocean` concurrency group that would otherwise serialize

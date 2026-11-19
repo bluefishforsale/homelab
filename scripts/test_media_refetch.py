@@ -87,7 +87,23 @@ def test_download_still_in_the_queue_after_grab_timeout_is_not_given_up():
     # The 2026-10-20 batch queued 1.5 TB behind NZBGet's 18:00-02:00 pause; 37 items
     # went stuck while still downloading and stuck never restores the added date.
     grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
-    assert not refetch.gave_up(grabbed, downloading=True)
+    assert not refetch.gave_up(grabbed, downloading=[{"status": "downloading"}])
+
+
+def test_auto_carries_every_option_plan_reads():
+    # --tv-files and --ids reached plan but not auto, so the first batch the
+    # agentbox timer tried to plan after them died on a.tv_files.
+    ap = refetch.parser()
+    auto = vars(ap.parse_args(["auto", "--yes", "--movies", "50", "--tv-gb", "1000"]))
+    plan = vars(ap.parse_args(["plan"]))
+    assert set(plan) - {"fn"} <= set(auto)
+
+
+def test_download_paused_in_the_client_after_grab_timeout_is_given_up():
+    # Doctor Who S08E01 sat paused in NZBGet with 10% left from 2026-11-13; read as
+    # still downloading, it held off every batch for six days.
+    grabbed = refetch.now() - refetch.GRAB_TIMEOUT * 2
+    assert refetch.gave_up(grabbed, downloading=[{"status": "paused"}])
 
 
 class FakeArr:
@@ -503,6 +519,45 @@ def test_movie_tdarr_remuxed_to_mkv_is_probed_at_its_new_path():
         refetch.ssh, refetch.subs = saved
     assert probed == [mkv] and item["file"] == mkv, (probed, item.get("file"))
     assert item["path"] == mkv.removeprefix("/media") and item["state"] == "imported"
+
+
+def test_radarr_folder_with_a_trailing_slash_records_one_slash():
+    # Totoro (2026-11-10): Radarr's folder ended in "/", so the imported path read
+    # ".../My Neighbor Totoro (1988)//...", which no Plex path ever matches.
+    class Fake:
+        def get(self, app, path, **kw):
+            return {"hasFile": True, "path": "/movies/Totoro (1988)/",
+                    "movieFile": {"id": 5, "relativePath": "Totoro.mkv",
+                                  "dateAdded": refetch.now().isoformat()}}
+
+    saved = refetch.subs
+    refetch.mc = Fake()
+    refetch.subs = lambda file: ["eng"]
+    item = {"movie_id": 1, "state": "grabbed", "attempts": 0, "title": "t", "log": [],
+            "grabbed_at": (refetch.now() - refetch.dt.timedelta(hours=1)).isoformat()}
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.subs = saved
+    assert item["path"] == "/movies/Totoro (1988)/Totoro.mkv", item["path"]
+
+
+def test_imported_movie_recorded_with_a_double_slash_still_finds_its_plex_item():
+    # Totoro (2026-11-15 to 11-18): the "//" path never matched Plex, so the item sat
+    # in imported for three days and held off every batch behind it.
+    restored = []
+    saved = refetch.probe, refetch.plex_items, refetch.restore_added
+    refetch.probe = lambda file: []
+    refetch.plex_items = lambda: {"/movies/Totoro (1988)/Totoro.mkv": (7, 0, None)}
+    refetch.restore_added = lambda rk, added_at, plex_type: restored.append(rk)
+    item = {"movie_id": 1, "state": "imported", "title": "t", "log": [], "added_at": 1628446834,
+            "imported_at": refetch.now().isoformat(),
+            "file": "/media/movies/Totoro (1988)//Totoro.mkv", "path": "/movies/Totoro (1988)//Totoro.mkv"}
+    try:
+        refetch.step(item, yes=True)
+    finally:
+        refetch.probe, refetch.plex_items, refetch.restore_added = saved
+    assert item["state"] == "done" and restored == [7], (item["state"], restored)
 
 
 def test_movie_search_gets_the_same_time_as_a_season_search():

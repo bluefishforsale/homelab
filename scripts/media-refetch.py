@@ -547,8 +547,10 @@ def note(item, msg):
 
 
 def gave_up(grabbed, downloading):
-    """A download still in the client's queue is waited on however long it takes."""
-    return not downloading and now() - grabbed > GRAB_TIMEOUT
+    """A download still in the client's queue is waited on however long it takes,
+    unless the client has paused it: a paused download never finishes on its own."""
+    moving = [q for q in downloading if q.get("status") != "paused"]
+    return not moving and now() - grabbed > GRAB_TIMEOUT
 
 
 def awaiting_redownload(item):
@@ -673,7 +675,7 @@ def step(item, yes):
                 return True
             return False
         # Radarr may still name the .mp4 the flow already remuxed to .mkv.
-        file = flowed("/media" + movie["path"] + "/" + mf["relativePath"])
+        file = flowed("/media" + os.path.join(movie["path"].rstrip("/"), mf["relativePath"]))
         path = file.removeprefix("/media")
         langs = subs(file)
         item["attempts"] += 1
@@ -700,7 +702,8 @@ def step(item, yes):
         return True
 
     if item["state"] == "imported":
-        item["file"] = flowed(item["file"])
+        # normpath heals ledger entries recorded with a "//" before the grabbed step joined paths properly.
+        item["file"] = flowed(os.path.normpath(item["file"]))
         item["path"] = item["file"].removeprefix("/media")
         why = conformance.reasons(probe(item["file"]))
         if "no-dialogue-track" in why or "video-not-hevc" in why:
@@ -934,7 +937,7 @@ def lock():
     return fd
 
 
-def main():
+def parser():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
@@ -957,11 +960,16 @@ def main():
     au.add_argument("--min-free-tb", type=float, default=3.0,
                     help="do not start a batch with less than this free on /data01")
     au.add_argument("--yes", action="store_true")
-    au.set_defaults(fn=cmd_auto, show_skipped=False)
+    # The timer plans through auto, so every option plan reads needs a value here.
+    au.set_defaults(fn=cmd_auto, show_skipped=False, tv_files=None, ids=None)
     s = sub.add_parser("status")
     s.add_argument("-v", "--verbose", action="store_true")
     s.set_defaults(fn=cmd_status)
-    a = ap.parse_args()
+    return ap
+
+
+def main():
+    a = parser().parse_args()
     # NOTE: two runs over one ledger both see an item as planned and both grab
     # a release; this happened on batch 1 (Sinners grabbed twice, seconds apart).
     _held = lock()  # noqa: F841
