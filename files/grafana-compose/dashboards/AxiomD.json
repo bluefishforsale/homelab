@@ -191,7 +191,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(increase(axiomd_ops_triage_total{job=\"axiomd\",outcome!~\"model_error|no_issue\"}[$__range]))",
+          "expr": "sum(increase(axiomd_ops_triage_total{job=\"axiomd\",outcome!~\"model_error|push_error\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -267,7 +267,7 @@
     },
     {
       "type": "stat",
-      "title": "Issues opened",
+      "title": "Pushes sent",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -314,7 +314,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(increase(axiomd_ops_issues_opened_total{job=\"axiomd\"}[$__range]))",
+          "expr": "sum(increase(axiomd_ops_pushes_total{job=\"axiomd\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -382,7 +382,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(increase(axiomd_ops_notes_withheld_total{job=\"axiomd\"}[$__range])) + sum(increase(axiomd_ops_issues_capped_total{job=\"axiomd\"}[$__range]))",
+          "expr": "sum(increase(axiomd_ops_notes_withheld_total{job=\"axiomd\"}[$__range])) + sum(increase(axiomd_ops_pushes_capped_total{job=\"axiomd\"}[$__range]))",
           "refId": "A"
         }
       ],
@@ -439,7 +439,7 @@
           "legendFormat": "{{outcome}}"
         }
       ],
-      "description": "A verdict, or no_issue (nowhere to post) or model_error (the call failed and will be retried).",
+      "description": "A verdict, or model_error (the call failed) or push_error (ntfy refused it); both are retried.",
       "id": 8
     },
     {
@@ -565,7 +565,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Issues and reports (per day)",
+      "title": "Pushes (per day)",
       "datasource": {
         "type": "prometheus",
         "uid": "bf02tpxiz6m0wf"
@@ -604,9 +604,9 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(increase(axiomd_ops_issues_opened_total{job=\"axiomd\"}[1d]))",
+          "expr": "sum(increase(axiomd_ops_pushes_total{job=\"axiomd\"}[1d]))",
           "refId": "A",
-          "legendFormat": "log anomaly issues opened"
+          "legendFormat": "real incidents pushed"
         },
         {
           "datasource": {
@@ -614,7 +614,7 @@
             "uid": "bf02tpxiz6m0wf"
           },
           "editorMode": "code",
-          "expr": "sum(increase(axiomd_ops_issues_capped_total{job=\"axiomd\"}[1d]))",
+          "expr": "sum(increase(axiomd_ops_pushes_capped_total{job=\"axiomd\"}[1d]))",
           "refId": "B",
           "legendFormat": "capped"
         },
@@ -627,16 +627,6 @@
           "expr": "sum(increase(axiomd_ops_notes_withheld_total{job=\"axiomd\"}[1d]))",
           "refId": "C",
           "legendFormat": "withheld"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bf02tpxiz6m0wf"
-          },
-          "editorMode": "code",
-          "expr": "sum by(outcome) (increase(axiomd_ops_flap_reports_total{job=\"axiomd\"}[1d]))",
-          "refId": "D",
-          "legendFormat": "flap report: {{outcome}}"
         }
       ],
       "id": 11
