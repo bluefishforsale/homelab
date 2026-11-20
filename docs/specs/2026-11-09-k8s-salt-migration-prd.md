@@ -113,7 +113,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, approved |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. harbor is excluded too until its Docker is gone (D54). An alert fires when ocean has had a reboot pending for more than 35 days, which means a window was missed (R12). Kernel live patching is not used: nothing free supports Debian, it would not cover the ZFS and NVIDIA modules, and it would be changing kernel code on the host that owns the pool. It is a question for the distro-lifecycle plan. | design call, approved |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, approved |
-| D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
+| D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library, starting on 5.x (5.3.0 was current on 2026-11-19) and pinned. A library major is a supervised change, run on the rehearsal cluster first: majors have broken the values schema four times, and the move to 5.x changed Deployment selector labels, which means deleting and recreating each Deployment. | terrac (upgrade, style), design call, approved (which dependency; terrac: 5.x) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). Service records written by ExternalDNS are the one exception (D55). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
 | D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, approved |
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D24 (which dependency), D28, D29, D30, D31, D33, D34, D35
+  confirmed: D28, D29, D30, D31, D33, D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says

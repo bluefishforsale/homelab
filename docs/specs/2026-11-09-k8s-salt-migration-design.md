@@ -1415,6 +1415,8 @@ Claims this design leans on, and where each gets checked. A row moves to
 | `192.168.1.64/27` is unused | Sweep and repo read, 2026-11-19; a powered-off device would not show, and the UniFi client history was not read | UniFi client list, phase 0 |
 | A record written through the PowerDNS API reaches both dns01 and dns02 | Unknown: this spec and `scripts/dns-drift-check.sh` disagree on how the pair replicates | Phase 0, before ExternalDNS |
 | ExternalDNS's PowerDNS provider reads Gateway API routes and `DNSEndpoint` objects, and leaves records without its ownership TXT alone | From memory, unverified | ExternalDNS docs, then the rehearsal cluster, phase 1 |
+| `app-template` 5.x is maintained (5.3.0 released October 2026) and its majors can force a Deployment to be recreated | Confirmed from the project's release page and a downstream chart's upgrade notes, 2026-11-19 | |
+| `app-template` 5.x needs Kubernetes 1.31 and Helm 3.18 or newer | From a third-party listing, not the project's own pages | Reference chart render in CI, phase 0 |
 | The Gateway sees a LAN client's address with `externalTrafficPolicy: Local` | From memory, unverified | The rehearsal cluster, phase 1 |
 | A tunnel with one catch-all rule to the Gateway serves any hostname whose CNAME points at it, and a proxied CNAME moved between tunnels takes effect in seconds | From memory, unverified | The rehearsal cluster, phase 1 |
 | Cilium creates an in-cluster Service for each Gateway that `cloudflared` can target by name | From memory, unverified | The rehearsal cluster, phase 1 |
