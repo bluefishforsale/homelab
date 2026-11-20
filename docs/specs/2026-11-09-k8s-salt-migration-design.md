@@ -283,7 +283,18 @@ worth it for the last group is an open item in the PRD.
     commit (terrac, D20). The cluster has one Cloudflare tunnel of its own,
     with `cloudflared` as a Deployment, a replica on each node, and a single
     catch-all rule that sends everything to the Gateway. That rule is
-    written once in `terraform-root` and no cutover touches it. A public
+    written once in `terraform-root` and no cutover touches it. It names
+    the Gateway's in-cluster Service, not its LAN address, so the public
+    path does not depend on the L2 announcement.
+  - The tunnel never points at a host or a pod, which is what makes a pod
+    easy to move (terrac). Cloudflare reaches any `cloudflared` replica,
+    the Gateway matches the hostname to a route, and the route's Service
+    finds the pod on whichever node it runs. A pod changing node changes no
+    tunnel config, no DNS record and nothing in `terraform-root`. With a
+    node down, Cloudflare uses the other replica and the surviving node
+    announces the Gateway's LAN address. What ties a pod to a node is its
+    state, the GPU or the pool's local mount (Storage, below), never its
+    names. A public
     name is a CNAME in Cloudflare pointing at a tunnel, so moving a service
     is pointing its CNAME at the cluster tunnel instead of ocean's. A second
     ExternalDNS instance, with the Cloudflare provider, writes that record
@@ -1401,6 +1412,7 @@ Claims this design leans on, and where each gets checked. A row moves to
 | ExternalDNS's PowerDNS provider reads Gateway API routes and `DNSEndpoint` objects, and leaves records without its ownership TXT alone | From memory, unverified | ExternalDNS docs, then the rehearsal cluster, phase 1 |
 | The Gateway sees a LAN client's address with `externalTrafficPolicy: Local` | From memory, unverified | The rehearsal cluster, phase 1 |
 | A tunnel with one catch-all rule to the Gateway serves any hostname whose CNAME points at it, and a proxied CNAME moved between tunnels takes effect in seconds | From memory, unverified | The rehearsal cluster, phase 1 |
+| Cilium creates an in-cluster Service for each Gateway that `cloudflared` can target by name | From memory, unverified | The rehearsal cluster, phase 1 |
 | A record removed from Terraform state is left in place at Cloudflare, and ExternalDNS can then adopt it | From memory, unverified | One test record, phase 1 |
 | k3s stores Secrets unencrypted in its database unless `--secrets-encryption` is set | From memory, unverified | k3s docs, phase 1; the nightly backup carries that database, so the flag goes on if so |
 | Cilium's datapath and Docker's bridge and iptables rules coexist on one host through a reboot | Unverified | The rehearsal VM, phase 1, before k3s goes onto ocean |

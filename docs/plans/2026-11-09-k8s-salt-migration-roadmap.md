@@ -224,6 +224,10 @@ On the rehearsal VM:
 - [ ] Each nginx feature in use today (rate limit, body size, websocket
       upgrade, IP allowlist) proven on the Gateway with a test route, or its
       fallback decided (D50).
+- [ ] The public test name still answers after its pod is moved to another
+      node and after one `cloudflared` replica is stopped, with no tunnel or
+      DNS change (on the rehearsal cluster this needs its second node, an
+      open item; otherwise it is first proven in phase 2).
 - [ ] The Gateway's address answers on 80/443 from a laptop, under a name
       ExternalDNS wrote; the record goes away when the route does; a record
       ExternalDNS did not create is left alone when a route claims its name;
