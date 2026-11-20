@@ -116,7 +116,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library, starting on 5.x (5.3.0 was current on 2026-11-19) and pinned. A library major is a supervised change, run on the rehearsal cluster first: majors have broken the values schema four times, and the move to 5.x changed Deployment selector labels, which means deleting and recreating each Deployment. | terrac (upgrade, style), design call, approved (which dependency; terrac: 5.x) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). Service records written by ExternalDNS are the one exception (D55). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
 | D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, approved |
-| D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
+| D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call, approved |
 | D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
 | D30 | The VM base image is stock Debian genericcloud, pinned by hash, mirrored to GCS, downloaded per node by `terraform-root`. No custom template build. | design call |
 | D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. | design call |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D28, D29, D30, D31, D33, D34, D35
+  confirmed: D29, D30, D31, D33, D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
