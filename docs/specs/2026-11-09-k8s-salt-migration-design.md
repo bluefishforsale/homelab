@@ -1048,8 +1048,18 @@ path that runs on the thing that died sends nothing.
   at odds with cattle VMs (D26) and with a new VM being one `terraform apply`
   away (D30). So a workflow takes the host's name as its only input, reads the
   public key from that host itself over SSH by IP, updates `.sops.yaml`, runs
-  `sops updatekeys` with the CI key and opens the PR; terrac's part is the
-  merge. It never takes a key as an input: a re-encrypted diff cannot be
+  `sops updatekeys` with the CI key and opens the PR. For a new VM that PR
+  merges itself (terrac, D29), so `terraform apply` to a fully configured
+  VM has no manual step: the Terraform apply dispatches this workflow, it
+  waits for SSH, rekeys, merges, and CI rsyncs the tree and runs the first
+  highstate. The merge is automatic only under R31's guards: the host is in
+  the address table and in `terraform-root`, the key came from the host at
+  its table IP, and the diff adds that host as a recipient of its own
+  pillar file and the shared files its role already lists, nothing else.
+  What that leaves is a narrow window: something answering SSH at a table
+  IP before the real VM does would be handed that host's pillar, on a LAN
+  with static addresses. The DNS pair, pihole and the hypervisors do not
+  get the automatic merge. It never takes a key as an input: a re-encrypted diff cannot be
   checked by eye, so a pasted key would hand that host's pillar to whoever
   dispatched the run. Bare metal (the Proxmox hosts) runs it by hand after install, since
   there is no cloud-init there; VMs run the same script from cloud-init

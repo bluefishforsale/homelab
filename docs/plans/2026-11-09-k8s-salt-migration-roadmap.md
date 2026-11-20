@@ -92,7 +92,9 @@ none of it blocks this phase.
       bootstrap script (pinned `.deb` from the GCS mirror, verified by hash,
       tested by CI in a clean Debian container, wrapped by one Ansible play
       for existing hosts); the rekey workflow, which reads the key from the
-      host (R31); pillar decryption settled; the per-host deploy lock (R27);
+      host and merges its own PR for a new VM under R31's guards, with one
+      VM taken from `terraform apply` to a finished highstate untouched
+      (D29); pillar decryption settled; the per-host deploy lock (R27);
       both hypervisors bootstrapped by hand; the D28 timer as the first state
       applied through CI.
 - [ ] Confirm GitHub concurrency groups are per repository (two repos, one

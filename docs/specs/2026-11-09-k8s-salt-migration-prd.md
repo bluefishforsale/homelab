@@ -117,7 +117,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). Service records written by ExternalDNS are the one exception (D55). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
 | D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, approved |
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call, approved |
-| D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
+| D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. Cloud-init is the preferred path: a new VM goes from `terraform apply` to its full highstate with no manual step. The apply dispatches the Salt workflow for the new host, and the rekey PR that lets the host read its own pillar merges itself under R31's guards. The DNS pair and the hypervisors are the exceptions; their rekey waits for terrac. | design call, approved (terrac: hands-off through cloud-init, highstate after provision, guarded auto-merge of the rekey) |
 | D30 | The VM base image is stock Debian genericcloud, pinned by hash, mirrored to GCS, downloaded per node by `terraform-root`. No custom template build. | design call |
 | D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. | design call |
 | D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, approved |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D29, D30, D31, D33, D34, D35
+  confirmed: D30, D31, D33, D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
@@ -289,7 +289,14 @@ Not decided yet. Each needs terrac, and none blocks phase 0.
 - **R30.** The dead-man watchdog alerts only past a ten-minute outage, so a
   planned ocean reboot does not page.
 - **R31.** The rekey workflow reads a host's public key from the host. It
-  never accepts a key as an input.
+  never accepts a key as an input. For a new VM its PR merges without
+  terrac only if all of these hold: the host is in the address table and in
+  `terraform-root`; the key was read from the host at its table IP; the diff
+  touches only `.sops.yaml` recipients for that host's own pillar file and
+  the shared files its role already lists, and the re-encrypted files
+  themselves. Anything else, and any rekey of dns01, dns02, pihole or a
+  hypervisor, waits for terrac's merge. The highstate that follows is
+  dispatched by CI; a host still never fetches the tree itself (R9).
 - **R32.** Deploying k3s never breaks Docker or the ability to run containers
   under it (terrac). On every host with Docker services, from its first k3s
   step until its last container has moved to containerd under k3s, each step
