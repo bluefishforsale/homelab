@@ -336,6 +336,21 @@ The `agents.md` rule "Nothing with a write-ahead log goes over NFS" carries over
 unchanged. SQLite and Postgres state (the *arrs, Plex, Tautulli, Bazarr,
 Grafana's MySQL, Prometheus TSDB, Loki) must be on a node-local disk.
 
+Which node a service's state lives on is decided by three things (terrac,
+D14), and the migration table records the answer per service:
+
+- whether it keeps a SQLite database or anything else with a write-ahead
+  log, which NFS can corrupt. harbor mounts the pool over NFS, so a pod
+  there can reach `/data01` and nothing but this rule stops a chart from
+  putting such state on it. That state goes on a local disk of the node the
+  pod runs on, always;
+- how much disk latency it tolerates;
+- how much bandwidth it moves to and from the pool. A service that streams
+  or rewrites large files belongs on ocean, beside the disks, not on
+  harbor across the network.
+
+The pod then follows its state, by role label, never by hostname.
+
 | Kind | Where | How |
 |---|---|---|
 | Media (read/write, hardlinks) | `/data01` | One static NFS PV of the whole pool, `ReadWriteMany`, `Retain`, mounted on harbor, which is an NFS client of the pool today. On ocean, a static local PV of `/data01` (no NFS loopback). One mount of the whole pool so *arr hardlinks do not hit `EXDEV`. A PV binds one claim, so each consuming namespace gets its own PV onto the same path. |

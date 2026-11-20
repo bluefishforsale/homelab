@@ -104,7 +104,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D10 | The cluster gets a load-balancer address pool, `192.168.1.64/27`, which sits outside the DHCP pool (`.150` to `.239`) and is empty today apart from one stale record. Cilium hands the addresses out (LB IPAM) and answers ARP for them (L2 announcements). MetalLB in L2 mode is the fallback if Cilium's way fails the Docker gate on the rehearsal cluster. BGP is wanted later and is not in this plan. The top `/29` of the pool belongs to the rehearsal cluster. New VMs still take addresses from the existing static range, and ntfy's name resolves to agentbox, since a push that travels through ocean dies with ocean (D19). | terrac |
 | D11 | Patches and package upgrades are continuous, for CVEs. OS majors, and replacing ocean or harbor, are out of this plan: they are planned after everything is on Salt and k3s and upgrades have been proven in operation, even if that runs past the end of Debian 12 LTS (D53). | terrac |
 | D13 | Ocean runs Docker and k3s side by side until Docker is completely drained, and ends this plan as the same VM with Docker removed. | terrac |
-| D14 | Pods pin to node role labels, never to a hostname, so a later replacement VM needs no chart change. | design call |
+| D14 | Pods pin to node role labels, never to a hostname, so a later replacement VM needs no chart change. Where a service's state lives is decided by whether it has a SQLite database or other write-ahead log that NFS could corrupt (harbor's pods can reach the pool over NFS, so the rule has to be held by the charts), how much disk latency it tolerates, and how much bandwidth it moves to and from the pool. | design call, approved (terrac: the storage criteria) |
 | D15 | CNI is Cilium. | terrac |
 | D17 | "Cluster is down" is reported by email and ntfy. | terrac |
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D14, D20 (public names through nginx until W7), D22, D24 (which
+  confirmed: D20 (public names through nginx until W7), D22, D24 (which
   dependency), D28, D29, D30, D31, D33, D34, D35 (shape) and D49 (the whole
   cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
