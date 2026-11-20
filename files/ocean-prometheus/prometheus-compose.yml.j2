@@ -45,12 +45,15 @@ services:
     read_only: false
     
     # Resource Limits
+    # NOTE: the limit has to cover WAL replay at startup, not steady state.
+    # At 2G a 1.4GB WAL could not be replayed, so the container was OOM-killed
+    # about 40s into every start and restarted forever (2026-11-20).
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
         reservations:
-          memory: 1G
+          memory: 2G
     
     # Logging
     logging:
