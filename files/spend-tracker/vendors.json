@@ -1,0 +1,17 @@
+[
+  {"vendor": "Anthropic", "match": "anthropic", "cadence": "monthly"},
+  {"vendor": "OpenAI", "match": "openai", "cadence": "usage"},
+  {"vendor": "Alpaca", "match": "alpacad", "cadence": "monthly"},
+  {"vendor": "Massive", "match": "massive\\.com", "cadence": "monthly"},
+  {"vendor": "Suno", "match": "suno", "cadence": "monthly"},
+  {"vendor": "Google Cloud", "match": "google cloud", "cadence": "usage"},
+  {"vendor": "Google One", "match": "google one", "cadence": "annual"},
+  {"vendor": "YouTube", "match": "youtube", "cadence": "monthly"},
+  {"vendor": "Newsdemon", "match": "newsdemon", "cadence": "monthly"},
+  {"vendor": "Monarch", "match": "monarch money", "cadence": "annual"},
+  {"vendor": "Docker", "match": "docker", "cadence": "annual"},
+  {"vendor": "Apple Developer", "match": "^apple$", "amount": 99.00, "cadence": "annual"},
+  {"vendor": "Cloudflare Registrar", "match": "^cloudflare$", "cadence": "annual"},
+  {"vendor": "Cloudflare Pro", "match": "paypal", "amount": 240.00, "cadence": "annual"},
+  {"vendor": "GitHub", "match": "paypal", "amount": 4.00, "cadence": "monthly"}
+]

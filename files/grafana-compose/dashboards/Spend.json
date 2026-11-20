@@ -1,0 +1,148 @@
+{
+  "annotations": {"list": []},
+  "description": "Subscriptions, APIs and cloud accounts, from the spend tracker's Postgres table (card transactions via Monarch, classified by files/spend-tracker/vendors.json).",
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "This month so far",
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "text"}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "none", "graphMode": "none"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coalesce(sum(amount), 0) AS spend FROM spend WHERE date >= date_trunc('month', now())"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Last month",
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "text"}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "none", "graphMode": "none"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coalesce(sum(amount), 0) AS spend FROM spend WHERE date >= date_trunc('month', now()) - interval '1 month' AND date < date_trunc('month', now())"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Monthly run rate",
+      "description": "Monthly and usage charges averaged over the last 3 full months, plus the last 12 months of annual charges divided by 12.",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "text"}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "none", "graphMode": "none"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT coalesce(sum(amount), 0) / 3 FROM spend WHERE cadence <> 'annual' AND date >= date_trunc('month', now()) - interval '3 months' AND date < date_trunc('month', now())) + (SELECT coalesce(sum(amount), 0) / 12 FROM spend WHERE cadence = 'annual' AND date >= now() - interval '12 months') AS run_rate"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Last 12 months",
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "fixed", "fixedColor": "text"}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "none", "graphMode": "none"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coalesce(sum(amount), 0) AS spend FROM spend WHERE date >= now() - interval '12 months'"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Spend per month by vendor",
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 5},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 0, "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {
+        "xField": "month",
+        "stacking": "normal",
+        "showValue": "never",
+        "legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "transformations": [
+        {"id": "groupingToMatrix", "options": {"columnField": "vendor", "rowField": "month", "valueField": "spend", "emptyValue": "zero"}},
+        {"id": "organize", "options": {"renameByName": {"month\\vendor": "month"}}}
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT to_char(date_trunc('month', date), 'YYYY-MM') AS month, vendor, sum(amount) AS spend FROM spend WHERE $__timeFilter(date) GROUP BY 1, 2 ORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Annual renewals",
+      "description": "Latest charge per annual vendor and the date it is due again.",
+      "gridPos": {"h": 10, "w": 10, "x": 0, "y": 16},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {}, "overrides": [{"matcher": {"id": "byName", "options": "amount"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}]}]},
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DISTINCT ON (vendor) vendor, amount, to_char(date, 'YYYY-MM-DD') AS last_charged, to_char(date + interval '1 year', 'YYYY-MM-DD') AS next_due FROM spend WHERE cadence = 'annual' ORDER BY vendor, date DESC"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Charges",
+      "gridPos": {"h": 10, "w": 14, "x": 10, "y": 16},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "spend"},
+      "fieldConfig": {"defaults": {}, "overrides": [{"matcher": {"id": "byName", "options": "amount"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}]}]},
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT to_char(date, 'YYYY-MM-DD') AS date, vendor, amount, cadence FROM spend WHERE $__timeFilter(date) ORDER BY spend.date DESC, vendor"
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": ["spend"],
+  "time": {"from": "now-13M", "to": "now"},
+  "timezone": "browser",
+  "title": "Spend",
+  "uid": "spend",
+  "version": 1
+}

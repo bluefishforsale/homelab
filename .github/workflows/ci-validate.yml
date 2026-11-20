@@ -319,6 +319,11 @@ jobs:
       - name: emporia-exporter rate schedule
         run: python3 files/emporia-exporter/test_rates.py
 
+      # A vendor rule that claims the wrong merchant puts a paycheck or a
+      # hardware purchase on the Spend dashboard.
+      - name: spend-tracker vendor rules
+        run: python3 files/spend-tracker/test_collector.py
+
       # Every per-node Tdarr panel is an aggregate of job records whose shape
       # changed across Tdarr versions.
       - name: tdarr-exporter job math
