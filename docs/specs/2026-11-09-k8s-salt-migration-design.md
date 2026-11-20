@@ -279,14 +279,36 @@ worth it for the last group is an open item in the PRD.
     then on. The Gateway terminates TLS with a cert cert-manager issued
     before the window. Backout is the commit reverted; clients follow
     within the TTL.
-  - A public name keeps arriving the way it does now, `cloudflared` to
-    ocean's nginx, and its cutover repoints that one nginx upstream to the
-    Gateway address, Host header kept. That keeps a `terraform-root` PR out
-    of every public service's window.
-  - At the end (W7) the tunnel rules move from nginx to the Gateway in one
-    `terraform-root` PR, any name still pointing at ocean is dealt with, and
-    the Docker nginx retires. Every route has carried traffic since its own
-    cutover.
+  - A public name moves the same way, at the same cutover, in the same
+    commit (terrac, D20). The cluster has one Cloudflare tunnel of its own,
+    with `cloudflared` as a Deployment, a replica on each node, and a single
+    catch-all rule that sends everything to the Gateway. That rule is
+    written once in `terraform-root` and no cutover touches it. A public
+    name is a CNAME in Cloudflare pointing at a tunnel, so moving a service
+    is pointing its CNAME at the cluster tunnel instead of ocean's. A second
+    ExternalDNS instance, with the Cloudflare provider, writes that record
+    from the same route. Backout is the commit reverted.
+  - The reason for ExternalDNS here, and not a `terraform-root` PR per
+    cutover: a service and its names then live in one place, and nothing
+    has to be coordinated across two repos after the move. Its token is
+    scoped to DNS edit on the zones in use. That is no new exposure: ocean
+    holds such a token today for certbot
+    (`files/ocean-certbot/cloudflare.ini.j2`), and cert-manager needs one
+    in the cluster for Let's Encrypt regardless.
+  - The handover mirrors the LAN one. In phase 1 each public service
+    record leaves `terraform-root` (removed from state, not destroyed) and
+    becomes a `DNSEndpoint` still pointing at ocean's tunnel, so no name
+    changes its answer and one writer owns it from then on. The tunnels
+    themselves, the Access apps and every record that is not a cluster
+    service (mail, apex, verification) stay in `terraform-root`.
+  - The catch-all means any hostname pointed at the cluster tunnel reaches
+    the Gateway, which answers only names that have a route. So "a route
+    with a public hostname is public", and CI in `homelab-kube` refuses a
+    public hostname on a route that does not carry an explicit label
+    saying so.
+  - At the end (W7) nothing is left on ocean's tunnel or its nginx: the
+    last names move, then both retire, with certbot. Every route has
+    carried traffic since its own cutover.
   - nginx does more than proxy today: `files/nginx-compose` carries 3
     `limit_req`, 5 `client_max_body_size`, 6 websocket upgrades and 1 IP
     allowlist. Each needs a Gateway or Cilium equivalent, proven on a test app
@@ -297,19 +319,21 @@ worth it for the last group is an open item in the PRD.
   - Client addresses. A LAN client now reaches the Gateway directly, so a
     rate limit or allowlist keyed on client IP is proven at that service's
     own cutover, provided the Gateway's service keeps the source address
-    (`externalTrafficPolicy: Local`), which phase 1 checks. A public name
-    still comes through nginx until W7, so the Gateway sees nginx's address
-    for those, and W7 re-tests them. W7 also has its own 14-day soak before
-    Docker is removed.
+    (`externalTrafficPolicy: Local`), which phase 1 checks. A public
+    request arrives from `cloudflared`, so the client's address is in
+    Cloudflare's header, as it is behind nginx today; a rule keyed on it has
+    to read that header, and phase 1 proves one. W7 has its own 14-day soak
+    before Docker is removed.
   - Not ingress-nginx: the project was retired in March 2026 and gets no more
     fixes. The `ingress-nginx` chart in `homelab-kube` is archived, not reused.
     Cilium is already the CNI, so its Gateway is one less component.
-- **Public traffic** arrives through `cloudflared` tunnels whose ingress rules
-  are remote config in `terraform-root`. `cloudflared` stays a host service on
-  ocean. Any tunnel rule that points straight at a container port, not at
-  nginx, needs a `terraform-root` PR as part of that service's cutover, merged
-  first. The `cloudflare-tunnel-ingress-controller` chart in `homelab-kube`
-  is archived: it would fight `terraform-root` over tunnel config.
+- **Public traffic** today arrives through `cloudflared` on ocean, a host
+  service whose ingress rules are remote config in `terraform-root`. It
+  keeps serving every public name that has not moved, and retires at W7.
+  The cluster tunnel above is a second, separate tunnel. Not a tunnel per
+  service, and not the `cloudflare-tunnel-ingress-controller` (its chart in
+  `homelab-kube` is archived): many tunnels and credentials to keep, and
+  the controller writes tunnel config that `terraform-root` also owns.
 - **hostNetwork pods** where the app needs the LAN: Home Assistant (discovery),
   Plex (GDM discovery, real client IPs for local-network detection), avahi
   and netatalk (mDNS advertisement, AFP).
@@ -459,8 +483,8 @@ its own iptables rules. Mitigations:
    run a bridge-network container with a published port and pods, then verify
    pod-to-pod, pod-to-service, the Gateway's address from another host, **a
    Docker container reaching the Gateway's address from the host that is
-   announcing it** (a public name's nginx flip depends on exactly this path,
-   and so does any Docker service calling a migrated peer by name; it is
+   announcing it** (any Docker service calling a migrated peer by name
+   takes exactly this path; it is
    where Cilium's datapath and Docker's bridge meet), **a pod reaching a Docker container's published
    port on its own host** (a migrated pod calling a peer by its front-door
    name lands on Docker's nginx this way, and so do Alloy's writes to
@@ -545,7 +569,7 @@ exercised, and has failed on purpose once, before ocean depends on it.
 3. Window: retire the Docker side ("Staying down", below), scale the
    Deployment to 1 and unsuspend its CronJobs, move the name to the Gateway
    (the route replaces the service's `DNSEndpoint`, and ExternalDNS moves
-   the record; for a public name, the nginx upstream is repointed as well),
+   the record, the public one too if it has one),
    verify with the service's health check and blackbox probe. Then
    check that its alert rules and dashboard panels still return series. The
    Docker gate runs before and after: moving one service must not disturb the
@@ -553,7 +577,7 @@ exercised, and has failed on purpose once, before ocean depends on it.
 4. Soak: the play, the compose files and the stopped container stay in place
    for the 14-day soak (D45). Backout during the soak is the window in
    reverse: scale to 0, bring the compose project back up through its play,
-   the name back to ocean (and the nginx upstream, for a public name). It works because the pod runs the same image against
+   the name back to ocean. It works because the pod runs the same image against
    the same state directory, so the service's image is frozen for the soak:
    Renovate skips it and a home-grown release waits. An image that has to
    change in the soak ends the backout for that service, and is recorded as
@@ -614,7 +638,7 @@ Two things move with a service that are not in its chart:
   The cutover PR updates them, and step 3 checks they return data.
 
 A cutover can touch up to four repos, in this order: `terraform-root` (only if
-a tunnel rule or bucket changes), the service's own repo (only for home-grown
+a bucket or an Access app changes), the service's own repo (only for home-grown
 images, to switch its dispatch target), `homelab-kube`, then `homelab`.
 
 Never run the container and the pod at the same time against the same state
@@ -727,14 +751,14 @@ above. Waves, lowest risk first:
 | W4 | tdarr server, llama.cpp, open-webui, plex | GPU; plex in quiet hours. The desktop tdarr nodes are outside the cluster and keep pointing at the server's front-door name. |
 | W5 | homeassistant, avahi, netatalk | hostNetwork |
 | W6 | prometheus, loki, grafana, alertmanager, blackbox, pushgateway, karma, and the host exporters (node, smart, process, fail2ban, cadvisor, nvidia-gpu, dcgm) as DaemonSets | this is phase 5. Blackbox stays in Docker until here: it verifies every earlier cutover, so it must not run on the thing it checks. The node-exporter DaemonSet mounts the host's textfile directory, since the drift, patch and pool metrics are written there by host timers. |
-| W7 | nginx | The tunnel rules move from nginx to the Gateway, any name still pointing at ocean is dealt with, and nginx and certbot retire. cert-manager has issued every cert since each service's own cutover. |
+| W7 | nginx | The last names leave ocean, then ocean's tunnel, nginx and certbot retire. cert-manager has issued every cert since each service's own cutover. |
 
 The services that live on harbor (nzbget, tdarr-node, ml-log-analyzer, mem0,
 archmap) are not in these waves. They move in phase 2, on harbor, through
 the same cutover procedure. mem0 is the agents' shared memory, so it is cut
 over with no agent run in flight; its public name reaches a container port
-on harbor through ocean's `cloudflared`, so its cutover carries a
-`terraform-root` PR for that tunnel rule.
+on harbor through ocean's `cloudflared` today, and moves to the cluster
+tunnel with the rest of it.
 
 At the end of W7, Docker on ocean is empty and is removed. That is where this
 plan leaves ocean. `fail2ban` stays, but its nginx jails lose their log
@@ -1376,6 +1400,9 @@ Claims this design leans on, and where each gets checked. A row moves to
 | A record written through the PowerDNS API reaches both dns01 and dns02 | Unknown: this spec and `scripts/dns-drift-check.sh` disagree on how the pair replicates | Phase 0, before ExternalDNS |
 | ExternalDNS's PowerDNS provider reads Gateway API routes and `DNSEndpoint` objects, and leaves records without its ownership TXT alone | From memory, unverified | ExternalDNS docs, then the rehearsal cluster, phase 1 |
 | The Gateway sees a LAN client's address with `externalTrafficPolicy: Local` | From memory, unverified | The rehearsal cluster, phase 1 |
+| A tunnel with one catch-all rule to the Gateway serves any hostname whose CNAME points at it, and a proxied CNAME moved between tunnels takes effect in seconds | From memory, unverified | The rehearsal cluster, phase 1 |
+| A record removed from Terraform state is left in place at Cloudflare, and ExternalDNS can then adopt it | From memory, unverified | One test record, phase 1 |
+| k3s stores Secrets unencrypted in its database unless `--secrets-encryption` is set | From memory, unverified | k3s docs, phase 1; the nightly backup carries that database, so the flag goes on if so |
 | Cilium's datapath and Docker's bridge and iptables rules coexist on one host through a reboot | Unverified | The rehearsal VM, phase 1, before k3s goes onto ocean |
 | k3s's ServiceLB claims host ports 80 and 443 unless disabled, and k3s re-applies its bundled manifests on start | From memory, unverified | k3s docs and the rehearsal VM, phase 1 |
 | A plain NetworkPolicy cannot allow traffic from Cilium's Gateway or from a hostNetwork pod | From memory, unverified | Cilium docs and the reference chart, phase 1 |

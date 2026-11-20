@@ -202,7 +202,9 @@ On the rehearsal VM:
       load-balancer pool and L2 announcements (D10; this cluster's `/29`
       only), the Cilium Gateway on a fixed pool address on 80/443 (D20),
       ExternalDNS with its own owner id writing under `rehearsal.home`
-      (D55), the `local-path` provisioner as an Argo app with a
+      (D55), a tunnel of its own with `cloudflared` as a Deployment and one
+      catch-all rule, and a Cloudflare ExternalDNS instance writing one
+      public test name (D20), the `local-path` provisioner as an Argo app with a
       `reclaimPolicy: Retain` class as the default, metrics-server. App
       namespaces at Pod Security `baseline`, default-deny, and still served
       through the Gateway (the CiliumNetworkPolicy allow, R6).
@@ -276,6 +278,13 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
       static service record from phase 0 becomes a `DNSEndpoint` still
       pointing at ocean, a few at a time, and its static entry is removed.
       No name changes its answer in this step.
+- [ ] The cluster tunnel (D20): tunnel, catch-all rule and credentials in
+      `terraform-root`; `cloudflared` on production as a Deployment; the
+      Cloudflare ExternalDNS instance with a token scoped to DNS edit on the
+      zones in use; the CI check that a public hostname needs its label.
+      Then the public handover: each public service record removed from
+      `terraform-root` state (not destroyed) and recreated as a
+      `DNSEndpoint` still pointing at ocean's tunnel.
 - [ ] Three test apps on ocean: the sonarr reference chart behind the Gateway
       with a cert, one with the `/data01` PV, one reading a sops secret. The
       sonarr test instance has its own hostname and an empty state directory
@@ -361,8 +370,8 @@ cutover here).
 - [ ] mem0 cutover, last, with no agent run in flight: API, ollama embedder,
       MCP bridge and gateway nginx as pods; Postgres by `initdb.import` into
       a CloudNativePG cluster on a static local PV on the 870 EVO, with an
-      operand image that ships pgvector; a `terraform-root` PR first for the
-      `mem0.terrac.com` tunnel rule. Monthly mem0 scratch recovery scheduled
+      operand image that ships pgvector; `mem0.terrac.com` moves to the
+      cluster tunnel in the same commit. Monthly mem0 scratch recovery scheduled
       and passed once.
 - [ ] Docker removed from harbor after the last soak.
 - [ ] harbor enters kured's rota (D54). A kured drain and reboot of harbor
@@ -411,8 +420,8 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0, CronJobs
 suspended) -> window, run by the cutover workflow: the flag takes the Docker
 side down and masks its units, scale to 1, unsuspend, move the name to the
-Gateway (the route replaces its `DNSEndpoint`; a public name's nginx
-upstream is repointed too), verify probes, alert rules and panels, with the
+Gateway (the route replaces its `DNSEndpoint`, LAN and public), verify
+probes, alert rules and panels, with the
 Docker gate before and after (R32) -> 14-day
 soak (D45) with the image frozen and `back` as the backout -> `homelab` PR
 removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
@@ -441,12 +450,9 @@ what is left here:
       when the Docker one has stopped, node-exporter with the host's
       textfile directory mounted; TSDB and Loki on ocean local disk. Scrape configs become
       ServiceMonitors. Old file-based scrape config retires.
-- [ ] W7: the tunnel rules move from nginx to the Gateway in one
-      `terraform-root` PR, any name still pointing at ocean is dealt with,
-      and Docker nginx and certbot retire. Every route and cert has carried
-      traffic since its own cutover. Rate limits and the allowlist on public
-      names are re-tested here, the first time the Gateway handles them
-      without nginx in front. fail2ban's nginx jails get a Gateway log source or are
+- [ ] W7: the last names leave ocean; then ocean's tunnel (a
+      `terraform-root` PR), Docker nginx and certbot retire. Every route and
+      cert has carried traffic since its own cutover. fail2ban's nginx jails get a Gateway log source or are
       dropped, one by one. W7 has its own 14-day soak before Docker is
       removed.
       Cilium host firewall in
