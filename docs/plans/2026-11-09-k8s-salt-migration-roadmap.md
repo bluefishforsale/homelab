@@ -111,12 +111,23 @@ none of it blocks this phase.
       intermediate signed for production and one for the rehearsal cluster.
       Not a gate: until it exists the clusters run without an internal
       issuer.
+- [ ] Wildcards out (D55): one explicit record to ocean for every name
+      nginx serves (from its `server_name` list, checked against the query
+      log for names only the wildcard answered), then the `*.home` wildcard
+      removed; the `*.cluster.local` zone and its record at `.64` deleted.
+      Through the pair gates, merged by terrac.
+- [ ] Find out how the PowerDNS pair replicates (the spec says AXFR from
+      dns02, `scripts/dns-drift-check.sh` says not at all) and fix it if a
+      record written through the API would reach only one server.
+- [ ] `192.168.1.64/27` checked against the UniFi client history and recorded
+      in the address table as the cluster's pool (D10).
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
 - [ ] `homelab-kube`: app-of-apps sync policy `allowEmpty: false`.
 - [ ] `homelab-kube`: sops from GPG to age; age private key into the vault at
       a new key (single location).
 - [ ] `homelab-kube`: move legacy kubeadm leftovers (flannel manifest, diag
-      pods, consul, vault, kubernetes-dashboard, ingress-nginx, MetalLB,
+      pods, consul, vault, kubernetes-dashboard, ingress-nginx, MetalLB
+      (kept as D10's fallback, not deployed),
       cloudflare-tunnel-ingress-controller) to `archive/`; drop promtail for
       Alloy.
 - [ ] `homelab-kube`: write `docs/chart-style.md` from the 2021 charts (D24),
@@ -167,8 +178,9 @@ On the rehearsal VM:
       v1.37, so v1.34; `k3s_version` for production is set when the drill
       ends), node labels, taints, `registries.yaml` mirrors to
       registry-cache-01, the bundled Traefik, ServiceLB, `local-path` and
-      metrics-server disabled, and the pod and service ranges chosen against
-      the LAN and Docker's bridge ranges on ocean and harbor.
+      metrics-server disabled, kube-proxy disabled for Cilium's replacement
+      (D10), and the pod and service ranges chosen against the LAN and
+      Docker's bridge ranges on ocean and harbor.
 - [ ] `homelab-kube`: a root per cluster (`clusters/rehearsal`,
       `clusters/production`) and a sops key per cluster. The production key
       never goes onto the rehearsal VM.
@@ -186,9 +198,11 @@ On the rehearsal VM:
 - [ ] Tier 1 platform via app-of-apps: Cilium (D15; k3s with flannel and its
       NetworkPolicy controller disabled), Hubble, cert-manager with the
       Let's Encrypt issuer, an internal issuer from the cluster intermediate
-      once the CA is built (D39), sops-secrets-operator (age), Cilium Gateway
-      in host-network mode on alternate host ports, pinned to one node
-      (D20), the `local-path` provisioner as an Argo app with a
+      once the CA is built (D39), sops-secrets-operator (age), the Cilium
+      load-balancer pool and L2 announcements (D10; this cluster's `/29`
+      only), the Cilium Gateway on a fixed pool address on 80/443 (D20),
+      ExternalDNS with its own owner id writing under `rehearsal.home`
+      (D55), the `local-path` provisioner as an Argo app with a
       `reclaimPolicy: Retain` class as the default, metrics-server. App
       namespaces at Pod Security `baseline`, default-deny, and still served
       through the Gateway (the CiliumNetworkPolicy allow, R6).
@@ -196,9 +210,11 @@ On the rehearsal VM:
       this VM before k3s is installed, and made to fail once on purpose so a
       red result is known to stop a workflow.
 - [ ] Docker plus k3s coexistence proven (spec, "Docker and k3s side by
-      side"), including a Docker container reaching the Gateway's host port
-      on its own host, a pod reaching a Docker container's published port on
-      its own host, and a reboot. The Docker gate brackets the install,
+      side") with kube-proxy replacement on, including a Docker container
+      reaching the Gateway's address from the host announcing it, a pod
+      reaching a Docker container's published port on its own host, and a
+      reboot. If this cannot pass with Cilium announcing the pool, it is
+      run again with kube-proxy back and MetalLB (D10's fallback). The Docker gate brackets the install,
       the reboot and each of the three upgrades below. Nothing goes onto
       ocean before this is recorded.
 - [ ] Three toy apps: one behind the Gateway with a cert, one with a local
@@ -206,8 +222,10 @@ On the rehearsal VM:
 - [ ] Each nginx feature in use today (rate limit, body size, websocket
       upgrade, IP allowlist) proven on the Gateway with a test route, or its
       fallback decided (D50).
-- [ ] A Gateway listener bound on 80/443 once, to prove the Envoy capability
-      the alternate ports never exercise.
+- [ ] The Gateway's address answers on 80/443 from a laptop, under a name
+      ExternalDNS wrote; the record goes away when the route does; a record
+      ExternalDNS did not create is left alone when a route claims its name;
+      the Gateway sees the laptop's address, not a node's.
 - [ ] Registry fallback test: stop registry-cache-01, pull an image.
 - [ ] Renovate opens, and auto-merges, one real update on a toy app; one
       home-grown test image goes push, dispatch, values commit, sync.
@@ -251,8 +269,13 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
       Backout (`k3s-uninstall.sh`, restart Docker, gate again) tested on the
       rehearsal VM beforehand.
 - [ ] Argo CD and the tier 1 platform on ocean from `homelab-kube`, the same
-      charts the rehearsal VM ran. The Gateway on alternate host ports, the
-      `/data01` local PVs.
+      charts the rehearsal VM ran. The production pool and the Gateway on
+      its address, the `/data01` local PVs.
+- [ ] ExternalDNS on production (D55), with the `homelab-kube` CI check
+      that refuses a hostname in the address table. Then the handover: each
+      static service record from phase 0 becomes a `DNSEndpoint` still
+      pointing at ocean, a few at a time, and its static entry is removed.
+      No name changes its answer in this step.
 - [ ] Three test apps on ocean: the sonarr reference chart behind the Gateway
       with a cert, one with the `/data01` PV, one reading a sops secret. The
       sonarr test instance has its own hostname and an empty state directory
@@ -268,7 +291,7 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
 - [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
       Its name moves with it, so a push does not travel through ocean: the
       LAN record through the pair gates, and a tunnel that ends on agentbox
-      in `terraform-root` if it has a public name (D10's one exception).
+      in `terraform-root` if it has a public name (D10).
 - [ ] Watchdog on agentbox: probes the k3s API, ocean and Alertmanager's
       heartbeat; sends email by a relay that bypasses ocean, and ntfy (D17).
       Tested by stopping the API and receiving both. In place before the
@@ -387,8 +410,9 @@ Waves W1 to W5 from the spec. Each service is its own cutover:
 
 Per cutover: chart and values PR in `homelab-kube` (scaled to 0, CronJobs
 suspended) -> window, run by the cutover workflow: the flag takes the Docker
-side down and masks its units, scale to 1, unsuspend, flip the nginx
-upstream to the Gateway, verify probes, alert rules and panels, with the
+side down and masks its units, scale to 1, unsuspend, move the name to the
+Gateway (the route replaces its `DNSEndpoint`; a public name's nginx
+upstream is repointed too), verify probes, alert rules and panels, with the
 Docker gate before and after (R32) -> 14-day
 soak (D45) with the image frozen and `back` as the backout -> `homelab` PR
 removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
@@ -417,11 +441,12 @@ what is left here:
       when the Docker one has stopped, node-exporter with the host's
       textfile directory mounted; TSDB and Loki on ocean local disk. Scrape configs become
       ServiceMonitors. Old file-based scrape config retires.
-- [ ] W7: the Gateway moves from its alternate ports to 80/443 on ocean;
-      Docker nginx and certbot retire. A port swap: every route and cert has
-      carried traffic since its own cutover. Rate limits and the allowlist
-      are re-tested here, the first time the Gateway sees real client
-      addresses. fail2ban's nginx jails get a Gateway log source or are
+- [ ] W7: the tunnel rules move from nginx to the Gateway in one
+      `terraform-root` PR, any name still pointing at ocean is dealt with,
+      and Docker nginx and certbot retire. Every route and cert has carried
+      traffic since its own cutover. Rate limits and the allowlist on public
+      names are re-tested here, the first time the Gateway handles them
+      without nginx in front. fail2ban's nginx jails get a Gateway log source or are
       dropped, one by one. W7 has its own 14-day soak before Docker is
       removed.
       Cilium host firewall in

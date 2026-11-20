@@ -65,7 +65,8 @@ where merge is deploy.
 - **A6.** A host concern managed by both Ansible and Salt at once.
 - **A7.** A DNS, DHCP or resolver change that reaches a host without terrac's
   merge, outside CI, or without passing the pair gates; both DNS servers
-  changed in one step. Any sshd, `authorized_keys` or port 22 change made by an
+  changed in one step. (ExternalDNS writing a service record it owns is not
+  this; ExternalDNS touching any other record is, D55.) A wildcard DNS record. Any sshd, `authorized_keys` or port 22 change made by an
   agent as part of this work.
 - **A8.** A service migrated without its health check, blackbox probe and
   metrics scrape (the "every service is monitored" rule).
@@ -100,7 +101,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D7 | Salt runs masterless: `salt-call --local` on each host from a checkout of `homelab-salt`, driven by CI over SSH. No master VM, no minion daemon. | terrac |
 | D8 | Upgrade drill: start three minors behind stable, upgrade three times with Argo CD and test apps running, before any real service moves. It runs on the rehearsal VM (D51), so ocean is never the first host to see an upgrade. | terrac (drill), design call, approved (where it runs) |
 | D9 | `/data01` reaches the cluster via NFS from the ZFS passthrough on ocean, as today. | terrac |
-| D10 | No new IP ranges, and no service's DNS record changes; ocean's IP stays the front door. New VMs take addresses from the existing range. One exception: ntfy gets a name that resolves to agentbox, since a push that travels through ocean dies with ocean (D19). | design call |
+| D10 | The cluster gets a load-balancer address pool, `192.168.1.64/27`, which sits outside the DHCP pool (`.150` to `.239`) and is empty today apart from one stale record. Cilium hands the addresses out (LB IPAM) and answers ARP for them (L2 announcements). MetalLB in L2 mode is the fallback if Cilium's way fails the Docker gate on the rehearsal cluster. BGP is wanted later and is not in this plan. The top `/29` of the pool belongs to the rehearsal cluster. New VMs still take addresses from the existing static range, and ntfy's name resolves to agentbox, since a push that travels through ocean dies with ocean (D19). | terrac |
 | D11 | Patches and package upgrades are continuous, for CVEs. OS majors, and replacing ocean or harbor, are out of this plan: they are planned after everything is on Salt and k3s and upgrades have been proven in operation, even if that runs past the end of Debian 12 LTS (D53). | terrac |
 | D13 | Ocean runs Docker and k3s side by side until Docker is completely drained, and ends this plan as the same VM with Docker removed. | terrac |
 | D14 | Pods pin to node role labels, never to a hostname, so a later replacement VM needs no chart change. | design call |
@@ -108,12 +109,12 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D17 | "Cluster is down" is reported by email and ntfy. | terrac |
 | D18 | Image updates take two paths: third-party images by a bot that watches registries and opens tag-bump PRs; home-grown images by push then dispatch that updates the chart. | terrac |
 | D19 | The dead-man watchdog and ntfy live on agentbox (tier 0), built in phase 1; ntfy never moves into the cluster. The watchdog's email leaves by a relay that does not pass through ocean. Alertmanager keeps the exim smarthost on the ocean host as its own email route, so node005 dying is still reported. agentbox is slimmed to what must survive the cluster: the watchdog, ntfy, the remote-control sessions and break-glass applies. Its alert receiver and media timers become pods. | design call, approved |
-| D20 | North-south traffic uses Cilium's Gateway API in host-network mode: on alternate host ports from phase 1, with nginx proxying each migrated service to it, then on 80/443 on ocean at W7. No per-service NodePorts. ingress-nginx (retired March 2026), MetalLB and the tunnel ingress controller are not used. | design call (mode), terrac (staging on alternate ports) |
+| D20 | North-south traffic uses Cilium's Gateway API on an address of its own from the D10 pool, on 80/443 from phase 1. No host ports and no per-service NodePorts. A LAN name moves to the Gateway at its service's cutover (D55). A public name keeps arriving through the tunnel and ocean's nginx, which proxies it to the Gateway, until W7 moves the tunnel rules and nginx retires. ingress-nginx (retired March 2026) and the tunnel ingress controller are not used. | terrac (own address, names move per service), design call (public names through nginx until W7) |
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, approved |
 | D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. harbor is excluded too until its Docker is gone (D54). | design call |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, approved |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
-| D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
+| D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). Service records written by ExternalDNS are the one exception (D55). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
 | D26 | VM root disks are cattle: no VM-disk backups; every VM rebuilds from git, GCS and `/data01`, proven by the rebuild drill. A VM that fails the drill gets a weekly vzdump until it passes. | design call, approved |
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call |
 | D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. | design call |
@@ -142,14 +143,20 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D52 | node006's boot disk stays a single point: it holds Proxmox and every VM disk on that node, and nothing mirrors it. Neither hypervisor's boot disk is mirrored. The protection is rebuild from git, the nightly k3s server backup (R2) and the config DB backup (D28). | terrac (no physical change), design call, approved (what covers the gap) |
 | D53 | Running past the end of Debian 12 LTS (June 2028) is accepted. This plan ends in 2028 H1 and the distro-lifecycle plan only starts after it (D11), so ocean, harbor and the other Debian 12 VMs may run unpatched by Debian for a while. That is preferred to folding an OS major into this work. | terrac |
 | D54 | kured stays off harbor until Docker is removed from it. Through phase 2 harbor reboots only in a supervised window, with the Docker gate before and after, the same as ocean. It joins kured's rota as the last step of phase 2. | terrac |
+| D55 | No wildcard DNS. The `*.home` wildcard to ocean is removed in phase 0, replaced by one explicit record per name nginx serves, and the stale `*.cluster.local` wildcard goes with it. Cluster services get real `<svc>.home` records in PowerDNS, so a laptop resolves them the way it resolves any host; `cluster.local` stays inside the cluster. ExternalDNS in the cluster writes those records from each service's route, with a short TTL. This is the one exception to D25: it touches only records it created, a `homelab-kube` CI check refuses a hostname that is in the address table, and it never writes host, DHCP or resolver data. | terrac |
 
 ## Open items
 
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D10, D14, D20 (mode), D22, D24 (which dependency), D28, D29, D30,
-  D31, D33, D34, D35 (shape) and D49 (the whole cluster in ocean's window).
+  confirmed: D14, D20 (public names through nginx until W7), D22, D24 (which
+  dependency), D28, D29, D30, D31, D33, D34, D35 (shape) and D49 (the whole
+  cluster in ocean's window).
+- How the PowerDNS pair replicates. The design says primary on dns02 with an
+  AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
+  dual-primary with no replication. One is stale, and ExternalDNS (D55) can
+  only go in once a record written through the API is known to reach both.
 - axiomd runs as a compose project on agentbox. It is in no tier and no wave:
   does it stay on agentbox, or become a pod?
 - llmeval is a VM on node006 with a 300G disk on the single boot SSD. Nothing
@@ -222,7 +229,10 @@ Not decided yet. Each needs terrac, and none blocks phase 0.
   control: agents open PRs from terrac's own account, and GitHub does not let
   an account approve its own PR. Host, IP, MAC,
   reservation and DNS record render from one address table that CI checks
-  against `terraform-root`'s VM MACs.
+  against `terraform-root`'s VM MACs. No zone holds a wildcard. Service
+  records are ExternalDNS's (D55): Salt's render leaves alone any record
+  that carries ExternalDNS's ownership marker, and ExternalDNS leaves alone
+  any that does not.
 - **R10.** `unattended-upgrades` (security origin) on every VM; the DNS pair
   reboots one at a time through the pair gates, never both in a window run;
   NVIDIA, ZFS and kernel packages held on passthrough and module-building
@@ -297,13 +307,13 @@ failing.
 
 | Phase | Gate |
 |---|---|
-| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age). `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. Both hypervisors on PVE 9 (D48). Pillar decryption settled and the per-host deploy lock (R27) in place. The config DB backup live on both hypervisors (D28), the recovery age key in place (D32), and everything on a node006 VM disk (ocean's root, dns02, llmeval) that is in none of git, GCS or `/data01` listed and given a home (D52), before node006's PVE upgrade. |
-| 1 | On the rehearsal VM: Docker and k3s coexist through a reboot; three upgrades completed with Argo CD and three test apps running, the third needing no step outside the play; a Gateway listener bound on 80/443 once; one deliberate restore from backup onto a fresh build succeeds, and one upgrade is backed out in place. Then on ocean: k3s runs beside Docker through a reboot with no Docker service impact; the Gateway in host-network mode on alternate ports, with the sonarr reference chart behind it; each nginx feature in use has an equivalent proven on it or a decided fallback (D50). The dead-man watchdog and ntfy on agentbox, tested by stopping the API. Cluster access written down (R28). 14-day soak on ocean with no unplanned API outage. |
+| 0 | `homelab-kube` defects fixed (Retain, allowEmpty, age). `homelab-salt` and the bootstrap script exist and CI has applied one state to one host. ml-log-analyzer's database is in the nightly dump. Both hypervisors on PVE 9 (D48). Pillar decryption settled and the per-host deploy lock (R27) in place. The config DB backup live on both hypervisors (D28), the recovery age key in place (D32), and everything on a node006 VM disk (ocean's root, dns02, llmeval) that is in none of git, GCS or `/data01` listed and given a home (D52), before node006's PVE upgrade. The `*.home` and `*.cluster.local` wildcards are gone, every name nginx serves has its own record, and how the PowerDNS pair replicates is settled (D55). |
+| 1 | On the rehearsal VM: Docker and k3s coexist through a reboot; three upgrades completed with Argo CD and three test apps running, the third needing no step outside the play; the Gateway on its own pool address on 80/443, announced on the LAN, with ExternalDNS writing a test record a laptop resolves; one deliberate restore from backup onto a fresh build succeeds, and one upgrade is backed out in place. Then on ocean: k3s runs beside Docker through a reboot with no Docker service impact; the Gateway on its pool address on 80/443, with the sonarr reference chart behind it under a record ExternalDNS wrote; the existing service records handed to ExternalDNS, still pointing at ocean; each nginx feature in use has an equivalent proven on it or a decided fallback (D50). The dead-man watchdog and ntfy on agentbox, tested by stopping the API. Cluster access written down (R28). 14-day soak on ocean with no unplanned API outage. |
 | 1b | Patch pipeline live on ocean, harbor, the rehearsal VM and the tier 0 VMs: unattended-upgrades, update and reboot metrics and alerts. kured has rebooted the rehearsal cluster's node in its window; ocean and harbor are excluded from it (D22, D54). |
 | 2 | harbor has joined as an agent beside Docker. Its workloads (nzbget, tdarr-node, ml-log-analyzer, mem0, archmap, the nightly DB restore test) run as pods on it, each through its own cutover and soak, the three Postgres databases on CloudNativePG. Docker removed from harbor. Then harbor joins kured's rota, and a kured drain of it completes with the databases on it. |
 | 3 | GPU time-slicing runs a CUDA pod plus an NVENC transcode pod on ocean while Docker's llama.cpp still runs; NVENC session cap measured and recorded. |
 | 4 | Every Docker service on ocean is a pod or explicitly parked. |
-| 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Stopping agentbox still produces an email from Alertmanager. Docker nginx retired; the Cilium Gateway has moved to 80/443 on ocean. Docker removed from ocean. |
+| 5 | Stopping the k3s API produces both an email and an ntfy push from agentbox (tested before Alertmanager moves). Prometheus, Loki, Grafana and Alertmanager run in cluster. Stopping agentbox still produces an email from Alertmanager. Docker nginx retired; the tunnel rules point at the Gateway and no service record points at ocean. Docker removed from ocean. |
 | 6 | Every Linux host applies masterless from `homelab-salt` and reports drift; the Salt k3s state has done an install and an upgrade on the rehearsal VM; a host cannot decrypt another host's pillar (tested); the DNS and DHCP rehearsal drills pass on the isolated test pair and Salt's rendered DNS and DHCP configs match Ansible's byte for byte before the flip; every Ansible role and play is deleted or ported. |
 | 7 | The operational tooling `homelab` carries (`scripts/`, `health-check.yml`, the alert-to-issue receiver's target repo) has a new home or a recorded retirement. Every vault key has a new home (including the cluster age key and the Access email lists `terraform-root` reads). The rebuild drill passes from git and GCS only, with each step timed and recorded, and no Ansible. `homelab` archived. |
 
