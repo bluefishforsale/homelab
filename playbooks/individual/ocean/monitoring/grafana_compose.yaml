@@ -143,7 +143,8 @@
 
   # The spend tracker's Postgres, for the Spend dashboard. Host and port match
   # spend_pg_port in playbooks/individual/ocean/services/spend_tracker.yaml.
-  # Mode 0600 because the password is in the file.
+  # Mode 0600 because the password is in the file. grafana_ro can only SELECT;
+  # the role is created by files/spend-tracker/init-grafana-ro.sh.
   - name: Create Spend datasource provisioning configuration
     ansible.builtin.copy:
       dest: "{{ home }}/provisioning/datasources/spend.yml"
@@ -156,13 +157,13 @@
             uid: spend
             access: proxy
             url: 192.168.1.143:5433
-            user: spend
+            user: grafana_ro
             jsonData:
               database: spend
               sslmode: disable
               postgresVersion: 1600
             secureJsonData:
-              password: "{{ spend_tracker.postgres_password }}"
+              password: "{{ spend_tracker.grafana_ro_password }}"
             isDefault: false
             editable: false
       owner: "{{ uid }}"

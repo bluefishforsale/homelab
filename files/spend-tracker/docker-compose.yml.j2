@@ -57,6 +57,7 @@ services:
     volumes:
       - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - {{ home }}/pgdata:/var/lib/postgresql/data
+      - {{ home }}/init-grafana-ro.sh:/docker-entrypoint-initdb.d/init-grafana-ro.sh:ro
     # LAN address only. Grafana runs on the default bridge in another compose
     # project, so it reaches this through the host port, not a shared network.
     ports:

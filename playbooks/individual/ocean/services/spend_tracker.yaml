@@ -55,7 +55,13 @@
         chdir: "{{ home }}"
       when: spend_build_context is changed
 
-    - name: Template env file (Postgres password and the Monarch session)
+    - name: Copy the Postgres init script (read-only role for Grafana)
+      ansible.builtin.copy:
+        src: "{{ files }}/init-grafana-ro.sh"
+        dest: "{{ home }}/init-grafana-ro.sh"
+        mode: '0755'
+
+    - name: Template env file (Postgres passwords and the Monarch session)
       ansible.builtin.template:
         src: "{{ files }}/spend-tracker.env.j2"
         dest: "{{ home }}/spend-tracker.env"
