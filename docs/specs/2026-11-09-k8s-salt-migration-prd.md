@@ -111,7 +111,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D19 | The dead-man watchdog and ntfy live on agentbox (tier 0), built in phase 1; ntfy never moves into the cluster. The watchdog's email leaves by a relay that does not pass through ocean. Alertmanager keeps the exim smarthost on the ocean host as its own email route, so node005 dying is still reported. agentbox is slimmed to what must survive the cluster: the watchdog, ntfy, the remote-control sessions and break-glass applies. Its alert receiver and media timers become pods. | design call, approved |
 | D20 | North-south traffic uses Cilium's Gateway API on an address of its own from the D10 pool, on 80/443 from phase 1. No host ports and no per-service NodePorts. A service's names, LAN and public, move to the Gateway at its own cutover (D55). Public traffic reaches the Gateway through one Cloudflare tunnel that belongs to the cluster: `cloudflared` as a Deployment with a replica per node and a single catch-all rule to the Gateway's in-cluster Service, written once in `terraform-root`. The tunnel never names a host or a pod, so a pod that moves between nodes changes no tunnel config and no DNS record. Ocean's tunnel and nginx serve what has not moved and retire at W7. ingress-nginx (retired March 2026), a tunnel per service and the tunnel ingress controller are not used. | terrac |
 | D21 | Third-party update PRs: patch and minor for stateless apps auto-merge in the Sunday window; majors, stateful apps and platform charts wait for terrac. Renovate self-hosted on the runner. | design call, approved |
-| D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. harbor is excluded too until its Docker is gone (D54). | design call |
+| D22 | Ocean is excluded from kured; it reboots only in the supervised monthly window. harbor is excluded too until its Docker is gone (D54). An alert fires when ocean has had a reboot pending for more than 35 days, which means a window was missed (R12). Kernel live patching is not used: nothing free supports Debian, it would not cover the ZFS and NVIDIA modules, and it would be changing kernel code on the host that owns the pool. It is a question for the distro-lifecycle plan. | design call, approved |
 | D23 | Shape B static sites become small nginx images and use the home-grown path. | design call, approved |
 | D24 | The 2021 app charts in `homelab-kube` are upgraded, not replaced, and are the style basis for all app charts. Their dead `k8s-at-home` dependency moves to `bjw-s-labs/app-template`, the maintained descendant of the same library. | terrac (upgrade, style), design call (which dependency) |
 | D25 | DNS and DHCP are Salt states applied by CI, not by hand: agents may author changes, terrac is the only merger, and every apply goes through the pair gates (R9a). Service records written by ExternalDNS are the one exception (D55). sshd, `authorized_keys`, the fleet key and port 22 stay terrac-by-hand. | terrac |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D22, D24 (which dependency), D28, D29, D30, D31, D33, D34, D35
+  confirmed: D24 (which dependency), D28, D29, D30, D31, D33, D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
@@ -243,7 +243,9 @@ Not decided yet. Each needs terrac, and none blocks phase 0.
   CloudNativePG clusters set `enablePDB: false` so a drain is not blocked by
   a single-instance database.
 - **R12.** Pending-security-update and reboot-required metrics on every host,
-  alerting at 7 and 14 days.
+  alerting at 7 and 14 days. Ocean's reboot alert is at 35 days: it reboots
+  monthly by design (D22), so 14 would fire every month and be ignored,
+  and 35 means a window was missed.
 - **R15.** Every image the cluster runs is pinned to an immutable tag or
   digest. Nothing runs `:latest`. Tags change only by commit to `homelab-kube`.
 - **R16.** Metrics and logs for a migrated service keep flowing to the existing

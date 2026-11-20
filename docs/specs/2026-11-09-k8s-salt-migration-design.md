@@ -801,7 +801,12 @@ of this section.
   `dkms status` check above, take the API down, and during the overlap take
   down every Docker service too. Ocean reboots only in the supervised monthly
   window.
-  Its `reboot-required` alert still fires, so a pending reboot is visible.
+  Its `reboot-required` alert fires at 35 days, not the fleet's 14: a
+  monthly reboot would trip 14 every month and teach terrac to ignore it,
+  and 35 says a window was missed. Kernel live patching is not the answer
+  here (D22): nothing free supports Debian, it would not cover the ZFS and
+  NVIDIA modules, so the window stays regardless, and it would be patching
+  running kernel code on the host that owns the pool.
 - Reboots on tier 0 VMs: one at a time in the same window, driven by the
   patch play (Ansible now, Salt later). The DNS pair patches in the same
   window, one of the pair per run, through the pair gates in "DNS and DHCP
@@ -824,7 +829,7 @@ of this section.
   rehearsal host first.
 - Visibility: a node-exporter textfile metric for pending security updates and
   `reboot-required`; alert when security updates are pending more than 7 days
-  or a reboot is pending more than 14 days. Falling behind becomes an alert,
+  or a reboot is pending more than 14 days (35 on ocean). Falling behind becomes an alert,
   not a discovery.
 - Container images: Renovate (see platform table) covers CVEs inside images.
 

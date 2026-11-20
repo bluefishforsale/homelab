@@ -328,7 +328,8 @@ Written as Salt states from the start (D40), not in Ansible and then ported.
       Docker is gone (D54), so in production it does nothing until the end
       of phase 2. Its first real reboots are of the rehearsal VM.
 - [ ] Textfile metrics: pending security updates, `reboot-required`; alerts at
-      7 and 14 days.
+      7 and 14 days, with ocean's reboot alert at 35 (a missed monthly
+      window, D22).
 - [ ] `docs/operations/os-patching.md`: patch policy, held-package monthly
       window with the `dkms status` pre-reboot check, Proxmox patch window.
 - [ ] Roll the patch pipeline to tier 0 VMs one VM per PR. The DNS pair goes
