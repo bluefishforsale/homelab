@@ -254,7 +254,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Gateway LAN throughput",
-      "description": "UCG Max LAN-side receive (downstream to clients) and transmit (upstream from clients). Rate over 5m.",
+      "description": "UCG Max LAN-side throughput per port, rate over 5m. rx is what the gateway receives from the LAN, tx is what it sends to the LAN. Built from the per-port counters with the WAN port (Port 5) left out, because gateway firmware 6.x stopped exporting the aggregate unifi_device_lan_* series.",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -267,13 +267,13 @@
       },
       "targets": [
         {
-          "expr": "rate(unifi_device_lan_receive_bytes_total{name=\"UCG Max\"}[5m]) * 8",
-          "legendFormat": "rx {{port}}",
+          "expr": "rate(unifi_device_port_receive_bytes_total{name=\"UCG Max\", port_num!=\"5\"}[5m]) * 8",
+          "legendFormat": "rx {{port_name}}",
           "refId": "A"
         },
         {
-          "expr": "rate(unifi_device_lan_transmit_bytes_total{name=\"UCG Max\"}[5m]) * 8",
-          "legendFormat": "tx {{port}}",
+          "expr": "rate(unifi_device_port_transmit_bytes_total{name=\"UCG Max\", port_num!=\"5\"}[5m]) * 8",
+          "legendFormat": "tx {{port_name}}",
           "refId": "B"
         }
       ],
