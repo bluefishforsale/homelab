@@ -389,6 +389,17 @@ scrape_configs:
       labels:
         service: ml-log-analyzer
         host: harbor
+    # NOTE: the detector labels series by systemd unit, and every SSH login is
+    # its own unit (session-41918.scope). At about 26,000 logins a day on ocean
+    # that was 545,000 of 657,000 head series and it OOM-looped Prometheus on
+    # 2026-11-20. Dropped rather than rewritten to one name: a rewrite makes
+    # thousands of series collide in a single scrape, and Prometheus keeps an
+    # arbitrary one. The label is exported_service because the target's own
+    # `service` label above takes the plain name.
+    metric_relabel_configs:
+    - source_labels: [exported_service]
+      regex: 'session-\d+\.scope'
+      action: drop
 
   - job_name: 'ml-log-analyzer-processor'
     relabel_configs: *dropPortNumber
