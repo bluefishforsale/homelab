@@ -26,7 +26,8 @@
     # scrape job; spend_pg_port matches the Spend datasource in grafana_compose.yaml.
     spend_port: 9195
     spend_internal_port: 8080
-    spend_pg_port: 5433
+    # 5434, not 5433: docs/log-anomaly-pipeline.txt already plans 5433.
+    spend_pg_port: 5434
     spend_lookback_days: 400
     spend_sync_seconds: 86400
 
@@ -61,11 +62,14 @@
         dest: "{{ home }}/init-grafana-ro.sh"
         mode: '0755'
 
-    - name: Template env file (Postgres passwords and the Monarch session)
+    - name: Template env files (one per container, so each sees only its own secrets)
       ansible.builtin.template:
-        src: "{{ files }}/spend-tracker.env.j2"
-        dest: "{{ home }}/spend-tracker.env"
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "{{ home }}/{{ item }}"
         mode: '0600'
+      loop:
+        - spend-tracker.env
+        - postgres.env
       register: spend_env
 
     - name: Template compose file
@@ -92,6 +96,11 @@
         enabled: true
         state: "{{ 'restarted' if (spend_env is changed or spend_unit is changed or spend_build_context is changed or spend_compose is changed) else 'started' }}"
         daemon_reload: true
+
+    # No docker-restart@ timer, unlike the cloudflare exporter. That project is
+    # wholly host-built, so docker-refresh skips it and nothing recreates it.
+    # This one has a pulled Postgres image, so the weekly refresh converges the
+    # project, and the collector holds no state worth recycling.
 
   handlers:
     - name: Reload systemd daemon

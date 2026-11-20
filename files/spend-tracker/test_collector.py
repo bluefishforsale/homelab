@@ -30,6 +30,28 @@ def test_income_from_a_vendor_name_is_not_spend():
     assert vendor("OpenAI", 10.26) is None
 
 
+def test_a_merchant_that_only_contains_a_vendor_name_is_not_that_vendor():
+    assert vendor("Sunoco", -52.10) is None
+    assert vendor("Dockers", -64.00) is None
+    assert vendor("YouTube TV", -82.99) is None
+    assert vendor("Cloudflare Inc", -11.17) is None
+
+
+def test_every_merchant_spelling_seen_in_monarch_still_matches():
+    seen = {
+        "Anthropic": "Anthropic", "OpenAI": "OpenAI", "Massive.com": "Massive", "Suno Inc": "Suno",
+        "Suno Inc.": "Suno", "YouTube": "YouTube", "NEWSDEMON.COM": "Newsdemon", "Newsdemon.com": "Newsdemon",
+        "Monarch Money App": "Monarch", "Docker Inc": "Docker", "CLOUDFLARE": "Cloudflare Registrar",
+    }
+    for merchant, expected in seen.items():
+        assert vendor(merchant, -1.00) == expected, merchant
+
+
+def test_a_transaction_hidden_in_monarch_is_not_counted():
+    hidden = dict(txn("PAYPAL", -4.00), hideFromReports=True)
+    assert collector.classify(hidden, RULES) is None
+
+
 def test_paypal_charge_is_claimed_only_at_the_exact_amount():
     assert vendor("PAYPAL", -4.00) == "GitHub"
     assert vendor("PAYPAL", -240.00) == "Cloudflare Pro"

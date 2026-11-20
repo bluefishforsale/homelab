@@ -9,7 +9,8 @@
 # refreshing Postgres. Its update path is a change under files/spend-tracker,
 # which rebuilds on the next apply.
 #
-# Every secret is in spend-tracker.env (mode 0600), not in this file.
+# Every secret is in the two env files (mode 0600), not in this file. They are
+# split so the Monarch session reaches the collector only.
 services:
   collector:
     build: .
@@ -51,7 +52,7 @@ services:
     hostname: postgres
     restart: unless-stopped
     env_file:
-      - spend-tracker.env
+      - postgres.env
     environment:
       TZ: America/Los_Angeles
     volumes:

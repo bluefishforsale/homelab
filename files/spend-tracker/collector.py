@@ -49,10 +49,17 @@ def classify(txn, rules):
     # paycheck from an employer that is also a vendor must not match its rule.
     if txn["amount"] >= 0:
         return None
+    # Hiding a row in Monarch is how a duplicate is retired, typically the card
+    # side of a charge that also shows up through PayPal.
+    if txn.get("hideFromReports"):
+        return None
     amount = -Decimal(str(txn["amount"]))
     merchant = (txn.get("merchant") or {}).get("name") or txn.get("plaidName") or ""
     for rule in rules:
-        if not rule["re"].search(merchant):
+        # NOTE: the whole merchant name must match. A substring search let
+        # "suno" claim Sunoco and "docker" claim Dockers; a rule that misses a
+        # new spelling shows up as a bar that drops, which is the louder failure.
+        if not rule["re"].fullmatch(merchant):
             continue
         if "amount" in rule and rule["amount"] != amount:
             continue
@@ -77,8 +84,13 @@ async def _fetch(start, end):
         page = (await mm.get_transactions(limit=PAGE, offset=offset, start_date=start, end_date=end))["allTransactions"]
         txns += page["results"]
         offset += PAGE
-        if offset >= page["totalCount"]:
-            return txns
+        if offset < page["totalCount"]:
+            continue
+        # A short page would otherwise be stored as a complete window, and the
+        # months it dropped would just read as cheaper.
+        if len(txns) < page["totalCount"]:
+            raise RuntimeError(f"Monarch returned {len(txns)} of {page['totalCount']} transactions")
+        return txns
 
 
 def _store(rows, start, end):
@@ -103,7 +115,14 @@ def sync(rules, lookback_days):
     end = datetime.date.today()
     start = end - datetime.timedelta(days=lookback_days)
     txns = asyncio.run(_fetch(start.isoformat(), end.isoformat()))
-    rows = [row for row in (classify(t, rules) for t in txns) if row]
+    # Keyed by id because paging is by offset: a charge that posts mid-fetch
+    # shifts the list and can put one transaction on two pages.
+    rows = list({row["id"]: row for row in (classify(t, rules) for t in txns) if row}.values())
+    # A year with no vendor charges is Monarch failing quietly or the rules
+    # matching nothing, not a free year. Storing it would delete the whole
+    # window and call that a success.
+    if not rows:
+        raise RuntimeError(f"0 spend rows from {len(txns)} transactions for {start} to {end}; keeping the stored window")
     _store(rows, start, end)
     log.info("stored %d spend rows from %d transactions, %s to %s", len(rows), len(txns), start, end)
     return len(rows)
