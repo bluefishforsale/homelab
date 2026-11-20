@@ -1,0 +1,142 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "mem0 nightly LOCOMO quality: graded score, extraction size and returned context. Pushed once a day by the homelab mem0-nightly-quality workflow; values are flat between runs.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Overall score (last run)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_score{category=\"overall\"}", "legendFormat": "overall"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 1, "min": 0, "max": 100}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "type": "stat",
+      "title": "3-day vs 7-day median gap",
+      "description": "Mem0LocomoScoreDropped fires below -6. Same-code noise measured at about 4 points.",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "quantile_over_time(0.5, mem0_locomo_score{category=\"overall\"}[3d]) - quantile_over_time(0.5, mem0_locomo_score{category=\"overall\"}[7d])", "legendFormat": "gap"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "red", "value": null},
+            {"color": "orange", "value": -6},
+            {"color": "green", "value": -3}
+          ]}
+        },
+        "overrides": []
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "type": "stat",
+      "title": "Hours since last successful run",
+      "description": "Mem0LocomoNightlyStale fires above 36.",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "(time() - mem0_locomo_last_success_timestamp_seconds) / 3600", "legendFormat": "hours"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "orange", "value": 30},
+            {"color": "red", "value": 36}
+          ]}
+        },
+        "overrides": []
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "type": "table",
+      "title": "Last run",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_run_info", "format": "table", "instant": true}
+      ],
+      "transformations": [
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "__name__": true, "job": true, "instance": true}, "indexByName": {}, "renameByName": {}}}
+      ],
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "options": {"showHeader": true}
+    },
+    {
+      "type": "timeseries",
+      "title": "Graded score by category",
+      "description": "Small categories swing on one answer (open-domain has 13 questions, about 7.7 points each); read the overall line.",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_score", "legendFormat": "{{category}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 1, "custom": {"lineInterpolation": "stepAfter"}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "min", "max"]}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Mean extracted memory length (tokens)",
+      "description": "Mem0LocomoMemoriesGrewLonger fires above 1.1x the 7-day median.",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 13},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_memory_tokens_mean", "legendFormat": "mean"},
+        {"refId": "B", "expr": "1.10 * quantile_over_time(0.5, mem0_locomo_memory_tokens_mean[7d])", "legendFormat": "alert line"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 1, "custom": {"lineInterpolation": "stepAfter"}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Context returned per search at cutoff 10 (tokens)",
+      "description": "Mem0LocomoReturnedContextGrew fires above 1.1x the 7-day median.",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 13},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_returned_tokens_mean", "legendFormat": "mean"},
+        {"refId": "B", "expr": "1.10 * quantile_over_time(0.5, mem0_locomo_returned_tokens_mean[7d])", "legendFormat": "alert line"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "custom": {"lineInterpolation": "stepAfter"}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Memories extracted and run duration",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 13},
+      "datasource": {"type": "prometheus", "uid": "bf02tpxiz6m0wf"},
+      "targets": [
+        {"refId": "A", "expr": "mem0_locomo_memories_extracted", "legendFormat": "memories"},
+        {"refId": "B", "expr": "mem0_locomo_duration_seconds / 60", "legendFormat": "duration (min)"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "custom": {"lineInterpolation": "stepAfter"}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["mem0", "ai", "quality"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "mem0 nightly quality",
+  "uid": "mem0-quality",
+  "version": 1
+}
