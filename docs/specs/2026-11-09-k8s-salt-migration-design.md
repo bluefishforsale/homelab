@@ -1380,7 +1380,12 @@ exists.
   `pvesm`, the D28 timer, NUT, and the exporters. On node006 the state also
   disables `zfs-import-scan` and `zfs-import-cache` for anything but the
   host's own pools: a reinstalled host that sees the HBA must never import
-  `/data01` while ocean may. The bridges in `/etc/network/interfaces` are
+  `/data01` while ocean may. The passthrough states write boot-time
+  configuration only (kernel arguments, modprobe files, the initramfs); they
+  never unbind or rebind a device on a running host, so a highstate on
+  node006 cannot pull the GPU or the HBA out from under ocean. What they
+  wrote takes effect at the host's next reboot, which is when it gets
+  checked. The bridges in `/etc/network/interfaces` are
   rendered by Salt, but like sshd a mistake there locks the host out, so CI
   only runs them `test=True`; terrac applies them by hand with the iDRAC
   console open.
