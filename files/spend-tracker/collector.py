@@ -18,6 +18,7 @@ from decimal import Decimal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = 500
+RENEWAL_SLACK_DAYS = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS spend (
@@ -42,7 +43,21 @@ def load_rules(path):
             rule["descriptor"] = re.compile(rule["descriptor"], re.I)
         if "amount" in rule:
             rule["amount"] = Decimal(str(rule["amount"]))
+        if "renews" in rule:
+            month, day = rule["renews"].split("-")
+            rule["renews"] = (int(month), int(day))
     return rules
+
+
+def _is_renewal(date, renews):
+    """Whether a charge dated YYYY-MM-DD falls on a yearly plan's (month, day)."""
+    # NOTE: two plans at the same price on the same card differ in nothing but
+    # the day they renew, so this date is the whole identity of the yearly one.
+    # The slack covers a charge that posts a day or two off its invoice. A
+    # monthly plan whose billing day moves inside the window would be counted
+    # as the yearly one every year.
+    day = datetime.date.fromisoformat(date)
+    return abs((day - datetime.date(day.year, *renews)).days) <= RENEWAL_SLACK_DAYS
 
 
 def classify(txn, rules):
@@ -67,14 +82,13 @@ def classify(txn, rules):
             continue
         # Monarch folds every Anthropic charge into one merchant. The bank's
         # own description is the only field that still tells a plan charge
-        # from an API credit.
+        # from an API credit. A description no rule recognises falls to the
+        # merchant-only rule below it, so the bar moves between series instead
+        # of dropping; keep the descriptor patterns loose about spacing and
+        # trailing text.
         if "descriptor" in rule and not rule["descriptor"].fullmatch(txn.get("plaidName") or ""):
             continue
-        # NOTE: "on" is the MM-DD a yearly plan renews. Two plans at the same
-        # price on the same card differ in nothing else, so a renewal that
-        # posts a day late lands on the next rule, as a monthly plan charged
-        # twice that month.
-        if "on" in rule and rule["on"] != txn["date"][5:]:
+        if "renews" in rule and not _is_renewal(txn["date"], rule["renews"]):
             continue
         return {
             "id": f"monarch:{txn['id']}",

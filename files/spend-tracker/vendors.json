@@ -1,6 +1,6 @@
 [
-  {"vendor": "Anthropic Sub (wife)", "match": "anthropic", "descriptor": "anthropic\\* claude sub", "on": "11-02", "cadence": "annual"},
-  {"vendor": "Anthropic Sub", "match": "anthropic", "descriptor": "anthropic\\* claude sub", "cadence": "monthly"},
+  {"vendor": "Anthropic Sub (wife)", "match": "anthropic", "descriptor": "anthropic\\s*\\*\\s*claude\\s+sub.*", "renews": "11-02", "cadence": "annual"},
+  {"vendor": "Anthropic Sub", "match": "anthropic", "descriptor": "anthropic\\s*\\*\\s*claude\\s+sub.*", "cadence": "monthly"},
   {"vendor": "Anthropic API", "match": "anthropic", "cadence": "usage"},
   {"vendor": "OpenAI", "match": "openai", "cadence": "usage"},
   {"vendor": "Alpaca", "match": "alpacadb?", "cadence": "monthly"},

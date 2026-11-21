@@ -94,10 +94,10 @@ def test_merchant_falls_back_to_the_bank_description():
 def anthropic(descriptor, amount, date):
     charge = dict(txn("Anthropic", amount, date=date), plaidName=descriptor)
     row = collector.classify(charge, RULES)
-    return row["vendor"], row["cadence"]
+    return row and (row["vendor"], row["cadence"])
 
 
-def test_anthropic_api_credit_is_not_counted_as_the_subscription():
+def test_anthropic_plan_charges_and_api_credits_are_separate_vendors():
     assert anthropic("ANTHROPIC", -37.05, "2026-11-11") == ("Anthropic API", "usage")
     assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2026-11-12") == ("Anthropic Sub", "monthly")
 
@@ -112,8 +112,29 @@ def test_an_api_credit_bought_on_the_annual_renewal_day_stays_api():
     assert anthropic("ANTHROPIC", -20.02, "2026-11-02") == ("Anthropic API", "usage")
 
 
-def test_a_subscription_charge_off_its_usual_day_is_still_the_subscription():
-    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2026-12-14") == ("Anthropic Sub", "monthly")
+def test_an_annual_renewal_that_posts_a_few_days_off_is_not_a_second_monthly_charge():
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-01") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-04") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-12") == ("Anthropic Sub", "monthly")
+
+
+def test_a_plan_charge_with_a_reworded_bank_description_is_not_counted_as_api():
+    assert anthropic("ANTHROPIC *CLAUDE SUB", -200.00, "2026-12-12") == ("Anthropic Sub", "monthly")
+    assert anthropic("ANTHROPIC* CLAUDE SUB SAN FRANCISCO CA", -200.00, "2026-12-12") == ("Anthropic Sub", "monthly")
+
+
+def test_a_renewal_date_that_is_not_month_dash_day_fails_at_load():
+    import json
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json") as fh:
+        json.dump([{"vendor": "X", "match": "x", "renews": "11/02", "cadence": "annual"}], fh)
+        fh.flush()
+        try:
+            collector.load_rules(fh.name)
+        except ValueError:
+            return
+    raise AssertionError("a malformed renews value loaded")
 
 
 def test_every_shipped_rule_has_a_cadence_the_dashboard_knows():
