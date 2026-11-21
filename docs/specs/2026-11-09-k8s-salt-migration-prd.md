@@ -146,13 +146,13 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D55 | No wildcard DNS. The `*.home` wildcard to ocean is removed in phase 0, replaced by one explicit record per name nginx serves, and the stale `*.cluster.local` wildcard goes with it. Cluster services get real `<svc>.home` records in PowerDNS, so a laptop resolves them the way it resolves any host; `cluster.local` stays inside the cluster. ExternalDNS in the cluster writes those records from each service's route, with a short TTL. The PowerDNS pair stays two independent primaries with no replication, so one ExternalDNS instance runs per server and each keeps its own server complete. This is the one exception to D25: it touches only records it created, a `homelab-kube` CI check refuses a hostname that is in the address table, and it never writes host, DHCP or resolver data. A second instance writes a public service's record in Cloudflare the same way, so a service and its names live in one repo and nothing is coordinated with `terraform-root` after the move; those records leave `terraform-root` once, in phase 1. The tunnels, the Access apps and every record that is not a cluster service stay there. A route publishes a public name only if it is labelled to. | terrac |
 | D56 | axiomd stays on agentbox as a compose project, tier 0, never a pod. It triages alerts today and will later be allowed limited actions on the VMs and on the cluster, so it runs on a VM outside the cluster it acts on and keeps working when the cluster is what is broken. Salt owns its compose project like ntfy's. What it may act on, and with which credentials, is decided when it gets actions, not in this plan. | terrac |
 | D57 | llmeval is a lasting VM, not a temporary one: ported to Salt in phase 6 with the other plain VMs, outside the cluster and outside tier 0. It rebuilds from `terraform-root` plus Salt, and its models download again against their recorded sha256, so its 300G disk holds nothing that needs a backup (D52). | terrac |
+| D58 | Salt lives in two repos so that as much as possible is public. `homelab-salt` is public: states, templates, bootstrap, CI, and an example pillar the states are tested against. `homelab-salt-pillar` is private and holds only this site's values: the address table, MACs, reservations, zone records and the sops-encrypted secrets. Every apply runs from the public repo's workflows, so the environment approval D25 and D33 need sits there. A change that needs both is two PRs, pillar first. | terrac |
 
 ## Open items
 
-Not decided yet. Each needs terrac, and none blocks phase 0.
-
-- `homelab-salt`: public or private. A private repo on a user account may not
-  get the environment approval rule that D25 and D33 lean on.
+None. Every decision above has been ruled on or approved by terrac
+(2026-11-21). What is still unproven is listed in the design under
+"Assumptions to verify", each with the phase that checks it.
 
 ## Requirements
 

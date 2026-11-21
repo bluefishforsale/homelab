@@ -88,7 +88,13 @@ The decisions this phase was waiting on are made and live in the PRD's
 decision table. What is still undecided is in the PRD's "Open items", and
 none of it blocks this phase.
 
-- [ ] Salt (D40): `homelab-salt` repo; the D29
+- [ ] Salt repos (D58): `homelab-salt` public with an example pillar its CI
+      renders every state against; `homelab-salt-pillar` private with the
+      site's values and sops secrets; a read-only deploy key from the first
+      to the second; a pillar merge dispatches the public apply workflow;
+      the environment approval rule proven on the public repo; fork pull
+      requests shown to reach neither the runners nor the key.
+- [ ] Salt (D40): in those repos, the D29
       bootstrap script (pinned `.deb` from the GCS mirror, verified by hash,
       tested by CI in a clean Debian container, wrapped by one Ansible play
       for existing hosts); the rekey workflow, which reads the key from the

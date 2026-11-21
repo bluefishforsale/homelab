@@ -1016,7 +1016,31 @@ path that runs on the thing that died sends nothing.
   hostname.
 - **Hosts**: every Linux host in the inventory, Proxmox hosts included. Not
   the Mac.
-- **Repo**: new repo, `homelab-salt` (name is the builder's call).
+- **Repos (D58)**: two, split so that as much as possible is public
+  (terrac: the homelab repos are proof of skill and useful to other people
+  running homelabs). `homelab-salt` is public and holds everything that is
+  not site data: states, templates, the bootstrap script, the CI workflows,
+  the pillar layout, and an example pillar with made-up values that CI
+  renders every state against, so the public repo lints and tests alone and
+  a stranger can read how it fits together. `homelab-salt-pillar` is
+  private and holds only this site's values: the address table, MACs and
+  DHCP reservations, zone records, the sops-encrypted secrets and
+  `.sops.yaml`. (Names are the builder's call.) The rule for which side a
+  thing goes on: if a reader needs it to understand or reuse the state, it
+  is public; if it only identifies this house's network or unlocks
+  something, it is private.
+  What the split costs. A change that needs a new pillar key is two PRs, so
+  states read pillar with a default or fail the render with a clear
+  message, and the pillar PR lands first. CI in `homelab-salt` checks the
+  private repo out with a read-only deploy key, applies the two at a
+  recorded pair of commits, and a merge in the pillar repo dispatches the
+  same apply workflow, so there is one apply path and one set of gates. The
+  rekey PR (D29, R31) is a pillar-repo PR. Fork pull requests never run on
+  the self-hosted runners and never see the deploy key; whatever protects
+  `homelab` there today is copied, after it has been read.
+  What it does not do: `homelab` is public and its history already holds
+  the addresses, MACs and zone records, so the private repo keeps new site
+  data out of view, it does not unpublish the old.
 - **Apply model**: no scheduled highstate. Changes apply through CI, per changed
   state, from the self-hosted runner, mirroring today's impact detection and
   serialization: for each impacted host the runner rsyncs the repo tree at the
@@ -1163,8 +1187,10 @@ resolver states, the address table, or the dns01, dns02 and pihole pillar,
 so a PR on those paths waits for terrac to merge it by hand. And the apply
 workflow for those paths runs in a GitHub environment that waits for
 terrac's approval before any host is touched (the same mechanism D33 uses).
-Environment approvals are free on a public repository; whether
-`homelab-salt` is one is an open item in the PRD. Agents never run these states outside CI. terrac's
+Environment approvals are free on a public repository, and `homelab-salt`
+is one (D58): every apply runs from its workflows, so the gate sits there
+even when the change that triggered it merged in the private pillar repo.
+The no-auto-merge rule is set in both repos, each for its own paths. Agents never run these states outside CI. terrac's
 break-glass is `salt-call --local` on one host of the pair from the tree that
 is already there, which works with GitHub, CI and DNS all down.
 
@@ -1525,7 +1551,8 @@ Claims this design leans on, and where each gets checked. A row moves to
 | A rebuilt node under its old name is refused without its node password file | From memory, unverified | Fresh-build restore on the rehearsal VM |
 | k3s has no supported in-place downgrade | From memory, unverified | k3s docs, phase 1 |
 | A pod's NFS volume on harbor shows ocean's `/data01/services`, not harbor's local disk | Reasoned from `data01-workers.md`, unverified | Phase 2 test pod |
-| A GitHub account cannot approve its own PR, and environment approvals are available on a public repo under a user account | From memory, unverified | Phase 0, on `homelab-salt` |
+| A GitHub account cannot approve its own PR, and environment approvals are available on a public repo under a user account | From memory, unverified (`homelab` is public and user-owned, read 2026-11-21) | Phase 0, on `homelab-salt` |
+| A workflow in the public repo can be dispatched by a merge in the private pillar repo and check it out with a read-only deploy key, and fork pull requests reach neither the key nor the self-hosted runners | from memory, unverified; `homelab`'s current fork-PR setting not read | Phase 0, on `homelab-salt` |
 | PVE 8 reached end of life in August 2026 | Confirmed, 2026-11-15 | |
 | GitHub concurrency groups are scoped to one repository | Probable, no definitive source found | Phase 0, two repos, one group name |
 | A local PV whose path is missing fails to mount instead of creating it | Unverified | The rehearsal VM, before k3s goes onto ocean |
