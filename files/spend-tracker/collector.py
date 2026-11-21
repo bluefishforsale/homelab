@@ -145,7 +145,7 @@ def sync(rules, lookback_days):
     # Keyed by id because paging is by offset: a charge that posts mid-fetch
     # shifts the list and can put one transaction on two pages.
     rows = list({row["id"]: row for row in (classify(t, rules) for t in txns) if row}.values())
-    # A year with no vendor charges is Monarch failing quietly or the rules
+    # A window with no vendor charges is Monarch failing quietly or the rules
     # matching nothing, not a free year. Storing it would delete the whole
     # window and call that a success.
     if not rows:
