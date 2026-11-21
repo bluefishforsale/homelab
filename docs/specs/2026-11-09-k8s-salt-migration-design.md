@@ -1263,11 +1263,48 @@ exists.
   `purge_on_destroy` and `delete_unreferenced_disks_on_destroy`). The timer
   is a Salt state from the start (D40).
 - **D29: one bootstrap script** (in "Salt" above).
-- **D30: the base image is stock.** No custom template build. Each node's base
-  is the Debian genericcloud image, pinned by URL and sha512, mirrored to GCS,
-  and downloaded onto the node by `terraform-root`. Everything else comes from
-  cloud-init calling the bootstrap script, then Salt. A dead node's template
-  is therefore one `terraform apply` away. The pin is the Debian major the
+- **D30: the base image is a golden image, built by plain CI** (terrac). No
+  Packer and no image framework: the build is the same path a new VM takes
+  under D29, so every run also tests the bootstrap. A scheduled workflow
+  (monthly, plus manual dispatch) does this:
+  1. Resolve the source. Debian publishes each cloud build under a dated
+     directory (`cloud.debian.org/images/cloud/bookworm/20261112-2660/`, with
+     `latest/` pointing at the newest). The workflow reads which build
+     `latest` is, then downloads from the dated directory and checks the file
+     against that directory's `SHA512SUMS`. The build ID and sha512 are
+     recorded; the `latest` tag is never what gets built on. The image is
+     `generic`, the full-kernel one template 9999 was made from, not the slim
+     `genericcloud`, so a VM with a passed-through GPU or HBA needs no kernel
+     swap.
+  2. Boot it as a throwaway VM on one hypervisor, at a fixed VM ID that the
+     run destroys first, so a failed build leaves no orphan.
+  3. cloud-init runs the bootstrap script, a full package upgrade and a
+     highstate of the `base` role only: packages, users, repos, the pinned
+     Salt, the exporters. Nothing with encrypted pillar, so the build host
+     needs no rekey PR and there is no secret to leak into the image.
+  4. Scrub identity: `cloud-init clean --logs --machine-id`, SSH host keys,
+     the Salt minion id, the age key, DHCP leases. Two clones sharing an age
+     key would break R31's per-host secrets, so the workflow fails if any of
+     these is still present after the scrub.
+  5. Convert to a template with cloud-init still enabled, so hostname,
+     address, keys and users are set per clone, and the clone's first
+     highstate only has its role's states left to do.
+  6. Export the disk as qcow2 to GCS with its sha512, and write the Debian
+     build ID, source hash, `homelab-salt` commit and build date into the
+     template description and next to the object.
+
+  One build serves every node: `terraform-root` pins the exported image by
+  sha512 and downloads it per node, so the hypervisors run the same bits and
+  a dead node's template is still one `terraform apply` away. Promotion is a
+  PR, not automatic. The rehearsal VM is recreated from the new image and
+  must reach a clean highstate before the pin moves, and moving the pin must
+  not recreate VMs that already exist. A failed build changes nothing and
+  alerts; the previous image stays pinned. The image is a cache of what Salt
+  would do, not a second source of truth: Salt still runs the full highstate
+  on every clone. It is traceable, not bit-for-bit rebuildable (Debian's
+  build plus the Salt tree at one commit plus that day's package upgrades),
+  which is why every promoted image is kept in GCS. The workflow lives in
+  `terraform-root`, which owns Proxmox VMs. The Debian major is the one the
   fleet runs today; moving it is the later distro-lifecycle plan's business.
   (Provider resource names are confirmed when it is built.)
 - **D31: stateful pods restore by an explicit Job.** Every app chart with a
@@ -1372,8 +1409,8 @@ exists.
    until that state has applied. Before anything touches the HBA, `zpool import` with no arguments must show
    `/data01` as last used by another system; the host never imports it.
    terrac applies the D34 network state by hand; CI applies the rest.
-3. **node006 VMs** through CI: `terraform-root` downloads the base image
-   (D30) and recreates whatever is missing.
+3. **node006 VMs** through CI: `terraform-root` downloads the pinned golden
+   image from GCS (D30) and recreates whatever is missing.
 4. **dns02** through the D33 rebuild mode, then the normal pair gate.
 5. **ocean**: terrac imports `/data01` inside the VM; Salt brings NFS,
    NVIDIA and zed, then installs k3s; the nightly SQLite backup is restored
@@ -1417,6 +1454,10 @@ Claims this design leans on, and where each gets checked. A row moves to
 
 | Claim | Status | Checked in |
 |---|---|---|
+| Debian publishes each cloud build under a dated directory with its own `SHA512SUMS`, and `latest/` matches the newest | confirmed 2026-11-21 for the directory listing (`cloud.debian.org/images/cloud/bookworm/`, newest `20261112-2660`); the per-directory `SHA512SUMS` not read | Phase 0, image build |
+| `terraform-root`'s CI can create, start, template and export a VM on a hypervisor (credentials and reachability) | not checked | Phase 0, image build |
+| Moving the base image pin does not make Terraform recreate existing VMs | from memory, unverified | Phase 0, image build |
+| A template made from a booted, scrubbed VM gives each clone a fresh machine-id, host keys and cloud-init run | from memory, unverified | Phase 0, image build (two clones compared) |
 | `local-path`'s stock StorageClass reclaims with `Delete` | Confirmed from docs, 2026-11-15 | Re-read on the cluster, phase 1 |
 | A minor kubelet upgrade needs a drain first | Confirmed, upstream version skew policy, 2026-11-15 | |
 | A single-instance CloudNativePG cluster blocks a node drain unless `enablePDB: false` | Confirmed from operator docs, 2026-11-15 | Drain drill on harbor, phase 2 |

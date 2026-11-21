@@ -145,9 +145,15 @@ none of it blocks this phase.
       backup.
 - [ ] Agree the branch and merge policy for `homelab-kube` (merge is deploy
       under Argo CD auto-sync); add it to `docs/architecture/agent-autonomy.md`.
-- [ ] Base image per D30: stock Debian genericcloud at the major the fleet
-      runs today, pinned by sha512, mirrored to GCS, downloaded per node by
-      `terraform-root` (9999 stays until nothing uses it).
+- [ ] Golden image per D30: a scheduled workflow in `terraform-root` resolves
+      Debian's newest dated build (ID and sha512, not `latest`), boots it as
+      a throwaway VM, runs the bootstrap, upgrades and a `base`-role
+      highstate through cloud-init, scrubs identity, templates it with
+      cloud-init enabled and exports the disk to GCS with its sha512.
+- [ ] Image build proven: two clones of one image have different machine-ids,
+      host keys and age keys; the pin in `terraform-root` moves by PR after
+      the rehearsal VM comes up clean on the new image; moving it recreates
+      no existing VM (9999 stays until nothing uses it).
 
 Rebuild gaps that exist today, so they do not wait for 2027:
 
