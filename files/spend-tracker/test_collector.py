@@ -39,7 +39,7 @@ def test_a_merchant_that_only_contains_a_vendor_name_is_not_that_vendor():
 
 def test_every_merchant_spelling_seen_in_monarch_still_matches():
     seen = {
-        "Anthropic": "Anthropic", "OpenAI": "OpenAI", "Massive.com": "Massive", "Suno Inc": "Suno",
+        "Anthropic": "Anthropic API", "OpenAI": "OpenAI", "Massive.com": "Massive", "Suno Inc": "Suno",
         "Suno Inc.": "Suno", "YouTube": "YouTube", "NEWSDEMON.COM": "Newsdemon", "Newsdemon.com": "Newsdemon",
         "Monarch Money App": "Monarch", "Docker Inc": "Docker", "CLOUDFLARE": "Cloudflare Registrar",
     }
@@ -89,6 +89,52 @@ def test_amount_is_positive_and_keeps_its_cents():
 def test_merchant_falls_back_to_the_bank_description():
     row = collector.classify({"id": "1", "date": "2026-11-11", "amount": -30.0, "merchant": None, "plaidName": "SUNO INC"}, RULES)
     assert row["vendor"] == "Suno"
+
+
+def anthropic(descriptor, amount, date):
+    charge = dict(txn("Anthropic", amount, date=date), plaidName=descriptor)
+    row = collector.classify(charge, RULES)
+    return row and (row["vendor"], row["cadence"])
+
+
+def test_anthropic_plan_charges_and_api_credits_are_separate_vendors():
+    assert anthropic("ANTHROPIC", -37.05, "2026-11-11") == ("Anthropic API", "usage")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2026-11-12") == ("Anthropic Sub", "monthly")
+
+
+def test_the_annual_plan_is_told_from_the_monthly_one_by_its_renewal_day():
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2026-11-02") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-02") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2026-10-12") == ("Anthropic Sub", "monthly")
+
+
+def test_an_api_credit_bought_on_the_annual_renewal_day_stays_api():
+    assert anthropic("ANTHROPIC", -20.02, "2026-11-02") == ("Anthropic API", "usage")
+
+
+def test_an_annual_renewal_that_posts_a_few_days_off_is_not_a_second_monthly_charge():
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-01") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-04") == ("Anthropic Sub (wife)", "annual")
+    assert anthropic("ANTHROPIC* CLAUDE SUB", -200.00, "2027-11-12") == ("Anthropic Sub", "monthly")
+
+
+def test_a_plan_charge_with_a_reworded_bank_description_is_not_counted_as_api():
+    assert anthropic("ANTHROPIC *CLAUDE SUB", -200.00, "2026-12-12") == ("Anthropic Sub", "monthly")
+    assert anthropic("ANTHROPIC* CLAUDE SUB SAN FRANCISCO CA", -200.00, "2026-12-12") == ("Anthropic Sub", "monthly")
+
+
+def test_a_renewal_date_that_is_not_month_dash_day_fails_at_load():
+    import json
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json") as fh:
+        json.dump([{"vendor": "X", "match": "x", "renews": "11/02", "cadence": "annual"}], fh)
+        fh.flush()
+        try:
+            collector.load_rules(fh.name)
+        except ValueError:
+            return
+    raise AssertionError("a malformed renews value loaded")
 
 
 def test_every_shipped_rule_has_a_cadence_the_dashboard_knows():

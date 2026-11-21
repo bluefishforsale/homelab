@@ -4,7 +4,7 @@ so Grafana can chart monthly spend from one table.
 
 Monarch already aggregates every card, which makes it the one source that sees
 every vendor. vendors.json decides which merchants count and what to call them;
-the first rule that matches wins.
+the first rule that matches wins, so a narrower rule goes above a broader one.
 """
 import asyncio
 import base64
@@ -18,6 +18,7 @@ from decimal import Decimal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = 500
+RENEWAL_SLACK_DAYS = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS spend (
@@ -38,9 +39,25 @@ def load_rules(path):
         rules = json.load(fh)
     for rule in rules:
         rule["re"] = re.compile(rule["match"], re.I)
+        if "descriptor" in rule:
+            rule["descriptor"] = re.compile(rule["descriptor"], re.I)
         if "amount" in rule:
             rule["amount"] = Decimal(str(rule["amount"]))
+        if "renews" in rule:
+            month, day = rule["renews"].split("-")
+            rule["renews"] = (int(month), int(day))
     return rules
+
+
+def _is_renewal(date, renews):
+    """Whether a charge dated YYYY-MM-DD falls on a yearly plan's (month, day)."""
+    # NOTE: two plans at the same price on the same card differ in nothing but
+    # the day they renew, so this date is the whole identity of the yearly one.
+    # The slack covers a charge that posts a day or two off its invoice. A
+    # monthly plan whose billing day moves inside the window would be counted
+    # as the yearly one every year.
+    day = datetime.date.fromisoformat(date)
+    return abs((day - datetime.date(day.year, *renews)).days) <= RENEWAL_SLACK_DAYS
 
 
 def classify(txn, rules):
@@ -62,6 +79,16 @@ def classify(txn, rules):
         if not rule["re"].fullmatch(merchant):
             continue
         if "amount" in rule and rule["amount"] != amount:
+            continue
+        # Monarch folds every Anthropic charge into one merchant. The bank's
+        # own description is the only field that still tells a plan charge
+        # from an API credit. A description no rule recognises falls to the
+        # merchant-only rule below it, so the bar moves between series instead
+        # of dropping; keep the descriptor patterns loose about spacing and
+        # trailing text.
+        if "descriptor" in rule and not rule["descriptor"].fullmatch(txn.get("plaidName") or ""):
+            continue
+        if "renews" in rule and not _is_renewal(txn["date"], rule["renews"]):
             continue
         return {
             "id": f"monarch:{txn['id']}",
