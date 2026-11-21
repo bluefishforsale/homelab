@@ -498,8 +498,9 @@ The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
       `homelab-salt` and `terraform-root`.
 - [ ] Port by concern, one per PR, each deleting the Ansible owner in the same
       change: base packages and users, node-exporter, docker on remaining
-      Docker hosts, registry-cache, runners, agentbox. (The patch pipeline
-      was born in Salt in phase 1b.)
+      Docker hosts, registry-cache, runners, agentbox, llmeval (D57: its
+      router, the model download unit and the on-request eval unit). (The
+      patch pipeline was born in Salt in phase 1b.)
 - [ ] k3s install and upgrade (after phase 1's drill, using the play that
       survived it as the reference). One install and one upgrade on the rehearsal
       VM under Salt before the real cluster.
