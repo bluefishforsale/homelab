@@ -119,7 +119,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D28 | Each hypervisor's `/var/lib/pve-cluster/config.db` backed up nightly to GCS, age-encrypted; restoring it is how surviving VM disks get reattached after a reinstall. | design call, approved |
 | D29 | One Salt bootstrap script for every host: by hand on bare metal, from cloud-init on VMs, from an Ansible play during the migration. Cloud-init is the preferred path: a new VM goes from `terraform apply` to its full highstate with no manual step. The apply dispatches the Salt workflow for the new host, and the rekey PR that lets the host read its own pillar merges itself under R31's guards. The DNS pair and the hypervisors are the exceptions; their rekey waits for terrac. | design call, approved (terrac: hands-off through cloud-init, highstate after provision, guarded auto-merge of the rekey) |
 | D30 | The VM base image is a golden image built on a schedule by plain CI, no image framework. Each run resolves Debian's newest dated cloud build (a build ID and sha512, never the `latest` tag), boots it as a throwaway VM, lets cloud-init run the D29 bootstrap, the updates and a `base`-role highstate with no secrets, scrubs the VM's identity, and converts it to a template with cloud-init still enabled. The disk is exported to GCS with its sha512; `terraform-root` pins that hash and downloads it per node. Moving the pin is a PR, opened after the rehearsal VM is recreated from the new image and reaches a clean highstate. | terrac |
-| D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. | design call |
+| D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. Manual is where this starts; automating a restore after a rebuild is a later change, made once the manual path has been used. | design call, approved |
 | D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, approved |
 | D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D31, D33, D34, D35
+  confirmed: D33, D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
