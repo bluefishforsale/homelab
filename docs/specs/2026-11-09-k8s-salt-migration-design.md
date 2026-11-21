@@ -1367,8 +1367,11 @@ exists.
   that only terrac can approve, applies to that host only. It requires the
   other peer to pass its host gate first and never touches it. Kea syncs
   leases from the survivor on start; the rebuilt PowerDNS renders zones from
-  git, and its SOA serial must be at least the survivor's. Then the normal
-  pair gate runs.
+  git, and its SOA serial must be at least the survivor's. Records that
+  ExternalDNS owns (D55) are not in git, so the rebuilt peer must also answer
+  for them before the mode reports success; how they get there depends on how
+  the pair replicates, which is an open item in the PRD. Then the normal pair
+  gate runs.
 - **D34: Salt owns the hypervisor, passthrough included.** States for the
   Proxmox hosts cover apt repos, IOMMU kernel arguments (handled for
   whichever of GRUB or `proxmox-boot-tool` the host boots with),

@@ -121,7 +121,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D30 | The VM base image is a golden image built on a schedule by plain CI, no image framework. Each run resolves Debian's newest dated cloud build (a build ID and sha512, never the `latest` tag), boots it as a throwaway VM, lets cloud-init run the D29 bootstrap, the updates and a `base`-role highstate with no secrets, scrubs the VM's identity, and converts it to a template with cloud-init still enabled. The disk is exported to GCS with its sha512; `terraform-root` pins that hash and downloads it per node. Moving the pin is a PR, opened after the rehearsal VM is recreated from the new image and reaches a clean highstate. | terrac |
 | D31 | Pods with node-local databases restore through a per-chart restore Job: manual, dry-run by default, never auto-synced. Manual is where this starts; automating a restore after a rebuild is a later change, made once the manual path has been used. | design call, approved |
 | D32 | An offline recovery age key is a recipient on every sops file in every repo, with a quarterly decrypt test. | design call, approved |
-| D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call |
+| D33 | The DNS pair gate has a `rebuild_peer` dispatch mode, approved only by terrac, that rebuilds a dead peer without touching the survivor. | design call, approved |
 | D34 | Salt owns the hypervisors, passthrough and HBA import guards included. Their network bridges are Salt-rendered but applied only by terrac with the iDRAC console open; CI runs them `test=True`. | design call |
 | D35 | Every Postgres database runs as a single-instance CloudNativePG cluster with continuous WAL archiving to GCS: RPO about five minutes, 14 days of point-in-time recovery. The nightly logical dump stays. No Postgres replicas. | terrac (WAL archiving), design call (shape) |
 | D36 | A second self-hosted runner on node006, so losing node005 does not also lose CI. A runner is never applied or rebooted by its own job. | design call, approved |
@@ -150,7 +150,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
 - The decisions still marked plain `design call` above have not been
-  confirmed: D33, D34, D35
+  confirmed: D34, D35
   (shape) and D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
