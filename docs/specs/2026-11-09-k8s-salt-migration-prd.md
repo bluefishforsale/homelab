@@ -144,13 +144,12 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D53 | Running past the end of Debian 12 LTS (June 2028) is accepted. This plan ends in 2028 H1 and the distro-lifecycle plan only starts after it (D11), so ocean, harbor and the other Debian 12 VMs may run unpatched by Debian for a while. That is preferred to folding an OS major into this work. | terrac |
 | D54 | kured stays off harbor until Docker is removed from it. Through phase 2 harbor reboots only in a supervised window, with the Docker gate before and after, the same as ocean. It joins kured's rota as the last step of phase 2. | terrac |
 | D55 | No wildcard DNS. The `*.home` wildcard to ocean is removed in phase 0, replaced by one explicit record per name nginx serves, and the stale `*.cluster.local` wildcard goes with it. Cluster services get real `<svc>.home` records in PowerDNS, so a laptop resolves them the way it resolves any host; `cluster.local` stays inside the cluster. ExternalDNS in the cluster writes those records from each service's route, with a short TTL. The PowerDNS pair stays two independent primaries with no replication, so one ExternalDNS instance runs per server and each keeps its own server complete. This is the one exception to D25: it touches only records it created, a `homelab-kube` CI check refuses a hostname that is in the address table, and it never writes host, DHCP or resolver data. A second instance writes a public service's record in Cloudflare the same way, so a service and its names live in one repo and nothing is coordinated with `terraform-root` after the move; those records leave `terraform-root` once, in phase 1. The tunnels, the Access apps and every record that is not a cluster service stay there. A route publishes a public name only if it is labelled to. | terrac |
+| D56 | axiomd stays on agentbox as a compose project, tier 0, never a pod. It triages alerts today and will later be allowed limited actions on the VMs and on the cluster, so it runs on a VM outside the cluster it acts on and keeps working when the cluster is what is broken. Salt owns its compose project like ntfy's. What it may act on, and with which credentials, is decided when it gets actions, not in this plan. | terrac |
 
 ## Open items
 
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
-- axiomd runs as a compose project on agentbox. It is in no tier and no wave:
-  does it stay on agentbox, or become a pod?
 - llmeval is a VM on node006 with a 300G disk on the single boot SSD. Nothing
   here says what runs on it, whether it is tier 0, or what on that disk
   cannot be rebuilt.
