@@ -1,0 +1,108 @@
+---
+# Monthly spend on subscriptions, APIs and cloud accounts, charted in Grafana.
+#
+# A collector pulls card transactions from Monarch once a day, keeps the ones
+# files/spend-tracker/vendors.json claims, and writes them to a Postgres table
+# that the Spend dashboard queries. Each sync replaces the last
+# spend_lookback_days whole, so the first run is also the backfill.
+#
+# Adding or renaming a vendor is an edit to vendors.json; the next apply
+# rebuilds the image and the next sync reclassifies the whole window.
+- name: Spend tracker
+  hosts: ocean
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../vault/secrets.yaml"
+
+  vars:
+    service: spend-tracker
+    image: "spend-tracker:local"
+    files: "{{ playbook_dir }}/../../../../files/spend-tracker"
+    home: "/data01/services/spend-tracker"
+    # Hardcoded (not vars_service_ports) so this deploy does not fan out to every
+    # playbook referencing that shared file. spend_port matches the prometheus
+    # scrape job; spend_pg_port matches the Spend datasource in grafana_compose.yaml.
+    spend_port: 9195
+    spend_internal_port: 8080
+    # 5434, not 5433: docs/log-anomaly-pipeline.txt already plans 5433.
+    spend_pg_port: 5434
+    spend_lookback_days: 400
+    spend_sync_seconds: 86400
+
+  tasks:
+    - name: Ensure basedir exists
+      ansible.builtin.file:
+        path: "{{ home }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy build context (collector, vendor rules, deps, Dockerfile)
+      ansible.builtin.copy:
+        src: "{{ files }}/{{ item }}"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - collector.py
+        - vendors.json
+        - requirements.txt
+        - Dockerfile
+      register: spend_build_context
+
+    - name: Build collector image
+      ansible.builtin.command:
+        cmd: "docker build -t {{ image }} ."
+        chdir: "{{ home }}"
+      when: spend_build_context is changed
+
+    - name: Copy the Postgres init script (read-only role for Grafana)
+      ansible.builtin.copy:
+        src: "{{ files }}/init-grafana-ro.sh"
+        dest: "{{ home }}/init-grafana-ro.sh"
+        mode: '0755'
+
+    - name: Template env files (one per container, so each sees only its own secrets)
+      ansible.builtin.template:
+        src: "{{ files }}/{{ item }}.j2"
+        dest: "{{ home }}/{{ item }}"
+        mode: '0600'
+      loop:
+        - spend-tracker.env
+        - postgres.env
+      register: spend_env
+
+    - name: Template compose file
+      ansible.builtin.template:
+        src: "{{ files }}/docker-compose.yml.j2"
+        dest: "{{ home }}/docker-compose.yml"
+        mode: '0644'
+      register: spend_compose
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: "{{ files }}/spend-tracker.service.j2"
+        dest: "/etc/systemd/system/{{ service }}.service"
+        mode: '0644'
+      register: spend_unit
+      notify: Reload systemd daemon
+
+    - name: Flush handlers so the unit is registered before enabling
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and start the tracker (restart only on config/unit change)
+      ansible.builtin.systemd:
+        name: "{{ service }}.service"
+        enabled: true
+        state: "{{ 'restarted' if (spend_env is changed or spend_unit is changed or spend_build_context is changed or spend_compose is changed) else 'started' }}"
+        daemon_reload: true
+
+    # No docker-restart@ timer, unlike the cloudflare exporter. That project is
+    # wholly host-built, so docker-refresh skips it and nothing recreates it.
+    # This one has a pulled Postgres image, so the weekly refresh converges the
+    # project, and the collector holds no state worth recycling.
+
+  handlers:
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true

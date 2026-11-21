@@ -39,6 +39,7 @@ on:
           - my_ta_jose
           - etrading_boy
           - tradey_boy_quant
+          - spend_tracker
           - archmap
           - ml_log_analyzer
           # Monitoring
@@ -108,6 +109,7 @@ jobs:
             my_ta_jose) PLAYBOOK="playbooks/individual/ocean/services/my_ta_jose.yaml" ;;
             etrading_boy) PLAYBOOK="playbooks/individual/ocean/services/etrading_boy.yaml" ;;
             tradey_boy_quant) PLAYBOOK="playbooks/individual/ocean/services/tradey_boy_quant.yaml" ;;
+            spend_tracker) PLAYBOOK="playbooks/individual/ocean/services/spend_tracker.yaml" ;;
             archmap) PLAYBOOK="playbooks/individual/workers/archmap.yaml" ;;
             ml_log_analyzer) PLAYBOOK="playbooks/individual/workers/ml_log_analyzer.yaml" ;;
 

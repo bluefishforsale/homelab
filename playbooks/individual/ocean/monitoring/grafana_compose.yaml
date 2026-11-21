@@ -141,6 +141,36 @@
       mode: '0644'
     register: grafana_loki_datasource
 
+  # The spend tracker's Postgres, for the Spend dashboard. Host and port match
+  # spend_pg_port in playbooks/individual/ocean/services/spend_tracker.yaml.
+  # Mode 0600 because the password is in the file. grafana_ro can only SELECT;
+  # the role is created by files/spend-tracker/init-grafana-ro.sh.
+  - name: Create Spend datasource provisioning configuration
+    ansible.builtin.copy:
+      dest: "{{ home }}/provisioning/datasources/spend.yml"
+      content: |
+        apiVersion: 1
+
+        datasources:
+          - name: Spend
+            type: postgres
+            uid: spend
+            access: proxy
+            url: 192.168.1.143:5434
+            user: grafana_ro
+            jsonData:
+              database: spend
+              sslmode: disable
+              postgresVersion: 1600
+            secureJsonData:
+              password: "{{ spend_tracker.grafana_ro_password }}"
+            isDefault: false
+            editable: false
+      owner: "{{ uid }}"
+      group: "{{ gid }}"
+      mode: '0600'
+    register: grafana_spend_datasource
+
   - name: Create dashboard provisioning configuration
     ansible.builtin.copy:
       dest: "{{ home }}/provisioning/dashboards/dashboards.yml"
@@ -208,7 +238,7 @@
   - name: Show what configuration files changed
     ansible.builtin.debug:
       msg: "Configuration files have been updated - containers will be recreated"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_spend_datasource.changed or grafana_dashboard_provisioning.changed
 
   - name: Create grafana systemd service
     ansible.builtin.template:
@@ -232,7 +262,7 @@
       docker compose down --timeout 30
       docker compose up -d --force-recreate
       echo "Container recreation completed"
-    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_dashboard_provisioning.changed
+    when: mysql_init_script.changed or mysql_config.changed or grafana_config.changed or docker_compose_config.changed or grafana_env.changed or grafana_users_config.changed or grafana_loki_datasource.changed or grafana_spend_datasource.changed or grafana_dashboard_provisioning.changed
 
   handlers:
   - name: Reload systemd daemon

@@ -1,0 +1,78 @@
+# Rendered by playbooks/individual/ocean/services/spend_tracker.yaml.
+#
+# Tracks what the subscriptions, APIs and cloud accounts cost each month. The
+# collector pulls card transactions from Monarch once a day and writes the
+# vendor charges to Postgres; Grafana reads that table for the Spend dashboard.
+#
+# The collector image is built here from repo source, so it declares `build:`
+# and the weekly docker-refresh skips it with --ignore-buildable while still
+# refreshing Postgres. Its update path is a change under files/spend-tracker,
+# which rebuilds on the next apply.
+#
+# Every secret is in the two env files (mode 0600), not in this file. They are
+# split so the Monarch session reaches the collector only.
+services:
+  collector:
+    build: .
+    image: "{{ image }}"
+    container_name: "{{ service }}"
+    hostname: "{{ service }}"
+    restart: unless-stopped
+    env_file:
+      - spend-tracker.env
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+    ports:
+      - "{{ spend_port }}:{{ spend_internal_port }}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Proves the process is up, not that Monarch answered. A dead session keeps
+    # this green on purpose; SpendTrackerStale is the alert for that.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ spend_internal_port }}/metrics')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cpus: '0.5'
+    mem_limit: 256m
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}"
+
+  postgres:
+    image: registry-cache.home:5001/library/postgres:16-alpine
+    container_name: "{{ service }}-postgres"
+    hostname: postgres
+    restart: unless-stopped
+    env_file:
+      - postgres.env
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+      - {{ home }}/pgdata:/var/lib/postgresql/data
+      - {{ home }}/init-grafana-ro.sh:/docker-entrypoint-initdb.d/init-grafana-ro.sh:ro
+    # LAN address only. Grafana runs on the default bridge in another compose
+    # project, so it reaches this through the host port, not a shared network.
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ spend_pg_port }}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "spend", "-U", "spend"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cpus: '0.5'
+    mem_limit: 256m
+    logging:
+      driver: journald
+      options:
+        tag: "{{ service }}-postgres"
