@@ -270,11 +270,19 @@ one node to the other) is seen on the rehearsal pair first.
     is the only DNS credential in the cluster. The rehearsal cluster's
     ExternalDNS has its own owner id and only writes names under
     `rehearsal.home`.
-  - What has to be true first: a record written through the API reaches
-    both DNS servers. This spec says PowerDNS is primary on dns02 with an
-    AXFR secondary on dns01; `scripts/dns-drift-check.sh` says dual-primary
-    with no replication. Phase 0 finds out which, and if it is the second,
-    fixes replication before ExternalDNS exists.
+  - Both DNS servers get every record. The pair is two independent
+    primaries with no replication between them: `pdns.conf.j2` sets no
+    primary or secondary role, each server loads the same zone data from
+    git, and each Kea updates only its local PowerDNS
+    (`scripts/dns-drift-check.sh:5`). That stays (terrac), because it is
+    what lets either server run alone and it leaves tier 0 untouched. So
+    ExternalDNS runs once per server: two instances with the same sources,
+    one pointed at dns01's API and one at dns02's, each with its own owner
+    id. A server that was down or rebuilt is refilled by its instance within
+    a sync interval. The cost is that the two can disagree for as long as
+    one API is unreachable, which the pair's parity check reports. The
+    drift DHCP names already cause between the two servers is not changed
+    by this, for better or worse.
   - Tier 0 does not come to depend on the cluster (A1): a record stays in
     PowerDNS when ExternalDNS or the whole cluster is down. Only changes
     stop.
@@ -1129,8 +1137,9 @@ takes the runner that would fix it down too.
 
 **Scope.** Everything `roles/dns_infrastructure` and its neighbours own today:
 
-- PowerDNS authoritative (primary on dns02, AXFR secondary on dns01), the
-  recursor, dnsdist, and the zone data and its import.
+- PowerDNS authoritative (two independent primaries, each loading the same
+  zone data from git, no replication between them), the recursor, dnsdist,
+  and the zone data and its import.
 - Kea DHCP4 in hot-standby (primary dns02, standby dns01), Kea DHCP-DDNS, the
   control agent, every reservation and option, and the kea exporter.
 - netboot.xyz and TFTP on the pair, and promtail on both.
@@ -1169,7 +1178,9 @@ PR or terrac's break-glass.
    a PowerDNS zone check, dnsdist's config check; exact flags confirmed when
    porting).
 2. *Pair pre-flight*: both hosts answer DNS, Kea HA reports a healthy
-   hot-standby pair, and the secondary's SOA serials match the primary's. A
+   hot-standby pair, and the static records match on both servers (what
+   `dns-parity-check.sh` checks today; SOA serials are not compared, since
+   each server takes its own DHCP updates and counts its own). A
    pair that is already degraded is not applied to, except through a dispatch
    input only terrac uses.
 3. *Standby first* (dns01). Every managed config file uses Salt's
@@ -1183,14 +1194,16 @@ PR or terrac's break-glass.
    the 2026-09-09 slow restart.
 5. *Primary* (dns02), then its host gate. Kea fails over to dns01 while the
    primary restarts; that is the hot-standby pair doing its job.
-6. *Pair gate*: both answering, Kea HA back to normal hot-standby, SOA serials
-   equal on both.
+6. *Pair gate*: both answering, Kea HA back to normal hot-standby, static
+   records matching on both.
 7. *Resolver config* on fleet hosts: one canary host first, then one host at a
    time with a `dig` gate each, and the runner last so a bad resolver change
    cannot cut off the run applying it.
 
-A zone-only change applies to the primary alone and gates on the secondary's
-serial catching up through NOTIFY and AXFR.
+A zone-only change goes to both servers the same way, dns01 first and then
+dns02, each behind its host gate, because nothing copies a zone from one to
+the other. ("Primary" and "standby" in the steps above are Kea's roles;
+PowerDNS has none.)
 
 **Cutover from Ansible.** For at least two weeks before ownership moves, the
 Salt DNS and DHCP states run on the pair in `test=True` only, and CI diffs
@@ -1206,7 +1219,7 @@ through the real CI path: a full apply; a deliberately bad Kea config (CI
 halts at step 1); a config that passes the check but breaks resolution (CI
 halts at step 4, the primary untouched, the client still resolving and
 renewing its lease); a killed primary (the standby serves leases); and a zone
-change reaching the secondary. Results are recorded, then the test VMs are
+change landing on both servers. Results are recorded, then the test VMs are
 deleted.
 
 ## Disaster recovery: rebuild from git
@@ -1372,11 +1385,10 @@ exists.
   that only terrac can approve, applies to that host only. It requires the
   other peer to pass its host gate first and never touches it. Kea syncs
   leases from the survivor on start; the rebuilt PowerDNS renders zones from
-  git, and its SOA serial must be at least the survivor's. Records that
-  ExternalDNS owns (D55) are not in git, so the rebuilt peer must also answer
-  for them before the mode reports success; how they get there depends on how
-  the pair replicates, which is an open item in the PRD. Then the normal pair
-  gate runs.
+  git, and its static records must match the survivor's. Records that
+  ExternalDNS owns (D55) are not in git; the instance pointed at the rebuilt
+  peer writes them back, and the mode waits for the peer to answer for them
+  before it reports success. Then the normal pair gate runs.
 - **D34: Salt owns the hypervisor, passthrough included.** States for the
   Proxmox hosts cover apt repos, IOMMU kernel arguments (handled for
   whichever of GRUB or `proxmox-boot-tool` the host boots with),
@@ -1409,7 +1421,7 @@ exists.
    get a static address and an outside resolver by hand, or the bootstrap
    cannot reach GCS. Start dns01
    first: DNS and DHCP return on one server (Kea standby in partner-down,
-   PowerDNS serving its secondary copy). Then gh-runner-01, which carries
+   PowerDNS serving its own copy of the zones). Then gh-runner-01, which carries
    every repo's runner registration, and CI is back. Then registry-cache-01, agentbox
    (ntfy, dead-man), pihole, netboot01, harbor. The household is
    without DNS only for this step, which is why it comes first.
@@ -1478,7 +1490,8 @@ Claims this design leans on, and where each gets checked. A row moves to
 | Cilium's L2 announcements need kube-proxy replacement, and are stable enough to run at the pinned Cilium version | From memory, unverified | Cilium docs, then the rehearsal cluster, phase 1 |
 | A Gateway on a load-balancer address serves 80/443 without binding a host port or needing `NET_BIND_SERVICE` | From memory, unverified | The rehearsal cluster, phase 1 |
 | `192.168.1.64/27` is unused | Sweep and repo read, 2026-11-19; a powered-off device would not show, and the UniFi client history was not read | UniFi client list, phase 0 |
-| A record written through the PowerDNS API reaches both dns01 and dns02 | Unknown: this spec and `scripts/dns-drift-check.sh` disagree on how the pair replicates | Phase 0, before ExternalDNS |
+| The PowerDNS pair is two independent primaries with no replication | confirmed 2026-11-21 from the repo (`files/dns-stack/pdns.conf.j2:26-28` sets no primary or secondary role; `scripts/dns-drift-check.sh:5`); not confirmed against the running servers | Phase 0, before ExternalDNS |
+| Two ExternalDNS instances with different owner ids, one per PowerDNS server, each keep their own server complete without fighting | from memory, unverified | Phase 1, rehearsal (against the test pair) |
 | ExternalDNS's PowerDNS provider reads Gateway API routes and `DNSEndpoint` objects, and leaves records without its ownership TXT alone | From memory, unverified | ExternalDNS docs, then the rehearsal cluster, phase 1 |
 | `app-template` 5.x is maintained (5.3.0 released October 2026) and its majors can force a Deployment to be recreated | Confirmed from the project's release page and a downstream chart's upgrade notes, 2026-11-19 | |
 | `app-template` 5.x needs Kubernetes 1.31 and Helm 3.18 or newer | From a third-party listing, not the project's own pages | Reference chart render in CI, phase 0 |
