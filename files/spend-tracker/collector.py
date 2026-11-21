@@ -4,7 +4,7 @@ so Grafana can chart monthly spend from one table.
 
 Monarch already aggregates every card, which makes it the one source that sees
 every vendor. vendors.json decides which merchants count and what to call them;
-the first rule that matches wins.
+the first rule that matches wins, so a narrower rule goes above a broader one.
 """
 import asyncio
 import base64
@@ -38,6 +38,8 @@ def load_rules(path):
         rules = json.load(fh)
     for rule in rules:
         rule["re"] = re.compile(rule["match"], re.I)
+        if "descriptor" in rule:
+            rule["descriptor"] = re.compile(rule["descriptor"], re.I)
         if "amount" in rule:
             rule["amount"] = Decimal(str(rule["amount"]))
     return rules
@@ -62,6 +64,17 @@ def classify(txn, rules):
         if not rule["re"].fullmatch(merchant):
             continue
         if "amount" in rule and rule["amount"] != amount:
+            continue
+        # Monarch folds every Anthropic charge into one merchant. The bank's
+        # own description is the only field that still tells a plan charge
+        # from an API credit.
+        if "descriptor" in rule and not rule["descriptor"].fullmatch(txn.get("plaidName") or ""):
+            continue
+        # NOTE: "on" is the MM-DD a yearly plan renews. Two plans at the same
+        # price on the same card differ in nothing else, so a renewal that
+        # posts a day late lands on the next rule, as a monthly plan charged
+        # twice that month.
+        if "on" in rule and rule["on"] != txn["date"][5:]:
             continue
         return {
             "id": f"monarch:{txn['id']}",
