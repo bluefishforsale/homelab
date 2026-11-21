@@ -124,11 +124,11 @@ none of it blocks this phase.
       log for names only the wildcard answered), then the `*.home` wildcard
       removed; the `*.cluster.local` zone and its record at `.64` deleted.
       Through the pair gates, merged by terrac.
-- [ ] Confirm on the running pair that PowerDNS is two independent primaries
-      with no replication, as the repo's config says, and correct
-      `files/dns-stack/README.md`, which claims AXFR replication. The pair
-      stays that way (terrac); ExternalDNS writes to each server through its
-      own instance.
+- [ ] Confirm on the running pair what the role says: dns02 primary, dns01
+      an AXFR secondary, and a record written through the primary's API
+      arriving on dns01. Correct the two stale claims of "no replication":
+      the header of `scripts/dns-drift-check.sh` and the old stack under
+      `files/dns-stack/`.
 - [ ] `192.168.1.64/27` checked against the UniFi client history and recorded
       in the address table as the cluster's pool (D10).
 - [ ] `homelab-kube`: PV `ocean-nfs-pvc.yaml` to `Retain`.
