@@ -28,7 +28,9 @@
     spend_internal_port: 8080
     # 5434, not 5433: docs/log-anomaly-pipeline.txt already plans 5433.
     spend_pg_port: 5434
-    spend_lookback_days: 400
+    # Two years and a few days, so the dashboard's "Last year" panel has the
+    # whole previous calendar year on any day of this one.
+    spend_lookback_days: 735
     spend_sync_seconds: 86400
 
   tasks:
