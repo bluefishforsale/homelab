@@ -192,11 +192,15 @@ On the rehearsal VM:
 - [ ] `homelab-kube`: a root per cluster (`clusters/rehearsal`,
       `clusters/production`) and a sops key per cluster. The production key
       never goes onto the rehearsal VM.
-- [ ] `terraform-root` PR: `k3s-rehearsal` on node005's `vmpool-storage`, the
-      same Debian major, kernel line, Docker version and iptables backend as
-      ocean, a static IP from the free infrastructure range, Docker
-      installed. Then the `homelab` inventory PR, merged by
-      terrac.
+- [ ] `terraform-root` PR: `k3s-rehearsal` and `k3s-rehearsal-agent` on
+      node005's `vmpool-storage`, the same Debian major, kernel line, Docker
+      version and iptables backend as ocean, each with a static IP from the
+      free infrastructure range and Docker installed. Then the `homelab`
+      inventory PR, merged by terrac.
+- [ ] The agent joins the rehearsal server: Docker gate before and after on
+      both, traffic between the two Cilium nodes, an L2 announcement moving
+      when the announcing node is drained, and every upgrade of the drill run
+      server first, then agent.
 - [ ] `k3s.yaml` install and upgrade play: server first, then agents with
       cordon, drain, upgrade, uncordon, `serial: 1`. Added to the
       never-auto-apply list, with a pinned test in
@@ -355,9 +359,9 @@ cutover here).
 - [ ] Join window: k3s agent on harbor beside Docker, with its role label,
       excluded from kured. The Docker gate passes before the join, after it,
       and after a reboot. Backout: `k3s-agent-uninstall.sh` and Cilium's
-      cleanup, gate again. This is the first agent join and the first
-      traffic between two Cilium nodes anywhere; the rehearsal cluster has
-      one node.
+      cleanup, gate again. The rehearsal pair did an agent join and
+      two-node Cilium traffic first; this is the first on a host that
+      matters.
 - [ ] The `/data01` NFS PV for harbor, proven with a test pod. It is the first
       NFS mount in the cluster. The same pod mounts a state PV at its own
       path and writes a file; on the host that file is on the local state

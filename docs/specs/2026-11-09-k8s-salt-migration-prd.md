@@ -93,7 +93,7 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | # | Decision | Made by |
 |---|---|---|
 | D1 | k3s with SQLite via kine. No etcd. | terrac |
-| D2 | One production cluster. No management cluster; tier 0 VMs cover the break-glass role. The rehearsal VM is a second, single-node cluster that holds nothing (D51). | design call, approved |
+| D2 | One production cluster. No management cluster; tier 0 VMs cover the break-glass role. The rehearsal cluster is a second cluster, a server and one agent, that holds nothing (D51). | design call, approved |
 | D3 | Cluster installed and upgraded by Ansible until proven, then by Salt. | terrac |
 | D4 | Ocean is a cluster node from phase 1 and runs Docker and k3s side by side for the whole migration; services move one at a time (least downtime per service). | design call, approved |
 | D5 | No new cluster VMs and no new hardware. The k3s server runs on ocean, configured as it is today, and harbor is the node005 agent. | terrac |
@@ -137,9 +137,9 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 | D46 | Everything on harbor moves in phase 2 with harbor: nzbget, tdarr-node, ml-log-analyzer, mem0 and archmap. That puts three of the four D35 databases in phase 2. ml-log-analyzer goes first, as the least critical, and gets a nightly dump now, since it is in no backup today. | terrac |
 | D47 | The cluster is never more than two minors behind k3s stable (R23). | terrac |
 | D48 | Both hypervisors are upgraded in place to PVE 9 in phase 0, node005 first, one per window, because PVE 8 reached end of life in August 2026. | terrac |
-| D49 | k3s upgrades run only in ocean's supervised monthly window (R29): ocean is the server, a minor upgrade needs a drain, and draining ocean stops nearly everything. harbor's agent follows in the same window. | terrac (window), design call (whole cluster in it) |
+| D49 | k3s upgrades run only in ocean's supervised monthly window (R29): ocean is the server, a minor upgrade needs a drain, and draining ocean stops nearly everything. harbor's agent follows in the same window. harbor cannot go first as the canary: upstream's skew policy says a kubelet must not be newer than the API server, and the API server is on ocean. The canary is the rehearsal cluster, which has a server and an agent (D51) so the same server-then-agent upgrade runs there a week earlier. | terrac |
 | D50 | An nginx feature with no Gateway equivalent is decided per feature at the phase 1 gate: a Cloudflare rule for a public vhost, an nginx pod behind the Gateway for a LAN-only one, dropping it last. | terrac |
-| D51 | A standing rehearsal cluster: one VM on node005's existing `vmpool-storage`, with Docker installed, that takes every risky step before ocean does: the Docker coexistence proof, the upgrade drill, the break-and-restore, and each later upgrade. It is never a member of the production cluster, runs its own k3s version and chart versions, has its own sops key, and holds no real data or secrets, so it can be rebuilt at will. | design call, approved (terrac: standing, not rebuilt per upgrade) |
+| D51 | A standing rehearsal cluster: two small VMs on node005's existing `vmpool-storage`, a server and one agent (terrac, with D49), each with Docker installed, that takes every risky step before ocean does: the Docker coexistence proof, the upgrade drill, the break-and-restore, and each later upgrade. It is never a member of the production cluster, runs its own k3s version and chart versions, has its own sops key, and holds no real data or secrets, so it can be rebuilt at will. | design call, approved (terrac: standing, not rebuilt per upgrade) |
 | D52 | node006's boot disk stays a single point: it holds Proxmox and every VM disk on that node, and nothing mirrors it. Neither hypervisor's boot disk is mirrored. The protection is rebuild from git, the nightly k3s server backup (R2) and the config DB backup (D28). | terrac (no physical change), design call, approved (what covers the gap) |
 | D53 | Running past the end of Debian 12 LTS (June 2028) is accepted. This plan ends in 2028 H1 and the distro-lifecycle plan only starts after it (D11), so ocean, harbor and the other Debian 12 VMs may run unpatched by Debian for a while. That is preferred to folding an OS major into this work. | terrac |
 | D54 | kured stays off harbor until Docker is removed from it. Through phase 2 harbor reboots only in a supervised window, with the Docker gate before and after, the same as ocean. It joins kured's rota as the last step of phase 2. | terrac |
@@ -149,8 +149,6 @@ number (here or in the requirements and anti-goals) is one that was dropped.
 
 Not decided yet. Each needs terrac, and none blocks phase 0.
 
-- The decisions still marked plain `design call` above have not been
-  confirmed: D49 (the whole cluster in ocean's window).
 - How the PowerDNS pair replicates. The design says primary on dns02 with an
   AXFR secondary on dns01; `scripts/dns-drift-check.sh` in `homelab` says
   dual-primary with no replication. One is stale, and ExternalDNS (D55) can
@@ -160,10 +158,6 @@ Not decided yet. Each needs terrac, and none blocks phase 0.
 - llmeval is a VM on node006 with a 300G disk on the single boot SSD. Nothing
   here says what runs on it, whether it is tier 0, or what on that disk
   cannot be rebuilt.
-- The rehearsal cluster has one node, so an agent join, agent and server
-  version skew, and Cilium between two nodes are first seen on harbor. A
-  second small VM joined to the rehearsal cluster would cover them, and is
-  one more VM.
 - D26 says a VM that fails the rebuild drill gets a weekly vzdump, but the
   drill rebuilds nested test VMs, not agentbox, harbor, pihole or llmeval,
   and there is no backup storage for a vzdump to land on.
@@ -284,7 +278,8 @@ Not decided yet. Each needs terrac, and none blocks phase 0.
   Argo token for CI.
 - **R29.** k3s upgrades run in ocean's supervised monthly window, then
   harbor (D49). The rehearsal cluster takes the same upgrade at least a week
-  earlier (D51), so a failure there has time to be understood.
+  earlier (D51), server first and then its agent, so a failure there has
+  time to be understood.
 - **R30.** The dead-man watchdog alerts only past a ten-minute outage, so a
   planned ocean reboot does not page.
 - **R31.** The rekey workflow reads a host's public key from the host. It

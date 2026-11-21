@@ -116,9 +116,13 @@ kernel line, Docker version and iptables backend as ocean) is built by the
 same play and takes every risky step first: the Docker coexistence proof, the
 three-upgrade drill, the deliberate break and restore, and from then on
 every k3s and Cilium upgrade at least a week before ocean gets it. It is a
-single-node cluster of its own, never a member of the production one, and it
-holds nothing, so it can be deleted and rebuilt at will. Backout for the
-whole idea is deleting it.
+cluster of its own, never a member of the production one, and it holds
+nothing, so it can be deleted and rebuilt at will. Backout for the whole
+idea is deleting it. A second small VM (`k3s-rehearsal-agent`, same node,
+same build) joins it as an agent (terrac, with D49), so the rehearsal has
+the same shape as production: a server and one agent. That is what makes it
+the upgrade canary. harbor cannot be one, because a kubelet must not be
+newer than the API server and the API server is on ocean.
 
 Being a second cluster, it needs its own of three things. Its k3s version is
 its own variable, because it runs ahead of production. Its Argo CD reads its
@@ -130,11 +134,11 @@ root carries only test secrets.
 
 What it cannot prove, because it has none of them: the GPU and the NVIDIA
 runtime, ZFS (the pool guard is simulated, and kubelet's view of memory with
-an ARC in it is not), the NFS mount, and anything that takes two nodes (an
-agent join, agent and server skew, Cilium's overlay between hosts). Those are
-first seen on ocean in phase 3 and on harbor in phase 2, each in a
-supervised window with its own backout. Whether a second rehearsal node is
-worth it for the last group is an open item in the PRD.
+an ARC in it is not) and the NFS mount. Those are first seen on ocean in
+phase 3 and on harbor in phase 2, each in a supervised window with its own
+backout. What takes two nodes (an agent join, agent and server skew during
+an upgrade, Cilium's traffic between hosts, an L2 announcement moving from
+one node to the other) is seen on the rehearsal pair first.
 
 - **Distribution**: k3s. **Datastore**: embedded SQLite via kine (single
   server, no `--cluster-init`, no etcd). HA control plane is an anti-goal for
@@ -179,7 +183,8 @@ worth it for the last group is an open item in the PRD.
   in ocean's supervised monthly window (D49), where ocean is drained and
   rebooted anyway: ocean, then harbor's agent, which never runs ahead of the
   server. The rehearsal cluster takes the same upgrade at least a week
-  before (R29). R23 measures the server.
+  before (R29), in the same order, its server and then its agent, so the
+  window on ocean repeats something already seen. R23 measures the server.
 - **Upgrade backout**: k3s has no supported downgrade, so backing out an
   upgrade on ocean is not the fresh-build restore. It is in place: stop k3s,
   put the previous binary back, restore the database copy taken just before
@@ -1462,6 +1467,7 @@ Claims this design leans on, and where each gets checked. A row moves to
 
 | Claim | Status | Checked in |
 |---|---|---|
+| A kubelet must not be newer than the API server, so harbor cannot upgrade before ocean | confirmed 2026-11-21 (kubernetes.io/releases/version-skew-policy: "`kubelet` must not be newer than `kube-apiserver`") | D49 |
 | Debian publishes each cloud build under a dated directory with its own `SHA512SUMS`, and `latest/` matches the newest | confirmed 2026-11-21 for the directory listing (`cloud.debian.org/images/cloud/bookworm/`, newest `20261112-2660`); the per-directory `SHA512SUMS` not read | Phase 0, image build |
 | `terraform-root`'s CI can create, start, template and export a VM on a hypervisor (credentials and reachability) | not checked | Phase 0, image build |
 | Moving the base image pin does not make Terraform recreate existing VMs | from memory, unverified | Phase 0, image build |
