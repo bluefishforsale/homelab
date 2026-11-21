@@ -1253,8 +1253,24 @@ exists.
 ### Decisions that close the gaps
 
 - **D26: VM root disks are cattle.** No VM-disk backups. Every VM is
-  rebuildable from git, GCS and `/data01`, and the rebuild drill proves it.
-  Backout: a VM that fails the drill gets a weekly vzdump until it passes.
+  rebuildable from git, GCS and `/data01`. The nested drill (Rehearsal,
+  below) proves the order and the tooling, but it rebuilds stand-ins, so
+  each real VM is also proven once (terrac): during its port to Salt in
+  phase 6 it is destroyed and recreated from the golden image through
+  `terraform-root`, cloud-init and Salt, the D29 path. The order runs from
+  least to most missed: llmeval and registry-cache-01, the runners (one at
+  a time, so CI never loses both), netboot01, pihole, agentbox, harbor. The
+  DNS pair goes through D33's rebuild mode. Before a VM's turn, whatever it
+  keeps on its root disk is listed and given a home, and its other disks
+  are confirmed to survive a root rebuild (harbor's state disk and its
+  passed-through SSD are separate devices; that is checked, not assumed).
+  Backout: one `vzdump` of the VM to node005's `vmpool-storage` before the
+  destroy, kept until the rebuilt VM has run clean for two weeks, then
+  deleted. A VM on node006 has its dump written across the network to
+  node005, since node006 has one disk. There is no standing VM backup.
+  Ocean is the snowflake and stays one (terrac): it is never destroyed or
+  rebuilt by automation, its root is only rebuilt in a real recovery, and
+  every change to it has terrac in the loop.
 - **node006's boot disk is an accepted single point.** It is the worst
   exposure in the table above: one SSD holds Proxmox and every VM disk on
   that node, and there is no free bay for a second, so nothing mirrors it and

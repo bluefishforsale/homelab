@@ -501,6 +501,11 @@ The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
       Docker hosts, registry-cache, runners, agentbox, llmeval (D57: its
       router, the model download unit and the on-request eval unit). (The
       patch pipeline was born in Salt in phase 1b.)
+- [ ] Each real VM rebuilt once (D26), as its port lands: root-disk contents
+      listed and homed, one vzdump to node005's `vmpool-storage`, destroy,
+      recreate from the golden image, clean highstate, dump deleted after
+      two clean weeks. Order: llmeval, registry-cache-01, the runners one at
+      a time, netboot01, pihole, agentbox, harbor. Never ocean.
 - [ ] k3s install and upgrade (after phase 1's drill, using the play that
       survived it as the reference). One install and one upgrade on the rehearsal
       VM under Salt before the real cluster.
