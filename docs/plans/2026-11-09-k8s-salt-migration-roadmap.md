@@ -52,7 +52,7 @@ hard limits so a phase plan cannot quietly drop one.
 | Quarter | Kubernetes track | OS lifecycle track | Salt track |
 |---|---|---|---|
 | 2026 Q4 | Phase 0 | | `homelab-salt` repo, bootstrap script, first CI apply (D40) |
-| 2027 Q1 | Phase 1 (rehearsal VM, upgrade drill, restore, k3s onto ocean, watchdog) | Phase 1b on ocean | Masterless bootstrap on every host |
+| 2027 Q1 | Phase 1 (rehearsal cluster, upgrade drill, restore, k3s onto ocean, watchdog) | Phase 1b on ocean | Masterless bootstrap on every host |
 | 2027 Q2 | Phase 2 (harbor joins) and Phase 3 (GPU gate) in parallel; W1 | Patch pipeline fleet-wide | Base system states |
 | 2027 Q3 | Phase 4 (ocean waves W2 to W5) | | k3s install, then ocean and harbor host states, move to Salt |
 | 2027 Q4 | Phase 5 (monitoring, ingress) | | Proxmox, then DNS and DHCP (gated CI, D25) |
@@ -71,7 +71,7 @@ terrac accepts running past it (D53); a slip here makes that stretch longer.
 Phases gate on what they need, not on their number (D37).
 
 - Phase 1's rehearsal work needs from phase 0: the base image (for the
-  rehearsal VM), the GCS bucket, the `homelab-kube` defects fixed with the
+  rehearsal cluster), the GCS bucket, the `homelab-kube` defects fixed with the
   sonarr reference chart and the Renovate and dispatch workflows, and the
   Salt bootstrap (the watchdog is a Salt state). The rest of phase 0 runs
   beside it.
@@ -84,21 +84,25 @@ Phases gate on what they need, not on their number (D37).
 
 ## Phase 0: clean up and bootstrap (2026 Q4 into 2027 Q1)
 
-The decisions this phase was waiting on are made and live in the PRD's
-decision table. What is still undecided is in the PRD's "Open items", and
-none of it blocks this phase.
+Every decision is made and lives in the PRD's decision table. The PRD's
+"Open questions" came out of the review; none blocks this phase, and Q1 is
+worth answering during it, because it decides how ExternalDNS is set up in
+phase 1.
 
 - [ ] Salt repos (D58): `homelab-salt` public with an example pillar its CI
       renders every state against; `homelab-salt-pillar` private with the
       site's values and sops secrets; a read-only deploy key from the first
       to the second; a pillar merge dispatches the public apply workflow;
-      the environment approval rule proven on the public repo; fork pull
-      requests shown to reach neither the runners nor the key.
+      the environment approval rule proven on the public repo; a fork's
+      pull request shown to reach neither the runners nor the key; the CI
+      age key held only as a secret of the rekey workflow's environment.
 - [ ] Salt (D40): in those repos, the D29
       bootstrap script (pinned `.deb` from the GCS mirror, verified by hash,
       tested by CI in a clean Debian container, wrapped by one Ansible play
       for existing hosts); the rekey workflow, which reads the key from the
-      host and merges its own PR for a new VM under R31's guards, with one
+      host (through the hypervisor's guest agent if CI can reach it, over
+      SSH by table IP if not) and merges its own PR for a VM under R31's
+      guards, with one
       VM taken from `terraform apply` to a finished highstate untouched
       (D29); pillar decryption settled; the per-host deploy lock (R27);
       both hypervisors bootstrapped by hand; the D28 timer as the first state
@@ -119,10 +123,9 @@ none of it blocks this phase.
       intermediate signed for production and one for the rehearsal cluster.
       Not a gate: until it exists the clusters run without an internal
       issuer.
-- [ ] Wildcards out (D55): one explicit record to ocean for every name
-      nginx serves (from its `server_name` list, checked against the query
-      log for names only the wildcard answered), then the `*.home` wildcard
-      removed; the `*.cluster.local` zone and its record at `.64` deleted.
+- [ ] Wildcards out (D55): `*.home` is already gone (#1359, #1363), so this
+      is confirming on the running pair that no zone answers a wildcard,
+      and deleting the `*.cluster.local` zone and its record at `.64`.
       Through the pair gates, merged by terrac.
 - [ ] Confirm on the running pair what the role says: dns02 primary, dns01
       an AXFR secondary, and a record written through the primary's API
@@ -159,9 +162,24 @@ none of it blocks this phase.
       highstate through cloud-init, scrubs identity, templates it with
       cloud-init enabled and exports the disk to GCS with its sha512.
 - [ ] Image build proven: two clones of one image have different machine-ids,
-      host keys and age keys; the pin in `terraform-root` moves by PR after
-      the rehearsal VM comes up clean on the new image; moving it recreates
-      no existing VM (9999 stays until nothing uses it).
+      host keys and age keys; the build's last step boots a throwaway clone
+      to a clean highstate, and only then is the PR that moves the pin in
+      `terraform-root` opened; moving the pin recreates no existing VM (9999
+      stays until nothing uses it).
+- [ ] The DNS role's zone import no longer deletes and recreates a zone on
+      the primary (R9a): a static record change becomes a record-level
+      change, as `roles/dns_infrastructure/tasks/powerdns.yaml` already
+      asks for. Proven by changing one static record and finding a DHCP
+      name and a hand-made test record still there, with no REFUSED
+      answers during the apply. Through the pair gates, merged by terrac.
+      ExternalDNS does not go in before this.
+- [ ] Backup buckets (R34): versioning on, writers without delete, a
+      retention lock sized for the WAL bucket, all in `terraform-root`.
+- [ ] Checked and written into the design's assumptions table: whether a
+      PowerDNS API key can be limited to one zone (decides PRD Q1); whether
+      `sops-secrets-operator` is maintained and supports age; what
+      `homelab` does today to keep a fork's pull request off the
+      self-hosted runners.
 
 Rebuild gaps that exist today, so they do not wait for 2027:
 
@@ -184,10 +202,10 @@ closes before k3s goes onto ocean.
 
 ## Phase 1: rehearse, then k3s onto ocean (2027 Q1)
 
-The rehearsal VM (D51) takes every risk first. Ocean is touched once, in one
+The rehearsal cluster (D51) takes every risk first. Ocean is touched once, in one
 window, after the play has been through three upgrades and a restore.
 
-On the rehearsal VM:
+On the rehearsal cluster:
 
 - [ ] `vars/vars_k3s.yaml`: one version per cluster (`k3s_rehearsal_version`
       starts at stable minus 3 minors at build time; on 2026-11-09 stable is
@@ -195,11 +213,12 @@ On the rehearsal VM:
       ends), node labels, taints, `registries.yaml` mirrors to
       registry-cache-01, the bundled Traefik, ServiceLB, `local-path` and
       metrics-server disabled, kube-proxy disabled for Cilium's replacement
-      (D10), and the pod and service ranges chosen against the LAN and
-      Docker's bridge ranges on ocean and harbor.
+      (D10), `--secrets-encryption` on from the first install, and the pod
+      and service ranges chosen against the LAN and Docker's bridge ranges
+      on ocean and harbor.
 - [ ] `homelab-kube`: a root per cluster (`clusters/rehearsal`,
       `clusters/production`) and a sops key per cluster. The production key
-      never goes onto the rehearsal VM.
+      never goes onto the rehearsal cluster.
 - [ ] `terraform-root` PR: `k3s-rehearsal` and `k3s-rehearsal-agent` on
       node005's `vmpool-storage`, the same Debian major, kernel line, Docker
       version and iptables backend as ocean, each with a static IP from the
@@ -246,8 +265,22 @@ On the rehearsal VM:
       fallback decided (D50).
 - [ ] The public test name still answers after its pod is moved to another
       node and after one `cloudflared` replica is stopped, with no tunnel or
-      DNS change (on the rehearsal cluster this needs its second node, an
-      open item; otherwise it is first proven in phase 2).
+      DNS change.
+- [ ] R33, with the rehearsal server stopped: pods on the agent keep running
+      and still resolve names (a CoreDNS replica on each node, and the
+      replica count still there after a server restart); the public test
+      name still answers through the agent's `cloudflared`; the Gateway's
+      LAN address still answers, tried once with the server as the
+      announcer and once with the agent. If the address is lost either way,
+      the test is repeated with MetalLB announcing, and D10's fallback is
+      taken if that fixes it. What still fails is written into the runbook.
+- [ ] The rehearsal agent destroyed and rebuilt under its old name: what
+      the server needs removed before it lets the node back, and its
+      `local-path` volume binding again. This is harbor's D26 rebuild in
+      miniature.
+- [ ] The R29 check in CI: a production version bump of k3s, Cilium or a
+      tier 1 chart fails unless the rehearsal cluster has carried that
+      version for seven days.
 - [ ] The Gateway's address answers on 80/443 from a laptop, under a name
       ExternalDNS wrote; the record goes away when the route does; a record
       ExternalDNS did not create is left alone when a route claims its name;
@@ -255,16 +288,18 @@ On the rehearsal VM:
 - [ ] Registry fallback test: stop registry-cache-01, pull an image.
 - [ ] Renovate opens, and auto-merges, one real update on a toy app; one
       home-grown test image goes push, dispatch, values commit, sync.
-- [ ] Nightly server backup (SQLite `.backup`, token, `server/tls`) to GCS;
-      covered by `ownership-coverage.test.sh`.
+- [ ] Nightly server backup (SQLite `.backup`, token, `server/tls`, the
+      node password file), age-encrypted to terrac's key and the recovery
+      key before upload (R2), to GCS; covered by
+      `ownership-coverage.test.sh`.
 - [ ] **Upgrade 1, 2, 3** (v1.34 to v1.35 to v1.36 to v1.37, or whatever stable
       minus 3 is then). Each: check every add-on's supported Kubernetes range,
       scan for removed APIs, upgrade add-ons that must move first, bump
       `k3s_version` by PR, dispatch, record the upgrade log entry
       (`docs/operations/k3s-upgrade-log.md`).
 - [ ] **Deliberate failure and restore:** break an upgrade on purpose, then
-      restore the latest backup onto a freshly built rehearsal VM with the old
-      IP and MAC. Write `docs/operations/k3s-restore.md` from what actually
+      restore the latest backup onto a freshly built rehearsal server with the
+      old IP and MAC, and have its agent rejoin. Write `docs/operations/k3s-restore.md` from what actually
       happened.
 - [ ] **Upgrade backout in place:** after one of the upgrades, stop k3s, put
       the previous binary back, restore the pre-upgrade database copy, start,
@@ -273,8 +308,8 @@ On the rehearsal VM:
 - [ ] **Install backout:** `k3s-uninstall.sh` plus Cilium's cleanup with
       Docker running; the Docker gate passes afterwards, with a reboot only
       if it has to be part of the procedure.
-- [ ] kured on this cluster reboots its node in the D38 window (D54 keeps it
-      off ocean and harbor).
+- [ ] kured on this cluster reboots its nodes, one at a time, in the D38
+      window (D54 keeps it off ocean and harbor).
 - [ ] Phase 1 rows of the design's "Assumptions to verify" checked and dated.
 
 On ocean, once the boxes above are checked and phase 0's full gate is closed:
@@ -293,19 +328,22 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
       `/data01` mount guard on the k3s unit (R17). The Docker gate passes
       before the window starts, after the install, and after the reboot.
       Backout (`k3s-uninstall.sh`, restart Docker, gate again) tested on the
-      rehearsal VM beforehand.
+      rehearsal cluster beforehand.
 - [ ] Argo CD and the tier 1 platform on ocean from `homelab-kube`, the same
-      charts the rehearsal VM ran. The production pool and the Gateway on
+      charts the rehearsal cluster ran. The production pool and the Gateway on
       its address, the `/data01` local PVs.
 - [ ] ExternalDNS on production (D55), with the `homelab-kube` CI check
       that refuses a hostname in the address table. Then the handover: each
-      static service record from phase 0 becomes a `DNSEndpoint` still
-      pointing at ocean, a few at a time, and its static entry is removed.
-      No name changes its answer in this step.
+      name in the DNS role's `nginx_lb_vhosts` becomes a `DNSEndpoint` still
+      pointing at `nginx.home`, a few at a time, and leaves that list.
+      `nginx-vhosts-have-dns.test.sh` is changed first so a vhost may have
+      its record in either place. No name changes its answer in this step,
+      and each is checked on both DNS servers after it moves.
 - [ ] The cluster tunnel (D20): tunnel, catch-all rule and credentials in
       `terraform-root`; `cloudflared` on production as a Deployment; the
       Cloudflare ExternalDNS instance with a token scoped to DNS edit on the
-      zones in use; the CI check that a public hostname needs its label.
+      zones in use and a domain filter; the CI checks that a public hostname
+      needs its label, and an Access app or a stated reason to have none.
       Then the public handover: each public service record removed from
       `terraform-root` state (not destroyed) and recreated as a
       `DNSEndpoint` still pointing at ocean's tunnel.
@@ -319,8 +357,9 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
 - [ ] Alloy in the cluster: metrics by remote write to ocean's Prometheus,
       pod logs to ocean's Loki (R16); blackbox probes for the API and each
       test app.
-- [ ] Cluster access (R28): terrac's kubeconfig on the laptop and agentbox,
-      the agents' read-only ServiceAccount, the CI sync token.
+- [ ] Cluster access (R28): terrac's kubeconfig on the laptop (and on
+      agentbox only as PRD Q6 is answered), the agents' read-only
+      ServiceAccount, the CI sync token.
 - [ ] ntfy moved to agentbox (tier 0); it never enters the cluster (D19).
       Its name moves with it, so a push does not travel through ocean: the
       LAN record through the pair gates, and a tunnel that ends on agentbox
@@ -332,7 +371,7 @@ On ocean, once the boxes above are checked and phase 0's full gate is closed:
       minutes (R30), so ocean's monthly window does not page.
 - [ ] 14-day soak.
 
-The rehearsal VM stays after the gate: every later upgrade runs there first
+The rehearsal cluster stays after the gate: every later upgrade runs there first
 (R29).
 
 **Gate:** PRD phase 1 acceptance.
@@ -342,11 +381,11 @@ The rehearsal VM stays after the gate: every later upgrade runs there first
 Written as Salt states from the start (D40), not in Ansible and then ported.
 
 - [ ] `unattended-upgrades` (security origin only) on ocean, harbor and the
-      rehearsal VM; package holds for kernel, NVIDIA and ZFS where they apply.
+      rehearsal cluster; package holds for kernel, NVIDIA and ZFS where they apply.
 - [ ] kured on both clusters, Wednesday 03:00 to 05:00 Pacific (D38), one
       node at a time. Ocean is excluded for good (D22) and harbor until its
       Docker is gone (D54), so in production it does nothing until the end
-      of phase 2. Its first real reboots are of the rehearsal VM.
+      of phase 2. Its first real reboots are of the rehearsal cluster.
 - [ ] Textfile metrics: pending security updates, `reboot-required`; alerts at
       7 and 14 days, with ocean's reboot alert at 35 (a missed monthly
       window, D22).
@@ -364,6 +403,9 @@ become pods on it one at a time, through the same cutover workflow ocean's
 services use (first box of phase 4, which therefore lands before the first
 cutover here).
 
+- [ ] Before the join: harbor's memory and CPU measured against what the
+      agent, Cilium, a CoreDNS replica, `cloudflared` and its own services
+      as pods will need; a resize is a `terraform-root` PR.
 - [ ] Join window: k3s agent on harbor beside Docker, with its role label,
       excluded from kured. The Docker gate passes before the join, after it,
       and after a reboot. Backout: `k3s-agent-uninstall.sh` and Cilium's
@@ -398,6 +440,9 @@ cutover here).
       operand image that ships pgvector; `mem0.terrac.com` moves to the
       cluster tunnel in the same commit. Monthly mem0 scratch recovery scheduled
       and passed once.
+- [ ] R33 on production, in ocean's next monthly window: with ocean down,
+      harbor's services keep running and resolving, `mem0.terrac.com`
+      answers, and the LAN names answer or the gap is on record.
 - [ ] Docker removed from harbor after the last soak.
 - [ ] harbor enters kured's rota (D54). A kured drain and reboot of harbor
       completes with all three databases on it.
@@ -450,7 +495,9 @@ probes, alert rules and panels, with the
 Docker gate before and after (R32) -> 14-day
 soak (D45) with the image frozen and `back` as the backout -> `homelab` PR
 removes the play, files, port entry and vault keys -> `homelab-kube` PR moves
-the service to its own uid and a `0700` state directory (R26).
+the service to its own uid and a `0700` state directory (R26), after a dump
+of its database and a copy of its config, since a recursive `chown` does
+not revert with the commit.
 Database services: the `db-backup` entry becomes a CronJob writing the same
 GCS object name, verified with `db_restore_test.yaml`.
 
@@ -474,7 +521,9 @@ what is left here:
       cluster; the host exporters as DaemonSets, each taking its port only
       when the Docker one has stopped, node-exporter with the host's
       textfile directory mounted; TSDB and Loki on ocean local disk. Scrape configs become
-      ServiceMonitors. Old file-based scrape config retires.
+      ServiceMonitors. Old file-based scrape config retires. Alertmanager
+      as a pod still mails through the exim on the ocean host, which is
+      set to accept the pod network and tested by stopping agentbox again.
 - [ ] W7: the last names leave ocean; then ocean's tunnel (a
       `terraform-root` PR), Docker nginx and certbot retire. Every route and
       cert has carried traffic since its own cutover. fail2ban's nginx jails get a Gateway log source or are
@@ -482,7 +531,8 @@ what is left here:
       removed.
       Cilium host firewall in
       audit mode, enforced after a clean week (port 22 rules: terrac approves).
-- [ ] Docker removed from ocean.
+- [ ] Docker removed from ocean, and then from the rehearsal pair, so it
+      keeps matching what it rehearses for.
 
 ## Phase 6: Salt takes the hosts (parallel, 2027 Q1 to 2028 H1)
 
@@ -511,7 +561,9 @@ The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
       listed and homed, one vzdump to node005's `vmpool-storage`, destroy,
       recreate from the golden image, clean highstate, dump deleted after
       two clean weeks. Order: llmeval, registry-cache-01, the runners one at
-      a time, netboot01, pihole, agentbox, harbor. Never ocean.
+      a time, netboot01, pihole, agentbox, harbor. harbor is drained first
+      and rejoins under its own node name, by the procedure the rehearsal
+      agent's rebuild proved. Never ocean.
 - [ ] k3s install and upgrade (after phase 1's drill, using the play that
       survived it as the reference). One install and one upgrade on the rehearsal
       VM under Salt before the real cluster.
@@ -523,7 +575,11 @@ The repo, the bootstrap script and the rekey workflow are phase 0 boxes (D40).
       via `pvesm`, the D28 timer, NUT, exporters. Network bridges rendered,
       `test=True` in CI, applied by terrac with the iDRAC console open.
 - [ ] DNS `rebuild_peer` mode (D33) built and drilled on the isolated test
-      pair (a sixth drill: delete a test peer, rebuild it, survivor untouched).
+      pair (a sixth drill: delete a test peer, rebuild it, survivor
+      untouched), once for each role. The rebuilt primary pulls its zones
+      from the secondary before git's records go on top, and a DHCP name
+      and a service name are both still there afterwards. The same pair
+      shows how long a secondary serves a zone with its primary gone.
 - [ ] DNS and DHCP (D25), in this order:
   - [ ] Address table in pillar; CI check against `terraform-root` VM MACs.
   - [ ] Merge control: no auto-merge on DNS, DHCP, resolver, address table
